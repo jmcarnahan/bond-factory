@@ -1,0 +1,821 @@
+{
+ "schema": "bond.roof_model/0.1",
+ "generated_at": "2026-11-07T00:00:00Z",
+ "address": {
+  "line1": "12 Test Ln",
+  "city": "Testville",
+  "state": "CA",
+  "zip": "90000",
+  "formatted": "12 TEST LN, TESTVILLE, CA, 90000"
+ },
+ "origin": {
+  "lat": 0.0,
+  "lng": 0.0
+ },
+ "north_deg": 0,
+ "units": "ft",
+ "source": {
+  "method": "lidar_skeleton",
+  "footprint": {
+   "provider": "test",
+   "id": "1",
+   "area_sqft": 1920.0
+  },
+  "lidar": {
+   "project": "TEST_1",
+   "acquired": "2023-10-03/2023-12-08",
+   "points_on_roof": 1000,
+   "density_per_m2": 19.0
+  },
+  "solar": null
+ },
+ "blocks": [
+  {
+   "id": "b1",
+   "form": "flat",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     40,
+     0
+    ],
+    [
+     40,
+     30
+    ],
+    [
+     0,
+     30
+    ]
+   ],
+   "pitch_rise": 0.0,
+   "gable_edges": []
+  },
+  {
+   "id": "b2",
+   "form": "hip",
+   "polygon": [
+    [
+     40,
+     0
+    ],
+    [
+     70,
+     0
+    ],
+    [
+     70,
+     24
+    ],
+    [
+     40,
+     24
+    ]
+   ],
+   "pitch_rise": 6.0,
+   "gable_edges": []
+  },
+  {
+   "id": "b3",
+   "form": "hip",
+   "polygon": [
+    [
+     52,
+     24
+    ],
+    [
+     58,
+     24
+    ],
+    [
+     58,
+     28
+    ],
+    [
+     52,
+     28
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "gable_edges": []
+  }
+ ],
+ "facets": [
+  {
+   "id": "f1",
+   "block": "b1",
+   "kind": "flat",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     40,
+     0
+    ],
+    [
+     40,
+     30
+    ],
+    [
+     0,
+     30
+    ]
+   ],
+   "pitch_rise": 0.0,
+   "aspect_deg": null,
+   "plan_area_sqft": 1187.0,
+   "area_sqft": 1187.0
+  },
+  {
+   "id": "f2",
+   "block": "b2",
+   "kind": "sloped",
+   "polygon": [
+    [
+     40,
+     0
+    ],
+    [
+     70,
+     0
+    ],
+    [
+     58.0,
+     12.0
+    ],
+    [
+     52.0,
+     12.0
+    ]
+   ],
+   "pitch_rise": 6.0,
+   "aspect_deg": 180,
+   "plan_area_sqft": 216.0,
+   "area_sqft": 241.4953
+  },
+  {
+   "id": "f3",
+   "block": "b2",
+   "kind": "sloped",
+   "polygon": [
+    [
+     70,
+     0
+    ],
+    [
+     70,
+     24
+    ],
+    [
+     58.0,
+     12.0
+    ]
+   ],
+   "pitch_rise": 6.0,
+   "aspect_deg": 90,
+   "plan_area_sqft": 144.0,
+   "area_sqft": 160.9969
+  },
+  {
+   "id": "f4",
+   "block": "b2",
+   "kind": "sloped",
+   "polygon": [
+    [
+     70,
+     24
+    ],
+    [
+     40,
+     24
+    ],
+    [
+     52.0,
+     12.0
+    ],
+    [
+     58.0,
+     12.0
+    ]
+   ],
+   "pitch_rise": 6.0,
+   "aspect_deg": 0,
+   "plan_area_sqft": 216.0,
+   "area_sqft": 241.4953
+  },
+  {
+   "id": "f5",
+   "block": "b2",
+   "kind": "sloped",
+   "polygon": [
+    [
+     40,
+     24
+    ],
+    [
+     40,
+     0
+    ],
+    [
+     52.0,
+     12.0
+    ]
+   ],
+   "pitch_rise": 6.0,
+   "aspect_deg": 270,
+   "plan_area_sqft": 144.0,
+   "area_sqft": 160.9969
+  },
+  {
+   "id": "f6",
+   "block": "b3",
+   "kind": "sloped",
+   "polygon": [
+    [
+     52,
+     24
+    ],
+    [
+     58,
+     24
+    ],
+    [
+     56.0,
+     26.0
+    ],
+    [
+     54.0,
+     26.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 180,
+   "plan_area_sqft": 8.0,
+   "area_sqft": 8.4327
+  },
+  {
+   "id": "f7",
+   "block": "b3",
+   "kind": "sloped",
+   "polygon": [
+    [
+     58,
+     24
+    ],
+    [
+     58,
+     28
+    ],
+    [
+     56.0,
+     26.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 90,
+   "plan_area_sqft": 4.0,
+   "area_sqft": 4.2164
+  },
+  {
+   "id": "f8",
+   "block": "b3",
+   "kind": "sloped",
+   "polygon": [
+    [
+     58,
+     28
+    ],
+    [
+     52,
+     28
+    ],
+    [
+     54.0,
+     26.0
+    ],
+    [
+     56.0,
+     26.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 0,
+   "plan_area_sqft": 8.0,
+   "area_sqft": 8.4327
+  },
+  {
+   "id": "f9",
+   "block": "b3",
+   "kind": "sloped",
+   "polygon": [
+    [
+     52,
+     28
+    ],
+    [
+     52,
+     24
+    ],
+    [
+     54.0,
+     26.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 270,
+   "plan_area_sqft": 4.0,
+   "area_sqft": 4.2164
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "type": "parapet",
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     40,
+     0
+    ]
+   ],
+   "length_ft": 40.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e2",
+   "type": "parapet",
+   "points": [
+    [
+     40,
+     30
+    ],
+    [
+     0,
+     30
+    ]
+   ],
+   "length_ft": 40.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e3",
+   "type": "parapet",
+   "points": [
+    [
+     0,
+     30
+    ],
+    [
+     0,
+     0
+    ]
+   ],
+   "length_ft": 30.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e4",
+   "type": "parapet",
+   "points": [
+    [
+     40,
+     30
+    ],
+    [
+     40,
+     24
+    ]
+   ],
+   "length_ft": 6.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e5",
+   "type": "eave",
+   "points": [
+    [
+     40,
+     0
+    ],
+    [
+     70,
+     0
+    ]
+   ],
+   "length_ft": 30.0,
+   "facets": [
+    "f2"
+   ]
+  },
+  {
+   "id": "e6",
+   "type": "eave",
+   "points": [
+    [
+     70,
+     0
+    ],
+    [
+     70,
+     24
+    ]
+   ],
+   "length_ft": 24.0,
+   "facets": [
+    "f3"
+   ]
+  },
+  {
+   "id": "e7",
+   "type": "eave",
+   "points": [
+    [
+     70,
+     24
+    ],
+    [
+     40,
+     24
+    ]
+   ],
+   "length_ft": 30.0,
+   "facets": [
+    "f4"
+   ]
+  },
+  {
+   "id": "e8",
+   "type": "step_flashing",
+   "points": [
+    [
+     40,
+     24
+    ],
+    [
+     40,
+     0
+    ]
+   ],
+   "length_ft": 24.0,
+   "facets": [
+    "f5"
+   ]
+  },
+  {
+   "id": "e9",
+   "type": "ridge",
+   "points": [
+    [
+     52.0,
+     12.0
+    ],
+    [
+     58.0,
+     12.0
+    ]
+   ],
+   "length_ft": 6.0,
+   "facets": [
+    "f2",
+    "f4"
+   ]
+  },
+  {
+   "id": "e10",
+   "type": "hip",
+   "points": [
+    [
+     40,
+     0
+    ],
+    [
+     52.0,
+     12.0
+    ]
+   ],
+   "length_ft": 18.0,
+   "facets": [
+    "f2",
+    "f5"
+   ]
+  },
+  {
+   "id": "e11",
+   "type": "hip",
+   "points": [
+    [
+     70,
+     0
+    ],
+    [
+     58.0,
+     12.0
+    ]
+   ],
+   "length_ft": 18.0,
+   "facets": [
+    "f2",
+    "f3"
+   ]
+  },
+  {
+   "id": "e12",
+   "type": "hip",
+   "points": [
+    [
+     70,
+     24
+    ],
+    [
+     58.0,
+     12.0
+    ]
+   ],
+   "length_ft": 18.0,
+   "facets": [
+    "f3",
+    "f4"
+   ]
+  },
+  {
+   "id": "e13",
+   "type": "hip",
+   "points": [
+    [
+     40,
+     24
+    ],
+    [
+     52.0,
+     12.0
+    ]
+   ],
+   "length_ft": 18.0,
+   "facets": [
+    "f4",
+    "f5"
+   ]
+  },
+  {
+   "id": "e14",
+   "type": "step_flashing",
+   "points": [
+    [
+     52,
+     24
+    ],
+    [
+     58,
+     24
+    ]
+   ],
+   "length_ft": 6.0,
+   "facets": [
+    "f6"
+   ]
+  },
+  {
+   "id": "e15",
+   "type": "eave",
+   "points": [
+    [
+     58,
+     24
+    ],
+    [
+     58,
+     28
+    ]
+   ],
+   "length_ft": 4.0,
+   "facets": [
+    "f7"
+   ]
+  },
+  {
+   "id": "e16",
+   "type": "eave",
+   "points": [
+    [
+     58,
+     28
+    ],
+    [
+     52,
+     28
+    ]
+   ],
+   "length_ft": 6.0,
+   "facets": [
+    "f8"
+   ]
+  },
+  {
+   "id": "e17",
+   "type": "eave",
+   "points": [
+    [
+     52,
+     28
+    ],
+    [
+     52,
+     24
+    ]
+   ],
+   "length_ft": 4.0,
+   "facets": [
+    "f9"
+   ]
+  },
+  {
+   "id": "e18",
+   "type": "ridge",
+   "points": [
+    [
+     54.0,
+     26.0
+    ],
+    [
+     56.0,
+     26.0
+    ]
+   ],
+   "length_ft": 2.0,
+   "facets": [
+    "f6",
+    "f8"
+   ]
+  },
+  {
+   "id": "e19",
+   "type": "hip",
+   "points": [
+    [
+     52,
+     24
+    ],
+    [
+     54.0,
+     26.0
+    ]
+   ],
+   "length_ft": 2.9059,
+   "facets": [
+    "f6",
+    "f9"
+   ]
+  },
+  {
+   "id": "e20",
+   "type": "hip",
+   "points": [
+    [
+     58,
+     24
+    ],
+    [
+     56.0,
+     26.0
+    ]
+   ],
+   "length_ft": 2.9059,
+   "facets": [
+    "f6",
+    "f7"
+   ]
+  },
+  {
+   "id": "e21",
+   "type": "hip",
+   "points": [
+    [
+     58,
+     28
+    ],
+    [
+     56.0,
+     26.0
+    ]
+   ],
+   "length_ft": 2.9059,
+   "facets": [
+    "f7",
+    "f8"
+   ]
+  },
+  {
+   "id": "e22",
+   "type": "hip",
+   "points": [
+    [
+     52,
+     28
+    ],
+    [
+     54.0,
+     26.0
+    ]
+   ],
+   "length_ft": 2.9059,
+   "facets": [
+    "f8",
+    "f9"
+   ]
+  }
+ ],
+ "holes": [
+  {
+   "id": "h1",
+   "kind": "skylight",
+   "polygon": [
+    [
+     10,
+     10
+    ],
+    [
+     13,
+     10
+    ],
+    [
+     13,
+     13
+    ],
+    [
+     10,
+     13
+    ]
+   ],
+   "area_sqft": 9.0
+  },
+  {
+   "id": "h2",
+   "kind": "chimney",
+   "polygon": [
+    [
+     25,
+     20
+    ],
+    [
+     27,
+     20
+    ],
+    [
+     27,
+     22
+    ],
+    [
+     25,
+     22
+    ]
+   ],
+   "area_sqft": 4.0
+  }
+ ],
+ "totals": {
+  "total_area_sqft": 2017.2826,
+  "pitched_area_sqft": 830.2826,
+  "flat_area_sqft": 1187.0,
+  "predominant_pitch_rise": 0.0,
+  "predominant_pitch_area_sqft": 1187.0,
+  "squares": 20.172826,
+  "lengths_ft": {
+   "eave": 98.0,
+   "rake": 0,
+   "ridge": 8.0,
+   "hip": 83.6236,
+   "valley": 0,
+   "step_flashing": 30.0,
+   "wall_flashing": 0,
+   "parapet": 116.0,
+   "transition": 0,
+   "unspecified": 0
+  }
+ },
+ "confidence": {
+  "overall": "medium",
+  "notes": [
+   "Parapet assigned by rule.",
+   "Porch pitch assumed."
+  ]
+ },
+ "warnings": [
+  "Tree canopy overhangs the south edge."
+ ]
+}

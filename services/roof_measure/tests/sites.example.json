@@ -1,0 +1,30 @@
+{
+  "_comment": "Copy to <repo>/local/sites.json (untracked) and fill in real values. Tests that need it skip when it is absent.",
+  "site1": {
+    "line1": "Street address line 1",
+    "city": "City",
+    "state": "Two-letter state",
+    "zip": "ZIP code",
+    "formatted": "Census-style upper-case one-line address that geocode.geocode() should return",
+    "origin": {"lat": 0.0, "lng": 0.0},
+    "geocode_point": {"lat": 0.0, "lon": 0.0},
+    "footprint_id": "Building outline id the county layer returns for this address",
+    "parcel_id": "Parcel id (AIN) of this address in parcels_site1_60m.geojson",
+    "lidar_box_center": {"lat": 0.0, "lon": 0.0},
+    "parcel_tests": {
+      "near_neighbor_point": {"lat": 0.0, "lon": 0.0},
+      "neighbor_line1": "104 Example Ave",
+      "missing_line1": "999 Example Ave",
+      "truth_point": {"lat": 0.0, "lon": 0.0}
+    }
+  },
+  "_keys": {
+    "origin": "SW corner of the footprint bbox, as written in the truth fixture",
+    "geocode_point": "Exact coordinates the recorded Census response contains (census_site1.json)",
+    "lidar_box_center": "Centre of the 20 m LiDAR box used by the live network test",
+    "parcel_tests.near_neighbor_point": "A point in front of the neighbour, nearest to a different parcel than the target",
+    "parcel_tests.neighbor_line1": "Address of the neighbouring parcel (house number 104) that must resolve to its own parcel",
+    "parcel_tests.missing_line1": "Address with a house number that exists on no parcel (999), expected to fall back to nearest",
+    "parcel_tests.truth_point": "Truth-fixture origin, used as the query point for footprint selection"
+  }
+}

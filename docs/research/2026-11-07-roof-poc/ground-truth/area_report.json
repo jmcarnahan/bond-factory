@@ -1,0 +1,357 @@
+{
+ "source": "IMG_0229.JPG, page 4 \"Area measurement report\", same address, prepared by Roofr",
+ "says": {
+  "totals_sqft": {
+   "total_roof_area": 5405,
+   "pitched": 1200,
+   "flat": 4205,
+   "two_story": 0,
+   "two_layer": 0,
+   "predominant_pitch": "0/12",
+   "predominant_pitch_area": 4205,
+   "unspecified_pitch_area": 0
+  },
+  "header_px": {
+   "total": [
+    165,
+    306
+   ],
+   "pitched": [
+    165,
+    341
+   ],
+   "flat": [
+    165,
+    371
+   ],
+   "two_story": [
+    165,
+    404
+   ],
+   "two_layer": [
+    165,
+    436
+   ],
+   "predominant_pitch": [
+    703,
+    290
+   ]
+  },
+  "footnote": "\"Area measurements in diagram are rounded. The totals at the top of the page are the sums of the exact measurements, which are then rounded. Deleted facets (skylights, chimneys, etc.) are designated with a dashed line and are excluded from the calculations.\"",
+  "handwritten": [
+   {
+    "text": "Re stack",
+    "where": "right of \"Pitched roof area: 1200 sqft\", px ~(545,330)",
+    "confidence_pct": 85
+   },
+   {
+    "text": "Tear off",
+    "where": "right of \"Flat roof area: 4205 sqft\", px ~(510,368)",
+    "confidence_pct": 90
+   },
+   {
+    "text": "Tile",
+    "where": "across the hip section, px ~(390,892)",
+    "confidence_pct": 95
+   },
+   {
+    "text": "Tile",
+    "where": "under awning 82, px ~(577,1225)",
+    "confidence_pct": 95
+   },
+   {
+    "text": "Tile",
+    "where": "under awning 87, px ~(757,1221)",
+    "confidence_pct": 95
+   },
+   {
+    "text": "Tile",
+    "where": "under awning 86, px ~(988,1224)",
+    "confidence_pct": 95
+   },
+   {
+    "text": "a small star/asterisk mark left of the Pitched line",
+    "where": "px ~(148,343)",
+    "confidence_pct": 60
+   }
+  ],
+  "compass": "N up (rose bottom-right px ~(1385,1540))",
+  "facets": [
+   {
+    "id": "hip_N",
+    "label_text": "300",
+    "area_sqft": 300,
+    "roof_type": "pitched",
+    "shape": "trapezoid (north hip facet, wide edge on the 35 ft north eave)",
+    "label_px": [
+     384,
+     856
+    ],
+    "material": "Tile",
+    "pos": "top-left hip section, north triangle/trapezoid",
+    "frac_of_page": {
+     "x": 0.256,
+     "y": 0.428
+    }
+   },
+   {
+    "id": "hip_W",
+    "label_text": "169",
+    "area_sqft": 169,
+    "roof_type": "pitched",
+    "shape": "triangle (west hip end)",
+    "label_px": [
+     293,
+     870
+    ],
+    "material": "Tile",
+    "pos": "west end of hip section; skylight/chimney pair sits on it so area is net of the openings",
+    "frac_of_page": {
+     "x": 0.195,
+     "y": 0.435
+    }
+   },
+   {
+    "id": "hip_E",
+    "label_text": "190",
+    "area_sqft": 190,
+    "roof_type": "pitched",
+    "shape": "triangle (east hip end)",
+    "label_px": [
+     461,
+     893
+    ],
+    "material": "Tile",
+    "pos": "east end of hip section",
+    "frac_of_page": {
+     "x": 0.307,
+     "y": 0.447
+    }
+   },
+   {
+    "id": "hip_S",
+    "label_text": "289",
+    "area_sqft": 289,
+    "roof_type": "pitched",
+    "shape": "trapezoid (south hip facet, south eave jogs)",
+    "label_px": [
+     377,
+     939
+    ],
+    "material": "Tile",
+    "pos": "south of hip section, above Flat 151",
+    "frac_of_page": {
+     "x": 0.251,
+     "y": 0.469
+    }
+   },
+   {
+    "id": "flat151",
+    "label_text": "Flat 151",
+    "area_sqft": 151,
+    "roof_type": "flat",
+    "shape": "rectangle about 22 x 7 ft",
+    "label_px": [
+     423,
+     1001
+    ],
+    "material": "Tear off",
+    "pos": "directly south of the hip section, one skylight inside",
+    "frac_of_page": {
+     "x": 0.282,
+     "y": 0.5
+    }
+   },
+   {
+    "id": "flat2121",
+    "label_text": "Flat 2,121",
+    "area_sqft": 2121,
+    "roof_type": "flat",
+    "shape": "irregular rectilinear polygon (about 23 vertices) wrapping Flat 151 on its south and east sides, long E-W strip with north steps and south notches for the awnings",
+    "label_px": [
+     464,
+     1097
+    ],
+    "material": "Tear off",
+    "pos": "whole west and middle of the building, 7 dashed openings",
+    "frac_of_page": {
+     "x": 0.309,
+     "y": 0.548
+    }
+   },
+   {
+    "id": "flat1013",
+    "label_text": "Flat 1,013",
+    "area_sqft": 1013,
+    "roof_type": "flat",
+    "shape": "roughly 35 x 29 ft polygon with a stepped SE corner",
+    "label_px": [
+     1054,
+     830
+    ],
+    "material": "Tear off",
+    "pos": "north-east block",
+    "frac_of_page": {
+     "x": 0.703,
+     "y": 0.415
+    }
+   },
+   {
+    "id": "flat922",
+    "label_text": "Flat 922",
+    "area_sqft": 922,
+    "roof_type": "flat",
+    "shape": "roughly 31 x 25 ft rectangle plus a small western lobe about 11 x 8 ft (inferred, the lobe has no label of its own)",
+    "label_px": [
+     1097,
+     1068
+    ],
+    "material": "Tear off",
+    "pos": "south-east block",
+    "frac_of_page": {
+     "x": 0.731,
+     "y": 0.534
+    }
+   },
+   {
+    "id": "awning_82",
+    "label_text": "82",
+    "area_sqft": 82,
+    "roof_type": "pitched",
+    "shape": "rectangle about 7.5 x 11 ft",
+    "label_px": [
+     568,
+     1143
+    ],
+    "material": "Tile",
+    "pos": "south edge, west awning",
+    "frac_of_page": {
+     "x": 0.379,
+     "y": 0.572
+    }
+   },
+   {
+    "id": "awning_87",
+    "label_text": "87",
+    "area_sqft": 87,
+    "roof_type": "pitched",
+    "shape": "rectangle about 8 x 11 ft",
+    "label_px": [
+     749,
+     1132
+    ],
+    "material": "Tile",
+    "pos": "south edge, middle awning",
+    "frac_of_page": {
+     "x": 0.499,
+     "y": 0.566
+    }
+   },
+   {
+    "id": "awning_86",
+    "label_text": "86",
+    "area_sqft": 86,
+    "roof_type": "pitched",
+    "shape": "rectangle about 8 x 11 ft",
+    "label_px": [
+     968,
+     1125
+    ],
+    "material": "Tile",
+    "pos": "south edge, east awning",
+    "frac_of_page": {
+     "x": 0.645,
+     "y": 0.562
+    }
+   }
+  ],
+  "dashed_excluded_shapes": {
+   "count": 17,
+   "full_rectangles": 14,
+   "small_attached_pieces": 3,
+   "centres_page4_px": [
+    [
+     283,
+     916
+    ],
+    [
+     310,
+     916
+    ],
+    [
+     371,
+     1018
+    ],
+    [
+     352,
+     1115
+    ],
+    [
+     376,
+     1115
+    ],
+    [
+     612,
+     994
+    ],
+    [
+     727,
+     997
+    ],
+    [
+     900,
+     1003
+    ],
+    [
+     911,
+     1101
+    ],
+    [
+     1001,
+     892
+    ],
+    [
+     1126,
+     860
+    ],
+    [
+     1150,
+     860
+    ],
+    [
+     1054,
+     970
+    ],
+    [
+     1118,
+     966
+    ],
+    [
+     1026,
+     1031
+    ],
+    [
+     1177,
+     1066
+    ],
+    [
+     1203,
+     1066
+    ]
+   ],
+   "note": "same openings as page 3; no area printed for them"
+  }
+ },
+ "infers": {
+  "material_to_area": "Tile = the four hip facets plus three awnings (1203 sq ft) which Roofr calls pitched; Re stack is the owner or estimator note for the pitched area; Tear off for the flat area.",
+  "predominant_pitch_zero": "0/12 only describes the flat area; Roofr prints no pitch for the pitched 1200 sq ft, which is why Unspecified pitch is 0 yet no 4/12 style entry shows. Pitch of the hip is not on the report.",
+  "lobe": "The small unlabelled lobe west of the 86 awning is not a labelled facet, so I fold it into Flat 922 (its polygon boundary is flat-to-flat teal on three sides)."
+ },
+ "uncertain_readings": [
+  "289 (85 percent; could be 280 or 288)",
+  "169 (90 percent)",
+  "2,121 (90 percent)",
+  "handwritten Re stack (85 percent)",
+  "dashed count 17 plus or minus 1"
+ ]
+}

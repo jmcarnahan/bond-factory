@@ -1,0 +1,75 @@
+# --- Dart / Flutter ---
+.dart_tool/
+# Unanchored on purpose: standard Flutter build output at any depth.
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+coverage/
+.fvm/
+pubspec_overrides.yaml
+# Only the workspace root lockfile is committed.
+**/pubspec.lock
+!/pubspec.lock
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Pods/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/macos/Flutter/ephemeral/
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+services/*/out/
+services/*/cache/
+packages/*/example/out/
+
+# --- Generated (copied from fixtures/ by demos/*/tool/sync_fixtures.sh) ---
+demos/*/assets/fixtures/*.json
+
+# --- Large data (point clouds, rasters) is never committed ---
+*.laz
+*.las
+*.npz
+*.tif
+*.tiff
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+/**/service-account*.json
+!fixtures/**/service-account*.json
+!**/test/**/service-account*.json
+!**/tests/**/service-account*.json
+
+# --- Local scratch ---
+/local/
+/tmp/
+*.log
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+# per-user editor settings
+.vscode/
+
+# --- Claude Code (per-user) ---
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md

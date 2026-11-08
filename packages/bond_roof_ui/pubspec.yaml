@@ -1,0 +1,21 @@
+name: bond_roof_ui
+description: Flutter widgets that draw roof diagram scenes, print and share them.
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  bond_roof:
+    path: ../bond_roof
+  printing: ^5.15.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  assets:
+    - assets/fonts/Roboto-Regular.ttf
