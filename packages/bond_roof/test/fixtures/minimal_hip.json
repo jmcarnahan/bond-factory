@@ -1,0 +1,351 @@
+{
+ "schema": "bond.roof_model/0.1",
+ "generated_at": "2026-11-07T00:00:00Z",
+ "address": {
+  "line1": "12 Test Ln",
+  "city": "Testville",
+  "state": "CA",
+  "zip": "90000",
+  "formatted": "12 TEST LN, TESTVILLE, CA, 90000"
+ },
+ "origin": {
+  "lat": 0.0,
+  "lng": 0.0
+ },
+ "north_deg": 0,
+ "units": "ft",
+ "source": {
+  "method": "fixture",
+  "footprint": null,
+  "lidar": null,
+  "solar": null
+ },
+ "blocks": [
+  {
+   "id": "b1",
+   "form": "hip",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     35,
+     0
+    ],
+    [
+     35,
+     26
+    ],
+    [
+     0,
+     26
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "ridge_azimuth_deg": 90,
+   "gable_edges": [],
+   "eave_height_ft": 10.0,
+   "plan_area_sqft": 910.0
+  }
+ ],
+ "facets": [
+  {
+   "id": "f1",
+   "block": "b1",
+   "kind": "sloped",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     35,
+     0
+    ],
+    [
+     22.0,
+     13.0
+    ],
+    [
+     13.0,
+     13.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 180,
+   "plan_area_sqft": 286.0,
+   "area_sqft": 301.4705
+  },
+  {
+   "id": "f2",
+   "block": "b1",
+   "kind": "sloped",
+   "polygon": [
+    [
+     35,
+     0
+    ],
+    [
+     35,
+     26
+    ],
+    [
+     22.0,
+     13.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 90,
+   "plan_area_sqft": 169.0,
+   "area_sqft": 178.1416
+  },
+  {
+   "id": "f3",
+   "block": "b1",
+   "kind": "sloped",
+   "polygon": [
+    [
+     35,
+     26
+    ],
+    [
+     0,
+     26
+    ],
+    [
+     13.0,
+     13.0
+    ],
+    [
+     22.0,
+     13.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 0,
+   "plan_area_sqft": 286.0,
+   "area_sqft": 301.4705
+  },
+  {
+   "id": "f4",
+   "block": "b1",
+   "kind": "sloped",
+   "polygon": [
+    [
+     0,
+     26
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     13.0,
+     13.0
+    ]
+   ],
+   "pitch_rise": 4.0,
+   "aspect_deg": 270,
+   "plan_area_sqft": 169.0,
+   "area_sqft": 178.1416
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "type": "eave",
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     35,
+     0
+    ]
+   ],
+   "length_ft": 35.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e2",
+   "type": "eave",
+   "points": [
+    [
+     35,
+     0
+    ],
+    [
+     35,
+     26
+    ]
+   ],
+   "length_ft": 26.0,
+   "facets": [
+    "f2"
+   ]
+  },
+  {
+   "id": "e3",
+   "type": "eave",
+   "points": [
+    [
+     35,
+     26
+    ],
+    [
+     0,
+     26
+    ]
+   ],
+   "length_ft": 35.0,
+   "facets": [
+    "f3"
+   ]
+  },
+  {
+   "id": "e4",
+   "type": "eave",
+   "points": [
+    [
+     0,
+     26
+    ],
+    [
+     0,
+     0
+    ]
+   ],
+   "length_ft": 26.0,
+   "facets": [
+    "f4"
+   ]
+  },
+  {
+   "id": "e5",
+   "type": "ridge",
+   "points": [
+    [
+     13.0,
+     13.0
+    ],
+    [
+     22.0,
+     13.0
+    ]
+   ],
+   "length_ft": 9.0,
+   "facets": [
+    "f1",
+    "f3"
+   ]
+  },
+  {
+   "id": "e6",
+   "type": "hip",
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     13.0,
+     13.0
+    ]
+   ],
+   "length_ft": 18.8886,
+   "facets": [
+    "f1",
+    "f4"
+   ]
+  },
+  {
+   "id": "e7",
+   "type": "hip",
+   "points": [
+    [
+     35,
+     0
+    ],
+    [
+     22.0,
+     13.0
+    ]
+   ],
+   "length_ft": 18.8886,
+   "facets": [
+    "f1",
+    "f2"
+   ]
+  },
+  {
+   "id": "e8",
+   "type": "hip",
+   "points": [
+    [
+     35,
+     26
+    ],
+    [
+     22.0,
+     13.0
+    ]
+   ],
+   "length_ft": 18.8886,
+   "facets": [
+    "f2",
+    "f3"
+   ]
+  },
+  {
+   "id": "e9",
+   "type": "hip",
+   "points": [
+    [
+     0,
+     26
+    ],
+    [
+     13.0,
+     13.0
+    ]
+   ],
+   "length_ft": 18.8886,
+   "facets": [
+    "f3",
+    "f4"
+   ]
+  }
+ ],
+ "holes": [],
+ "totals": {
+  "total_area_sqft": 959.2242,
+  "pitched_area_sqft": 959.2242,
+  "flat_area_sqft": 0.0,
+  "predominant_pitch_rise": 4.0,
+  "predominant_pitch_area_sqft": 959.2242,
+  "squares": 9.592242,
+  "lengths_ft": {
+   "eave": 122.0,
+   "rake": 0,
+   "ridge": 9.0,
+   "hip": 75.5544,
+   "valley": 0,
+   "step_flashing": 0,
+   "wall_flashing": 0,
+   "parapet": 0,
+   "transition": 0,
+   "unspecified": 0
+  }
+ },
+ "confidence": {
+  "overall": "high",
+  "notes": [
+   "Closed-form hip roof."
+  ]
+ },
+ "warnings": []
+}

@@ -1,0 +1,25 @@
+# bond_roof
+
+Role: pure Dart roof model. JSON schema `bond.roof_model/0.1`, totals, diagram scenes, SVG/PDF export.
+Consumed by bond_roof_ui and by the roof_measure service's contract tests.
+Contract: docs/contracts/roof_model.md
+
+## Key files
+- lib/bond_roof.dart — barrel (everything public except PDF)
+- lib/roof_pdf.dart — separate PDF library (keeps `pdf` out of non-printing apps)
+- lib/src/model.dart — RoofModel JSON parsing, totals, points
+- lib/src/scene.dart — device-independent drawing primitives
+- lib/src/length_diagram.dart, area_diagram.dart, summary_block.dart — the three report scenes
+- lib/src/layout.dart, polylabel.dart, metrics.dart — label placement and text width
+- lib/src/format.dart, style.dart — number formats, colours, sizes; svg.dart, pdf_export.dart — scene to SVG / PDF
+- test/support.dart — fixture loader
+
+## Commands
+- One test: `make test T=test/model_test.dart`
+- All tests: `make test`; analyze: `make analyze`
+- Render fixtures: `make render` (= `dart run example/render_fixtures.dart`)
+
+## Rules
+- No Flutter imports.
+- Fixtures come from `test/fixtures/` and `../../fixtures/` via test/support.dart.
+- Changing the schema id or a field is a contract change: update docs/contracts/roof_model.md and the service.

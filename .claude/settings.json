@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./services/*/tests/data/**)",
+      "Read(./uv.lock)",
+      "Read(./docs/research/**/*.png)",
+      "Read(./**/build/**)",
+      "Read(./**/.dart_tool/**)"
+    ]
+  }
+}

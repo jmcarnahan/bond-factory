@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ttf binary
+*.pts binary
+*.geojson -diff
+pubspec.lock linguist-generated
+uv.lock linguist-generated

@@ -1,0 +1,190 @@
+{
+ "schema": "bond.roof_model/0.1",
+ "generated_at": "2026-11-07T21:27:03Z",
+ "address": {
+  "line1": "Synthetic flat roof 60 x 40 ft with parapet",
+  "city": "",
+  "state": "",
+  "zip": "",
+  "formatted": "Synthetic flat roof 60 x 40 ft with parapet"
+ },
+ "origin": {
+  "lat": 0.0,
+  "lng": 0.0
+ },
+ "north_deg": 0,
+ "units": "ft",
+ "source": {
+  "method": "fixture",
+  "footprint": {
+   "provider": "synthetic",
+   "id": "Synthetic flat roof 60 x 40 ft with parapet",
+   "area_sqft": 2400.0
+  },
+  "lidar": null,
+  "solar": null
+ },
+ "blocks": [
+  {
+   "id": "b1",
+   "form": "flat",
+   "polygon": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     60.0,
+     0.0
+    ],
+    [
+     60.0,
+     40.0
+    ],
+    [
+     0.0,
+     40.0
+    ]
+   ],
+   "pitch_rise": 0.0,
+   "ridge_azimuth_deg": null,
+   "gable_edges": [],
+   "eave_height_ft": 12.0,
+   "plan_area_sqft": 2400.0
+  }
+ ],
+ "facets": [
+  {
+   "id": "f1",
+   "block": "b1",
+   "kind": "flat",
+   "polygon": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     60.0,
+     0.0
+    ],
+    [
+     60.0,
+     40.0
+    ],
+    [
+     0.0,
+     40.0
+    ]
+   ],
+   "pitch_rise": 0.0,
+   "aspect_deg": null,
+   "plan_area_sqft": 2400.0,
+   "area_sqft": 2400.0
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "type": "parapet",
+   "points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     60.0,
+     0.0
+    ]
+   ],
+   "length_ft": 60.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e2",
+   "type": "parapet",
+   "points": [
+    [
+     60.0,
+     0.0
+    ],
+    [
+     60.0,
+     40.0
+    ]
+   ],
+   "length_ft": 40.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e3",
+   "type": "parapet",
+   "points": [
+    [
+     60.0,
+     40.0
+    ],
+    [
+     0.0,
+     40.0
+    ]
+   ],
+   "length_ft": 60.0,
+   "facets": [
+    "f1"
+   ]
+  },
+  {
+   "id": "e4",
+   "type": "parapet",
+   "points": [
+    [
+     0.0,
+     40.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "length_ft": 40.0,
+   "facets": [
+    "f1"
+   ]
+  }
+ ],
+ "holes": [],
+ "totals": {
+  "total_area_sqft": 2400.0,
+  "pitched_area_sqft": 0,
+  "flat_area_sqft": 2400.0,
+  "predominant_pitch_rise": 0.0,
+  "predominant_pitch_area_sqft": 2400.0,
+  "squares": 24.0,
+  "lengths_ft": {
+   "eave": 0.0,
+   "rake": 0.0,
+   "ridge": 0.0,
+   "hip": 0.0,
+   "valley": 0.0,
+   "step_flashing": 0.0,
+   "wall_flashing": 0.0,
+   "parapet": 200.0,
+   "transition": 0.0,
+   "unspecified": 0.0
+  }
+ },
+ "confidence": {
+  "overall": "medium",
+  "notes": [
+   "Parapet assigned by rule: flat roof edge on the outline (height not measured).",
+   "Wall flashing is not derivable from this data (0 ft here): LiDAR resolves no wall steps and skylight/curb openings are not modelled.",
+   "Total area includes the roof overhang beyond the county wall line (blocks may extend up to 1 m past the footprint)."
+  ]
+ },
+ "warnings": [],
+ "debug": {}
+}

@@ -1,0 +1,9 @@
+name: bond_factory_workspace
+publish_to: none
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+workspace:
+  - packages/bond_roof
+  - packages/bond_roof_ui
+  - demos/roof_demo
