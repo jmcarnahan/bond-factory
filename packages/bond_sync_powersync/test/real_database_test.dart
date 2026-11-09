@@ -28,7 +28,12 @@ void main() {
     dir = Directory.systemTemp.createTempSync('bsp_real');
     policy = SyncPolicy(schema: _schema, createPuts: const {'notes': null});
     db = PowerSyncDatabase(schema: _schema, path: '${dir.path}/t.db');
-    await db.initialize();
+    try {
+      await db.initialize();
+    } catch (_) {
+      dir.deleteSync(recursive: true);
+      rethrow;
+    }
     store = PowerSyncSyncStore(db, policy: policy);
   });
 

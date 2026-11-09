@@ -6,9 +6,9 @@ PY := $(VENV)/bin/python
 ADDR ?= 100 Example Ave, Sampletown, CA 90000
 
 .PHONY: setup test lint measure serve
-setup:
-	uv venv $(VENV) --python 3.12 --seed >/dev/null || python3 -m venv $(VENV)
-	uv pip install --python $(PY) -e ".[dev]" || $(VENV)/bin/pip install -e ".[dev]"
+setup:  # always the module venv, never the root fallback
+	uv venv .venv --python 3.12 --seed >/dev/null || python3 -m venv .venv
+	uv pip install --python .venv/bin/python -e ".[dev]" || .venv/bin/pip install -e ".[dev]"
 
 test:
 	$(PY) -m pytest -q

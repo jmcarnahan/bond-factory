@@ -174,6 +174,8 @@ def register(app: FastAPI) -> None:
         provider_or_404(provider)
         with session_scope(request.app.state.session_factory) as session:
             try:
+                # Single use is enforced by a process-local registry (bond_oauth.handoff): fine for this one-process
+                # example; a multi-process deployment keeps a nonce table instead (docs/migration/bond_oauth.md, section 6).
                 oauth.redeem_handoff(session, code=body.code, user_id=user_id, cipher=wiring.cipher,
                                      connection_model=OAuthConnection, expected_provider=provider)
             except oauth.OAuthError as exc:
