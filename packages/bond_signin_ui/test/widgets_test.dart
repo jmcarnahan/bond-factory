@@ -176,4 +176,14 @@ void main() {
     expect([list.wanted.single.provider, list.wanted.single.granted], ['google', false]);
     expect(list.wanted.single.scopes, hasLength(1));
   });
+
+  testWidgets('ask buttons are named by their set for assistive tech', (t) async {
+    setPhone(t);
+    final handle = t.ensureSemantics();
+    await pumpApp(t, BondScopeAskCard(wanted: [const WantedSet(id: 'calendar', provider: 'google', label: 'Calendar'), const WantedSet(id: 'mail', provider: 'google', label: 'Send mail')], labels: _labels, onAsk: (_) async {}));
+    expect(find.text('Allow'), findsNWidgets(2)); // visible text unchanged
+    expect(t.getSemantics(_id('sdk.scopes.ask-calendar')).label, 'Allow Calendar');
+    expect(t.getSemantics(_id('sdk.scopes.ask-mail')).label, 'Allow Send mail');
+    handle.dispose();
+  });
 }

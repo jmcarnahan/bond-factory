@@ -28,7 +28,8 @@ String? jsonText(Object? v) {
 /// The last six characters of a token: enough to see a renewal, never the token.
 String tokenTail(String token) => token.length <= 6 ? token : token.substring(token.length - 6);
 
-/// A refusal as one inline line: code, message, hint.
+/// A refusal as one inline line: the server's message (the code when there is
+/// none). The code stays in the semantics label so a walk can still read it.
 class AuthErrorLine extends StatelessWidget {
   const AuthErrorLine(this.failure, {super.key});
 
@@ -36,17 +37,18 @@ class AuthErrorLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parts = [
-      'code: ${failure.code ?? failure.reason.name}',
-      if (failure.message != null) 'message: ${failure.message}',
-      if (failure.hint != null) 'hint: ${failure.hint}',
-    ];
+    final code = failure.code ?? failure.reason.name;
+    final message = jsonText(failure.message);
+    final hint = jsonText(failure.hint);
+    // The hint is a machine word (e.g. apple_relay) for the client to map to copy: label only.
+    final shown = message ?? code;
+    final label = message == null ? code : (hint == null ? '$message ($code)' : '$message ($code; $hint)');
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: authRead(
         'error',
-        parts.join(' | '),
-        Text(parts.join(' | '), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        label,
+        Text(shown, style: TextStyle(color: Theme.of(context).colorScheme.error)),
       ),
     );
   }

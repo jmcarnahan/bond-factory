@@ -79,12 +79,21 @@ class _BondScopeAskCardState extends State<BondScopeAskCard> {
             Row(children: [
               Expanded(child: Text(s.label, style: text.small)),
               BondSpace.w12,
-              BondButton(
-                label: widget.labels.allow,
-                variant: BondButtonVariant.secondary,
-                loading: _asking == s.id,
-                onPressed: _asking == null ? () => unawaited(_ask(s)) : null,
-                semanticsId: '${widget.semanticsPrefix}.ask-${s.id}',
+              // The visible text stays "Allow"; the accessible name carries the set.
+              Semantics(
+                identifier: '${widget.semanticsPrefix}.ask-${s.id}',
+                label: '${widget.labels.allow} ${s.label}',
+                button: true,
+                enabled: _asking == null,
+                container: true,
+                excludeSemantics: true,
+                onTap: _asking == null ? () => unawaited(_ask(s)) : null,
+                child: BondButton(
+                  label: widget.labels.allow,
+                  variant: BondButtonVariant.secondary,
+                  loading: _asking == s.id,
+                  onPressed: _asking == null ? () => unawaited(_ask(s)) : null,
+                ),
               ),
             ]),
           ],
