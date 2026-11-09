@@ -11,7 +11,7 @@ Role: Pure Dart auth contracts: id-token source seam, token stores, session, cap
 
 ## Rules
 - No Flutter imports. `SessionRefresh` lives in bond_api; re-export it, never redefine.
-- Refresh: null = offline (keep session), `AuthFailure` or another person = rejected; never store a session for another person.
+- Refresh: null = offline (keep session), `AuthFailure` (except reason network, which is offline) or another person = rejected; never store a session for another person.
 - Tests use `MockClient` (`test/support.dart`), not bond_test_support (Flutter).
 - No codegen; hand-write fromJson.
 - Barrel + CHANGELOG.md updated on every public API change.

@@ -41,7 +41,7 @@ wrapper named `parseServerInstant` and moves call sites later.
 | Old | New |
 |---|---|
 | A `parseServerInstant(s)` | `jtime({'t': s}, 't')` or `jtime(json, 'key')` |
-| P `jstr(v, '')` (232 uses) | `jstr(json, 'k') ?? ''` (new code), shim keeps old form |
+| P `jstr(v, '')` (229 uses) | `jstr(json, 'k') ?? ''` (new code), shim keeps old form |
 | P `jstrOrNull(v)`, `jintOrNull(v)`, `jdouble(v)` | `jstr(json, 'k')`, `jint(json, 'k')`, `jnum(json, 'k')` |
 | P `jlist(v, f)` over maps | `jlist(json, 'k', (e) => f(jmap({'e': e}, 'e')!))`, or `jlistOf` for a top-level array |
 

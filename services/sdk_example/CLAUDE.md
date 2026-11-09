@@ -1,6 +1,6 @@
 # sdk_example
 Role: reference FastAPI app wiring every bond Python lib. Never shipped.
-State: auth, storage, sync and connections wired; tasks and jobs routes land in phase 3.
+State: auth, storage, sync, connections, tasks, calendar and jobs wired.
 
 ## Key files
 - `sdk_example/wiring.py`: auth settings, storage, jobs registry, clock, middleware (installed by `routes/a0_wiring.py`).

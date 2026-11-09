@@ -1,7 +1,7 @@
 # sdk_example
 
 Reference FastAPI app wiring every bond Python lib, in fake mode (no network, no secrets).
-Route modules under `sdk_example/routes/` are discovered by `main.create_app()`; tasks and jobs routes land in phase 3.
+Route modules under `sdk_example/routes/` are discovered by `main.create_app()`.
 
 ```
 make -C services/sdk_example test
@@ -20,6 +20,10 @@ fake mode and logs one warning. Real mode needs `SDK_EXAMPLE_AUTH_SECRET`, and a
 | Sign-in, session, `/auth/*` | `routes/auth.py`, `auth_dep.py`, `models/auth.py` | bond_auth_py |
 | Documents, share links, `/d/<token>` | `routes/storage.py`, `models/grants.py` | bond_storage |
 | Job table and handler registry | `models/jobs.py`, `wiring.py` | bond_jobs |
+| Tasks, reminders | `routes/tasks.py`, `tasks_wiring.py` | bond_tasks_py |
+| Calendar events | `routes/calendar.py`, `calendar_wiring.py` | bond_calendar |
+| Job tick (fake mode) | `routes/jobs.py` | bond_jobs |
+| Migrations | `alembic/versions/0001_phase2.py`, `0002_phase3.py` | |
 
 `routes/a0_wiring.py` is named so it sorts before every other route module: middleware and error handlers have
 to be in place before the first request, and `main.py` imports route modules alphabetically.
@@ -30,9 +34,10 @@ to be in place before the first request, and `main.py` imports route modules alp
 - `POST /auth/firebase {"id_token": "mock:<email>"}` runs the mock verifier. The addresses it knows live in
   `out/mock_identities.json`, written at start: `demo@example.com` and `viewer@example.com` have a users row,
   `notinvited@example.com` has none (403 `not_invited`).
-- Seeded users: `demo-user-1` (capabilities `tasks.write`, `connections.manage`) and `demo-user-2` (none).
-- An unmigrated database gets its tables created and is stamped at the migration head, so `make migrate` later
-  is a no-op. A migrated database is left alone.
+- Seeded users: `demo-user-1` (capabilities `tasks.write`, `tasks.read_all`, `connections.manage`) and `demo-user-2` (none).
+- An EMPTY database gets its tables created and is stamped at the migration head, so `make migrate` later
+  is a no-op. A migrated database is left alone. One that has tables but no `alembic_version` is left alone
+  too, with a warning to run `make migrate`.
 
 ## Protecting a route
 

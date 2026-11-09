@@ -15,12 +15,12 @@ the example uses `/auth`. Errors use `docs/contracts/error_body.md`.
 | `POST /auth/logout` | none | `{"status": "logged_out"}`, clears the cookie |
 
 `sign_in=false` on firebase skips accepted, last-sign-in and audit bookkeeping. Refresh ignores `sign_in`: it is always a renewal.
-Rate limit on firebase and refresh: `20/minute` by default.
+Rate limit on firebase and refresh: app policy; the example uses `20/minute`.
 
 ## User
 
-`{id, email, name, initials, language, capabilities: [str], ...app fields}`. The library returns the generic
-part; an `extra_user_fields(user)` hook adds the rest. Capability vocabularies belong to the app, behind a
+`{id, email, name, initials, language, capabilities: [str], ...app fields}`. The library does not build it: the
+app assembles the payload in this shape and adds its own fields. Capability vocabularies belong to the app, behind a
 `CapabilityPolicy`.
 
 ## Session JWT
@@ -28,7 +28,7 @@ part; an `extra_user_fields(user)` hook adds the rest. Capability vocabularies b
 - HS256, secret from settings, default lifetime 10080 minutes.
 - Claims: `sub` (user id), `user_id` (user id; both required on verify), `name`, `capabilities`
   (informational: authority is re-read from the database per request), `iat` (float epoch, real clock), `exp`,
-  `aud` (list), `iss`. An `extra_claims(user)` hook adds more.
+  `aud` (list), `iss`. `create_access_token` takes an `extra_claims` dict for app claims.
 - Read from `Authorization: Bearer` first, then the `<app>_access_token` cookie (httponly, samesite lax,
   secure by setting).
 
@@ -73,7 +73,7 @@ Env names: `BOND_AUTH_MOCK`, `BOND_AUTH_TEST_ENV`, `FIREBASE_PROJECT_ID`, `FIREB
 
 After a refused `not_invited` Google or Apple sign-in, delete the Firebase user only when the provider is
 `google.com` or `apple.com`, it was created under 60 s ago (5 s skew), provider data is exactly that provider,
-and no users row exists by uid or lowercased email (re-checked after rollback). Hook `on_janitor(uid,
+and no users row exists by uid or lowercased email (re-checked after rollback). Callback `audit(uid,
 provider)`. The response stays 403. Sign-in only, never refresh.
 
 ## `GET /auth/providers`

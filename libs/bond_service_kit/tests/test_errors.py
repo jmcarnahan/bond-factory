@@ -8,7 +8,7 @@ from bond_service_kit import ApiError, RateLimited, error_body, install_error_ha
 
 @pytest.mark.parametrize("status,code", [
     (400, "bad_request"), (401, "unauthorized"), (403, "forbidden"), (404, "not_found"), (405, "method_not_allowed"),
-    (409, "conflict"), (413, "too_large"), (415, "unsupported_media_type"), (422, "invalid"), (429, "rate_limited"),
+    (409, "conflict"), (500, "internal_error"), (413, "too_large"), (415, "unsupported_media_type"), (422, "invalid"), (429, "rate_limited"),
     (501, "not_implemented"), (502, "bad_gateway"), (503, "unavailable"), (418, "error"),
 ])
 def test_status_fallback_codes(status, code):

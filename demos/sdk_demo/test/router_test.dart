@@ -13,14 +13,15 @@ void main() {
     });
   }
 
-  testWidgets('tapping a nav entry navigates', (tester) async {
+  testWidgets('tapping each nav entry shows that page title', (tester) async {
     await tester.pumpWidget(const SdkDemoApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(ListTile, 'Tasks'));
-    await tester.pumpAndSettle();
+    for (final page in demoPages) {
+      await tester.tap(find.widgetWithText(ListTile, page.title));
+      await tester.pumpAndSettle();
 
-    expect(tester.widget<Text>(find.byKey(const Key('page-title'))).data, 'Tasks');
-    expect(find.textContaining('arrives in phase 3'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('page-title'))).data, page.title);
+    }
   });
 }

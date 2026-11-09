@@ -1,0 +1,116 @@
+from datetime import date
+
+from conftest import NOW, Task
+
+from bond_tasks_py import TaskCreate, TaskFilters, list_tasks, service, summary
+
+TODAY = date(2026, 11, 8)
+
+
+def add(session, owner="u1", **fields):
+    data = TaskCreate(**{"title": "t", **fields})
+    return service.create(session, task_model=Task, owner_user_id=owner, actor_user_id=owner, data=data, now=NOW)
+
+
+def titles(session, user="u1", limit=25, offset=0, **filters):
+    rows, total = list_tasks(session, task_model=Task, user_id=user, filters=TaskFilters(**filters), limit=limit,
+                             offset=offset)
+    return [t.title for t in rows], total
+
+
+def seed(session):
+    add(session, title="late", due_date=date(2026, 11, 1))
+    add(session, title="today-b", due_date=TODAY, due_time="15:00")
+    add(session, title="today-a", due_date=TODAY, due_time="09:00")
+    add(session, title="later", due_date=date(2026, 11, 20))
+    add(session, title="undated")
+    add(session, title="theirs", owner="u2", due_date=TODAY)
+    add(session, title="given", owner="u2", assigned_user_id="u1", due_date=TODAY)
+    done = add(session, title="finished", due_date=TODAY)
+    service.complete(session, done, "u1", NOW)
+    session.flush()
+
+
+def test_default_lists_my_open_tasks_soonest_first_undated_last(session):
+    seed(session)
+    names, total = titles(session)
+    assert names[:3] == ["late", "today-a", "today-b"] and names[-1] == "undated" and total == 6
+    assert "theirs" not in names and "finished" not in names
+
+
+def test_scope_all_includes_other_peoples_tasks(session):
+    seed(session)
+    assert "theirs" in titles(session, scope="all")[0]
+
+
+def test_status_done_and_all(session):
+    seed(session)
+    assert titles(session, status="done")[0] == ["finished"]
+    assert "finished" in titles(session, status="all")[0]
+
+
+def test_cancelled_shows_only_under_all(session):
+    seed(session)
+    service.cancel(session, add(session, title="dropped"), "u1", NOW)
+    session.flush()
+    assert "dropped" not in titles(session)[0] and "dropped" in titles(session, status="all")[0]
+
+
+def test_on_or_before_excludes_undated_unless_asked(session):
+    seed(session)
+    assert titles(session, on_or_before=TODAY)[0] == ["late", "today-a", "today-b", "given"]
+    assert titles(session, on_or_before=TODAY, include_undated=True)[0][-1] == "undated"
+
+
+def test_due_window(session):
+    seed(session)
+    assert titles(session, due_from=date(2026, 11, 8), due_to=date(2026, 11, 8))[0] == ["today-a", "today-b", "given"]
+
+
+def test_no_date_filter(session):
+    seed(session)
+    assert titles(session, no_date=True)[0] == ["undated"]
+
+
+def test_owner_and_assignee_filters(session):
+    seed(session)
+    assert sorted(titles(session, scope="all", owner_user_id="u2")[0]) == ["given", "theirs"]
+    assert titles(session, scope="all", assigned_user_id="u1")[0] == ["given"]
+    assert titles(session, assigned_to_me=True)[0] == ["given"]
+
+
+def test_paging_reports_the_total(session):
+    seed(session)
+    names, total = titles(session, limit=2, offset=2)
+    assert len(names) == 2 and total == 6
+
+
+def test_link_filter_lists_everything_on_the_record(session):
+    add(session, title="a", links=[{"kind": "loan", "id": "L1"}])
+    add(session, title="b", owner="u2", links=[{"kind": "loan", "id": "L1"}])
+    add(session, title="c", links=[{"kind": "contact", "id": "L1"}])
+    add(session, title="d", links=[{"kind": "loan", "id": "L10"}])
+    session.flush()
+    assert sorted(titles(session, scope="all", link_kind="loan", link_id="L1")[0]) == ["a", "b"]
+    assert titles(session, scope="all", link_id="L1")[1] == 3  # kind is optional
+    assert sorted(titles(session, link_id="L1")[0]) == ["a", "c"]  # scope mine stays mine, link filter or not
+    assert titles(session, scope="all", link_kind="loan", link_id="L1", limit=1)[1] == 2
+
+
+def test_link_ids_with_odd_characters_are_matched_exactly(session):
+    add(session, title="a", links=[{"kind": "x", "id": "50%_off"}])
+    add(session, title="b", links=[{"kind": "x", "id": "50xyoff"}])
+    session.flush()
+    assert titles(session, scope="all", link_id="50%_off")[0] == ["a"]
+
+
+def test_summary_counts_my_open_tasks(session):
+    seed(session)
+    assert summary(session, task_model=Task, user_id="u1", today=TODAY) == {
+        "open": 6, "overdue": 1, "due_today": 3, "no_date": 1}
+
+
+def test_summary_ignores_other_users(session):
+    seed(session)
+    assert summary(session, task_model=Task, user_id="u3", today=TODAY) == {
+        "open": 0, "overdue": 0, "due_today": 0, "no_date": 0}

@@ -166,3 +166,68 @@ def test_database_down_answers_503_with_retry_after(signed_in, monkeypatch):
     assert r.status_code == 503
     assert r.headers["retry-after"] == "5"
     assert r.json()["detail"]["code"] == "db_unavailable"
+
+
+def _task_op(seq, kind, id_, data=None, action=None):
+    return {"seq": seq, "op": kind, "table": "tasks", "id": id_, "action": action, "data": data or {}}
+
+
+def test_task_put_through_upload_creates_a_task_for_the_session_user(app, signed_in):
+    body = {"ops": [_task_op(0, "put", "dev-task-1", {"title": "From a device", "owner_user_id": "someone-else"})]}
+    r = signed_in.post("/sync/upload", json=body)
+    assert r.status_code == 200
+    assert r.json()["results"] == [{"seq": 0, "status": "ok"}]
+    from sdk_example.models.tasks import Task
+
+    with app.state.session_factory() as session:
+        task = session.get(Task, "dev-task-1")
+        assert (task.title, task.owner_user_id) == ("From a device", DEMO_USER_ID)
+
+
+def test_task_complete_action_marks_it_done(app, signed_in):
+    body = {"ops": [_task_op(0, "put", "dev-task-2", {"title": "Finish me"}),
+                    _task_op(1, "patch", "dev-task-2", action="complete"),
+                    _task_op(2, "put", "dev-task-3", {}),
+                    _task_op(3, "patch", "missing", {"title": "x"})]}
+    results = signed_in.post("/sync/upload", json=body).json()["results"]
+    assert [x["status"] for x in results] == ["ok", "ok", "rejected", "rejected"]
+    assert (results[2]["code"], results[2]["message"]) == ("invalid", "title_required")
+    assert results[3]["code"] == "not_found"
+    from sdk_example.models.tasks import Task
+
+    with app.state.session_factory() as session:
+        assert session.get(Task, "dev-task-2").status == "done"
+
+
+def test_synced_task_put_is_mirrored_to_the_calendar(client, app):
+    from connections_util import connect, headers
+
+    h = headers(client)
+    connect(client, h, "fake-google")
+    body = {"ops": [_task_op(0, "put", "dev-task-4", {"title": "Mirror me", "due_date": "2026-11-09"})]}
+    assert client.post("/sync/upload", json=body, headers=h).json()["results"] == [{"seq": 0, "status": "ok"}]
+    from sdk_example.models.tasks import Task
+
+    with app.state.session_factory() as session:
+        task = session.get(Task, "dev-task-4")
+        assert task.mirror_status == "mirrored"
+        assert task.external_event_id
+    calendar = next(iter(app.state.fake_calendars.values()))
+    assert [e.subject for e in calendar.events] == ["Mirror me"]
+    delete = {"ops": [_task_op(0, "delete", "dev-task-4")]}
+    assert client.post("/sync/upload", json=delete, headers=h).json()["results"][0]["status"] == "ok"
+    assert calendar.events == []
+
+
+def test_synced_task_with_unknown_assignee_is_refused(app, signed_in):
+    from sdk_example.models.auth import VIEWER_USER_ID
+    from sdk_example.models.tasks import Task
+
+    body = {"ops": [_task_op(0, "put", "dev-task-5", {"title": "Assign", "assigned_user_id": "no-such-user"}),
+                    _task_op(1, "put", "dev-task-6", {"title": "Assign", "assigned_user_id": VIEWER_USER_ID})]}
+    results = signed_in.post("/sync/upload", json=body).json()["results"]
+    assert (results[0]["status"], results[0]["code"], results[0]["message"]) == ("rejected", "invalid", "unknown_assignee")
+    assert results[1] == {"seq": 1, "status": "ok"}
+    with app.state.session_factory() as session:
+        assert session.get(Task, "dev-task-5") is None
+        assert session.get(Task, "dev-task-6").assigned_user_id == VIEWER_USER_ID

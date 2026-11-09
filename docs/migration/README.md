@@ -31,8 +31,10 @@ otherwise. Re-run the grep given in each file's section 3 before you start; the 
 | `bond_auth`, `bond_auth_firebase` | `bond_auth.md`, `bond_auth_firebase.md` | A, P; S later |
 | `bond_sync`, `bond_sync_powersync`, `bond_sync_py` | `bond_sync.md`, `bond_sync_powersync.md`, `bond_sync_py.md` | S first, then A |
 | `bond_oauth` | `bond_oauth.md` | A, S |
-
-The module docs for calendar, tasks and connections arrive with phase 3, when those modules land.
+| `bond_calendar` | `bond_calendar.md` | S (Microsoft Graph), A (Google read); P adopts nothing |
+| `bond_tasks_py` | `bond_tasks_py.md` | S, A |
+| `bond_tasks`, `bond_tasks_ui` | `bond_tasks.md` | S web, S phone, A |
+| `bond_connections`, `bond_connections_ui` | `bond_connections.md` | A, S |
 
 ## Suggested order
 

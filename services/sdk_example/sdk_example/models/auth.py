@@ -13,10 +13,10 @@ DEMO_USER_ID = "demo-user-1"
 VIEWER_USER_ID = "demo-user-2"
 NOT_INVITED_EMAIL = "notinvited@example.com"
 
-#: The seeded users. ``demo-user-1`` can write tasks and manage connections; ``demo-user-2`` is a viewer.
+#: The seeded users. ``demo-user-1`` can write tasks, read everyone's tasks and manage connections; ``demo-user-2`` is a viewer.
 DEMO_USERS: tuple[dict, ...] = (
     {"id": DEMO_USER_ID, "email": "demo@example.com", "name": "Demo User", "initials": "DU",
-     "capabilities": ["tasks.write", "connections.manage"]},
+     "capabilities": ["tasks.write", "tasks.read_all", "connections.manage"]},
     {"id": VIEWER_USER_ID, "email": "viewer@example.com", "name": "Viewer User", "initials": "VU",
      "capabilities": []},
 )

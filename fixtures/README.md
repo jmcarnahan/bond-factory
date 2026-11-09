@@ -23,6 +23,7 @@ Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`).
 | `sync/bad_ids.json` | Id strings with the expected result: accepted, an `invalid` verdict, or a 422. | hand-written |
 | `sync/sync_token_claims.json` | Sync token header, claims, token response, the `sync_off` body, and an example token signed by the test key. TEST ONLY. | generated |
 | `sync/jwks_example.json` | Public half of the throwaway EC P-256 test key that signed the example token. TEST ONLY. | generated |
+| `tasks/task.json` | One `TaskItem` as `GET /tasks/{id}` returns it (two checklist items, one link, a mirrored Google event, a 15-minute reminder). Round-tripped by `bond_tasks` (Dart) and `bond_tasks_py`. Keys: the `TaskItem` table in `packages/bond_tasks/README.md`; `libs/bond_tasks_py` pins the same list in `ITEM_KEYS`. | hand-written |
 
 Contract for the sync files: `docs/contracts/sync_upload.md`.
 

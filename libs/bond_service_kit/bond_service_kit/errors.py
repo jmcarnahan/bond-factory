@@ -22,7 +22,7 @@ _CODE_WORD = re.compile(r"^[a-z][a-z0-9_]*$")
 _BY_STATUS = {
     400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found", 405: "method_not_allowed",
     409: "conflict", 413: "too_large", 415: "unsupported_media_type", 422: "invalid", 429: "rate_limited",
-    501: "not_implemented", 502: "bad_gateway", 503: "unavailable",
+    500: "internal_error", 501: "not_implemented", 502: "bad_gateway", 503: "unavailable",
 }
 DB_UNAVAILABLE = {"code": "db_unavailable", "message": "The database is not answering. Try again in a few seconds"}
 
