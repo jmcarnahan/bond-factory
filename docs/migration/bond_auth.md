@@ -1,6 +1,8 @@
 # Migrating to bond_auth
 
-`bond_auth` is pure Dart: token stores, `AuthSession`, `AuthFailure`, the id-token seam, gateways, capability policy, providers parsing. Few-shot reference: `demos/sdk_demo/lib/src/example_api.dart` (wiring) and `pages/auth_page.dart`, with `services/sdk_example/sdk_example/routes/auth.py` as the server. Normative wire contract: `docs/contracts/auth.md`. Legend: `docs/migration/README.md`.
+`bond_auth` is pure Dart: token stores, `AuthSession`, `AuthFailure`, the id-token seam, gateways, capability policy, providers parsing. Few-shot reference: `demos/sdk_demo/lib/src/example_api.dart` (wiring) and `pages/auth_page.dart`, with `services/sdk_example/sdk_example/routes/auth.py` as the server. Legend: `docs/migration/README.md`.
+
+Contracts: `docs/contracts/auth.md`.
 
 ## 1. What it replaces
 

@@ -1,7 +1,7 @@
 # Migrating to bond_sync_powersync
 
 Flutter package (powersync needs Flutter). It holds the PowerSync calls and SQL; the rules live in `bond_sync` (see
-`bond_sync.md`). Contract: `docs/contracts/sync_upload.md`.
+`bond_sync.md`). Contracts: `docs/contracts/sync_upload.md`.
 
 ## 1. What it replaces
 

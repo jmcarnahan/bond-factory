@@ -3,15 +3,17 @@
 `ApiClient`, the typed `ApiException` family, `ErrorBody.parse`, SSE and `networkFailureText`
 (`packages/bond_api`, pure Dart). Needs `bond_json` through the same SHA. Legend: `docs/migration/README.md`.
 
+Contracts: `docs/contracts/error_body.md`.
+
 ## 1. What it replaces
 
-Paths are under `flutterui/packages/<core>/lib/src/api/` (A `avalon_core`, P `pt_core`).
+Paths are relative to `flutterui/packages/<core>/lib/src/` (A `avalon_core`, P `pt_core`): `api/` for the client files, `providers/` for the wiring.
 
 | App | Goes away | Shrinks or stays |
 |---|---|---|
 | A | `api_client.dart` 509, `api_exception.dart` 173, `sse.dart` 32 | `network_failure_text.dart` 20 becomes an adapter; `error_hooks.dart` 25 stays (Flutter); `avalon_api.dart` 2,206 keeps its 218 `_client.<verb>(` calls |
 | P | `api_client.dart` 367, `api_exception.dart` 148 | `network_failure_text.dart` 20 adapter; `error_hooks.dart` 25 and `device_anchor.dart` 18 stay; `paga_api.dart` 1,565 keeps 123 verb calls |
-| S | phone `mobile/crm_proposals/lib/core/api/{api_client 178, api_exception 76}.dart`, `SseFrameSplitter` in `lib/data/calendar_assistant/stream.dart:14` | web has no client (45 services use `package:http`): later |
+| S | phone `mobile/crm_proposals/lib/core/api/{api_client 178, api_exception 76}.dart`, `SseFrameSplitter` in `lib/data/calendar_assistant/stream.dart:14` | web has no client (51 files in `flutterui/lib` import `package:http`): later |
 
 ## 2. The adapter
 
@@ -48,7 +50,7 @@ client.onDeactivated = controller.accountDeactivated;
 client.onSessionRevoked = () async => controller.markRevoked(); // A only
 ```
 
-`networkFailureText` adapter (A keeps its `AvL10n` strings; bond's returns a sentence always, A's returned null):
+`networkFailureText` adapter (import bond_api with `hide networkFailureText`, or name this adapter differently, else the two collide; A keeps its `AvL10n` strings; bond's returns a sentence always, A's returned null):
 
 ```dart
 String? networkFailureText(AvL10n l, Object error, {required String baseUrl}) {
@@ -73,11 +75,11 @@ String? networkFailureText(AvL10n l, Object error, {required String baseUrl}) {
 | `mapApiError(status, body)` (59 uses incl. tests) | `ErrorBody.parse(status, body)` | `grep -rn mapApiError flutterui` |
 | A `SessionRefresh`, `TokenSource` (`auth/token_store.dart:4`) | import from `bond_api`; delete the local copies | `grep -rn "TokenSource" flutterui` |
 | `get(path, bearer: t)` (4 uses, A) | send the token through `tokens`, or call `request` with a one-off client | `grep -rn "bearer: "` |
-| `postMultipart(path, fileField:, filePath:)` (2) / `postMultipartBytes(...)` (5) | `postMultipart(path, fields: {...}, files: [ApiFile(field:, filename:, bytes:)])` | `grep -rn postMultipart` |
+| `postMultipart(path, fileField:, filePath:)` (A 2, P 2) / `postMultipartBytes(...)` (A 7, P 3); counts include tests | `postMultipart(path, fields: {...}, files: [ApiFile(field:, filename:, bytes:)])` | `grep -rn postMultipart` |
 | A `.sse(path, body:)` (`agent_stream_service.dart:67`) yields decoded maps | `.sse(...)` yields `SseEvent`; use `e.decoded` | |
 | `ServerError(message, statusCode:)` | same, plus `code` | |
 
-The exception names are the same (1,104 uses in A need no edit). `onSessionExpired` once meant renewal; grep for it.
+The exception names are the same (no edit needed; find them with `grep -rnwE "ApiException|NetworkFailure|Unauthorized|Forbidden|NotFound|Conflict|ValidationError|ServerError" flutterui`). `onSessionExpired` once meant renewal; grep for it.
 
 ## 4. Data
 
@@ -86,7 +88,7 @@ None. P's `ServerError` now carries `code` (`db_unavailable`); `bond_service_kit
 ## 5. Acceptance
 
 - A: `flutter test` in `packages/avalon_core` (`test/api/{api_client,robust_client,sse_client}_test.dart` move onto `MockClient`).
-- P: `flutter test` in `packages/pt_core` (`test/api/`). Both: a test that two concurrent 401s call the renewal hook once.
+- P: `flutter test` in `packages/pt_core` (`test/api/`). Neither app has a test that two concurrent 401s call the renewal hook once: write it.
 - `flutter analyze` clean. P's `networkFailureText` adapter is the same with `PtL10n` in place of `AvL10n`.
 
 ## 6. Known gaps (the app keeps these)

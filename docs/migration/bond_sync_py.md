@@ -1,6 +1,6 @@
 # Migrating to bond_sync_py
 
-Contract: `docs/contracts/sync_upload.md`. Fixtures: `fixtures/sync/`. Both apps keep their routes, tables and
+Contracts: `docs/contracts/sync_upload.md`. Fixtures: `fixtures/sync/`. Both apps keep their routes, tables and
 handlers; only the generic core moves into `libs/bond_sync_py`. Legend: `docs/migration/README.md`.
 
 ## 1. What it replaces

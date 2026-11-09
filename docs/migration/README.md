@@ -36,9 +36,22 @@ otherwise. Re-run the grep given in each file's section 3 before you start; the 
 | `bond_tasks`, `bond_tasks_ui` | `bond_tasks.md` | S web, S phone, A |
 | `bond_connections`, `bond_connections_ui` | `bond_connections.md` | A, S |
 
+## Dart and Python pairs
+
+A wire contract has a client half and a server half. Migrate both halves of a pair in the same app, in the same SHA bump.
+
+| Dart (client) | Python (server) |
+|---|---|
+| `bond_auth`, `bond_auth_firebase` | `bond_auth_py` |
+| `bond_sync`, `bond_sync_powersync` | `bond_sync_py` |
+| `bond_tasks`, `bond_tasks_ui` | `bond_tasks_py`, with `bond_calendar` for the mirror |
+| `bond_connections`, `bond_connections_ui` | `bond_oauth` |
+| `bond_api` | `bond_service_kit` (the error body) |
+
 ## Suggested order
 
-Each module lands on its own, so stop after any step. The order keeps later steps small:
+Each module lands on its own, so stop after any step. The order is per module and per app: sync comes first only for S,
+whose core already has the shape the lib took, and last for A and P. The order keeps later steps small:
 
 1. `bond_json`, `bond_test_support` (pure moves behind re-exports).
 2. `bond_api`, then `bond_auth` and `bond_auth_firebase` (they use its hooks).

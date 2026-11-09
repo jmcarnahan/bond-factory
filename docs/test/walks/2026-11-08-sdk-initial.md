@@ -1,7 +1,7 @@
 # SDK initial modules walk (2026-11-08)
 
 What was walked: the shared SDK demo (`demos/sdk_demo`) against the example API (`services/sdk_example`, fake mode),
-phases 1-3 of the initial-modules plan, commit 8af40b7 (round 1) and the uncommitted walk fixes on top of it (round 2, committed next as "Walk fixes"), per `docs/test/WEB.md`,
+phases 1-3 of the initial-modules plan, commit 8af40b7 (round 1) and the walk fixes committed as 5437aa8 (round 2), per `docs/test/WEB.md`,
 by a Sonnet walker with `@playwright/test` (headless Chromium).
 Stack: `make serve-example` (:8012, fake mode, fresh `out/`) and `make demo-sdk-web` (:8078, debug web-server), both
 started by the walk. Phone on web: the same demo at 390x844 for steps 2 and 7. Simulator: not booted (web-only plan).

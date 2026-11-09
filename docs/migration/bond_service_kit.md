@@ -1,10 +1,10 @@
 # Migrating to bond_service_kit
 
 FastAPI and SQLAlchemy plumbing (`libs/bond_service_kit`): error body, middleware, rate limits, clock, session
-factory, health, web and uploads mounts. Error shape: `docs/contracts/error_body.md`. Legend: `docs/migration/README.md`.
+factory, health, web and uploads mounts. Legend: `docs/migration/README.md`.
+Contracts: `docs/contracts/error_body.md`.
 
 ## 1. What it replaces
-
 Paths: A `backend/avalon/`, P `backend/pagatime/`, S `sbelcrm/`.
 
 | App | Goes away | Stays app-side |
