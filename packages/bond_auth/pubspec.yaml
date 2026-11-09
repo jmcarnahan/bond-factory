@@ -11,5 +11,6 @@ dependencies:
   bond_json:
     path: ../bond_json
 dev_dependencies:
+  http: ^1.2.0
   lints: ^6.0.0
   test: ^1.25.6

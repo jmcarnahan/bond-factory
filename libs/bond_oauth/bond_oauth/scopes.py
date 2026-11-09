@@ -1,0 +1,35 @@
+"""Named scope sets and drift detection."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+
+GOOGLE_DEFAULT = (
+    "https://www.googleapis.com/auth/gmail.send",
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/calendar.events",
+)
+MICROSOFT_BASE = ("Mail.Send", "Mail.Read", "Calendars.ReadWrite", "MailboxSettings.Read", "User.Read",
+                  "offline_access")
+MICROSOFT_OFFICE = ("Contacts.ReadWrite", "Files.ReadWrite")
+
+_ALIASES = {"email": "userinfo.email", "profile": "userinfo.profile"}
+
+
+def split_scopes(value: str | Iterable[str] | None) -> list[str]:
+    if not value:
+        return []
+    return value.split() if isinstance(value, str) else [s for s in value if s]
+
+
+def _short(scope: str) -> str:
+    """Resource-qualified scopes (``https://graph.microsoft.com/Mail.Read``) compare by their last segment."""
+    name = scope.rsplit("/", 1)[-1].lower()
+    return _ALIASES.get(name, name)
+
+
+def scope_drift(granted: str | Iterable[str] | None, wanted: str | Iterable[str] | None) -> list[str]:
+    """The ``wanted`` scopes missing from ``granted`` (both a space-separated string or a list), sorted."""
+    have = {_short(s) for s in split_scopes(granted)}
+    return sorted(s for s in split_scopes(wanted) if _short(s) not in have)

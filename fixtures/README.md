@@ -14,6 +14,17 @@ Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`).
 | `site1_lidar.json` | What the LiDAR service produced for the same address. | service |
 | `site1_blocks.json` | Intermediate `bond.roof_blocks/0.1` output of the data layer (LiDAR blocks) for the same address. NOT a roof model. Any code that loads every fixture must filter by the `schema` string, as the Dart tests and the demo already do. | service |
 | `synthetic_hip.json`, `synthetic_gable.json`, `synthetic_flat_parapet.json` | Closed-form cases with known totals, produced by the service (`python -m roof_measure.synth`). | service |
+| `sync/upload_request_ok.json` | Valid upload body: a put, a patch, a put and a delete on `notes`. | hand-written |
+| `sync/upload_request_mixed.json` | Upload body that yields every verdict kind (ok, invalid, skipped, conflict, not_found, unsupported). Needs a `note-taken` row owned by another user. | hand-written |
+| `sync/upload_response_mixed.json` | The exact answer to the mixed request. | hand-written |
+| `sync/upload_response_all_codes.json` | Shape fixture: one result per verdict code, including `resolved_id`. For client parsers. | hand-written |
+| `sync/upload_request_too_many_ops.json` | 101 ops: refused with a 422. | generated |
+| `sync/upload_request_dup_seq.json` | Two ops with the same `seq`: refused with a 422. | hand-written |
+| `sync/bad_ids.json` | Id strings with the expected result: accepted, an `invalid` verdict, or a 422. | hand-written |
+| `sync/sync_token_claims.json` | Sync token header, claims, token response, the `sync_off` body, and an example token signed by the test key. TEST ONLY. | generated |
+| `sync/jwks_example.json` | Public half of the throwaway EC P-256 test key that signed the example token. TEST ONLY. | generated |
+
+Contract for the sync files: `docs/contracts/sync_upload.md`.
 
 ## site1_truth.json: accuracy caveats
 

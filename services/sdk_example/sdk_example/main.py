@@ -9,8 +9,8 @@ import importlib
 import logging
 import pkgutil
 
+from bond_service_kit import LoggingCORSMiddleware
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from . import models, routes  # noqa: F401  (models import attaches every mixin to Base)
 from .db import make_engine, make_session_factory
@@ -28,7 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = make_engine(settings)
     app.state.session_factory = make_session_factory(app.state.engine)
     app.add_middleware(
-        CORSMiddleware,
+        LoggingCORSMiddleware,
         allow_origins=list(settings.cors_origins),
         allow_methods=["*"],
         allow_headers=["*"],

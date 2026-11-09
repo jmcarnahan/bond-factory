@@ -1,0 +1,14 @@
+{
+  "_note": "TEST ONLY. A throwaway EC P-256 public key; its private half was discarded after signing the example token. Never use for real.",
+  "keys": [
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "oJaZXcVxE5IB04l-KwXh-yOjCEE-DN5d792awDFjSK0",
+      "y": "_TwkazCxlTjM_ORTrBaJuJA18wke4EkrJyFUNyoyytE",
+      "kid": "bond-sync-1",
+      "alg": "ES256",
+      "use": "sig"
+    }
+  ]
+}
