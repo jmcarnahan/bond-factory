@@ -24,7 +24,8 @@ def test_fixture_files_are_small_and_complete():
     assert names == {
         "start_request_web.json", "start_request_native.json", "start_response.json", "callback_redirects.json",
         "redeem_request.json", "redeem_response.json", "refresh_request_body.json", "refresh_response.json",
-        "error_envelope.json", "providers_payload.json", "wanted_list.json", "labels_codes.json"}
+        "error_envelope.json", "providers_payload.json", "wanted_list.json", "labels_codes.json",
+        "seed_identities.json"}  # the example's fake-mode identities (owned by services/sdk_example)
     assert all((FIX / n).stat().st_size < 4096 for n in names)
 
 

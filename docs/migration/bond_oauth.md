@@ -35,8 +35,8 @@ Four app routes over the service functions (see the example):
 ### Phone apps (native flow)
 
 A phone has no browser session, so a device secret binds the flow instead (`docs/contracts/signin.md`):
-1. The app calls `GET /connections/{provider}/start?mode=native&redirect_to=<return url>&device_challenge=<sha256 hex>`
-   with its bearer token. `redirect_to` is `<public_base>/app/return/<provider>` or an entry of the native scheme list.
+1. The app calls `GET /connections/{provider}/start?mode=native&redirect_to=<return url>&device_challenge=<sha256 hex>&attempt=<id>`
+   with its bearer token. `redirect_to` is the same https app link or native scheme as sign-in (`SDK_EXAMPLE_NATIVE_REDIRECTS` is a deprecated alias).
 2. The app opens the URL in the system browser session (never an embedded web view). `/go` needs no session for a native state.
 3. The callback exchanges the provider code but STORES NOTHING. It seals the `PendingConnection` (tokens inside the DB row,
    not the URL) with `HandoffStore.issue(purpose="connect", ...)` and redirects to `<return>?attempt=<id>&code=<handoff>`.
@@ -45,19 +45,19 @@ A phone has no browser session, so a device secret binds the flow instead (`docs
 
 Guarantee: nothing is stored until the starting user redeems with the right secret. An intercepted code is useless without
 the secret and a wrong secret burns it. Residual risk of a scheme fallback is denial of service. `HandoffsMixin` adds the
-`oauth_handoffs` table (columns in the contract); schedule `HandoffStore.prune`. <!-- check -->
-
+`oauth_handoffs` table (columns in the contract); schedule `HandoffStore.prune` (the example does not call it; add it to the app's job tick).
 ### Sign-in (new in 0.2.0)
 
-`SignInFlow(providers, cipher, client_ids, redirect_uri_for, pinned_tenants)` has `start`, `complete` and `store`, and
+`SignInFlow(providers, cipher, client_ids, public_base, pinned_tenants, clock)` has `start`, `complete` and `store`, and
 satisfies `bond_signin.IdentityFlow` by shape. `complete` needs the web nonce or the device hash, exchanges the code,
 builds an `OidcIdentity` with `identity_from_token_response` (claims checked, no signature, `alg: none` refused unless the
 provider sets `unsigned_ids_ok`), and STORES NOTHING; `store` writes the connection only after the checks pass.
-Scopes come from `GOOGLE_SIGNIN`, `MICROSOFT_SIGNIN(_FULL)` and the app's policy, never `GOOGLE_DEFAULT`. <!-- check -->
+Scopes come from `GOOGLE_SIGNIN`, `MICROSOFT_SIGNIN(_FULL)` and the app's policy, never `GOOGLE_DEFAULT`.
 
 Role asks: the connect `authorize_url` carries `login_hint=<signed-in e-mail>` and `complete` compares the provider subject
-with the user's bound identity: a different account is 403 `account_mismatch`, except `shared=True` (A's office mailbox) and
-users with no bound identity. <!-- check -->
+with the user's bound identity: a different account redirects with `connection=error&reason=account_mismatch` (an `OAuthError`, not an HTTP 403), except
+`shared=True` (A's office mailbox) and users with no bound identity. A web connect whose consent omits the asked set stores no row
+(`consent_declined`).
 
 ## 3. Call-site changes
 
@@ -91,10 +91,10 @@ users with no bound identity. <!-- check -->
 
 - `GoogleOAuth` and `MicrosoftOAuth` have run only against `httpx.MockTransport`; no live exchange, refresh or revoke has
   been made. The first adopter does the first live run (see `bond_signin.md` section 6) and records it in `docs/sdk/sdk-pins.md`.
-- `issue_handoff`/`redeem_handoff`/`forget_handoffs` stay as deprecated wrappers in 0.2.0 and go in 0.3.0 once the example
-  has switched; use `HandoffStore`. The process-local single-use registry is gone: hand-offs are DB rows. <!-- check -->
+- `issue_handoff`/`redeem_handoff`/`forget_handoffs` stay as deprecated wrappers in 0.2.0 and go in 0.3.0; use `HandoffStore`. The example no
+  longer uses the old process-local registry; the old functions still run it until 0.3.0.
 - `FakeOAuth` mints an unsigned `id_token` (`unsigned_ids_ok = True`); the consent form posts `mock:<b64 e-mail>[;decline=<set ids>]`
   so a walk can sign in as any identity, as an uninvited one, or decline a set. A provider name starting `fake` is refused at
-  startup outside fake mode. It keeps requested scopes in memory: a restart between start and callback gives `invalid_code`. <!-- check -->
+  startup outside fake mode. It keeps requested scopes in memory: a restart between start and callback gives `invalid_code`.
 - Microsoft has no per-token revoke call: disconnect closes the row only.
 - The state is expired at its `exp`, not after it (10 minutes, real clock).

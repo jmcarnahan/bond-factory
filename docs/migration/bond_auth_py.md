@@ -72,7 +72,7 @@ runs before the `is_active` check and `check_exchange(identity, rev, settings, u
 
 `users.sessions_valid_after` (nullable `DateTime`) exists in A (`db/models.py:46`) and P (`:108`); S adds it. Cookie names stay
 (`avalon_access_token` is `cookie_name("avalon")`). The 20/minute limit moves to `rate_limit_dependency`. For sessions (0.2.0,
-opt in) the app attaches `SessionsMixin` (`auth_sessions`, hashes only) and writes the revision; `schema_contract()` checks it. <!-- check -->
+opt in) the app attaches `SessionsMixin` (`auth_sessions`, hashes only) and writes the revision; `schema_contract()` checks it.
 
 Sessions:
 - `SessionStore` (model and settings bound): `issue`, `rotate`, `revoke_token`, `revoke_user`; satisfies `bond_signin.SessionIssuer`
@@ -80,9 +80,9 @@ Sessions:
   `refresh_max_sessions_per_user` 10, `session_access_ttl_minutes` 60.
 - `bond_signin` mounts `/auth/refresh`, `/auth/logout`, `/auth/sessions/revoke-all`; the app deletes its own refresh and logout
   and keeps `/auth/firebase` (break-glass), `/auth/demo`, `/auth/me`, which call `finish_session` so every sign-in issues sessions.
-- New 401 codes `refresh_reused`, `refresh_expired`, `refresh_revoked`; new 403 codes `tenant_mismatch`, `consent_declined`,
-  `signin_expired`. `providers_payload` adds `signin`, `break_glass`, `default_flow`.
-- `rotate` commits BEFORE it raises `ReuseDetected`; a rolling-back `session_scope` would undo the revoke. Keep that test. <!-- check -->
+- New 401 codes `refresh_reused`, `refresh_expired`, `refresh_revoked`; new 403 codes `tenant_mismatch`, `consent_declined`;
+  400 `signin_expired`. `providers_payload` adds `signin`, `break_glass`, `default_flow`.
+- `rotate` commits BEFORE it raises `ReuseDetected`; a rolling-back `session_scope` would undo the revoke. Keep that test.
 - `firebase-admin` is the extra `bond_auth_py[firebase]` (break-glass, push admin). Without it the tier raises `AuthNotConfigured`.
 
 ## 5. Acceptance

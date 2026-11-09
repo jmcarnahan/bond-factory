@@ -252,4 +252,7 @@ def test_real_mode_without_a_url_keeps_sync_off(monkeypatch):
 
     monkeypatch.setenv("SDK_EXAMPLE_MODE", "real")
     monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", "x" * 40)
+    monkeypatch.setenv("SDK_EXAMPLE_PUBLIC_BASE", "https://api.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "https://app.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "https://app.example.org")
     assert Settings.from_env().sync_url == ""

@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from bond_oauth import pkce
 from bond_oauth.cipher import TokenCipher
 from bond_oauth.errors import OAuthError, ProviderError, ReconnectRequired, RetryableError
+from bond_oauth.guid import ATTEMPT, HEX64
 from bond_oauth.identity import ensure_subject
 from bond_oauth.providers import OAuthProvider, TokenSet
 from bond_oauth.scopes import split_scopes
@@ -82,7 +83,8 @@ class StartedFlow:
 def start_flow(session: Session, *, user_id: str, provider_name: str, provider: OAuthProvider, scopes: list[str],
                redirect_to: str, cipher: TokenCipher, redirect_uri: str, shared: bool = False,
                connection_name: str | None = None, native: bool = False, login_hint: str | None = None,
-               expected_subject: str | None = None, set_id: str | None = None) -> StartedFlow:
+               expected_subject: str | None = None, set_id: str | None = None, device_hash: str | None = None,
+               attempt_id: str | None = None) -> StartedFlow:
     """The state, the provider's consent URL and the state's nonce. ``redirect_to`` rides inside the encrypted
     state; the app validates it first.
 
@@ -91,14 +93,21 @@ def start_flow(session: Session, *, user_id: str, provider_name: str, provider: 
     ``complete(expected_nonce=...)``; otherwise a victim can be tricked into finishing an attacker's flow.
     ``shared=True`` connects a shared mailbox (``user_id`` NULL on the row); who may do that is the app's call.
     ``native=True`` is for a phone app that opens the system browser: the state is marked native, no cookie binds it,
-    and the app hands the result over with ``handoff.issue_handoff`` / ``redeem_handoff`` instead.
+    and the app hands the result over with ``HandoffStore`` (``handoff.py`` is deprecated, removed in 0.3.0).
     ``login_hint`` (the signed-in e-mail) goes to the provider. ``expected_subject`` binds the account: ``complete``
     refuses ``account_mismatch`` when the consenting account's identity subject differs (skipped when ``shared``).
+    ``device_hash`` (sha256 hex, 64 lowercase) and ``attempt_id`` (``[A-Za-z0-9_-]{1,64}``) ride in the state for a
+    native flow; a bad value is ``OAuthError("invalid_request")``.
     """
+    if device_hash is not None and not HEX64.fullmatch(device_hash):
+        raise OAuthError("invalid_request", "The device hash is not valid")
+    if attempt_id is not None and not ATTEMPT.fullmatch(attempt_id):
+        raise OAuthError("invalid_request", "The attempt id is not valid")
     verifier = pkce.new_verifier()
     state = encode_state(cipher, sub=user_id, provider=provider_name, connection_name=connection_name or provider_name,
                          verifier=verifier, redirect_to=redirect_to, shared=shared, native=native,
-                         login_hint=login_hint, expected_subject=expected_subject, set_id=set_id)
+                         login_hint=login_hint, expected_subject=expected_subject, set_id=set_id,
+                         device_hash=device_hash, attempt_id=attempt_id)
     extra = {"login_hint": login_hint} if login_hint else {}
     url = provider.authorize_url(state=state, challenge=pkce.challenge(verifier), scopes=list(scopes),
                                  redirect_uri=redirect_uri, **extra)
@@ -124,8 +133,8 @@ def complete(session: Session, *, state: str, code: str, providers: Mapping[str,
     A concurrent callback that wins the live-row race (unique index violation) is revoked and the insert is retried
     once; a second violation raises ``OAuthError("conflict")``.
 
-    A NATIVE state stores nothing: it returns a ``PendingConnection`` for ``handoff.issue_handoff``, and the row is
-    inserted only when ``redeem_handoff`` is called by the user who started the flow."""
+    A NATIVE state stores nothing: it returns a ``PendingConnection`` for ``HandoffStore.issue``, and the row is
+    inserted (``store_connection``) only when the user who started the flow redeems it."""
     stamp = now or utcnow()
     payload = decode_state(cipher, state)
     if payload.intent != "connect":
@@ -172,7 +181,7 @@ def connection_fields(cipher: TokenCipher, tokens: TokenSet, *, email: str, name
 
 @dataclass(frozen=True)
 class PendingConnection:
-    """A native flow's finished exchange, not yet stored: ``issue_handoff`` seals it into the one-time code."""
+    """A native flow's finished exchange, not yet stored: ``HandoffStore.issue`` seals it into the one-time code."""
     owner: str | None
     provider: str
     connection_name: str

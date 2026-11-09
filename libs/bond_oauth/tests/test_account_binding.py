@@ -112,3 +112,27 @@ def test_a_provider_that_exposes_no_subject_fails_closed(session, cipher):
     with pytest.raises(OAuthError) as caught:
         finish(session, cipher, blank, flow)
     assert caught.value.code == "account_mismatch"
+
+
+def test_start_flow_stores_device_hash_and_attempt_id(session, cipher, fake):
+    flow = begin(session, cipher, fake, native=True, device_hash="ab" * 32, attempt_id="att_1-x")
+    state = decode_state(cipher, flow.state)
+    assert (state.device_hash, state.attempt_id, state.native) == ("ab" * 32, "att_1-x", True)
+
+
+def test_start_flow_defaults_leave_both_unset(session, cipher, fake):
+    state = decode_state(cipher, begin(session, cipher, fake).state)
+    assert state.device_hash is None and state.attempt_id is None
+
+
+@pytest.mark.parametrize("kw", [{"device_hash": "AB" * 32}, {"device_hash": "ab" * 31}, {"device_hash": ""},
+                                {"attempt_id": "a b"}, {"attempt_id": ""}, {"attempt_id": "a" * 65}])
+def test_start_flow_validates_both(session, cipher, fake, kw):
+    with pytest.raises(OAuthError) as caught:
+        begin(session, cipher, fake, **kw)
+    assert caught.value.code == "invalid_request"
+
+
+def test_store_connection_is_exported():
+    import bond_oauth
+    assert bond_oauth.store_connection is bond_oauth.service.store_connection

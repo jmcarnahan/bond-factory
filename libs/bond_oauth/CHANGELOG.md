@@ -1,8 +1,9 @@
 # Changelog
 
 ## 0.2.0 - unreleased
-Additive: every 0.1.0 call keeps working. Connect-native still uses the process-local registry (`handoff.py`) until
-the example switches to `HandoffStore(purpose="connect")` in phase 2.
+Additive: every 0.1.0 call keeps working. Native connect goes through `HandoffStore(purpose="connect")` (the example's
+`routes/connect_native.py`); the process-local registry functions in `handoff.py` are deprecated, kept for 0.2.x
+compatibility and removed in 0.3.0.
 - `SignInFlow.peek(state=)` and `StateInfo`: pure decode (no network). Raises `invalid_state` for an unauthentic state;
   an authentic expired state is returned with `expired=True` (`complete` raises `signin_expired`).
 - Tenant pin at construction: `SignInFlow` raises `ValueError` for a Microsoft provider (not `unsigned_ids_ok`) without a
@@ -26,6 +27,8 @@ the example switches to `HandoffStore(purpose="connect")` in phase 2.
   `is_identity_only(provider_name, scopes)`.
 - `OAuthProvider.authorize_url` gains `offline`, `prompt`, `nonce`, `login_hint` (Google: `access_type=online` and
   `prompt=select_account` when not offline); `MicrosoftOAuth(pinned_tenant=)`; `MicrosoftOAuth.userinfo` adds `mail`.
+- `start_flow(device_hash=, attempt_id=)` store a native connect's device hash and attempt id in the state (same
+  validation as `SignInFlow.start`: `invalid_request`); `store_connection` is exported from the barrel.
 - Connect account binding: `start_flow(login_hint=, expected_subject=, set_id=)`; `complete` raises `account_mismatch`
   (skipped for `shared`). `service.connection_fields` builds the row values.
 - `FakeOAuth`: `unsigned_ids_ok`, `client_id`, `kind`, `pinned_tenant`, `set_scopes`, `clock`; codes `mock` and

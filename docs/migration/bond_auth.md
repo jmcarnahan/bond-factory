@@ -46,17 +46,18 @@ No database change. Config:
 ## 5. Refresh sessions (0.2.0, for apps on direct sign-in)
 
 The one-string `TokenStore` stays for apps without sessions. With sessions:
-- `RefreshTokenStore` (`load`, `save`, `clear`, `reload`) holds the refresh token: `InMemoryRefreshTokenStore`, `NoRefreshTokenStore`
+- `RefreshTokenStore` (`load`, `save`, `clear`, `reload`, `loadRotation`, `saveRotation`) holds the refresh token: `InMemoryRefreshTokenStore`, `NoRefreshTokenStore`
   (web: the HttpOnly cookie carries it; delivery is decided by the injected store, never by `Platform`), and
   `bond_signin_ui`'s `SecureRefreshTokenStore` over `flutter_secure_storage` on a phone, so the app writes no storage code.
 - `AuthSession.refreshToken` is nullable. `GatewayBase` saves the NEW refresh token before the access token (write-ahead) and
   `LiveTokenForgetter.forget` clears both slots. `reload()` runs before every rotate so two isolates share one token.
 - Renewal is single-flight (five concurrent 401s make one `POST /auth/refresh`). 401 `refresh_reused`, `refresh_expired` or
-  `refresh_revoked` clears both slots and fires `onSessionExpired`; network errors and 5xx keep both and return null.
+  `refresh_revoked`, `session_revoked` or `invalid_handoff` clears both slots and fires `onSessionExpired`; network errors and 5xx keep both and return null.
 - `GatewayBase.lastEndReason` and an `onSessionEnded(String code)` callback let the UI show the `refresh_reused` message.
-- `OidcAuthGateway` (in `bond_signin`) implements `AuthGateway`: it posts `/auth/refresh` with the stored token on a phone and `{}`
-  with credentials on web, then reads `/auth/me`. E-mail and password methods throw `UnsupportedError`; use `FirebaseAuthGateway`
-  for break-glass. `AuthProviders` gains `signin`, `breakGlass` and `defaultFlow`; unknown keys are ignored. <!-- check -->
+- `OidcAuthGateway` (in `bond_signin`) implements `AuthGateway`. `exchangeForRefresh` posts `{rotation_id}` (cookie delivery) or
+  `{refresh_token, rotation_id, delivery: "body"}` to `/auth/refresh` and reads the user from the answer. `completeWeb()` posts `{}`
+  after a `signin=ok` return; `completeNative(attempt, code)` redeems. E-mail and password methods throw `UnsupportedError`; use
+  `FirebaseAuthGateway` for break-glass. `AuthProviders` gains `signin`, `breakGlass` and `defaultFlow`; unknown keys are ignored.
 
 ## 6. Acceptance
 

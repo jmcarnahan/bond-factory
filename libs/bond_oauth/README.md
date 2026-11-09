@@ -32,17 +32,14 @@ disconnect(session, user_id=uid, provider_name="google", connection_model=OAuthC
 - Native apps have no browser session cookie, so this web binding does not cover them. They use the code-exchange
   variant: `start_flow(..., native=True)` marks the state native; the callback calls `complete(...,
   expected_nonce=None, expected_user_id=None)` (accepted ONLY for a native state), which exchanges the code but
-  STORES NOTHING and returns a `PendingConnection`. `issue_handoff(pending, cipher=)` seals it (encrypted tokens
-  included) into a 120 s one-time code. The app redeems it with its bearer token via `redeem_handoff(session, code=,
-  user_id=, cipher=, connection_model=)`, which inserts the row only for the user who started the flow. A victim
-  lured through an attacker's link gets a code bound to the attacker, is refused and nothing is stored. Expired,
-  used, damaged or another user's codes raise `OAuthError("invalid_handoff")`. Single use is a process-local registry:
-  a replay within 120 s after a restart, or in another process, re-stores the connection and can undo a disconnect;
-  for multi-process deployments keep a nonce table in the app. The code is bound to the user, not the device: a
-  custom URL scheme can be claimed by another app on the phone, so use universal/app links in production (a consent
-  screen cannot prevent it). The code carries the encrypted tokens and can reach about 5 KB with provider-sized
-  tokens (fine for iOS and Android intents, but long). `redeem_handoff(..., expected_provider=)` refuses a code for another provider before
-  anything is stored.
+  STORES NOTHING and returns a `PendingConnection`. The app seals it with
+  `HandoffStore.issue(purpose="connect", ...)` (tokens stay in the database row, never in a URL; 120 s, single use by
+  one `UPDATE`, bound to the device secret) and redeems it with its bearer token and the device secret; the route then
+  stores through `store_connection` only for the user who started the flow. A victim lured through an attacker's link
+  gets a code bound to the attacker, is refused and nothing is stored. See the example's `routes/connect_native.py`.
+  The old `issue_handoff` / `redeem_handoff` / `forget_handoffs` (process-local registry) are deprecated, kept for
+  0.2.x compatibility and removed in 0.3.0. A custom URL scheme can be claimed by another app on the phone; the device
+  secret makes an intercepted code useless, and universal/app links remain the production choice.
 - One live row per (owner, provider, connection_name) is also enforced by the partial unique index
   `uq_oauth_connections_live`. A callback that loses a race is retried once after revoking the winner's row, then
   raises `OAuthError("conflict")`.
@@ -90,7 +87,7 @@ flow.store(session, OAuthConnection, owner=user_id, result=result)   # one live 
   true only when a tenant is pinned. Google `email_verified` may be a bool or `"true"`/`"false"`.
 - `flow.peek(state=)` decodes a state with no network (`StateInfo`, incl. `expired`; unauthentic is `invalid_state`).
   A real Microsoft provider needs a GUID tenant pin at construction (`common` and the like are refused).
-  Connect-native still uses the old process-local registry until the example moves to `HandoffStore` (phase 2).
+  Native connect goes through `HandoffStore` (the example's `routes/connect_native.py`).
 - Role asks (connect) bind to the account: `start_flow(login_hint=, expected_subject=)`; `complete` raises
   `account_mismatch` for another account, except `shared=True`.
 - `HandoffStore(model, cipher)` over `HandoffsMixin` (table `oauth_handoffs`): `issue` (sealed payload, device hash,

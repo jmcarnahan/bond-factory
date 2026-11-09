@@ -10,23 +10,23 @@ list and the return banner. The server half is `bond_oauth` (see `bond_oauth.md`
 |---|---|
 | `ConnectionStatus` | One row of `GET /connections`: provider, connected, email, connectedAt, needsReconnect, scopes |
 | `ConnectionPhase` | disconnected, connected, needsReconnect (derived; a needed reconnect wins). Not called `ConnectionState`: Flutter exports that name |
-| `ConnectionsApi(ApiClient)` | `list()`, `startUrl(provider, redirectTo:, native:, set:)`, `redeem(provider, code, deviceSecret)`, `disconnect(provider)` |
-| `ConnectionList`, `WantedSet` | `{connections, wanted}`; a set is `{id, provider, label, scopes, granted}`; a bare array reads as no sets |
+| `ConnectionsApi(ApiClient)` | `list()` (bare array only), `listAll()` (the `{connections, wanted}` answer; use it), `wanted()`, `startUrl(provider, redirectTo:, native:, set:, deviceChallenge:, attempt:)`, `redeem(provider, code, deviceSecret:)`, `disconnect(provider)` |
+| `ConnectionList`, `WantedSet` | `{connections, wanted}`; a set is `{id, provider, label, scopes, granted}`; `listAll()` reads a bare array as no sets |
 | `DemoConnectionsApi` | `simulateExpiry(provider)`, fake mode only |
 | `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`, `code` and `attempt` (native) from the address the browser came back to; null when absent |
-| `ConnectionLabels` | Every string, English defaults, `{provider}` placeholders, reason codes in plain words |
+| `ConnectionLabels` | Every string, English defaults, `{provider}` placeholders, reason codes in plain words (including `consent_declined`, `account_mismatch`) |
 | `BondConnectionCard`, `BondConnectionsList`, `BondConnectionReturnBanner` | The widgets; `semanticsId` is a prefix (`sdk.connections` gives `.card-<p>`, `.connect-<p>`, `.reconnect-<p>`, `.disconnect-<p>`) |
 
 ## 2. App A: connect_gmail_card
 
-- `ConnectGmailCard` becomes `BondConnectionCard` for provider `google`, fed by `ConnectionsApi.list()`.
-- Its mail connection provider and notifier stay in the app: they only hold what `list()` returned and a busy flag.
+- `ConnectGmailCard` becomes `BondConnectionCard` for provider `google`, fed by `ConnectionsApi.listAll()`.
+- Its mail connection provider and notifier stay in the app: they only hold what `listAll()` returned and a busy flag.
 - `?mail=connected|error` becomes `ConnectionReturn.parse(Uri.base)` shown by `BondConnectionReturnBanner`.
 - `onOpenUrl` stays the app's choice. Web: navigate the whole window to `startUrl`. Phone: see section 4.
 - The inline disconnect confirm is built in (two-step `BondConfirm`, no dialog).
 - Dropped: the calendar permission line, the "fallback mailbox" line and the phone "check again" button. They are app
   details; keep them next to the card, or read `scopes` for the calendar one.
-- The resume hook (`didChangeAppLifecycleState`) stays in the app: call `list()` again, there is nothing else to restore.
+- The resume hook (`didChangeAppLifecycleState`) stays in the app: call `listAll()` again, there is nothing else to restore.
 
 ## 3. App S: connect_microsoft_screen and microsoft_status
 
@@ -36,7 +36,7 @@ list and the return banner. The server half is `bond_oauth` (see `bond_oauth.md`
 - `/connections/microsoft/authorize?token=` (a token in the query string) is replaced by `startUrl` and `/go`, which use
   the session cookie. No token is put in an address.
 - `?connection=microsoft&status=success|error&message=` becomes `connection=connected|error&provider=microsoft&reason=`.
-- The mandatory connect step after sign-in stays in the app's router; it reads `list()` and checks `phase`.
+- The mandatory connect step after sign-in stays in the app's router; it reads `listAll()` and checks `phase`.
 - The embedded web view, its redirect interception and the URL rewriting for a phone are not lifted (section 4).
 
 ## 4. The /go flow, the session cookie and the native limit
@@ -47,7 +47,7 @@ list and the return banner. The server half is `bond_oauth` (see `bond_oauth.md`
    API session cookie; the server checks the state belongs to that person, sets an httponly nonce cookie and redirects
    to the provider.
 3. The callback needs both cookies, then redirects to `redirectTo` with `connection=` and `provider=`.
-4. The app loads afresh. It reads the return parameters, shows the banner, and calls `list()`. Nothing is kept in memory
+4. The app loads afresh. It reads the return parameters, shows the banner, and calls `listAll()`. Nothing is kept in memory
    across the trip.
 
 On web the HTTP client must send cookies to the API origin (the demo uses a browser client with credentials, see
@@ -57,11 +57,11 @@ Native apps have no browser session cookie, so they use the code-exchange varian
 ### Phone apps
 
 1. Make a device secret and its sha256 challenge (`SignInAttempt` in `bond_signin`). `startUrl(provider, redirectTo: <return url>,
-   native: true)` with the bearer token; `redirectTo` is the https app-link return or an entry of the server's native scheme list.
-2. Open that URL in the system browser session (`BrowserAuth` in `bond_signin_ui`); no cookie is needed or set. <!-- check -->
+   native: true, deviceChallenge:, attempt:)` with the bearer token; `redirectTo` is the same https app link or native scheme as sign-in.
+2. Open that URL in the system browser session (`BrowserAuth` in `bond_signin_ui`); no cookie is needed or set.
 3. The server redirects to the return URL with `connection=connected&provider=<p>&attempt=<id>&code=<handoff>` (or `connection=error`).
    Read it with `ConnectionReturn.parse(uri)`.
-4. Call `redeem(provider, code, deviceSecret)` with the bearer token. The connection is stored only now, only for the user who
+4. Call `redeem(provider, code, deviceSecret: secret)` with the bearer token. The connection is stored only now, only for the user who
    started the flow and only with the right secret; the code works once, within 120 s. It returns the status.
 
 ## 5. Role asks (`wanted` sets)
@@ -71,9 +71,10 @@ Native apps have no browser session cookie, so they use the code-exchange varian
   the next load; a declined ask leaves the set wanted with `consent_declined`.
 - `BondScopeAskCard(wanted, onAsk)` (in `bond_signin_ui`) shows each ungranted set inline with one button; no dialog.
   `BondConnectionsList` keeps showing status and reconnect.
-- Native: `startUrl(..., native: true)` needs the device challenge; the return carries `attempt` as well as `code`. The app drops
+- Native: `startUrl(..., native: true)` needs `deviceChallenge` and `attempt`; the return carries `attempt` as well as `code`. The app drops
   a return whose `attempt` is not the pending one and passes its device secret to `redeem`. Return URL rules: `bond_signin.md`.
-- A connect for a different account than the signed-in one is refused `account_mismatch`, except shared connects. <!-- check -->
+- A connect for a different account than the signed-in one returns `connection=error&reason=account_mismatch`, except shared connects.
+  A consent that leaves the asked set unticked stores no row and returns `consent_declined`.
 
 ## 6. Acceptance
 
@@ -85,8 +86,7 @@ Native apps have no browser session cookie, so they use the code-exchange varian
 
 ## 7. Known gaps
 
-- Hand-offs are DB rows (`oauth_handoffs`); the process-local registry is gone. See `bond_oauth.md` section 6. <!-- check -->
-- The navigation helpers moved from the demo into `bond_signin_ui` (`lib/src/browser/`); the demo imports them. <!-- check -->
-- The return parameters stay in the address bar after the banner is dismissed; `ConnectionReturn.cleaned` gives the
-  address without them for apps whose router can replace the location.
+- Hand-offs are DB rows (`oauth_handoffs`); the old process-local registry is deprecated until 0.3.0. See `bond_oauth.md` section 6.
+- The navigation helpers moved from the demo into `bond_signin_ui` (`lib/src/browser/`); the demo imports them.
+- `ConnectionReturn.cleaned` gives the address without the return parameters; the demo clears the address after the first read.
 - Display names and logos are the app's: pass `ConnectionLabels.providerNames` and `logo`.

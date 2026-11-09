@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import re
 import secrets
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -19,15 +18,12 @@ from typing import Any
 from bond_oauth import pkce
 from bond_oauth.cipher import TokenCipher
 from bond_oauth.errors import OAuthError, RetryableError
-from bond_oauth.guid import GUID
+from bond_oauth.guid import ATTEMPT, GUID, HEX64
 from bond_oauth.identity import OidcIdentity, identity_from_token_response
 from bond_oauth.providers import OAuthProvider
 from bond_oauth.scopes import is_identity_only, split_scopes
 from bond_oauth.service import PendingConnection, connection_fields, store_connection, utcnow
 from bond_oauth.state import decode_state, encode_state
-
-_HEX64 = re.compile(r"[0-9a-f]{64}")
-_ATTEMPT = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 @dataclass(frozen=True)
@@ -93,9 +89,9 @@ class SignInFlow:
         impl = self._providers.get(provider)
         if impl is None:
             raise OAuthError("unknown_provider", "That provider is not configured")
-        if device_hash is not None and not _HEX64.fullmatch(device_hash):
+        if device_hash is not None and not HEX64.fullmatch(device_hash):
             raise OAuthError("invalid_request", "The device hash is not valid")
-        if attempt_id is not None and not _ATTEMPT.fullmatch(attempt_id):
+        if attempt_id is not None and not ATTEMPT.fullmatch(attempt_id):
             raise OAuthError("invalid_request", "The attempt id is not valid")
         verifier, nonce = pkce.new_verifier(), secrets.token_urlsafe(12)
         oidc_nonce = hashlib.sha256(nonce.encode()).hexdigest()

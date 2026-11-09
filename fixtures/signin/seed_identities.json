@@ -1,0 +1,17 @@
+{
+  "_note": "The identities sdk_example seeds in fake mode (invited rows) plus one nobody invited. The fake consent page offers all of them. Asserted against models/auth.py by services/sdk_example/tests/test_signin.py.",
+  "identities": [
+    {"email": "demo@example.com", "name": "Demo User", "invited": true, "fake_provider": "fake-google",
+     "allow_password": true, "capabilities": ["tasks.write", "tasks.read_all", "connections.manage"],
+     "wanted_sets": ["mail_send", "calendar"]},
+    {"email": "viewer@example.com", "name": "Viewer User", "invited": true, "fake_provider": "fake-google",
+     "capabilities": [], "wanted_sets": []},
+    {"email": "crew@example.com", "name": "Crew Member", "invited": true, "fake_provider": "fake-google",
+     "capabilities": ["tasks.write"], "wanted_sets": []},
+    {"email": "demo.microsoft@example.com", "name": "Demo Microsoft", "invited": true,
+     "fake_provider": "fake-microsoft", "capabilities": ["tasks.write", "connections.manage"],
+     "wanted_sets": []},
+    {"email": "uninvited@example.com", "name": null, "invited": false, "fake_provider": "fake-google",
+     "capabilities": [], "wanted_sets": []}
+  ]
+}
