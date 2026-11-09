@@ -3,7 +3,7 @@
 Direct Google/Microsoft sign-in with our own refresh sessions, replacing Firebase sign-in. Server: `libs/bond_signin`
 (Protocol-only router factory, check order, `ScopePolicy`) over `bond_oauth` (`SignInFlow`, `HandoffStore`) and
 `bond_auth_py` (`SessionStore`). Client: `bond_signin`, `bond_signin_ui`. Contract: `docs/contracts/signin.md`.
-Reference adapter: `services/sdk_example/sdk_example/signin_wiring.py`. Legend: `docs/migration/README.md`. <!-- check -->
+Reference adapter: `services/sdk_example/sdk_example/signin_wiring.py`. Legend: `docs/migration/README.md`.
 
 The app writes ONLY a `UserDirectory`, a `ScopePolicy`, settings and a mount. Order of work: land the SDK pin and
 `bond_auth`/`bond_auth_py` first, then this (see README order). The first LIVE provider run happens here (section 6).
@@ -20,7 +20,7 @@ The app writes ONLY a `UserDirectory`, a `ScopePolicy`, settings and a mount. Or
 
 `UserDirectory` methods (the app writes all): `find_by_identity`, `find_by_id`, `find_invite(session, emails,
 provider)`, `link_identity` (raises `IdentityTaken`), `check_allowed`, `capabilities`, `session_spec`, `public`,
-`mark_sessions_invalid`, `provider_alive`, `record_sign_in`, `record_refusal`. Signatures: `libs/bond_signin/README.md`. <!-- check -->
+`mark_sessions_invalid`, `provider_alive`, `record_sign_in`, `record_refusal`. Signatures: `libs/bond_signin/README.md`.
 
 ## 2. ScopePolicy
 
@@ -35,10 +35,12 @@ identity scopes alone; a declined ask leaves the set `wanted`.
 
 ## 3. Settings and env
 
-`BOND_SIGNIN_PROVIDERS`, `BOND_GOOGLE_CLIENT_ID`/`_SECRET`, `BOND_MS_CLIENT_ID`/`_SECRET`, `BOND_MS_TENANT` (a GUID:
-`common`, `organizations`, `consumers` refuse at startup), `BOND_OAUTH_KEY`, the public base (https), the redirect
-allowlist (origins), `native_schemes`, `BOND_SIGNIN_BREAKGLASS` (default off), `BOND_AUTH_*` refresh lifetimes,
-`BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS`. Names and defaults: `docs/sdk/examples.md`; the app prefixes them its own way. <!-- check -->
+`SignInSettings` fields: providers, redirect allowlist (origins), public base (https outside fake mode), `native_return_base`, `native_schemes`,
+break-glass flag (default off). Provider env: `BOND_GOOGLE_CLIENT_ID`/`_SECRET`, `BOND_MS_CLIENT_ID`/`_SECRET`, `BOND_MS_TENANT` (a GUID: `common`,
+`organizations`, `consumers` refuse at startup), `BOND_OAUTH_KEY`, `BOND_AUTH_*` refresh lifetimes, `BOND_APPLE_APP_IDS` (csv),
+`BOND_ANDROID_APPS` (`package=FP;FP,pkg2=FP`). The example reads the rest as `SDK_EXAMPLE_*` (`docs/sdk/examples.md`); an app picks its own prefix.
+`services/sdk_example/README.md` has a copy-as-is / replace table for every example file (copy `directory.py` and `scope_policy.py`
+as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the app uses them).
 
 ## 4. Console setup (the app owner does this; nothing here is a secret)
 
@@ -55,7 +57,8 @@ allowlist (origins), `native_schemes`, `BOND_SIGNIN_BREAKGLASS` (default off), `
   `android:taskAffinity=""`, and `assetlinks.json` with debug and Play-signing SHA-256 fingerprints.
 - **iOS floor.** The apps build for iOS 15.0; the https return is honoured from iOS 17.4 and below it the plugin
   silently never returns. The app picks the return per device through `NativeReturn.choose(...)`: https on 17.4+, a
-  device-bound reverse-domain scheme below it. Raising the floor to 17.4 is the owner's decision (Q11). <!-- check -->
+  device-bound reverse-domain scheme below it. Whether the apps raise their iOS floor to 17.4 is the owners' decision (the open
+  iOS-floor question in the decision note). Not verified on a device.
 - Apple sign-in is dropped from A. Apple guideline 4.8: Google sign-in must be paired with an equivalent option unless it is
   an enterprise or business app requiring an existing enterprise account. S fits; A and P rely on reviewer judgment, with
   the break-glass password form as the reviewer path.
@@ -63,7 +66,8 @@ allowlist (origins), `native_schemes`, `BOND_SIGNIN_BREAKGLASS` (default off), `
 ## 5. Break-glass, linking, copies, what stays
 
 - **Break-glass.** The `/auth/firebase` route stays behind `BOND_SIGNIN_BREAKGLASS` for admin rows and the store
-  reviewer. A boolean column `allow_password`, owned by the app, gates who may use it. It issues the same refresh sessions
+  reviewer. A boolean column `allow_password`, owned by the app, gates who may use it (the example seeds it true for its demo user only; other rows answer
+  403 `provider_not_allowed`). It issues the same refresh sessions
   (`finish_session`, provider `password`). `firebase-admin` becomes `bond_auth_py[firebase]`.
 - **Existing Firebase users.** `identity_provider`/`identity_subject` start null. The first Google or Microsoft sign-in
   links once by a VERIFIED e-mail match in `find_invite` (P: the Firebase `identities` list already holds the Google

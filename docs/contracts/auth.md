@@ -10,10 +10,10 @@ the sign-in routes: `docs/contracts/signin.md`.
 |---|---|---|
 | `POST /auth/firebase` | `{id_token}` | `200 {token, user}` |
 | `POST /auth/refresh` | one of `{refresh_token, rotation_id?, delivery?}`, the refresh cookie, or `{id_token}` | `{token, user, refresh_token?}`; see Refresh sessions |
-| `POST /auth/demo` | `{user_id}` | `{token, user}` only when demo auth is on, else 404 |
+| `POST /auth/demo` | `{user_id, delivery?}` | `{token, user}` only when demo auth is on, else 404 |
 | `GET /auth/providers` | none | public client config, below |
 | `GET /auth/me`, `PATCH /auth/me` | `{language}` | the user |
-| `POST /auth/logout` | none, the refresh cookie, or `{refresh_token}` | `{"status": "logged_out"}`, revokes the refresh token, clears the cookies; never fails |
+| `POST /auth/logout` | none, the refresh cookie, or `{refresh_token}` | `{"status": "logged_out"}`, revokes the refresh token, clears the cookies; 403 `invalid_origin` on cookie delivery without an allowed Origin, otherwise never fails |
 | `POST /auth/sessions/revoke-all` | none, signed in | `{revoked: n}`; also sets `sessions_valid_after` |
 
 `sign_in=false` on firebase skips accepted, last-sign-in and audit bookkeeping. Refresh ignores `sign_in`: it is always a renewal.
@@ -49,15 +49,15 @@ Always compare on the real clock.
 Table `auth_sessions` (mixin `SessionsMixin`), one row per refresh token; only the sha256 is stored. Lifetimes
 (env `BOND_AUTH_`): `refresh_ttl_days` 60 sliding, `refresh_max_days` 180 absolute from the sign-in, `refresh_reuse_grace_seconds`
 20, `refresh_max_sessions_per_user` 10 families (the least recently used is revoked, reason `limit`),
-`refresh_cookie_path` `/auth`, `session_access_ttl_minutes` 60. <!-- check -->
+`refresh_cookie_path` `/auth`, `session_access_ttl_minutes` 60. Env names: `BOND_AUTH_REFRESH_TTL_DAYS`, `_MAX_DAYS`,
+`_REUSE_GRACE_SECONDS`, `_MAX_SESSIONS_PER_USER`, `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES`.
 
-- Body: `refresh_token` wins over the cookie. `delivery` is `cookie` (default, web: the token is set in a cookie and
-  absent from the JSON) or `body` (phone: the token is returned in `refresh_token`). The answer is `{token, user,
+- Body: `refresh_token` wins over the cookie. The delivery follows the client's token source: a client with no refresh-token store (web) gets the
+  token in a cookie and not in the JSON; a client with a store (phone) sends `delivery: body` and gets it in `refresh_token`. The answer is `{token, user,
   refresh_token?}` and a rotated cookie on web.
 - `rotation_id`: a random client string sent with every refresh and stored on the child row. A replay of the parent
   with the same `rotation_id` within 10 minutes while the child is unused is a retry: the unused child is revoked
   (`reason=retry`) and a fresh sibling is issued. Without a matching id the 20 s grace rule applies; after it, reuse.
-  <!-- check -->
 - Reuse: the family is revoked and the change committed before `refresh_reused` is raised. Revocation compares the
   family's `auth_time` plus 5 s with `sessions_valid_after`, never `now`.
 - Cookie `<app>_refresh_token`: HttpOnly, SameSite=Lax, Path `/auth`, set again on every rotation. Cookie POSTs need
@@ -78,7 +78,8 @@ Table `auth_sessions` (mixin `SessionsMixin`), one row per refresh token; only t
 | 401 | `refresh_reused` | "This session was ended for your security. Sign in again." |
 | 401 | `refresh_expired` | either lifetime ended; an expired attempt does not burn the token |
 | 401 | `refresh_revoked` | unknown, malformed, revoked, or the user left the directory; unknown tokens create no row |
-| 403 | `tenant_mismatch`, `consent_declined`, `signin_expired` | sign-in only; see `signin.md` |
+| 403 | `tenant_mismatch`, `consent_declined` | sign-in only; see `signin.md` |
+| 400 | `signin_expired` | stale sign-in state; see `signin.md` |
 | 501 | `firebase_not_configured` | |
 | 403 | `provider_not_allowed`, `company_suspended` | optional policy hooks |
 
@@ -92,7 +93,7 @@ Table `auth_sessions` (mixin `SessionsMixin`), one row per refresh token; only t
 
 These tiers are the Firebase path only. Direct sign-in has no verifier: the identity comes from the token response
 of the code exchange over TLS (claims checked, no signature check; `signin.md`), so `FakeOAuth` and real
-providers share one path. <!-- check -->
+providers share one path.
 
 A token that is empty or longer than 8192 characters is malformed. The verifier returns `{uid, email
 (lowercased), name, auth_time, sign_in_provider, identities}`.
@@ -124,7 +125,7 @@ provider)`. The response stays 403. Sign-in only, never refresh.
 
 With direct sign-in the payload adds `signin: [{"id": "google", "label": "Google"}]`, `break_glass: bool` (the
 Firebase e-mail form is offered only when true) and `default_flow: "signin" | "firebase"`. Clients ignore keys they
-do not know. <!-- check -->
+do not know. With the break-glass flag off, `email_password` is false.
 
 `firebase` is `null` when unconfigured. Every value is public client config; clients initialise Firebase at
 runtime from it. No `firebase_options.dart` ships in any shared package.

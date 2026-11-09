@@ -1,7 +1,7 @@
 # bond_auth_py
 
 Firebase ID token verification, the app's own session JWT, revocation, identity admin and an opt-in janitor.
-Framework-free: no FastAPI, no service kit, no database. The app wires these pieces into its routes.
+No web framework (no FastAPI, no service kit); sessions are SQLAlchemy mixins the app attaches. The app wires the routes.
 
 ## Pieces
 

@@ -14,7 +14,7 @@ Reconnect and Disconnect. A button whose callback is null is left out, and `busy
 
 ```dart
 BondConnectionsList(
-  statuses: statuses,                          // from ConnectionsApi.list()
+  statuses: statuses,                          // from ConnectionsApi.listAll().connections
   labels: const ConnectionLabels(providerNames: {'google': 'Google'}),
   onConnect: (p) => start(p),
   onReconnect: (p) => start(p),

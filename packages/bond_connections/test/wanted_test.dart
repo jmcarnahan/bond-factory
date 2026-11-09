@@ -91,8 +91,14 @@ void main() {
       final api = ConnectionsApi(apiAnswering({'url': 'http://x.test/go'}));
       await api.startUrl('google', set: 'mail');
       expect(seen.last.url.queryParameters, {'set': 'mail'});
-      await api.startUrl('google', redirectTo: 'http://app.test/c', native: true, set: 'cal');
-      expect(seen.last.url.queryParameters, {'redirect_to': 'http://app.test/c', 'mode': 'native', 'set': 'cal'});
+      await api.startUrl('google', redirectTo: 'http://app.test/c', native: true, set: 'cal', deviceChallenge: 'dc', attempt: 'at');
+      expect(seen.last.url.queryParameters, {
+        'redirect_to': 'http://app.test/c',
+        'mode': 'native',
+        'set': 'cal',
+        'device_challenge': 'dc',
+        'attempt': 'at',
+      });
       await api.startUrl('google');
       expect(seen.last.url.hasQuery, isFalse);
     });

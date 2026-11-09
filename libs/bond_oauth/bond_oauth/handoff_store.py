@@ -16,7 +16,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -27,10 +26,9 @@ from sqlalchemy.orm import Session, declared_attr
 
 from bond_oauth.cipher import TokenCipher
 from bond_oauth.errors import OAuthError
+from bond_oauth.guid import ATTEMPT, HEX64
 
 HANDOFF_TTL_SECONDS = 120
-_HEX64 = re.compile(r"[0-9a-f]{64}")
-_ATTEMPT = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 def _uuid() -> str:
@@ -79,9 +77,9 @@ class HandoffStore:
               attempt_id: str | None, ttl: int = HANDOFF_TTL_SECONDS, now: float | None = None) -> str:
         """Store a sealed payload and return the one-time code (only its hash is kept). ``device_hash`` must be 64
         lowercase hex; a bad one is ``OAuthError("invalid_request")``. Commits."""
-        if not _HEX64.fullmatch(device_hash or ""):
+        if not HEX64.fullmatch(device_hash or ""):
             raise OAuthError("invalid_request", "The device hash is not valid")
-        if attempt_id is not None and not _ATTEMPT.fullmatch(attempt_id):
+        if attempt_id is not None and not ATTEMPT.fullmatch(attempt_id):
             raise OAuthError("invalid_request", "The attempt id is not valid")
         code = secrets.token_urlsafe(32)
         stamp = _naive_utc(now)

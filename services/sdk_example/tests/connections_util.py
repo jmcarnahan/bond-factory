@@ -32,16 +32,16 @@ def begin(client, h, provider="fake-google", redirect_to=APP):
 
 
 def connect(client, h, provider="fake-google", redirect_to=APP):
-    """start -> go -> consent page -> its one button -> callback. Returns the final (redirect) response."""
+    """start -> go -> consent page (it has an Allow button) -> callback with the plain `mock` code. Returns the final (redirect) response."""
     state = begin(client, h, provider, redirect_to)
     page = client.get("/connections/fake/consent", params={"state": state})
-    assert page.status_code == 200 and page.text.count("<button") == 1
+    assert page.status_code == 200 and "id=sdk-consent-allow" in page.text
     return client.get(f"/connections/{provider}/callback", params={"state": state, "code": "mock"}, headers=h,
                       follow_redirects=False)
 
 
 def statuses(client, h):
-    return {row["provider"]: row for row in client.get("/connections", headers=h).json()}
+    return {row["provider"]: row for row in client.get("/connections", headers=h).json()["connections"]}
 
 
 def live_rows(app):

@@ -34,6 +34,7 @@ from bond_oauth.service import (
     start,
     start_flow,
     status,
+    store_connection,
 )
 from bond_oauth.signin import SignInFlow, SignInResult, StartedSignIn, StateInfo
 from bond_oauth.state import StatePayload, decode_state, encode_state
@@ -47,5 +48,5 @@ __all__ = [
     "PendingConnection", "ProviderError", "ReconnectRequired", "RetryableError", "SignInFlow", "SignInResult",
     "StartedFlow", "StartedSignIn", "StateInfo", "StatePayload", "TokenCipher", "TokenSet", "access_token", "complete",
     "decode_state", "disconnect", "encode_state", "forget_access", "identity_from_token_response", "is_identity_only",
-    "issue_handoff", "pkce", "redeem_handoff", "scope_drift", "start", "start_flow", "status",
+    "issue_handoff", "pkce", "redeem_handoff", "scope_drift", "start", "start_flow", "status", "store_connection",
 ]

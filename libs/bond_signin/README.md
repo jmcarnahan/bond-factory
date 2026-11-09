@@ -1,7 +1,7 @@
 # bond_signin
 
 Direct Google/Microsoft sign-in for a FastAPI service: Protocol seams, a scope policy, the fixed refusal order and
-a router factory. It imports `fastapi`, `pydantic`, `sqlalchemy` and the standard library only. No sibling `bond_*`
+a router factory. It imports `fastapi` (with starlette) and the standard library only. No sibling `bond_*`
 lib is imported: `bond_oauth` (`SignInFlow`, `HandoffStore`) and `bond_auth_py` (`SessionStore`) ship classes whose
 shapes satisfy the Protocols here, and errors are matched by a `code` attribute.
 
@@ -47,7 +47,7 @@ inside it so the audit row and the family revoke are committed.
 | `GET /auth/signin/{p}/callback` | `state`, `code` or `error` | 302 to `redirect_to?signin=ok` or `?signin=error&reason=` (native: `?attempt=&code=` or `&error=`) | 400 `invalid_state` (no redirect) |
 | `POST /auth/signin/redeem` | `{code, device_secret, device_label?}` | `{token, expires_in, refresh_token, user}` | 401 `invalid_handoff`, 403 `deactivated`, 401 `session_revoked` |
 | `POST /auth/refresh` | `{refresh_token?, rotation_id?, delivery?}` or `{id_token}` (legacy) | `{token, expires_in, user, refresh_token?}` | 401 `refresh_reused`, `refresh_expired`, `refresh_revoked`, `invalid_token` |
-| `POST /auth/logout` | cookie or `{refresh_token}` | `{"status": "logged_out"}` | never fails |
+| `POST /auth/logout` | cookie or `{refresh_token}` | `{"status": "logged_out"}` | 403 `invalid_origin` on cookie delivery without an allowed Origin; otherwise never fails (a revoke error is swallowed) |
 | `POST /auth/sessions/revoke-all` | signed in | `{revoked: n}` | 401 `invalid_token` |
 | `GET /auth/providers` | optional (`include_providers`) | your payload plus `signin`, `break_glass`, `default_flow` | |
 | `GET /app/return/{p}` | | static "Return to the app" page | |

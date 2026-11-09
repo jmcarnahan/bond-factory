@@ -43,10 +43,10 @@ def test_the_clock_is_released_after_the_pass(client, app):
 def test_without_now_it_uses_real_time_and_old_jobs_run(client, app):
     h = headers(client)
     make_task(client, h, "10:00")  # 2026-11-08 is not in the past of the real clock when the suite runs later
-    ran = client.post("/jobs/tick", json={}, headers=h).json()["ran"]
+    ran = [r for r in client.post("/jobs/tick", json={}, headers=h).json()["ran"] if r["job_type"] == "task_reminder"]
     with app.state.session_factory() as session:
-        pending = session.query(BackgroundJob).filter_by(status="pending").count()
-    assert len(ran) + pending == 1
+        pending = session.query(BackgroundJob).filter_by(status="pending", job_type="task_reminder").count()
+    assert len(ran) + pending == 1  # (the daily signin_prune job is a different type)
 
 
 def test_bad_now_is_a_422(client):

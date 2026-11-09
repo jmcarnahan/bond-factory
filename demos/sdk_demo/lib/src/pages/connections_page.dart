@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:bond_api/bond_api.dart';
 import 'package:bond_connections/bond_connections.dart';
 import 'package:bond_connections_ui/bond_connections_ui.dart';
+import 'package:bond_signin/bond_signin.dart';
+import 'package:bond_signin_ui/bond_signin_ui.dart';
 import 'package:bond_ui/bond_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../example_api.dart';
 import '../theme.dart';
-import 'connections_nav_io.dart' if (dart.library.js_interop) 'connections_nav_web.dart';
 import 'page_scaffold.dart';
 
 const _labels = ConnectionLabels(providerNames: {
@@ -18,7 +22,9 @@ const _labels = ConnectionLabels(providerNames: {
 
 /// OAuth connections against the example API. On build it signs in and reads
 /// `GET /connections`; Connect asks for the start address and sends the whole
-/// browser window there (top level, so the API session cookie goes along). The
+/// browser window there (top level, so the API session cookie goes along). Sets
+/// the role wants ([BondScopeAskCard], from `wanted`) start the same flow with
+/// `?set=<id>`; the list is read again after the return. The
 /// provider, or in fake mode the consent page, then sends the browser back to
 /// `/connections?connection=connected&provider=...`, the app loads afresh and
 /// shows the return banner. Nothing is kept in memory across that trip: every
@@ -36,12 +42,12 @@ class ConnectionsPage extends StatefulWidget {
   final Future<Object?> Function()? ensureSignedIn;
 
   /// Sends the browser to the start address and returns true; returns false
-  /// when there is no browser (the page then shows the address). Defaults to a
-  /// real top-level navigation on web.
+  /// when there is no browser (the page then shows the address). Defaults to
+  /// `defaultBrowserAuth()` (a top-level navigation) on web.
   final bool Function(Uri url)? navigate;
 
   /// Puts the cleaned address (return parameters removed) in the address bar.
-  /// Defaults to `history.replaceState` on web and nothing elsewhere.
+  /// Defaults to `replaceAddress` of `bond_signin_ui`.
   final void Function(Uri url)? replaceUrl;
 
   @override
@@ -62,6 +68,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
   bool? _canManage;
 
   List<ConnectionStatus>? _statuses;
+  List<WantedSet> _wanted = const [];
   String? _busy;
   String? _error;
   Uri? _startUrl;
@@ -91,12 +98,13 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
       final caps = DemoSession.session?.capabilities;
       final allowed = caps == null || caps.contains('connections.manage');
       await action();
-      final fresh = await _api.list();
+      final fresh = await _api.listAll();
       if (mounted) {
         setState(() {
           _canManage = allowed;
-          _statuses = fresh;
-          _judgeReturn(fresh);
+          _statuses = fresh.connections;
+          _wanted = fresh.wanted;
+          _judgeReturn(fresh.connections);
         });
       }
     } on ApiException catch (e) {
@@ -157,7 +165,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     try {
       await _signIn();
       final url = await _api.startUrl(provider, redirectTo: _redirectTo);
-      final left = (widget.navigate ?? navigateTopLevel)(url);
+      final left = (widget.navigate ?? _leave)(url);
       if (!left && mounted) setState(() => _startUrl = url);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = _describe(e));
@@ -166,6 +174,36 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     } finally {
       if (mounted) setState(() => _busy = null);
     }
+  }
+
+  /// Asks for a wanted set: the same connect flow with `?set=<id>`.
+  Future<void> _ask(WantedSet set) async {
+    if (_busy != null) return;
+    setState(() {
+      _busy = set.provider;
+      _error = null;
+      _startUrl = null;
+    });
+    try {
+      await _signIn();
+      final url = await _api.startUrl(set.provider, redirectTo: _redirectTo, set: set.id);
+      final left = (widget.navigate ?? _leave)(url);
+      if (!left && mounted) setState(() => _startUrl = url);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = _describe(e));
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  /// The system-browser port: on web the window leaves for [url] (the call never
+  /// returns); elsewhere there is no window, so the page shows the address.
+  bool _leave(Uri url) {
+    if (!kIsWeb) return false;
+    unawaited(defaultBrowserAuth().run(url, callback: Uri.parse(_redirectTo ?? url.toString())));
+    return true;
   }
 
   static const String _noManage = 'This account cannot change connections (it needs the connections.manage capability).';
@@ -215,6 +253,10 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
             ),
           if (statuses == null && _error == null)
             _labeled('loading', 'Loading connections...', const Text('Loading connections...')),
+          if (_wanted.any((w) => !w.granted) && _canManage != false) ...[
+            BondScopeAskCard(wanted: _wanted, labels: const SignInLabels(), onAsk: _ask),
+            BondSpace.h12,
+          ],
           if (statuses != null)
             Semantics(
               identifier: 'sdk.connections.list',

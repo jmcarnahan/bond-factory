@@ -14,7 +14,7 @@ Role: direct Google/Microsoft sign-in. Protocol seams, scope policy, fixed check
 - `make lint`
 
 ## Rules
-- Imports fastapi, pydantic, sqlalchemy and the standard library only.
+- Imports fastapi (with starlette) and the standard library only.
 - No imports of any sibling bond_* lib (tool/boundary_gate.sh); seams are Protocols, errors are matched by a `code` attribute.
 - No network in tests. No secrets, emails or customer data.
 - Public API change: update `__init__.py` and CHANGELOG.md together. 300-line soft cap per source file.

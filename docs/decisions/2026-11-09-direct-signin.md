@@ -18,7 +18,7 @@ to 1,100, P about 2,000 to 625 (estimates; each app keeps one directory file, on
   scopes alone.
 - **D2 Sessions.** Our own rotating refresh tokens in `bond_auth_py` (`SessionsMixin`, table `auth_sessions`): reuse detection
   with a 20 s grace and a client `rotation_id` for lost responses, 60 days sliding, 180 days absolute, 10 families per user,
-  access JWT 60 minutes with a `sid` claim. A provider liveness probe runs at most once per 24 h per family. <!-- check -->
+  access JWT 60 minutes with a `sid` claim. A provider liveness probe runs at most once per 24 h per family.
 - **D3 Break-glass.** Firebase e-mail and password stays behind `BOND_SIGNIN_BREAKGLASS` (default off) for admin rows and the
   store reviewer. Those sign-ins get the same refresh sessions. `firebase-admin` is the optional extra `bond_auth_py[firebase]`.
 - **D4 Identity.** `(identity_provider, identity_subject)` bound on first sign-in: Google `sub`, Microsoft `tid:oid`. E-mail is
@@ -29,12 +29,12 @@ to 1,100, P about 2,000 to 625 (estimates; each app keeps one directory file, on
 - **D6 Native binding.** The app is the PKCE client of OUR server: a 32-byte device secret, its sha256 sent at start, the
   secret presented at redeem. Hand-off codes live in a DB table, are single use by one `UPDATE`, burn on mismatch and expire in
   120 s. Return URL is an https app link where the iOS floor allows it; a device-bound reverse-domain scheme is allowed in
-  production as the fallback (residual risk: denial of service). Embedded web views are forbidden.
+  production as the fallback (residual risk: denial of service); connect-native accepts the same return forms. Embedded web views are forbidden.
 - **D7 Connect-native** keeps "store nothing until redeem"; sign-in-native stores the connection under the identified user at
   the callback and hands off only `{user_id, provider, auth_time, attempt}`.
 - **D8 `bond_signin`** is a Protocol-only lib with the router factory, the check order and `ScopePolicy`. It imports neither
   `bond_oauth` nor `bond_auth_py`; their classes satisfy its Protocols by shape, so the app writes only a `UserDirectory`,
-  settings and a mount. It reads exception codes by a string `code` attribute, never by class. <!-- check -->
+  settings and a mount. It reads exception codes by a string `code` attribute, never by class.
 - **D9 Dart.** `packages/bond_signin` (pure) and `packages/bond_signin_ui` (Flutter: widgets and the system-browser port).
   Sign-in UI is not in `bond_connections_ui`: P must not import connection UI to sign in.
 - **D10 Scopes** come from the app's `ScopePolicy`, never from `GOOGLE_DEFAULT`. Identity-only sign-in requests no offline access
@@ -64,7 +64,7 @@ D11 of the architecture decision (no lib imports another) stands. A real `bond_s
   declaration could pull a squatter; revision skew between siblings; a consumer-side rule the apps can get wrong.
 
 Cost: reverse a decision, rewrite a gate, add a per-app rule. The Protocol-only lib has none of these. A gate
-(`tool/boundary_gate.sh`) now also fails when a lib's `pyproject.toml` lists a `bond_` dependency. <!-- check -->
+(`tool/boundary_gate.sh`) now also fails when a lib's `pyproject.toml` lists a `bond_` dependency.
 
 ## Positions and follow-ups
 

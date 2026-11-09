@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .. import wiring
 from ..auth_dep import current_user_id
+from ..signin_prune import schedule as schedule_prune
 
 
 class TickBody(BaseModel):
@@ -43,7 +44,8 @@ def register(app: FastAPI) -> None:
         if body is not None and body.now:
             wiring.set_now(request.app, parse_now(body.now))
         try:
-            ran = bond_jobs.tick(state.engine, state.session_factory, state.job_registry, state.clock)
+            ran = bond_jobs.tick(state.engine, state.session_factory, state.job_registry, state.clock,
+                                 before=schedule_prune)  # an app's worker loop passes the same hook
         finally:
             wiring.set_now(request.app, None)
         return {"ran": ran}
