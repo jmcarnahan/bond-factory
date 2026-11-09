@@ -1,0 +1,48 @@
+{
+  "results": [
+    {
+      "seq": 0,
+      "status": "ok"
+    },
+    {
+      "seq": 1,
+      "status": "ok"
+    },
+    {
+      "seq": 2,
+      "status": "rejected",
+      "code": "invalid",
+      "message": "That id is not valid"
+    },
+    {
+      "seq": 3,
+      "status": "skipped",
+      "code": "already"
+    },
+    {
+      "seq": 4,
+      "status": "rejected",
+      "code": "conflict",
+      "message": "conflict"
+    },
+    {
+      "seq": 5,
+      "status": "rejected",
+      "code": "invalid",
+      "message": "title_required"
+    },
+    {
+      "seq": 6,
+      "status": "rejected",
+      "code": "not_found",
+      "message": "Not found"
+    },
+    {
+      "seq": 7,
+      "status": "rejected",
+      "code": "unsupported",
+      "message": "Not supported"
+    }
+  ],
+  "server_now": "2026-11-08T17:04:05.123Z"
+}

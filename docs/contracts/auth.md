@@ -14,7 +14,7 @@ the example uses `/auth`. Errors use `docs/contracts/error_body.md`.
 | `GET /auth/me`, `PATCH /auth/me` | `{language}` | the user |
 | `POST /auth/logout` | none | `{"status": "logged_out"}`, clears the cookie |
 
-`sign_in=false` on firebase and refresh skips accepted, last-sign-in and audit bookkeeping.
+`sign_in=false` on firebase skips accepted, last-sign-in and audit bookkeeping. Refresh ignores `sign_in`: it is always a renewal.
 Rate limit on firebase and refresh: `20/minute` by default.
 
 ## User

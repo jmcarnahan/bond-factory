@@ -1,6 +1,6 @@
 import pytest
 
-from sdk_example.settings import Settings
+from sdk_example.settings import DEV_SECRET, Settings
 
 
 def test_defaults(monkeypatch, tmp_path):
@@ -9,7 +9,7 @@ def test_defaults(monkeypatch, tmp_path):
     s = Settings.from_env()
     assert s.mode == "fake"
     assert s.database_url == "sqlite:///out/sdk_example.db"
-    assert s.auth_secret == "dev-secret-change-me"
+    assert s.auth_secret == DEV_SECRET
     assert s.cors_origins == ("http://localhost:8078",)
     assert s.redirect_allowlist == ("http://localhost:8078",)
     assert s.tz == "UTC"
@@ -48,7 +48,7 @@ def test_real_mode_without_secret_raises(monkeypatch):
 
 def test_real_mode_with_dev_secret_raises(monkeypatch):
     monkeypatch.setenv("SDK_EXAMPLE_MODE", "real")
-    monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", "dev-secret-change-me")
+    monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", DEV_SECRET)
     with pytest.raises(RuntimeError):
         Settings.from_env()
 
