@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Boundary gate. Keeps the module layers apart:
 #  (i)   a core package (packages/bond_* whose pubspec has no `flutter:` under
-#        dependencies) must not import package:flutter, dart:ui or dart:io in lib/.
-#  (ii)  libs/bond_* must not import another libs/* package inside libs/<x>/<x>/.
+#        dependencies) must not import package:flutter, package:universal_io, dart:ui or
+#        dart:io in lib/ (a directive split over several lines counts).
+#  (ii)  libs/bond_* must not import another libs/* package inside libs/<x>/<x>/
+#        (indented and lazy imports, `import os, bond_x`, __import__ and import_module count).
+#  (iv)  no libs/bond_*/pyproject.toml lists a bond_ package as a dependency.
 #  (iii) no packages/*/pubspec.yaml names intl, flutter_localizations,
 #        flutter_riverpod or go_router (demos may).
 #
@@ -15,7 +18,7 @@ cd "$(dirname "$0")/.."
 
 case "${1:-}" in
   --help|-h)
-    sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
   "") ;;
@@ -37,7 +40,9 @@ is_flutter_pkg() {
 
 core=0
 flutter_pkgs=0
-for p in packages/bond_*; do
+PKGS_GLOB="${BOUNDARY_PKGS_GLOB:-packages/bond_*}"   # BOUNDARY_*_GLOB: aim the gate at a scratch copy in a test
+LIBS_GLOB="${BOUNDARY_LIBS_GLOB:-libs/bond_*}"
+for p in $PKGS_GLOB; do
   [[ -f "$p/pubspec.yaml" ]] || continue
   if is_flutter_pkg "$p"; then
     flutter_pkgs=$((flutter_pkgs + 1))
@@ -45,22 +50,35 @@ for p in packages/bond_*; do
   fi
   core=$((core + 1))
   [[ -d "$p/lib" ]] || continue
-  grep -rnE "^[[:space:]]*(import|export)[[:space:]]+['\"](package:flutter[/_a-z]*|dart:ui|dart:io)" \
-    "$p/lib" --include='*.dart' 2>/dev/null \
-    | sed -E 's/^([^:]+:[0-9]+):(.*)$/\1: core package imports Flutter or dart:io|dart:ui: \2/' >> "$hits" || true
+  # perl -0 reads the whole file so a directive split over lines (`import\n 'dart:io';`) is still one match
+  while IFS= read -r f; do
+    perl -0777 -ne 'while (/^[ \t]*(?:import|export)\s+([\x27"](?:package:flutter[\/_a-z]*|package:universal_io[\/_a-z]*|dart:ui|dart:io))/mg) {
+      $n = (substr($_, 0, $-[0]) =~ tr/\n//) + 1; $m = $1; $m =~ s/\s+/ /g;
+      print "$ARGV:$n: core package imports Flutter, universal_io, dart:io or dart:ui: $m\n" }' "$f" >> "$hits" || true
+  done < <(find "$p/lib" -name '*.dart' 2>/dev/null)
 done
 
 libs=0
-for l in libs/bond_*; do
+for l in $LIBS_GLOB; do
   [[ -d "$l/$(basename "$l")" ]] || continue
   libs=$((libs + 1))
   me="$(basename "$l")"
   while IFS= read -r other; do
     on="$(basename "$other")"
     [[ "$on" == "$me" ]] && continue
-    grep -rnE "^(from|import)[[:space:]]+${on}([[:space:]]|\.|$)" "$l/$me" --include='*.py' 2>/dev/null \
+    # a line-start import, `import os, bond_x`, __import__("bond_x") and importlib.import_module("bond_x")
+    grep -rnE "^[[:space:]]*(from|import)[[:space:]]+${on}([[:space:]]|\.|,|$)|^[[:space:]]*import[[:space:]].*,[[:space:]]*${on}([[:space:]]|\.|,|$)|(__import__|import_module)[[:space:]]*\([[:space:]]*['\"]${on}[.'\"]" "$l/$me" --include='*.py' 2>/dev/null \
       | sed -E "s/^([^:]+:[0-9]+):(.*)$/\1: lib imports sibling lib ${on}: \2/" >> "$hits" || true
-  done < <(ls -d libs/bond_* 2>/dev/null)
+  done < <(ls -d $LIBS_GLOB 2>/dev/null)
+done
+
+# (iv) a lib's pyproject must not name a bond_ package (a quoted requirement or a bare `bond_x =` source line);
+# its own `name` and the `include` of its package finder are fine. BOUNDARY_LIBS_GLOB lets a test aim it at a copy.
+for f in ${LIBS_GLOB}/pyproject.toml; do
+  [[ -f "$f" ]] || continue
+  grep -nE "\"bond_[A-Za-z0-9_-]+|^[[:space:]]*bond_[A-Za-z0-9_-]+[[:space:]]*=" "$f" 2>/dev/null \
+    | grep -vE '^[0-9]+:[[:space:]]*(name|include)[[:space:]]*=' \
+    | sed -E "s|^([0-9]+):(.*)\$|${f}:\1: lib pyproject depends on a bond_ package:\2|" >> "$hits" || true
 done
 
 pubspecs=0

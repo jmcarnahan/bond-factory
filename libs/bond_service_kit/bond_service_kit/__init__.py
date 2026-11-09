@@ -28,6 +28,7 @@ from .rate_limit import (
     thread_limiter,
 )
 from .upload_limit import UploadLimit
+from .well_known import well_known_router
 
 __version__ = "0.1.0"
 
@@ -37,5 +38,5 @@ __all__ = [
     "ThreadLimiter", "UnhandledErrorMiddleware", "UploadLimit", "clock", "db_session_middleware",
     "error_body", "health_router", "install_error_handlers", "limiters", "make_session_factory", "mount_uploads",
     "mount_web", "parse_rate", "rate_limit_dependency", "schema_contract", "security_headers_middleware",
-    "session_scope", "thread_limiter",
+    "session_scope", "thread_limiter", "well_known_router",
 ]

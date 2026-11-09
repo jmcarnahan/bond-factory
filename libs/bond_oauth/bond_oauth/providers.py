@@ -21,7 +21,9 @@ class TokenSet:
 
 
 class OAuthProvider(Protocol):
-    def authorize_url(self, *, state: str, challenge: str, scopes: list[str], redirect_uri: str) -> str: ...
+    def authorize_url(self, *, state: str, challenge: str, scopes: list[str], redirect_uri: str,
+                      offline: bool = True, prompt: str | None = None, nonce: str | None = None,
+                      login_hint: str | None = None) -> str: ...
 
     def exchange(self, *, code: str, verifier: str, redirect_uri: str) -> TokenSet: ...
 

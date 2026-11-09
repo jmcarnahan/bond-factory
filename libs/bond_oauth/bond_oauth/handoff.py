@@ -1,5 +1,8 @@
 """One-time hand-off of a finished native-app connection.
 
+DEPRECATED in 0.2.0 (removed in 0.3.0): use ``handoff_store.HandoffStore`` (a database table, device-bound, single
+use across processes). These functions keep working until the example switches.
+
 A phone app has no browser session, so the callback of a ``native=True`` flow runs without one. It stores NOTHING:
 ``complete`` returns a ``PendingConnection`` and ``issue_handoff`` seals it (encrypted tokens included) into a
 short-lived ``code``. The app, which holds the user's bearer token, redeems the code once, and only then is the row
@@ -40,7 +43,7 @@ _LOCK = threading.Lock()
 
 
 def forget_handoffs() -> None:
-    """Empty the single-use registry (tests)."""
+    """Empty the single-use registry (tests). Deprecated with the module: see ``HandoffStore``."""
     with _LOCK:
         _USED.clear()
 
@@ -51,7 +54,8 @@ def _invalid(message: str = "The hand-off code is not valid") -> OAuthError:
 
 def issue_handoff(pending: PendingConnection, *, cipher: TokenCipher, ttl: int = HANDOFF_SECONDS,
                   now: float | None = None) -> str:
-    """Seal a native flow's ``PendingConnection`` into a one-time code. Shared mailboxes (no owner) are refused."""
+    """Deprecated (use ``HandoffStore.issue``). Seal a native flow's ``PendingConnection`` into a one-time code.
+    Shared mailboxes (no owner) are refused."""
     if pending.owner is None:
         raise _invalid("A shared connection cannot be handed off to one user")
     issued = time.time() if now is None else now
@@ -63,7 +67,7 @@ def issue_handoff(pending: PendingConnection, *, cipher: TokenCipher, ttl: int =
 
 def redeem_handoff(session: Session, *, code: str, user_id: str, cipher: TokenCipher, connection_model: Any,
                    expected_provider: str | None = None, now: float | None = None):
-    """Store and return the connection row sealed in ``code``, if it is valid, unused, unexpired and ``user_id`` is
+    """Deprecated (use ``HandoffStore.redeem``). Store and return the connection row sealed in ``code``, if it is valid, unused, unexpired and ``user_id`` is
     the user who started the flow (and, when ``expected_provider`` is given, the code is for that provider; checked
     before anything is stored or burned). Older live rows of the same (owner, provider, connection_name) are revoked.
 

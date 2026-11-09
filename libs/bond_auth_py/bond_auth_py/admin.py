@@ -14,11 +14,20 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from bond_auth_py.errors import AuthUnavailable, IdentityExists, IdentityNotFound, MailNotSent
-from bond_auth_py.firebase_app import admin_app
+from bond_auth_py.firebase_app import admin_app, require_firebase_admin
 from bond_auth_py.mock import MockIdentities, default_mock
 from bond_auth_py.settings import AuthSettings
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _fb_auth():
+    """``firebase_admin.auth``, imported on use; ``AuthNotConfigured`` when the ``firebase`` extra is missing."""
+    require_firebase_admin()
+    from firebase_admin import auth
+
+    return auth
+
 
 #: Identity Toolkit endpoint that sends the "set your password" mail. The web API key rides in the query string,
 #: so the URL is never logged and never put in an exception message.
@@ -112,7 +121,7 @@ class FirebaseIdentityAdmin:
         return AuthUnavailable(f"{what} failed")
 
     def get_user(self, *, email=None, uid=None):
-        from firebase_admin import auth as fb_auth
+        fb_auth = _fb_auth()
 
         try:
             user = (fb_auth.get_user_by_email(_norm(email), app=self._app()) if email
@@ -129,7 +138,7 @@ class FirebaseIdentityAdmin:
                 "providers": [p.provider_id for p in (user.provider_data or [])], "created_at": created}
 
     def create_user(self, email, name=None):
-        from firebase_admin import auth as fb_auth
+        fb_auth = _fb_auth()
 
         email = _norm(email)
         try:
@@ -143,7 +152,7 @@ class FirebaseIdentityAdmin:
             raise self._fail(exc, "create user") from exc
 
     def _update(self, uid: str, what: str, **fields) -> None:
-        from firebase_admin import auth as fb_auth
+        fb_auth = _fb_auth()
 
         try:
             fb_auth.update_user(uid, app=self._app(), **fields)
@@ -166,7 +175,7 @@ class FirebaseIdentityAdmin:
         self._update(uid, "change e-mail", email=_norm(email), email_verified=True)
 
     def revoke_sessions(self, uid):
-        from firebase_admin import auth as fb_auth
+        fb_auth = _fb_auth()
 
         try:
             fb_auth.revoke_refresh_tokens(uid, app=self._app())
@@ -178,7 +187,7 @@ class FirebaseIdentityAdmin:
             raise self._fail(exc, "revoke sessions") from exc
 
     def delete_user(self, uid):
-        from firebase_admin import auth as fb_auth
+        fb_auth = _fb_auth()
 
         try:
             fb_auth.delete_user(uid, app=self._app())
@@ -209,7 +218,7 @@ class FirebaseIdentityAdmin:
 
     def password_reset_link(self, email):
         """A one-time link for the admin to hand over when mail cannot be sent. Treat it as a secret."""
-        from firebase_admin import auth as fb_auth
+        fb_auth = _fb_auth()
 
         try:
             return fb_auth.generate_password_reset_link(_norm(email), app=self._app())

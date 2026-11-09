@@ -11,7 +11,14 @@ import 'id_token_source.dart';
 import 'session.dart';
 
 class FirebaseAuthGateway extends GatewayBase implements AuthGateway {
-  FirebaseAuthGateway({required super.api, required super.tokens, required this.source});
+  FirebaseAuthGateway({required super.api,
+    required super.tokens,
+    required this.source,
+    super.refreshTokens,
+    super.onSessionEnded,
+    super.onStorageFailure,
+    super.rotationIds,
+  });
 
   final IdTokenSource source;
 

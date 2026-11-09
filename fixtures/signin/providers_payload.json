@@ -1,0 +1,14 @@
+{
+  "signin": [
+    {
+      "id": "google",
+      "label": "Google"
+    },
+    {
+      "id": "microsoft",
+      "label": "Microsoft"
+    }
+  ],
+  "break_glass": false,
+  "default_flow": "signin"
+}

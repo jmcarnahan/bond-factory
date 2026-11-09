@@ -1,0 +1,6 @@
+{
+  "redirect_to": "https://api.example.org/app/return/google",
+  "mode": "native",
+  "device_challenge": "8fd6a6a78f5857d7ba1cfe9033bffeec86da2ba6a4bd60a6f833209d9d3e390d",
+  "attempt": "att_1"
+}

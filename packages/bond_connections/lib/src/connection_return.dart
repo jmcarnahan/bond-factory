@@ -19,7 +19,13 @@ class ConnectionReturn {
     };
     if (outcome == null) return null;
     String? clean(String? v) => v == null || v.isEmpty ? null : v;
-    return ConnectionReturn(outcome, provider: clean(params['provider']), reason: clean(params['reason']), code: clean(params['code']), attempt: clean(params['attempt']));
+    return ConnectionReturn(
+      outcome,
+      provider: clean(params['provider']),
+      reason: clean(params['reason']),
+      code: clean(params['code']),
+      attempt: clean(params['attempt']),
+    );
   }
 
   final ConnectionOutcome outcome;
@@ -38,7 +44,8 @@ class ConnectionReturn {
 
   bool get isError => outcome == ConnectionOutcome.error;
 
-  /// [url] without the return parameters (`connection`, `provider`, `reason`, `code`, `attempt`), to put back in the address bar.
+  /// [url] without the return parameters (`connection`, `provider`, `reason`,
+  /// `code`, `attempt`), to put back in the address bar.
   static Uri cleaned(Uri url) {
     final rest = Map<String, String>.of(url.queryParameters)
       ..remove('connection')

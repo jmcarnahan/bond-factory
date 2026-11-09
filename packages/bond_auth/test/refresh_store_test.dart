@@ -12,11 +12,21 @@ void main() {
     expect(await s.load(), isNull);
   });
 
+  test('in-memory store keeps the rotation id until cleared', () async {
+    final s = InMemoryRefreshTokenStore();
+    await s.saveRotation('abc');
+    expect(await s.loadRotation(), 'abc');
+    await s.saveRotation(null);
+    expect(await s.loadRotation(), isNull);
+  });
+
   test('no-op store stores nothing', () async {
     const s = NoRefreshTokenStore();
     await s.save('r1');
     await s.reload();
     expect(await s.load(), isNull);
+    await s.saveRotation('abc');
+    expect(await s.loadRotation(), isNull);
     await s.clear();
   });
 
@@ -46,5 +56,22 @@ void main() {
     expect(d.breakGlass, isFalse);
     expect(d.defaultFlow, 'firebase');
     expect(const AuthProviders().signin, isEmpty);
+  });
+
+  test('providers: signinById finds an offered method, null otherwise', () {
+    final p = AuthProviders.fromJson({
+      'signin': [
+        {'id': 'google', 'label': 'Google'},
+        {'id': 'microsoft', 'label': 'Microsoft'},
+      ],
+    });
+    expect(p.signinById('microsoft')!.label, 'Microsoft');
+    expect(p.signinById('apple'), isNull);
+    expect(const AuthProviders().signinById('google'), isNull);
+  });
+
+  test('providers: a non-list signin reads as empty; rows without an id are skipped', () {
+    expect(AuthProviders.fromJson({'signin': 'google'}).signin, isEmpty);
+    expect(AuthProviders.fromJson({'signin': [5, null, {'id': ''}]}).signin, isEmpty);
   });
 }

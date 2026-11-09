@@ -10,9 +10,10 @@ list and the return banner. The server half is `bond_oauth` (see `bond_oauth.md`
 |---|---|
 | `ConnectionStatus` | One row of `GET /connections`: provider, connected, email, connectedAt, needsReconnect, scopes |
 | `ConnectionPhase` | disconnected, connected, needsReconnect (derived; a needed reconnect wins). Not called `ConnectionState`: Flutter exports that name |
-| `ConnectionsApi(ApiClient)` | `list()`, `startUrl(provider, redirectTo:, native:)`, `redeem(provider, code)`, `disconnect(provider)` |
+| `ConnectionsApi(ApiClient)` | `list()`, `startUrl(provider, redirectTo:, native:, set:)`, `redeem(provider, code, deviceSecret)`, `disconnect(provider)` |
+| `ConnectionList`, `WantedSet` | `{connections, wanted}`; a set is `{id, provider, label, scopes, granted}`; a bare array reads as no sets |
 | `DemoConnectionsApi` | `simulateExpiry(provider)`, fake mode only |
-| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`, `code` (native) from the address the browser came back to; null when absent |
+| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`, `code` and `attempt` (native) from the address the browser came back to; null when absent |
 | `ConnectionLabels` | Every string, English defaults, `{provider}` placeholders, reason codes in plain words |
 | `BondConnectionCard`, `BondConnectionsList`, `BondConnectionReturnBanner` | The widgets; `semanticsId` is a prefix (`sdk.connections` gives `.card-<p>`, `.connect-<p>`, `.reconnect-<p>`, `.disconnect-<p>`) |
 
@@ -55,15 +56,26 @@ Native apps have no browser session cookie, so they use the code-exchange varian
 
 ### Phone apps
 
-1. `startUrl(provider, redirectTo: 'sdkdemo://connections', native: true)` with the bearer token (`redirectTo` must be on
-   the server's native allowlist, `SDK_EXAMPLE_NATIVE_REDIRECTS`; omit it for the first entry).
-2. Open that URL in the system browser (ASWebAuthenticationSession or a custom tab); no cookie is needed or set.
-3. The server redirects to the app scheme with `connection=connected&provider=<p>&code=<handoff>` (or `connection=error`).
-   Read it with `ConnectionReturn.parse(uri)`; `ConnectionReturn.code` is the hand-off.
-4. Call `redeem(provider, code)` with the bearer token. The connection is stored only now, and only for the user who
-   started the flow; the code works once, within 120 s. It returns the status.
+1. Make a device secret and its sha256 challenge (`SignInAttempt` in `bond_signin`). `startUrl(provider, redirectTo: <return url>,
+   native: true)` with the bearer token; `redirectTo` is the https app-link return or an entry of the server's native scheme list.
+2. Open that URL in the system browser session (`BrowserAuth` in `bond_signin_ui`); no cookie is needed or set. <!-- check -->
+3. The server redirects to the return URL with `connection=connected&provider=<p>&attempt=<id>&code=<handoff>` (or `connection=error`).
+   Read it with `ConnectionReturn.parse(uri)`.
+4. Call `redeem(provider, code, deviceSecret)` with the bearer token. The connection is stored only now, only for the user who
+   started the flow and only with the right secret; the code works once, within 120 s. It returns the status.
 
-## 5. Acceptance
+## 5. Role asks (`wanted` sets)
+
+- `GET /connections` reports `wanted` on every read: the sets the person's capabilities want that the live connection does not
+  hold. A set is asked through the same flow, `startUrl(provider, set: <id>)`; an unknown set is 400. A promotion shows the ask on
+  the next load; a declined ask leaves the set wanted with `consent_declined`.
+- `BondScopeAskCard(wanted, onAsk)` (in `bond_signin_ui`) shows each ungranted set inline with one button; no dialog.
+  `BondConnectionsList` keeps showing status and reconnect.
+- Native: `startUrl(..., native: true)` needs the device challenge; the return carries `attempt` as well as `code`. The app drops
+  a return whose `attempt` is not the pending one and passes its device secret to `redeem`. Return URL rules: `bond_signin.md`.
+- A connect for a different account than the signed-in one is refused `account_mismatch`, except shared connects. <!-- check -->
+
+## 6. Acceptance
 
 - `make -C packages/bond_connections test` and `analyze`; `make -C packages/bond_connections_ui test` and `analyze`.
 - `make -C demos/sdk_demo test` and `analyze`; `make gates`.
@@ -71,10 +83,10 @@ Native apps have no browser session cookie, so they use the code-exchange varian
   status; simulate or suffer an expiry and see Reconnect; disconnect asks twice; no dialog or modal appears.
 - No use of the old per-provider status route, the token-in-query authorize address or the web-view interception.
 
-## 6. Known gaps
+## 7. Known gaps
 
-- The native hand-off single-use registry is process-local; see `bond_oauth.md` section 6.
-- The demo navigates with `dart:js_interop`; an app that already depends on `package:web` can use `window.location.href`.
+- Hand-offs are DB rows (`oauth_handoffs`); the process-local registry is gone. See `bond_oauth.md` section 6. <!-- check -->
+- The navigation helpers moved from the demo into `bond_signin_ui` (`lib/src/browser/`); the demo imports them. <!-- check -->
 - The return parameters stay in the address bar after the banner is dismissed; `ConnectionReturn.cleaned` gives the
   address without them for apps whose router can replace the location.
 - Display names and logos are the app's: pass `ConnectionLabels.providerNames` and `logo`.

@@ -18,7 +18,7 @@ import logging
 from dataclasses import dataclass, field
 
 from bond_auth_py.errors import AuthNotConfigured, AuthUnavailable, EmailNotVerified, TokenError
-from bond_auth_py.firebase_app import firebase_app, service_account_info
+from bond_auth_py.firebase_app import firebase_app, require_firebase_admin, service_account_info
 from bond_auth_py.mock import MockIdentities, default_mock, provider_claims, register_default_token
 from bond_auth_py.settings import AuthSettings, mock_active
 
@@ -76,6 +76,7 @@ def is_transport_error(exc: BaseException) -> bool:
 def _from_firebase(token: str, settings: AuthSettings) -> dict:
     if not (settings.firebase_project_id or service_account_info(settings)):
         raise AuthNotConfigured("firebase is not configured")
+    require_firebase_admin()  # AuthNotConfigured("install bond_auth_py[firebase]") without the extra
     from firebase_admin import auth as fb_auth
 
     # Revocation needs the admin credential: one extra lookup, only when we can make it.

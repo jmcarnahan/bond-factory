@@ -1,14 +1,14 @@
 # bond_signin_ui
 Role: sign-in widgets and the system-browser port, built on bond_signin, bond_ui and bond_connections.
 
-## Key files (planned, PLAN §3.5 and §3.8 P)
+## Key files
 - `lib/src/sign_in_screen.dart` BondSignInScreen; `sign_in_buttons.dart` BondSignInButtons
 - `lib/src/scope_ask_card.dart` BondScopeAskCard (ungranted sets inline, one button each)
-- `lib/src/browser/browser_auth.dart` BrowserAuth port; `web_browser_auth.dart` (dart:js_interop); `native_browser_auth.dart` (flutter_web_auth_2)
+- `lib/src/browser/browser_auth.dart` BrowserAuth port; `browser_auth_web.dart` (dart:js_interop); `browser_auth_native.dart` (flutter_web_auth_2); `native_return.dart`
 - `lib/src/secure_refresh_token_store.dart` SecureRefreshTokenStore over flutter_secure_storage
 
 ## Commands
-- `make test T=test/barrel_test.dart`
+- `make test T=test/widgets_test.dart`
 - `make analyze`
 
 ## Rules

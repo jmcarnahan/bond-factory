@@ -22,11 +22,17 @@ def firebase_runtime_config(settings: AuthSettings) -> dict | None:
     }
 
 
-def providers_payload(settings: AuthSettings, *, sync_url: str | None = None, mock: bool | None = None) -> dict:
-    """The merged payload. ``mock`` overrides ``mock_active(settings)`` (an example's fake mode)."""
+def providers_payload(settings: AuthSettings, *, sync_url: str | None = None, mock: bool | None = None,
+                      signin: list[dict] | None = None, break_glass: bool = False,
+                      default_flow: str = "firebase") -> dict:
+    """The merged payload. ``mock`` overrides ``mock_active(settings)`` (an example's fake mode).
+
+    ``signin`` lists the direct sign-in providers (only ``id`` and ``label`` are served), ``break_glass`` says the
+    Firebase e-mail and password form is on, ``default_flow`` (``signin`` or ``firebase``) is what the client
+    shows first. Each of the three keys is present only when it differs from ``[]``, ``False``, ``"firebase"``."""
     is_mock = mock_active(settings) if mock is None else mock
     google = settings.google_enabled
-    return {
+    payload = {
         "demo": settings.demo_enabled,
         "email_password": settings.email_password_enabled,
         "google": google,
@@ -36,3 +42,12 @@ def providers_payload(settings: AuthSettings, *, sync_url: str | None = None, mo
         "firebase": None if is_mock else firebase_runtime_config(settings),
         "sync": {"url": sync_url},
     }
+    # Added only when set, so an app without direct sign-in serves exactly the old payload; clients default
+    # the missing keys to [], false and "firebase".
+    if signin:
+        payload["signin"] = [{"id": str(p["id"]), "label": str(p["label"])} for p in signin]
+    if break_glass:
+        payload["break_glass"] = True
+    if default_flow != "firebase":
+        payload["default_flow"] = default_flow
+    return payload

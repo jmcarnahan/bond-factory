@@ -13,6 +13,8 @@ dependencies:
     path: ../bond_connections
   bond_signin:
     path: ../bond_signin
+  bond_auth:
+    path: ../bond_auth
   bond_ui:
     path: ../bond_ui
   flutter_secure_storage: ^11.0.0

@@ -2,6 +2,7 @@ import 'package:bond_api/bond_api.dart';
 import 'package:bond_json/bond_json.dart';
 
 import 'status.dart';
+import 'wanted.dart';
 
 /// The connections routes: list, start, redeem (native apps), disconnect.
 ///
@@ -30,15 +31,36 @@ class ConnectionsApi {
     }
   }
 
+  /// `GET /connections` read as the whole answer: the statuses and the scope
+  /// sets the signed-in person's role wants. Accepts the bare array of an older
+  /// server (no wanted sets) and `{connections, wanted}`.
+  Future<ConnectionList> listAll() async {
+    final body = await client.request('GET', prefix);
+    try {
+      return ConnectionList.fromJson(body);
+    } on JsonShapeError catch (e) {
+      throw BadResponse(prefix, e.toString());
+    }
+  }
+
+  /// The wanted scope sets from `GET /connections`; those with `granted` false
+  /// are the asks to show. Empty on a server that reports none.
+  Future<List<WantedSet>> wanted() async => (await listAll()).wanted;
+
   /// `GET /connections/{provider}/start`: the address to open in the browser.
   /// [redirectTo] must be on the server's allowlist. With [native] (a phone
   /// app opening the system browser) the server takes [redirectTo] from its
   /// native allowlist (an app-scheme address), needs no cookie in that
   /// browser, and returns to the app with a one-time `code`; read it with
-  /// `ConnectionReturn.parse` and pass it to [redeem].
-  Future<Uri> startUrl(String provider, {String? redirectTo, bool native = false}) async {
+  /// `ConnectionReturn.parse` and pass it to [redeem]. [set] is a wanted set id
+  /// (`WantedSet.id`): the server asks only that set's scopes, for the
+  /// signed-in account.
+  Future<Uri> startUrl(String provider, {String? redirectTo, bool native = false, String? set}) async {
     final path = _path(provider, '/start');
-    final body = await client.getJson(path, query: {'redirect_to': ?redirectTo, if (native) 'mode': 'native'});
+    final body = await client.getJson(
+      path,
+      query: {'redirect_to': ?redirectTo, if (native) 'mode': 'native', 'set': ?set},
+    );
     final url = jstr(body, 'url');
     if (url == null || url.isEmpty) throw BadResponse(path, 'the answer has no url');
     return Uri.parse(url);
