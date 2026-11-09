@@ -1,0 +1,29 @@
+# Changelog
+
+## 0.1.0 - unreleased
+First API. Flutter package (powersync needs Flutter). Imports `bond_sync`; the core imports nothing from here.
+
+- `SyncPolicy({schema, notUploadedTables, createPuts, silentWrites, rekeyChildren, sendCaps, endpointOverride,
+  chunkSize, chunkBytes, transient*})`; getters `schemaTables`, `sendableTables`, `rules`, `limits`.
+- `syncSupportTables()`: the two local-only tables the adapter keeps (`sync_rejections`, `sync_meta`).
+  Add them to the app schema.
+- `SyncConnector({transport, mapFailure, clock, policy, onServerNow})` extends `PowerSyncBackendConnector`.
+  `fetchCredentials`: on `unauthorized`, `refreshSession() == renewed`, then ask once more; `StateError`
+  when no endpoint is known. `uploadData` runs one `SyncUploader.uploadNext`; any retry reaches the SDK as a
+  plain `Exception`, a permanent outcome never throws. `uploadWith(SyncStore)` is the same without a database.
+- `PowerSyncSyncStore implements SyncStore` (one transaction for re-keys, raw-table deletes and notes).
+- `openSyncStore(...)` / `SyncStoreOpener`: open, retry the same files, move them aside (never delete),
+  start fresh, else `SyncOpenFailure`. `deleteStoreFiles`. `BondSyncNames` and `syncDbPath` are re-exported.
+- Reactive reads lifted from the seed: `changeTargets`, `storeChanges`, `readSnapshot`, `watchSnapshot`
+  (view and raw table both watched, latest read wins), now over `SyncDb`.
+- `SyncDb` / `SyncSql` / `PowerSyncDb`: the minimal database surface the adapter uses; tests fake `SyncDb`.
+
+### Differences from the seed
+- The connector's upload loop is `SyncUploader` in bond_sync; only the database calls are here.
+- A refused create and its later writes: the planner marks the row dead when the create is refused; the seed
+  marked it only after the raw delete succeeded. A failed delete still writes the note and says so.
+- The store opener logs under `BondSyncNames.loggerName`; the database file prefix is an argument.
+
+### Limit
+PowerSync on Flutter web needs sqlite wasm and worker assets in `web/`; this package is unit tested against a
+fake `SyncDb` only. No test starts a database or a sync service.

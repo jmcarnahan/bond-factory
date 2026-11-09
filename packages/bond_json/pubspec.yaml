@@ -1,0 +1,10 @@
+name: bond_json
+description: 'Null-safe JSON readers and DateTime parsers shared by every bond package. Pure Dart, no Flutter.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

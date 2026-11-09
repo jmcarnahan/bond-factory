@@ -1,0 +1,20 @@
+name: bond_sync_powersync
+description: 'PowerSync connector and store opener for bond_sync.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  bond_sync:
+    path: ../bond_sync
+  powersync: ^2.5.0
+dev_dependencies:
+  bond_api:
+    path: ../bond_api
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

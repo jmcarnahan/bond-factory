@@ -1,0 +1,45 @@
+name: sdk_demo
+description: Flutter web harness that exercises every bond SDK package.
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  go_router: ^18.1.0
+  http: ^1.2.0
+  bond_json:
+    path: ../../packages/bond_json
+  bond_api:
+    path: ../../packages/bond_api
+  bond_test_support:
+    path: ../../packages/bond_test_support
+  bond_ui:
+    path: ../../packages/bond_ui
+  bond_auth:
+    path: ../../packages/bond_auth
+  bond_auth_firebase:
+    path: ../../packages/bond_auth_firebase
+  bond_sync:
+    path: ../../packages/bond_sync
+  bond_sync_powersync:
+    path: ../../packages/bond_sync_powersync
+  bond_tasks:
+    path: ../../packages/bond_tasks
+  bond_tasks_ui:
+    path: ../../packages/bond_tasks_ui
+  bond_connections:
+    path: ../../packages/bond_connections
+  bond_connections_ui:
+    path: ../../packages/bond_connections_ui
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

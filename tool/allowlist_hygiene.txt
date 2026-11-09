@@ -1,0 +1,6 @@
+# Files the public-hygiene gate skips (one repo-relative path per line).
+# Only dated history that must name the source apps. New entries need a reason.
+# Roof POC summary: records which app repo held the credentials it discusses.
+docs/decisions/2026-11-07-roof-poc-summary.md
+# Guard test that carries the denylist itself.
+packages/bond_ui/test/source_guards_test.dart

@@ -1,0 +1,16 @@
+name: bond_tasks
+description: 'Task models and API client shared by the bond apps. Pure Dart, no Flutter.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+dependencies:
+  bond_json:
+    path: ../bond_json
+  bond_api:
+    path: ../bond_api
+dev_dependencies:
+  http: ^1.2.0
+  lints: ^6.0.0
+  test: ^1.25.6

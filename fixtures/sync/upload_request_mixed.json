@@ -1,0 +1,13 @@
+{
+  "transaction_id": 8,
+  "ops": [
+    {"seq": 0, "op": "put", "table": "notes", "id": "note-1", "data": {"title": "First note", "body": "hello"}},
+    {"seq": 1, "op": "patch", "table": "notes", "id": "note-1", "data": {"title": "First note, edited"}},
+    {"seq": 2, "op": "put", "table": "notes", "id": "bad id!", "data": {"title": "Bad id"}},
+    {"seq": 3, "op": "delete", "table": "notes", "id": "note-gone", "data": {}},
+    {"seq": 4, "op": "put", "table": "notes", "id": "note-taken", "data": {"title": "Someone else's id"}},
+    {"seq": 5, "op": "put", "table": "notes", "id": "note-2", "data": {"title": ""}},
+    {"seq": 6, "op": "patch", "table": "notes", "id": "note-missing", "data": {"title": "Nope"}},
+    {"seq": 7, "op": "put", "table": "widgets", "id": "w-1", "data": {"name": "x"}}
+  ]
+}

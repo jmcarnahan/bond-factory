@@ -1,0 +1,16 @@
+name: bond_connections
+description: 'Calendar and mail connection status models and API client. Pure Dart, no Flutter.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+dependencies:
+  bond_api:
+    path: ../bond_api
+  bond_json:
+    path: ../bond_json
+dev_dependencies:
+  http: ^1.2.0
+  lints: ^6.0.0
+  test: ^1.25.6
