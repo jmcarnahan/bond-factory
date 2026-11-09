@@ -2,7 +2,9 @@ import 'package:bond_api/bond_api.dart';
 import 'package:bond_auth/bond_auth.dart';
 import 'package:bond_tasks/bond_tasks.dart';
 import 'package:bond_test_support/bond_test_support.dart';
+import 'package:bond_ui/bond_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sdk_demo/src/pages/tasks_page.dart';
 
@@ -46,7 +48,7 @@ class TasksRig {
   }
 
   final CannedHttpClient canned = CannedHttpClient();
-  late final TasksApi api;
+  late TasksApi api;
   late final DemoJobsApi jobs;
 
   Widget page() => TasksPage(
@@ -76,6 +78,24 @@ Future<void> pumpPage(WidgetTester t, TasksRig r, {bool phone = false}) async {
 Future<void> settle(WidgetTester t) async {
   for (var i = 0; i < 6; i++) {
     await t.pump(const Duration(milliseconds: 20));
+  }
+}
+
+BondIconButton completeButton(WidgetTester t, IconData icon) =>
+    t.widget(find.ancestor(of: find.byIcon(icon), matching: find.byType(BondIconButton)));
+
+/// Delays the reply of any request whose path ends with [suffix].
+class _SlowClient extends http.BaseClient {
+  _SlowClient(this.inner, this.suffix, this.delay);
+  final CannedHttpClient inner;
+  final String suffix;
+  final Duration delay;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final reply = await inner.send(request);
+    if (request.url.path.endsWith(suffix)) await Future<void>.delayed(delay);
+    return reply;
   }
 }
 
@@ -137,6 +157,35 @@ void main() {
     await pumpPage(t, r);
     await t.tap(find.byIcon(Icons.radio_button_unchecked));
     await settle(t);
+    expect(r.canned.requestsTo('POST', '/tasks/a/complete'), hasLength(1));
+  });
+
+  testWidgets('complete is disabled while in flight, then the same row reads Reopen', (t) async {
+    final r = TasksRig([
+      [task('a', 'Open one', date: '2026-03-12')],
+      [task('a', 'Open one', date: '2026-03-12', status: TaskStatus.done)],
+    ]);
+    r.canned.responses.json('POST', '/tasks/a/complete', task('a', 'Open one', status: TaskStatus.done));
+    r.canned.responses.json('POST', '/tasks/a/reopen', task('a', 'Open one'));
+    r.api = TasksApi(ApiClient(
+        baseUrl: Uri.parse('http://example.test'),
+        http: _SlowClient(r.canned, '/complete', const Duration(milliseconds: 300))));
+    await pumpPage(t, r);
+    // Two taps in the same frame, before the rebuild that disables the button.
+    await t.tap(find.byIcon(Icons.radio_button_unchecked));
+    await t.tap(find.byIcon(Icons.radio_button_unchecked), warnIfMissed: false);
+    await t.pump(const Duration(milliseconds: 100));
+    // A third tap while the first is in flight must not post again.
+    await t.tap(find.byIcon(Icons.radio_button_unchecked), warnIfMissed: false);
+    await t.pump(const Duration(milliseconds: 100));
+    expect(r.canned.requestsTo('POST', '/tasks/a/complete'), hasLength(1));
+    expect(r.canned.requestsTo('POST', '/tasks/a/reopen'), isEmpty);
+    expect(completeButton(t, Icons.radio_button_unchecked).onPressed, isNull);
+    await t.pump(const Duration(milliseconds: 400));
+    await settle(t);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    expect(t.getSemantics(byId('sdk.tasks.complete-a').first).label, 'Reopen');
+    expect(completeButton(t, Icons.check_circle).onPressed, isNotNull);
     expect(r.canned.requestsTo('POST', '/tasks/a/complete'), hasLength(1));
   });
 

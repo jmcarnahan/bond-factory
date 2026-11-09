@@ -5,12 +5,14 @@ from bond_oauth.cipher import TokenCipher
 from bond_oauth.errors import OAuthError, ProviderError, ReconnectRequired, RetryableError
 from bond_oauth.fake import FakeOAuth
 from bond_oauth.google import GoogleOAuth
+from bond_oauth.handoff import issue_handoff, redeem_handoff
 from bond_oauth.microsoft import MicrosoftOAuth
 from bond_oauth.models import ConnectionsMixin
 from bond_oauth.providers import OAuthProvider, TokenSet
 from bond_oauth.scopes import GOOGLE_DEFAULT, MICROSOFT_BASE, MICROSOFT_OFFICE, scope_drift
 from bond_oauth.service import (
     ConnectionStatus,
+    PendingConnection,
     StartedFlow,
     access_token,
     complete,
@@ -26,7 +28,8 @@ __version__ = "0.1.0"
 
 __all__ = [
     "GOOGLE_DEFAULT", "MICROSOFT_BASE", "MICROSOFT_OFFICE", "ConnectionStatus", "ConnectionsMixin", "FakeOAuth",
-    "GoogleOAuth", "MicrosoftOAuth", "OAuthError", "OAuthProvider", "ProviderError", "ReconnectRequired",
+    "GoogleOAuth", "MicrosoftOAuth", "OAuthError", "OAuthProvider", "PendingConnection", "ProviderError", "ReconnectRequired",
     "RetryableError", "StartedFlow", "StatePayload", "TokenCipher", "TokenSet", "access_token", "complete", "decode_state",
-    "disconnect", "encode_state", "forget_access", "pkce", "scope_drift", "start", "start_flow", "status",
+    "disconnect", "encode_state", "forget_access", "issue_handoff", "pkce", "redeem_handoff", "scope_drift", "start", "start_flow",
+    "status",
 ]

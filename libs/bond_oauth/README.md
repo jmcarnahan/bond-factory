@@ -29,9 +29,20 @@ disconnect(session, user_id=uid, provider_name="google", connection_model=OAuthC
   3. The callback requires the session again and calls `complete(..., expected_user_id=<session user>,
      expected_nonce=<cookie>)`. A mismatch raises `OAuthError("invalid_state")` and stores nothing.
   `start` is a thin wrapper that returns only the URL and gives no binding.
-- Native apps have no browser session cookie, so this web binding does not cover them. A native flow must finish
-  through the app's own authenticated API call (the callback redirects to the app with a one-time code that the app
-  exchanges using its bearer token). That is not implemented here; it is an adoption item.
+- Native apps have no browser session cookie, so this web binding does not cover them. They use the code-exchange
+  variant: `start_flow(..., native=True)` marks the state native; the callback calls `complete(...,
+  expected_nonce=None, expected_user_id=None)` (accepted ONLY for a native state), which exchanges the code but
+  STORES NOTHING and returns a `PendingConnection`. `issue_handoff(pending, cipher=)` seals it (encrypted tokens
+  included) into a 120 s one-time code. The app redeems it with its bearer token via `redeem_handoff(session, code=,
+  user_id=, cipher=, connection_model=)`, which inserts the row only for the user who started the flow. A victim
+  lured through an attacker's link gets a code bound to the attacker, is refused and nothing is stored. Expired,
+  used, damaged or another user's codes raise `OAuthError("invalid_handoff")`. Single use is a process-local registry:
+  a replay within 120 s after a restart, or in another process, re-stores the connection and can undo a disconnect;
+  for multi-process deployments keep a nonce table in the app. The code is bound to the user, not the device: a
+  custom URL scheme can be claimed by another app on the phone, so use universal/app links in production (a consent
+  screen cannot prevent it). The code carries the encrypted tokens and can reach about 5 KB with provider-sized
+  tokens (fine for iOS and Android intents, but long). `redeem_handoff(..., expected_provider=)` refuses a code for another provider before
+  anything is stored.
 - One live row per (owner, provider, connection_name) is also enforced by the partial unique index
   `uq_oauth_connections_live`. A callback that loses a race is retried once after revoking the winner's row, then
   raises `OAuthError("conflict")`.

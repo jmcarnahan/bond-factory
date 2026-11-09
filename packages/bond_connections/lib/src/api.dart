@@ -3,7 +3,7 @@ import 'package:bond_json/bond_json.dart';
 
 import 'status.dart';
 
-/// The connections routes: list, start, disconnect.
+/// The connections routes: list, start, redeem (native apps), disconnect.
 ///
 /// Starting a connection is a hand-off to the browser: [startUrl] returns the
 /// address the app navigates to at top level (it carries the session cookie
@@ -31,14 +31,24 @@ class ConnectionsApi {
   }
 
   /// `GET /connections/{provider}/start`: the address to open in the browser.
-  /// [redirectTo] must be on the server's allowlist.
-  Future<Uri> startUrl(String provider, {String? redirectTo}) async {
+  /// [redirectTo] must be on the server's allowlist. With [native] (a phone
+  /// app opening the system browser) the server takes [redirectTo] from its
+  /// native allowlist (an app-scheme address), needs no cookie in that
+  /// browser, and returns to the app with a one-time `code`; read it with
+  /// `ConnectionReturn.parse` and pass it to [redeem].
+  Future<Uri> startUrl(String provider, {String? redirectTo, bool native = false}) async {
     final path = _path(provider, '/start');
-    final body = await client.getJson(path, query: {'redirect_to': ?redirectTo});
+    final body = await client.getJson(path, query: {'redirect_to': ?redirectTo, if (native) 'mode': 'native'});
     final url = jstr(body, 'url');
     if (url == null || url.isEmpty) throw BadResponse(path, 'the answer has no url');
     return Uri.parse(url);
   }
+
+  /// `POST /connections/{provider}/redeem`: trades the one-time [code] from a
+  /// native return for the connection's status. The client's bearer token must
+  /// belong to the user who started the flow; a code works once.
+  Future<ConnectionStatus> redeem(String provider, String code) async =>
+      ConnectionStatus.fromJson(await client.postJson(_path(provider, '/redeem'), body: {'code': code}));
 
   /// `DELETE /connections/{provider}`: the status after the disconnect.
   Future<ConnectionStatus> disconnect(String provider) async =>

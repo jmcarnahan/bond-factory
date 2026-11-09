@@ -80,7 +80,7 @@ class StartedFlow:
 
 def start_flow(session: Session, *, user_id: str, provider_name: str, provider: OAuthProvider, scopes: list[str],
                redirect_to: str, cipher: TokenCipher, redirect_uri: str, shared: bool = False,
-               connection_name: str | None = None) -> StartedFlow:
+               connection_name: str | None = None, native: bool = False) -> StartedFlow:
     """The state, the provider's consent URL and the state's nonce. ``redirect_to`` rides inside the encrypted
     state; the app validates it first.
 
@@ -88,10 +88,12 @@ def start_flow(session: Session, *, user_id: str, provider_name: str, provider: 
     an httponly cookie in that browser before sending it to the consent URL and pass the cookie value to
     ``complete(expected_nonce=...)``; otherwise a victim can be tricked into finishing an attacker's flow.
     ``shared=True`` connects a shared mailbox (``user_id`` NULL on the row); who may do that is the app's call.
+    ``native=True`` is for a phone app that opens the system browser: the state is marked native, no cookie binds it,
+    and the app hands the result over with ``handoff.issue_handoff`` / ``redeem_handoff`` instead.
     """
     verifier = pkce.new_verifier()
     state = encode_state(cipher, sub=user_id, provider=provider_name, connection_name=connection_name or provider_name,
-                         verifier=verifier, redirect_to=redirect_to, shared=shared)
+                         verifier=verifier, redirect_to=redirect_to, shared=shared, native=native)
     url = provider.authorize_url(state=state, challenge=pkce.challenge(verifier), scopes=list(scopes),
                                  redirect_uri=redirect_uri)
     return StartedFlow(state=state, authorize_url=url, nonce=decode_state(cipher, state).nonce)
@@ -103,19 +105,26 @@ def start(session: Session, **kwargs: Any) -> str:
 
 
 def complete(session: Session, *, state: str, code: str, providers: Mapping[str, OAuthProvider], cipher: TokenCipher,
-             connection_model: Any, redirect_uri: str, expected_nonce: str, expected_user_id: str | None,
+             connection_model: Any, redirect_uri: str, expected_nonce: str | None, expected_user_id: str | None,
              now: datetime | None = None, expected_provider: str | None = None):
     """Verify the state, trade the code, store the connection. Live rows of the same
     (owner, provider, connection_name) are revoked first, so one live row remains. Returns the new row.
 
     ``expected_nonce`` (the browser-bound cookie value) is REQUIRED and must equal the state's nonce, else
     ``invalid_state``; leaving it out is a ``TypeError``, so a flow can never be completed unbound by accident.
+    ``None`` is accepted ONLY when the state was started with ``native=True`` (no browser to bind); for any other
+    state it is ``invalid_state``.
     ``expected_user_id`` is the signed-in user the state must belong to; pass ``None`` only when there is no session.
     A concurrent callback that wins the live-row race (unique index violation) is revoked and the insert is retried
-    once; a second violation raises ``OAuthError("conflict")``."""
+    once; a second violation raises ``OAuthError("conflict")``.
+
+    A NATIVE state stores nothing: it returns a ``PendingConnection`` for ``handoff.issue_handoff``, and the row is
+    inserted only when ``redeem_handoff`` is called by the user who started the flow."""
     stamp = now or utcnow()
     payload = decode_state(cipher, state)
-    if not expected_nonce or not hmac.compare_digest(expected_nonce.encode(), payload.nonce.encode()):
+    unbound_native = expected_nonce is None and payload.native
+    if not unbound_native and (not expected_nonce
+                               or not hmac.compare_digest(expected_nonce.encode(), payload.nonce.encode())):
         raise OAuthError("invalid_state", "The sign-in was not started in this browser")
     if expected_provider is not None and payload.provider != expected_provider:
         raise OAuthError("provider_mismatch", "The sign-in belongs to another provider")
@@ -134,18 +143,41 @@ def complete(session: Session, *, state: str, code: str, providers: Mapping[str,
     if not email:
         raise OAuthError("no_email", "The provider did not share the account address")
     owner = None if payload.shared else payload.sub
+    fields = {
+        "account_email": email, "scopes": tokens.scope, "access_token_enc": cipher.encrypt(tokens.access_token),
+        "refresh_token_enc": cipher.encrypt(tokens.refresh_token), "token_type": tokens.token_type,
+        "expires_at": (stamp + timedelta(seconds=tokens.expires_in)).isoformat(),
+        "provider_metadata": json.dumps({"name": info.get("name")}) if info.get("name") else None}
+    if payload.native:  # nothing is stored until the app redeems the hand-off as the user who started the flow
+        return PendingConnection(owner=owner, provider=payload.provider, connection_name=payload.connection_name,
+                                 fields=fields)
+    return store_connection(session, connection_model, owner=owner, provider=payload.provider,
+                            connection_name=payload.connection_name, fields=fields, stamp=stamp)
+
+
+@dataclass(frozen=True)
+class PendingConnection:
+    """A native flow's finished exchange, not yet stored: ``issue_handoff`` seals it into the one-time code."""
+    owner: str | None
+    provider: str
+    connection_name: str
+    fields: dict[str, Any]  # encrypted tokens, account_email, scopes, token_type, expires_at (ISO), provider_metadata
+
+
+def store_connection(session: Session, connection_model: Any, *, owner: str | None, provider: str,
+                     connection_name: str, fields: Mapping[str, Any], stamp: datetime):
+    """Revoke live rows of the same (owner, provider, connection_name), insert the new one, commit. Returns the row.
+    A lost unique-index race is retried once, then ``OAuthError("conflict")``."""
+    values = dict(fields)
+    values["expires_at"] = datetime.fromisoformat(values["expires_at"])
     for attempt in (1, 2):
-        for old in _live(session, connection_model, user_id=owner, provider=payload.provider,
-                         connection_name=payload.connection_name):
+        for old in _live(session, connection_model, user_id=owner, provider=provider,
+                         connection_name=connection_name):
             old.revoked_at, old.updated_at = stamp, stamp
             forget_access(old.id)
         session.flush()  # the revocation must reach the database before the insert
-        row = connection_model(
-            user_id=owner, provider=payload.provider, connection_name=payload.connection_name, account_email=email,
-            scopes=tokens.scope, access_token_enc=cipher.encrypt(tokens.access_token),
-            refresh_token_enc=cipher.encrypt(tokens.refresh_token), token_type=tokens.token_type,
-            expires_at=stamp + timedelta(seconds=tokens.expires_in), connected_at=stamp, created_at=stamp,
-            updated_at=stamp, provider_metadata=json.dumps({"name": info.get("name")}) if info.get("name") else None)
+        row = connection_model(user_id=owner, provider=provider, connection_name=connection_name,
+                               connected_at=stamp, created_at=stamp, updated_at=stamp, **values)
         session.add(row)
         try:
             session.commit()

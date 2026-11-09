@@ -57,6 +57,10 @@ None. The database file name stays through the prefix; `sync_rejections` and `sy
 
 - PowerSync on Flutter web needs sqlite wasm and worker assets in `web/`, so the demo exercises `bond_sync` with
   `FakeSyncStore` against the live upload route, and this package is unit tested against a fake `SyncDb`. No test starts a
-  database or a sync service; run item 2 to 6 above on a phone or simulator.
+  sync service. One test (`test/real_database_test.dart`, tag `real_db`) opens a real `PowerSyncDatabase` on a temp file in
+  `flutter test` on macOS: powersync 2.6.1's build hook downloads the core library (`libpowersync_core.dylib`, needs network
+  once) and no `sqlite3_flutter_libs` setup is needed. It covers the CRUD batch, `uploadData`, queue drain and a recorded
+  rejection. Caveat: the hook's `install_name_tool` step fails when the package path is very long (about 190 chars); keep the
+  checkout path short. Items 2 to 6 above (real sync service, damaged file, token expiry) still need a phone or simulator.
 - A's photos run before the rest of their transaction, so A needs its own ordering around `SyncUploader.uploadNext`;
   decide that before cutover.

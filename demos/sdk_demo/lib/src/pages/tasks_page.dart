@@ -84,6 +84,8 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   Future<void> _run(Future<void> Function() action, {String? info}) async {
+    // A second tap can land before the frame that disables the control: drop it.
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -223,11 +225,15 @@ class _TasksPageState extends State<TasksPage> {
             onRetry: _load,
             today: _today,
             semanticsPrefix: _id,
-            onComplete: (t) => _run(() async {
-              await (t.isOpen
-                  ? _api.complete(t.id, today: dueDateString(_today))
-                  : _api.reopen(t.id, today: dueDateString(_today)));
-            }),
+            // Disabled while a request is in flight: a second tap would re-post
+            // (complete, then reopen) and the label changes only after the reload.
+            onComplete: _busy
+                ? null
+                : (t) => _run(() async {
+                      await (t.isOpen
+                          ? _api.complete(t.id, today: dueDateString(_today))
+                          : _api.reopen(t.id, today: dueDateString(_today)));
+                    }),
             rowExtra: _extra,
           ),
           BondSpace.h16,
