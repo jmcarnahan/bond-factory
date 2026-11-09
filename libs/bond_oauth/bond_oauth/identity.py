@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from bond_oauth.errors import OAuthError
+from bond_oauth.family import family_of
 from bond_oauth.providers import TokenSet
 
 GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
@@ -51,8 +52,8 @@ def _segment(text: str) -> dict[str, Any]:
     return value
 
 
-def _is_microsoft(provider_name: str) -> bool:
-    return "microsoft" in provider_name.lower()
+def _is_microsoft(provider_name: str, provider: Any) -> bool:
+    return family_of(provider_name, provider) == "microsoft"
 
 
 def _claims(provider_name: str, provider: Any, tokens: TokenSet, *, expected_nonce: str | None,
@@ -68,7 +69,7 @@ def _claims(provider_name: str, provider: Any, tokens: TokenSet, *, expected_non
     if str(header.get("alg", "")).lower() == "none" and not unsigned_ok:
         raise _bad("The identity token is unsigned")
     issuer = claims.get("iss")
-    if _is_microsoft(provider_name):
+    if _is_microsoft(provider_name, provider):
         tid = claims.get("tid")
         allowed = (f"https://login.microsoftonline.com/{tid}/v2.0",) if isinstance(tid, str) and tid else ()
     else:
@@ -138,7 +139,7 @@ def identity_from_token_response(provider_name: str, provider: Any, tokens: Toke
     name = claims.get("name") or info.get("name")
     auth_time = claims.get("auth_time")
     when = float(auth_time) if isinstance(auth_time, int | float) and not isinstance(auth_time, bool) else stamp
-    if _is_microsoft(provider_name):
+    if _is_microsoft(provider_name, provider):
         subject = _microsoft_subject(claims)
         tenant = str(claims["tid"])
         pin = pinned_tenant or getattr(provider, "pinned_tenant", None)
@@ -170,13 +171,13 @@ def ensure_subject(provider_name: str, provider: Any, tokens: TokenSet, userinfo
     if tokens.raw.get("id_token"):
         try:
             claims = _claims(provider_name, provider, tokens, expected_nonce=None, client_id=None, now=time.time())
-            found = _microsoft_subject(claims) if _is_microsoft(provider_name) else str(claims.get("sub") or "")
+            found = _microsoft_subject(claims) if _is_microsoft(provider_name, provider) else str(claims.get("sub") or "")
         except OAuthError:
             found = None
     else:
         info = userinfo or {}
         found = str(info.get("sub") or info.get("id") or "") or None
-        if found and _is_microsoft(provider_name) and ":" in expected and ":" not in found:
+        if found and _is_microsoft(provider_name, provider) and ":" in expected and ":" not in found:
             found = f"{expected.split(':', 1)[0]}:{found}"
     if not found or not hmac.compare_digest(found.encode(), expected.encode()):
         raise OAuthError("account_mismatch", "That is not the account you signed in with")

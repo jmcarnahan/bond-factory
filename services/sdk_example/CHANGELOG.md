@@ -17,6 +17,8 @@
   localhost defaults (allowlist required, CORS origins checked against it); startup refuses a database behind head, a
   `fake*` provider outside fake mode, and fake mode on https (`SDK_EXAMPLE_ALLOW_FAKE_PUBLIC=1` to allow); phone connect
   needs an account bound by sign-in; `demo@example.com` is the seeded break-glass row (`allow_password`).
+- `SDK_EXAMPLE_CONNECTIONS=0` for sign-in only (`providers_wiring.py` builds the providers for both modules); real
+  mode no longer defaults the native scheme; `directory.find_invite` takes the new `subject=` argument.
 - Fake consent page is an identity picker with scope-set boxes (`sdk-consent-*` ids). New settings
   `SDK_EXAMPLE_SIGNIN_PROVIDERS`, `_PUBLIC_BASE` (also the connect callback base), `_NATIVE_RETURN_BASE`,
   `_NATIVE_SCHEMES`, `_BREAKGLASS`, `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS`.

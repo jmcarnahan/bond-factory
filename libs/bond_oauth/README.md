@@ -73,7 +73,7 @@ result.pending             # PendingConnection when mail/calendar scopes came wi
 flow.store(session, OAuthConnection, owner=user_id, result=result)   # one live row per (owner, provider, name)
 ```
 
-- The callback is `<public_base>/auth/signin/<provider>/callback`. Identity-only scopes (`is_identity_only`:
+- The callback is `<public_base><prefix>/signin/<provider>/callback` (`prefix` defaults to `/auth`). Identity-only scopes (`is_identity_only`:
   Google openid/email/profile; Microsoft those plus `User.Read` and no `offline_access`) ask Google for
   `access_type=online`, `prompt=select_account`, so a login never mints a refresh token. Microsoft always sends
   `prompt=select_account`. Sets: `GOOGLE_SIGNIN`, `MICROSOFT_SIGNIN`, `MICROSOFT_SIGNIN_FULL`, `GOOGLE_MAIL_SEND`,

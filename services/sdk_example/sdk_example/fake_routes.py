@@ -1,4 +1,4 @@
-"""REPLACE (an app deletes it). Fake mode only: the consent page, the expiry switch and `simulate-reuse`.
+"""REPLACE (an app deletes it). Fake mode only: the consent page, and `simulate-reuse` (no connections code: sign-in needs them).
 
 Real mode never registers these. The page stands in for the provider's own consent screen, so a person can sign in
 as any seeded identity, as one nobody invited, or as a typed address, and can leave a scope set unticked.
@@ -10,7 +10,6 @@ text, wins when filled), `sdk-consent-set-<id>` (one box per asked set), `sdk-co
 from __future__ import annotations
 
 import html
-from collections.abc import Callable
 from datetime import timedelta
 from urllib.parse import urlencode
 
@@ -20,15 +19,13 @@ from bond_auth_py import AuthRefused
 from bond_oauth.fake import mock_code
 from bond_service_kit import ApiError
 from bond_signin import ScopeSet
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import update
 
 from .auth_dep import UsersRevocation, auth_settings, invalid_token
-from .connect_helpers import status_json, status_of
 from .db import session_scope
 from .models.auth import DEMO_USERS, UNINVITED_EMAIL, User, utcnow
-from .models.connections import OAuthConnection
 from .models.sessions import AuthSession
 from .oauth_wiring import OAuthWiring
 from .scope_policy import FAKE_GOOGLE, FAKE_MICROSOFT
@@ -58,9 +55,7 @@ def identity_options(selected: str, esc=html.escape) -> str:
                    for e in emails)
 
 
-def register_fake(app: FastAPI, wiring: OAuthWiring, provider_or_404: Callable, manage: Callable,
-                  hook: Callable) -> None:
-    factory = app.state.session_factory
+def register_fake(app: FastAPI, wiring: OAuthWiring) -> None:
 
     def sets_asked(payload: oauth.StatePayload) -> list[ScopeSet]:
         """The scope sets this request asks: a sign-in asks none (identity or pre-consented), a connect asks its
@@ -94,7 +89,7 @@ def register_fake(app: FastAPI, wiring: OAuthWiring, provider_or_404: Callable, 
             payload = oauth.decode_state(wiring.cipher, state)
         except oauth.OAuthError as exc:
             raise ApiError(exc.code, str(exc), status=400) from exc
-        path = (f"/auth/signin/{payload.provider}/callback" if payload.intent == "signin"
+        path = (f"{request.app.state.signin.settings.prefix}/signin/{payload.provider}/callback" if payload.intent == "signin"
                 else f"/connections/{payload.provider}/callback")
         if q.get("action") == "deny":
             return RedirectResponse(f"{path}?{urlencode({'state': state, 'error': 'access_denied'})}", status_code=302)
@@ -113,27 +108,6 @@ def register_fake(app: FastAPI, wiring: OAuthWiring, provider_or_404: Callable, 
         if not token:
             raise invalid_token("Sign in to continue.")
         return simulate_reuse(request, token)
-
-    @app.post("/connections/{provider}/simulate-expiry")
-    def simulate_expiry(provider: str, user_id: str = Depends(manage)) -> dict:
-        provider_or_404(provider)
-        fake = wiring.fakes[provider]
-        with session_scope(factory) as session:
-            rows = session.query(OAuthConnection).filter_by(user_id=user_id, provider=provider, revoked_at=None).all()
-            if not rows:
-                raise ApiError("not_connected", "Connect this provider first.", status=404)
-            fake.fail_refresh_with("invalid_grant")
-            try:
-                for row in rows:
-                    oauth.forget_access(row.id)
-                    try:
-                        oauth.access_token(session, row, provider=fake, cipher=wiring.cipher,
-                                           on_reconnect_needed=hook)
-                    except oauth.ReconnectRequired:
-                        pass
-            finally:
-                fake.fail_refresh_with(None)
-            return status_json(status_of(session, user_id, provider))
 
 
 def simulate_reuse(request: Request, token: str) -> Response:

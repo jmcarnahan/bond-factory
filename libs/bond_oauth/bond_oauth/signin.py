@@ -18,6 +18,7 @@ from typing import Any
 from bond_oauth import pkce
 from bond_oauth.cipher import TokenCipher
 from bond_oauth.errors import OAuthError, RetryableError
+from bond_oauth.family import family_of
 from bond_oauth.guid import ATTEMPT, GUID, HEX64
 from bond_oauth.identity import OidcIdentity, identity_from_token_response
 from bond_oauth.providers import OAuthProvider
@@ -64,22 +65,26 @@ class SignInFlow:
     ``invalid_request`` and the provider's own error string."""
 
     def __init__(self, *, providers: Mapping[str, OAuthProvider], cipher: TokenCipher, client_ids: Mapping[str, str],
-                 public_base: str, pinned_tenants: Mapping[str, str] | None = None,
+                 public_base: str, pinned_tenants: Mapping[str, str] | None = None, prefix: str = "/auth",
                  clock: Callable[[], float] = time.time) -> None:
         missing = [name for name in providers if not client_ids.get(name)]
         if missing:
             raise ValueError(f"no client id for provider(s): {', '.join(sorted(missing))}")
         self._providers, self._cipher, self._client_ids = dict(providers), cipher, dict(client_ids)
         self._base, self._pinned, self._clock = public_base.rstrip("/"), dict(pinned_tenants or {}), clock
+        self._prefix = "/" + prefix.strip("/") if prefix.strip("/") else ""
         for name, impl in self._providers.items():  # a Microsoft sign-in without one pinned tenant is refused here
-            if "microsoft" in name.lower() and not getattr(impl, "unsigned_ids_ok", False):
+            kind = family_of(name, impl)
+            if kind is None:
+                raise ValueError(f"provider {name!r} has an unknown family (expected google or microsoft)")
+            if kind == "microsoft" and not getattr(impl, "unsigned_ids_ok", False):
                 pin = self._pinned.get(name) or getattr(impl, "pinned_tenant", None)
                 if not isinstance(pin, str) or not GUID.match(pin):
                     raise ValueError(f"provider {name!r} needs a pinned tenant that is a GUID "
                                      "(not common, organizations or consumers)")
 
     def callback_url(self, provider: str) -> str:
-        return f"{self._base}/auth/signin/{provider}/callback"
+        return f"{self._base}{self._prefix}/signin/{provider}/callback"
 
     def start(self, *, provider: str, scopes: Sequence[str], redirect_to: str, device_hash: str | None = None,
               attempt_id: str | None = None) -> StartedSignIn:
@@ -95,11 +100,12 @@ class SignInFlow:
             raise OAuthError("invalid_request", "The attempt id is not valid")
         verifier, nonce = pkce.new_verifier(), secrets.token_urlsafe(12)
         oidc_nonce = hashlib.sha256(nonce.encode()).hexdigest()
-        identity_only = is_identity_only(provider, scopes)
+        microsoft = family_of(provider, impl) == "microsoft"
+        identity_only = is_identity_only(provider, scopes, family=family_of(provider, impl))
         state = encode_state(self._cipher, sub=None, provider=provider, connection_name=provider, verifier=verifier,
                              redirect_to=redirect_to, native=device_hash is not None, intent="signin",
                              device_hash=device_hash, attempt_id=attempt_id, oidc_nonce=oidc_nonce, nonce=nonce)
-        prompt = "select_account" if identity_only or "microsoft" in provider.lower() else "consent"
+        prompt = "select_account" if identity_only or microsoft else "consent"
         url = impl.authorize_url(state=state, challenge=pkce.challenge(verifier), scopes=list(scopes),
                                  redirect_uri=self.callback_url(provider), offline=not identity_only, prompt=prompt,
                                  nonce=oidc_nonce)
@@ -150,7 +156,7 @@ class SignInFlow:
             pinned_tenant=self._pinned.get(payload.provider))
         granted = split_scopes(tokens.scope)
         pending = None
-        if tokens.refresh_token and identity.email and not is_identity_only(payload.provider, granted):
+        if tokens.refresh_token and identity.email and not is_identity_only(payload.provider, granted, family=family_of(payload.provider, provider)):
             fields = connection_fields(self._cipher, tokens, email=identity.email, name=identity.name,
                                        stamp=utcnow())
             pending = PendingConnection(owner=None, provider=payload.provider,
@@ -170,7 +176,7 @@ class SignInFlow:
         try:
             return fetch(access_token)
         except (OAuthError, RetryableError):
-            if "microsoft" in name.lower() and not getattr(provider, "unsigned_ids_ok", False):
+            if family_of(name, provider) == "microsoft" and not getattr(provider, "unsigned_ids_ok", False):
                 raise
             return None
 

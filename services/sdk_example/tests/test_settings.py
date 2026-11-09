@@ -60,7 +60,7 @@ def test_real_mode_with_secret_works(monkeypatch):
     monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "https://app.example.org")
     monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "https://app.example.org")
     s = Settings.from_env()
-    assert s.mode == "real" and s.native_redirects == ()  # no localhost or sdkdemo defaults outside fake mode
+    assert s.mode == "real" and s.native_redirects == () and s.native_schemes == ()  # no sdkdemo defaults outside fake mode
 
 
 def _real(monkeypatch, **extra):
@@ -89,3 +89,10 @@ def test_wildcard_cors_origin_raises(monkeypatch):
     monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "http://a.test,*")
     with pytest.raises(RuntimeError, match="CORS"):
         Settings.from_env()
+
+
+def test_fake_mode_defaults_the_native_scheme_and_connections_can_be_switched_off(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    assert Settings.from_env().native_schemes == ("org.example.sdkdemo",) and Settings.from_env().connections
+    monkeypatch.setenv("SDK_EXAMPLE_CONNECTIONS", "0")
+    assert Settings.from_env().connections is False

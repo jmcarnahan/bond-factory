@@ -190,3 +190,18 @@ def test_legacy_id_token_refresh_needs_an_origin_unless_a_bearer_is_present(stac
     assert ok.status_code == 200 and ok.json() == {"legacy": True}
     bearer = client.post("/auth/refresh", json=body, headers={"Authorization": "Bearer abc"})
     assert bearer.status_code == 200 and bearer.json() == {"legacy": True}
+
+
+def test_directory_fake_raises_the_coded_identity_taken(stack):
+    from bond_signin import IdentityTaken, refusal_code
+
+    with stack.db() as s:
+        a, b = s.get(User, "u-google"), s.get(User, "u-ms")
+        stack.directory.link_identity(s, a, GOOGLE, "subject-1")
+        s.flush()
+        try:
+            stack.directory.link_identity(s, b, GOOGLE, "subject-1")
+        except IdentityTaken as exc:
+            assert refusal_code(exc) == "identity_mismatch"
+        else:
+            raise AssertionError("IdentityTaken was not raised")

@@ -77,6 +77,9 @@ def native_callback(app: FastAPI, provider: str, payload: oauth.StatePayload, st
 
 
 def register(app: FastAPI) -> None:
+    if not app.state.settings.connections:
+        return
+
     @app.post("/connections/{provider}/redeem")
     def redeem(provider: str, body: RedeemBody, user_id: str = Depends(manage)) -> dict:
         helpers.provider_or_404(app.state.oauth, provider)

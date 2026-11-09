@@ -11,7 +11,8 @@ NONCE = "sdk_example_oauth_nonce"
 
 def headers(client, user_id=DEMO_USER_ID):
     """Sign in as a demo user (also leaves the session cookie in the client's jar) and return bearer headers."""
-    token = client.post("/auth/demo", json={"user_id": user_id}).json()["token"]
+    web = {"Origin": "http://localhost:8078"}  # the web app: on the allowlist and in CORS
+    token = client.post("/auth/demo", json={"user_id": user_id}, headers=web).json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
 

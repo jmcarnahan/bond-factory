@@ -10,8 +10,8 @@ Normative for `libs/bond_signin`, the sign-in half of `bond_oauth`, the sessions
 |---|---|---|---|
 | `POST /auth/signin/{p}/start` | `{redirect_to, mode: "web"\|"native", device_challenge?, attempt?}` | `200 {url}`; web also sets the nonce cookie | 400 `invalid_request`, 403 `invalid_origin`, 404 unknown provider |
 | `GET /auth/signin/{p}/callback` | `state`, `code` or `error` | `302` (below); no body | 400 `invalid_state` without the matching cookie; refusals ride `reason=` / `error=` |
-| `POST /auth/signin/redeem` | `{code, device_secret}` | `200 {token, refresh_token, user}` | 401 `invalid_handoff`, 401 `session_revoked`, 403 `deactivated`; body delivery, so no cookies are set |
-| `POST /auth/refresh` | `{refresh_token?, rotation_id?}`, cookie, or `{id_token}` | `{token, user, refresh_token?}`; see `auth.md` | 401 `refresh_reused\|refresh_expired\|refresh_revoked\|invalid_token` |
+| `POST /auth/signin/redeem` | `{code, device_secret}` | `200 {token, expires_in, refresh_token, user}` | 401 `invalid_handoff`, 401 `session_revoked`, 403 `deactivated`; body delivery, so no cookies are set |
+| `POST /auth/refresh` | `{refresh_token?, rotation_id?}`, cookie, or `{id_token}` | `{token, expires_in, user, refresh_token?}`; `delivery` rules in `auth.md` | 401 `refresh_reused\|refresh_expired\|refresh_revoked\|invalid_token` |
 | `POST /auth/logout` | cookie or `{refresh_token}` | `{"status": "logged_out"}`, clears the cookies | 403 `invalid_origin` on cookie delivery without an allowed Origin; otherwise never fails |
 | `POST /auth/sessions/revoke-all` | none, signed in | `{revoked: n}` | 401 |
 | `GET /auth/providers` | none | `auth.md` payload plus `signin`, `break_glass`, `default_flow` | none |

@@ -1,4 +1,4 @@
-"""``GET /app/return/{provider}``: shown only when the app is not installed to catch the link (§3.8 G)."""
+"""``GET <parent of prefix>/app/return/{provider}`` (``/app/return/...`` by default): shown only when the app is not installed to catch the link (§3.8 G)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,11 @@ HEADERS = {
 }
 
 
-def register(router: APIRouter) -> None:
-    @router.get("/app/return/{provider}", include_in_schema=False)
+def register(router: APIRouter, *, prefix: str = "/auth") -> None:
+    """Served at ``<parent of prefix>/app/return/{provider}``: ``/app/return/...`` for ``/auth``,
+    ``/api/v1/app/return/...`` for ``/api/v1/auth``."""
+    parent = prefix.rsplit("/", 1)[0]
+
+    @router.get(f"{parent}/app/return/{{provider}}", include_in_schema=False)
     def return_page(provider: str) -> HTMLResponse:  # the query (attempt, code) is never read or logged
         return HTMLResponse(PAGE, headers=HEADERS)

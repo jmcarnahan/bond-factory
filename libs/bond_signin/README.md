@@ -11,15 +11,17 @@ shapes satisfy the Protocols here, and errors are matched by a `code` attribute.
 3. One mount: `app.include_router(make_signin_router(...))`.
 
 ```python
+from bond_signin import IdentityTaken, SessionSpec  # IdentityTaken: raise it from link_identity
+
 class Directory:  # structurally a bond_signin.UserDirectory; `user` is your row (id, is_active, identity, sessions_valid_after)
     def find_by_identity(self, s, provider, subject):
         return s.scalar(select(User).where(User.idp == provider, User.idp_subject == subject))
     def find_by_id(self, s, user_id): return s.get(User, user_id)
-    def find_invite(self, s, emails, provider):
+    def find_invite(self, s, emails, provider, *, subject=None):  # subject: match a pre-known IdP subject too
         rows = {u.id: u for u in s.scalars(select(User).where(func.lower(User.email).in_(emails), User.removed.is_(False)))}
         return next(iter(rows.values())) if len(rows) == 1 else None  # none or ambiguous: not_invited
     def link_identity(self, s, user, provider, subject):
-        user.idp, user.idp_subject = provider, subject  # raise a coded `identity_mismatch` if the pair is taken
+        user.idp, user.idp_subject = provider, subject  # raise IdentityTaken() if the pair is taken
     def check_allowed(self, s, user, provider): ...  # raise AuthRefused("company_suspended" | "provider_not_allowed")
     def capabilities(self, s, user): return list(user.capabilities)
     def session_spec(self, s, user): return SessionSpec(sub=user.id, name=user.name, capabilities=list(user.capabilities))
@@ -41,7 +43,7 @@ router = make_signin_router(
 inside it so the audit row and the family revoke are committed.
 
 ## Routes
-| Route | Body or query | Answer | Errors |
+| Route (under `prefix`, default `/auth`; return page at `/app/return`) | Body or query | Answer | Errors |
 |---|---|---|---|
 | `POST /auth/signin/{p}/start` | `{redirect_to, mode: web or native, device_challenge?, attempt?}` | `{url}`, web also sets the nonce cookie | 400 `invalid_request`, 403 `invalid_origin`, 404 |
 | `GET /auth/signin/{p}/callback` | `state`, `code` or `error` | 302 to `redirect_to?signin=ok` or `?signin=error&reason=` (native: `?attempt=&code=` or `&error=`) | 400 `invalid_state` (no redirect) |
@@ -62,8 +64,28 @@ The web nonce cookie is per flow, `bond_signin_<8 hex of sha256(nonce)>`, set by
 |---|---|
 | `session_scope` | `() -> context manager` yielding the DB session; commits on exit, rolls back on an exception |
 | `connection_model` | the app's connection table class, passed to `flow.store` when a sign-in carries offline scopes |
-| `clock` | optional `() -> epoch seconds`, passed as `now` to sessions, hand-offs and the order; default is each lib's own clock |
-| `cookies` | `CookiePolicy(access_name, refresh_name, access_cookie(secure), refresh_cookie(secure))` |
+| `cookies` | `CookiePolicy(access_name, refresh_name, access_cookie(secure), refresh_cookie(secure), refresh_path=None)` |
+| `providers_payload` | REQUIRED with `include_providers=True`: your own `/providers` fields, else they vanish from the answer |
+| `legacy_refresh` | `(request, body) -> answer`; REQUIRED while installed builds still post `{id_token}` to refresh |
+| `labels` | optional `{provider: button label}` for the `signin` list |
+| `clock` | optional `() -> epoch seconds`, passed as `now` to sessions, hand-offs and the order |
+| `prefix` | default `settings.prefix` (`/auth`). Routes, the nonce cookie (`<prefix>/signin`) and the refresh cookie (`<prefix>`) move together; the return page is at `<parent>/app/return/{p}`. Set the flow's `public_base` to match |
+
+`from_env(prefix="BOND_SIGNIN_")` names (all prefixed):
+| Name | Default | Meaning |
+|---|---|---|
+| `PROVIDERS` | empty | comma list of provider ids |
+| `PUBLIC_BASE` | required | https base of the API (http only with `ALLOW_HTTP`) |
+| `REDIRECT_ALLOWLIST` | empty | comma list of web origins allowed as `Origin` and `redirect_to` |
+| `NATIVE_RETURN_BASE` | `<PUBLIC_BASE><parent of PREFIX>/app/return` | the https return URL the phone app is sent to |
+| `NATIVE_SCHEMES` | empty | reverse-domain custom schemes allowed as a fallback |
+| `BREAKGLASS` | off | break-glass flag; `AuthSettings.email_password_enabled` must follow it |
+| `COOKIE_SECURE` | on (off with `ALLOW_HTTP`) | Secure flag of the cookies |
+| `ALLOW_HTTP` | off | local runs only |
+| `PREFIX` | `/auth` | where the routes mount; `make_signin_router` and `callback_url` both use it |
+
+Origin rule for your own routes: any cookie-authenticated mutation outside this router needs the same check; see
+`services/sdk_example/sdk_example/origin_rule.py` (bearer requests skip it).
 
 Log hygiene: scrub the `code`, `state` and `attempt` query parameters from access logs for `/auth/signin/*/callback`
 and `/app/return/*`.

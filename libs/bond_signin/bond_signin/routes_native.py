@@ -94,7 +94,7 @@ def redeem_sync(deps: Deps, request: Request, body: dict) -> Response:
 
 
 def register(router: APIRouter, deps: Deps) -> None:
-    @router.post("/auth/signin/redeem")
+    @router.post(f"{deps.prefix}/signin/redeem")
     async def redeem(request: Request) -> Response:
         deps.limit(request, "redeem")
         body = await read_json(request)

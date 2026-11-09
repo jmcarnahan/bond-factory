@@ -18,7 +18,7 @@ void main() {
   test('startNative sends the fixture keys, mode, attempt shape and return address', () async {
     final s = FakeServer({'POST /auth/signin/google/start': signinMap('start_response')});
     final req = signinMap('start_request_native');
-    final (attempt, _) = await SignInApi(s.api).startNative('google', returnBase: 'https://api.example.org/app/return');
+    final (attempt, _) = await SignInApi(s.api).startNative('google', returnUrl: Uri.parse(req['redirect_to']! as String));
     final sent = s.seen.single.body;
     expect(sent.keys.toSet(), req.keys.toSet());
     expect(sent['redirect_to'], req['redirect_to']);

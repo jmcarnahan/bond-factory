@@ -15,7 +15,7 @@ void main() {
   test('startNative sends the challenge, never the secret', () async {
     final s = FakeServer({'POST /auth/signin/microsoft/start': {'url': 'https://idp.test/a'}});
     final (attempt, url) =
-        await SignInApi(s.api).startNative('microsoft', returnBase: 'https://api.test/app/return/');
+        await SignInApi(s.api).startNative('microsoft', returnUrl: Uri.parse('https://api.test/app/return/microsoft'));
     expect(url.host, 'idp.test');
     final body = s.seen.single.body;
     expect(body['mode'], 'native');

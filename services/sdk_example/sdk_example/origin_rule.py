@@ -14,13 +14,13 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 MUTATING = ("POST", "PUT", "PATCH", "DELETE")
-EXEMPT = ("/auth/signin", "/auth/refresh", "/auth/logout", "/auth/sessions")
+EXEMPT = ("signin", "refresh", "logout", "sessions")  # the library's routes under its prefix
 
 
 class OriginRule(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         stack = getattr(request.app.state, "signin", None)  # built after the middleware: read at request time
-        if (stack is not None and request.method in MUTATING and not request.url.path.startswith(EXEMPT)
+        if (stack is not None and request.method in MUTATING and not request.url.path.startswith(tuple(f"{stack.settings.prefix}/{n}" for n in EXEMPT))
                 and request.cookies.get(stack.cookies.access_name) and not has_bearer(request)):
             try:
                 require_origin(request, stack.settings)

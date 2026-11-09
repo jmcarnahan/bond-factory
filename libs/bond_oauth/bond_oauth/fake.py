@@ -49,6 +49,7 @@ class FakeOAuth:
         self.consent_base = consent_base
         self.email = email
         self.client_id, self.kind, self.pinned_tenant = client_id, kind, pinned_tenant
+        self.family = kind  # "google" or "microsoft": which identity rules the fake follows
         self.set_scopes = {key: list(value) for key, value in (set_scopes or {}).items()}
         self.refresh_calls = 0
         self.revoked: list[str] = []

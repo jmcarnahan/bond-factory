@@ -102,7 +102,7 @@ def revoke_all_sync(deps: Deps, request: Request) -> Response:
 
 
 def register(router: APIRouter, deps: Deps) -> None:
-    @router.post("/auth/refresh")
+    @router.post(f"{deps.prefix}/refresh")
     async def refresh(request: Request) -> Any:
         deps.limit(request, "refresh")
         body = await read_json(request)
@@ -126,7 +126,7 @@ def register(router: APIRouter, deps: Deps) -> None:
         rotation_id = rotation_id if isinstance(rotation_id, str) and 0 < len(rotation_id) <= 128 else None
         return await run_in_threadpool(rotate_sync, deps, request, token, rotation_id, delivery)
 
-    @router.post("/auth/logout")
+    @router.post(f"{deps.prefix}/logout")
     async def logout(request: Request) -> Response:
         body = await read_json(request, strict=False)
         body_token = body.get("refresh_token")
@@ -135,7 +135,7 @@ def register(router: APIRouter, deps: Deps) -> None:
             body_token = request.cookies.get(deps.cookies.refresh_name)
         return await run_in_threadpool(logout_sync, deps, request, body_token)
 
-    @router.post("/auth/sessions/revoke-all")
+    @router.post(f"{deps.prefix}/sessions/revoke-all")
     async def revoke_all(request: Request) -> Response:
         if not has_bearer(request):
             require_origin(request, deps.settings)

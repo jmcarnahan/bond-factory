@@ -90,10 +90,16 @@ def test_offline_scopes_store_one_connection_under_the_signed_in_user(h):
     assert h.flow.stored == [{"owner": "u-bob", "model": "CONN", "pending": "PENDING"}]
 
 
-def test_redirect_to_keeps_its_query_and_drops_the_fragment(h):
+def test_redirect_to_keeps_its_query_and_its_fragment_after_the_query(h):
     state = state_of(start_web(h, redirect_to=f"{DONE}?lang=de#frag"))
     resp = h.client.get(f"/auth/signin/google/callback?state={state}&code=alice")
-    assert resp.headers["location"] == f"{DONE}?lang=de&signin=ok"
+    assert resp.headers["location"] == f"{DONE}?lang=de&signin=ok#frag"
+
+
+def test_hash_route_fragment_is_kept(h):
+    state = state_of(start_web(h, redirect_to=f"{APP_ORIGIN}/#/auth"))
+    resp = h.client.get(f"/auth/signin/google/callback?state={state}&code=alice")
+    assert resp.headers["location"] == f"{APP_ORIGIN}/?signin=ok#/auth"
 
 
 def test_attacker_link_without_the_nonce_cookie_is_refused_and_nothing_happens(h):

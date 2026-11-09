@@ -76,7 +76,9 @@ class Settings:
     public_base: str = PUBLIC_BASE
     signin_providers: tuple[str, ...] = ()
     native_return_base: str = ""  # empty = `<public_base>/app/return`
-    native_schemes: tuple[str, ...] = (DEFAULT_SCHEME,)  # custom schemes a phone app may return to (fallback)
+    native_schemes: tuple[str, ...] = ()  # reverse-domain schemes a phone may return to (fallback); fake mode defaults to DEFAULT_SCHEME
+    signin_prefix: str = "/auth"  # where the library mounts its routes; the app's own /auth/* routers keep /auth
+    connections: bool = True  # SDK_EXAMPLE_CONNECTIONS=0: sign-in only, no connect routes (an app without mail)
     breakglass: bool = False  # the Firebase e-mail and password route (admin rows and the store reviewer)
     apple_app_ids: tuple[str, ...] = ()  # `<TEAMID>.<bundle id>` for the universal link file; empty = 404
     android_apps: tuple[tuple[str, tuple[str, ...]], ...] = ()  # (package, sha256 fingerprints); empty = 404
@@ -120,7 +122,9 @@ class Settings:
             public_base=public_base.rstrip("/"),
             signin_providers=_split(env("SDK_EXAMPLE_SIGNIN_PROVIDERS", FAKE_PROVIDERS if mode == "fake" else "")),
             native_return_base=env("SDK_EXAMPLE_NATIVE_RETURN_BASE", ""),
-            native_schemes=_split(env("SDK_EXAMPLE_NATIVE_SCHEMES", DEFAULT_SCHEME)),
+            native_schemes=_split(env("SDK_EXAMPLE_NATIVE_SCHEMES", DEFAULT_SCHEME if fake else "")),  # no default in real mode
+            signin_prefix="/" + env("SDK_EXAMPLE_SIGNIN_PREFIX", "/auth").strip("/"),
+            connections=env("SDK_EXAMPLE_CONNECTIONS", "1").lower() not in ("0", "false", "no", "off"),
             breakglass=env("SDK_EXAMPLE_BREAKGLASS", "").lower() in ("1", "true", "yes", "on"),
             apple_app_ids=_split(env("BOND_APPLE_APP_IDS", "")),
             android_apps=_android(env("BOND_ANDROID_APPS", "")),

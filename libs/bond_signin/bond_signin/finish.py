@@ -20,6 +20,13 @@ class CookiePolicy:
     refresh_name: str
     access_cookie: Callable[[bool], dict]
     refresh_cookie: Callable[[bool], dict]
+    refresh_path: str | None = None  # the router sets it from its prefix; overrides the callable's ``path``
+
+    def refresh_params(self, secure: bool) -> dict:
+        params = dict(self.refresh_cookie(secure))
+        if self.refresh_path:
+            params["path"] = self.refresh_path
+        return params
 
 
 def finish_session(response: Response, issued: IssuedSession, *, settings: SignInSettings, cookies: CookiePolicy,
@@ -31,7 +38,7 @@ def finish_session(response: Response, issued: IssuedSession, *, settings: SignI
     if mode == "cookie":
         secure = settings.cookie_secure
         response.set_cookie(cookies.access_name, issued.access_jwt, **cookies.access_cookie(secure))
-        response.set_cookie(cookies.refresh_name, issued.refresh_token, **cookies.refresh_cookie(secure))
+        response.set_cookie(cookies.refresh_name, issued.refresh_token, **cookies.refresh_params(secure))
     else:
         body["refresh_token"] = issued.refresh_token
     return body
@@ -41,5 +48,5 @@ def clear_session_cookies(response: Response, *, settings: SignInSettings, cooki
     """Delete the access and refresh cookies on the paths they were set on."""
     secure = settings.cookie_secure
     for name, params in ((cookies.access_name, cookies.access_cookie(secure)),
-                         (cookies.refresh_name, cookies.refresh_cookie(secure))):
+                         (cookies.refresh_name, cookies.refresh_params(secure))):
         response.delete_cookie(name, path=params.get("path", "/"), secure=secure, httponly=True, samesite="lax")

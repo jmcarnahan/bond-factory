@@ -28,6 +28,7 @@ import json
 import secrets
 import threading
 import time
+import warnings
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -42,8 +43,14 @@ _USED: dict[str, float] = {}  # nonce -> exp of a redeemed code; pruned once the
 _LOCK = threading.Lock()
 
 
+def _deprecated(name: str) -> None:
+    warnings.warn(f"bond_oauth.{name} is deprecated and is removed in 0.3.0; use HandoffStore",
+                  DeprecationWarning, stacklevel=3)
+
+
 def forget_handoffs() -> None:
     """Empty the single-use registry (tests). Deprecated with the module: see ``HandoffStore``."""
+    _deprecated("forget_handoffs")
     with _LOCK:
         _USED.clear()
 
@@ -56,6 +63,7 @@ def issue_handoff(pending: PendingConnection, *, cipher: TokenCipher, ttl: int =
                   now: float | None = None) -> str:
     """Deprecated (use ``HandoffStore.issue``). Seal a native flow's ``PendingConnection`` into a one-time code.
     Shared mailboxes (no owner) are refused."""
+    _deprecated("issue_handoff")
     if pending.owner is None:
         raise _invalid("A shared connection cannot be handed off to one user")
     issued = time.time() if now is None else now
@@ -74,6 +82,7 @@ def redeem_handoff(session: Session, *, code: str, user_id: str, cipher: TokenCi
     Anything else (damaged, expired, another user's, already used) raises ``OAuthError("invalid_handoff")`` and stores
     nothing. A code is burned only when it would otherwise succeed (and un-burned if the insert fails).
     """
+    _deprecated("redeem_handoff")
     current = time.time() if now is None else now
     try:
         data = json.loads(cipher.decrypt_state(code or ""))

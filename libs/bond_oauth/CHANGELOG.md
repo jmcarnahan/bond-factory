@@ -4,6 +4,12 @@
 Additive: every 0.1.0 call keeps working. Native connect goes through `HandoffStore(purpose="connect")` (the example's
 `routes/connect_native.py`); the process-local registry functions in `handoff.py` are deprecated, kept for 0.2.x
 compatibility and removed in 0.3.0.
+- Provider `family` ("google" on `GoogleOAuth`, "microsoft" on `MicrosoftOAuth`, the kind on `FakeOAuth`) decides the
+  identity rules (subject, tenant pin, identity-only scopes), not the registered name; `SignInFlow` refuses an unknown
+  family. Only a provider without the attribute falls back to a name containing `microsoft`. `is_identity_only` takes
+  an optional `family=`.
+- Deprecations: `issue_handoff`, `redeem_handoff`, `forget_handoffs` emit `DeprecationWarning`.
+  Removed in 0.3.0: `handoff.py`, its barrel exports and `tests/test_native_handoff.py`.
 - `SignInFlow.peek(state=)` and `StateInfo`: pure decode (no network). Raises `invalid_state` for an unauthentic state;
   an authentic expired state is returned with `expired=True` (`complete` raises `signin_expired`).
 - Tenant pin at construction: `SignInFlow` raises `ValueError` for a Microsoft provider (not `unsigned_ids_ok`) without a
@@ -12,6 +18,7 @@ compatibility and removed in 0.3.0.
   `idp` claim is `tenant_mismatch`. `StartedSignIn`, `SignInResult.pending` and `StateInfo.nonce`/`device_hash` hide secrets from `repr`.
 - `identity_from_token_response`: `exp` must be finite (NaN/inf refused); a non-string `email` claim counts as missing.
   A real Microsoft provider fails the sign-in when `/me` fails (it carries the guest markers); Google ignores a failed userinfo.
+- `SignInFlow(prefix="/auth")`: the callback is `<public_base><prefix>/signin/<provider>/callback`.
 - `SignInFlow` (`signin.py`): `start`, `complete`, `store`, `callback_url`; `StartedSignIn`, `SignInResult`. `complete`
   stores nothing; `pending` only for non-identity-only grants with a refresh token; web binds the cookie nonce, native
   the device hash; `expired_state` becomes `signin_expired`.

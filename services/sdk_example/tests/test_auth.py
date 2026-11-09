@@ -16,6 +16,9 @@ STRONG_SECRET = "a-test-secret-that-is-at-least-32-bytes-long"
 WEB = {"Origin": "http://localhost:8078"}  # cookie-delivery POSTs of the sign-in lib need an allowed Origin
 
 
+REAL_WEB = {"Origin": "https://app.example.org"}  # the real-mode tests' allowlist
+
+
 @pytest.fixture(autouse=True)
 def _breakglass(monkeypatch):
     """`/auth/firebase` is the break-glass route: off unless SDK_EXAMPLE_BREAKGLASS=1, and only for rows flagged
@@ -82,8 +85,8 @@ def test_demo_route_is_404_outside_fake_mode(tmp_path, monkeypatch):
     monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "https://app.example.org")
     monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/real.db")
     real = TestClient(create_app())
-    assert real.post("/auth/demo", json={"user_id": "demo-user-1"}).status_code == 404
-    answer = real.post("/auth/firebase", json={"id_token": "mock:demo@example.com"})
+    assert real.post("/auth/demo", json={"user_id": "demo-user-1"}, headers=REAL_WEB).status_code == 404
+    answer = real.post("/auth/firebase", json={"id_token": "mock:demo@example.com"}, headers=REAL_WEB)
     assert answer.status_code == 501
     assert code_of(answer) == "firebase_not_configured"
     providers = real.get("/auth/providers").json()
@@ -303,7 +306,7 @@ def test_session_cookie_is_secure_outside_fake_mode(tmp_path, monkeypatch):
 
     set_verifier(lambda token: {"uid": "u1", "email": "demo@example.com", "auth_time": datetime.now(UTC).timestamp()})
     try:
-        answer = TestClient(real).post("/auth/firebase", json={"id_token": "any"})
+        answer = TestClient(real).post("/auth/firebase", json={"id_token": "any"}, headers=REAL_WEB)
     finally:
         set_verifier(None)
     assert answer.status_code == 200, answer.text

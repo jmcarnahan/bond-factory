@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from bond_oauth.fake import FAKE_TENANT
+from urllib.parse import parse_qs, urlsplit
+
+from bond_oauth.fake import FAKE_TENANT, mock_code
 from fastapi.testclient import TestClient
 from signin_conformance_support import (  # noqa: F401
     ACCESS,
@@ -15,6 +17,7 @@ from signin_conformance_support import (  # noqa: F401
     AuthSession,
     Connection,
     User,
+    build_stack,
     callback,
     client,
     code_of,
@@ -218,3 +221,34 @@ def test_invalid_state_clears_the_per_flow_nonce_cookie(stack):
     assert done.status_code == 400
     cleared = [c for c in done.headers.get_list("set-cookie") if c.startswith(name)]
     assert cleared and "max-age=0" in _flags(cleared[0]) and "path=/auth/signin" in _flags(cleared[0])
+
+
+def test_mounted_under_a_prefix_end_to_end(tmp_path):
+    prefix = "/api/v1/auth"
+    st = build_stack(str(tmp_path / "prefixed.db"), prefix)
+    st.add_user("u-google", "demo.google@example.com")
+    c = TestClient(st.app, follow_redirects=False)
+    target = f"{REDIRECT}#/done"  # a fragment route must survive the redirect
+    started = c.post(f"{prefix}/signin/{GOOGLE}/start", json={"redirect_to": target, "mode": "web"}, headers=ORIGIN)
+    assert started.status_code == 200, started.text
+    query = parse_qs(urlsplit(started.json()["url"]).query)
+    assert c.post("/auth/signin/fake-google/start", json={"redirect_to": target, "mode": "web"},
+                  headers=ORIGIN).status_code == 404  # nothing is mounted at the default prefix
+    assert st.flow.callback_url(GOOGLE) == f"http://testserver{prefix}/signin/{GOOGLE}/callback"
+    nonce_cookie = [h for h in started.headers.get_list("set-cookie") if h.startswith("bond_signin_")]
+    assert len(nonce_cookie) == 1 and f"path={prefix}/signin" in _flags(nonce_cookie[0])
+
+    done = c.get(f"{prefix}/signin/{GOOGLE}/callback",
+                 params={"state": query["state"][0], "code": mock_code("demo.google@example.com")})
+    assert done.status_code == 302 and done.headers["location"] == f"{REDIRECT}?signin=ok#/done"
+    refresh_cookie = [h for h in done.headers.get_list("set-cookie") if h.startswith(REFRESH)]
+    assert len(refresh_cookie) == 1 and f"path={prefix}" in _flags(refresh_cookie[0])
+    assert f"path={prefix}/" not in _flags(refresh_cookie[0])
+
+    assert c.get(f"{prefix}/me").json()["id"] == "u-google"
+    old = c.cookies.get(REFRESH)
+    refreshed = c.post(f"{prefix}/refresh", json={}, headers=ORIGIN)
+    assert refreshed.status_code == 200, refreshed.text
+    assert c.cookies.get(REFRESH) not in (None, old)  # the rotated cookie came back on the prefixed path
+    out = c.post(f"{prefix}/logout", json={}, headers=ORIGIN)
+    assert out.status_code == 200 and c.cookies.get(REFRESH) is None and c.cookies.get(ACCESS) is None

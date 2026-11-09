@@ -88,3 +88,10 @@ def raise_for(exc: BaseException) -> None:
         LOGGER.error("unknown sign-in error code %r", code[:64])
         raise http_error("internal_error")
     raise http_error(code)
+
+
+class IdentityTaken(SignInRefused):
+    """Raise from ``UserDirectory.link_identity`` when the identity is bound to another user."""
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__("identity_mismatch", message)

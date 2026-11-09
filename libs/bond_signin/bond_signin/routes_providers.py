@@ -8,7 +8,7 @@ from ._common import Deps
 
 
 def register(router: APIRouter, deps: Deps) -> None:
-    @router.get("/auth/providers")
+    @router.get(f"{deps.prefix}/providers")
     def providers() -> dict:
         payload = dict(deps.providers_payload() if deps.providers_payload else {})
         payload.setdefault("signin", [{"id": p, "label": deps.labels.get(p, p.title())}

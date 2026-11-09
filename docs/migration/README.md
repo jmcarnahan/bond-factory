@@ -35,7 +35,7 @@ otherwise. Re-run the grep given in each file's section 3 before you start; the 
 | `bond_tasks_py` | `bond_tasks_py.md` | S, A |
 | `bond_tasks`, `bond_tasks_ui` | `bond_tasks.md` | S web, S phone, A |
 | `bond_connections`, `bond_connections_ui` | `bond_connections.md` | A, S |
-| `bond_signin`, `bond_signin_ui` (Dart) and `libs/bond_signin` | `bond_signin.md` | S, A, P, after `bond_auth(_py)`, `bond_oauth`, `bond_connections` |
+| `bond_signin`, `bond_signin_ui` (Dart) and `libs/bond_signin` | `bond_signin.md`, `bond_signin-cutover.md` | S, A, P, after `bond_auth(_py)`, `bond_oauth`, `bond_connections` |
 
 ## Dart and Python pairs
 

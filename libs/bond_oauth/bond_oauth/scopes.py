@@ -45,12 +45,14 @@ def scope_drift(granted: str | Iterable[str] | None, wanted: str | Iterable[str]
     return sorted(s for s in split_scopes(wanted) if _short(s) not in have)
 
 
-def is_identity_only(provider_name: str, scopes: Sequence[str]) -> bool:
+def is_identity_only(provider_name: str, scopes: Sequence[str], *, family: str | None = None) -> bool:
     """True when ``scopes`` ask for nothing beyond who the person is: no mail, calendar or long-lived access.
 
-    Google: a subset of openid, email, profile. Microsoft (a provider name containing ``microsoft``): a subset of
-    openid, profile, email and User.Read, and never ``offline_access`` (that asks for a refresh token).
+    Google: a subset of openid, email, profile. Microsoft: a subset of
+    openid, profile, email and User.Read, and never ``offline_access`` (that asks for a refresh token). ``family`` ("google" or "microsoft", from
+    ``family_of``) decides which; without it a name containing ``microsoft`` means Microsoft.
     """
     names = [_short(s) for s in split_scopes(list(scopes))]
-    allowed = _MICROSOFT_IDENTITY if "microsoft" in provider_name.lower() else _GOOGLE_IDENTITY
+    family = family or ("microsoft" if "microsoft" in provider_name.lower() else "google")
+    allowed = _MICROSOFT_IDENTITY if family == "microsoft" else _GOOGLE_IDENTITY
     return all(name in allowed for name in names)

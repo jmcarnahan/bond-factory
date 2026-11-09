@@ -85,17 +85,17 @@ class FailingSaveStore extends DiskRefreshStore {
 
 /// A native-style gateway: posts the stored refresh token and a rotation id.
 class RotatingGateway extends GatewayBase implements AuthGateway {
-  RotatingGateway({required super.api, required super.tokens, super.refreshTokens, super.onSessionEnded, super.onStorageFailure});
+  RotatingGateway({required super.api, required super.tokens, super.refreshTokens, super.onSessionEnded, super.onStorageFailure, super.authPrefix});
 
   @override
   Future<AuthSession> exchangeForRefresh(String? expectedUserId) async {
     final refresh = await refreshTokens.load();
-    final body = await api.postJson('/auth/refresh', body: {
+    final body = await api.postJson('$authPrefix/refresh', body: {
       'refresh_token': ?refresh,
       'delivery': 'body',
       'rotation_id': rotationIds.current,
     });
-    return sessionFromAuthBody(body, path: '/auth/refresh');
+    return sessionFromAuthBody(body, path: '$authPrefix/refresh');
   }
 
   @override
@@ -365,6 +365,56 @@ void main() {
       server.json('POST', '/auth/refresh', refused('refresh_revoked'), status: 401);
       await renewalHook(g)();
       expect(await store.loadRotation(), isNull);
+    });
+  });
+
+  group('authPrefix', () {
+    const p = '/api/v1/auth';
+
+    test('logout, providers, firebase and demo use the prefix; the default stays /auth', () async {
+      server.json('POST', '$p/logout', {'ok': true});
+      server.json('GET', '$p/providers', {'signin': []});
+      final g = RotatingGateway(api: server.api, tokens: tokens, refreshTokens: refresh, authPrefix: p);
+      await g.signOut();
+      await g.providers();
+      expect(server.count('POST', '$p/logout'), 1);
+      expect(server.count('GET', '$p/providers'), 1);
+
+      server.json('POST', '$p/firebase', authBody('u1'));
+      final fb = FirebaseAuthGateway(
+        api: server.api,
+        tokens: InMemoryTokenStore(),
+        source: FakeIdTokenSource(),
+        authPrefix: p,
+      );
+      await fb.signInWithIdToken('mock:a@example.com');
+      expect(server.count('POST', '$p/firebase'), 1);
+
+      server.json('POST', '$p/demo', authBody('u1'));
+      await DemoAuthGateway(api: server.api, tokens: InMemoryTokenStore(), authPrefix: p).signInDemo('u1');
+      expect(server.count('POST', '$p/demo'), 1);
+
+      server.json('POST', '/auth/logout', {'ok': true});
+      await RotatingGateway(api: server.api, tokens: tokens).signOut();
+      expect(server.count('POST', '/auth/logout'), 1);
+    });
+
+    test('renewal posts to the prefixed refresh path, and a 401 there does not renew again', () async {
+      server.json('POST', '$p/refresh', refused('refresh_revoked'), status: 401);
+      var hookCalls = 0;
+      final api = ApiClient(
+        baseUrl: Uri.parse('http://test.invalid'),
+        http: server.client,
+        tokens: tokens,
+        onUnauthorized: () async {
+          hookCalls++;
+          return SessionRefresh.rejected;
+        },
+      );
+      final g = RotatingGateway(api: api, tokens: tokens, refreshTokens: refresh, authPrefix: p);
+      await expectLater(g.refreshSession(), throwsA(isA<AuthFailure>()));
+      expect(server.count('POST', '$p/refresh'), 1);
+      expect(hookCalls, 0); // bond_api treats the suffix /auth/refresh as an auth path
     });
   });
 

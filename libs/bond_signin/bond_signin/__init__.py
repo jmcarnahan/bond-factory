@@ -1,6 +1,6 @@
 """Direct Google/Microsoft sign-in: Protocol seams, scope policy, router factory."""
 
-from .errors import MESSAGES, STATUS_FOR_CODE, SignInRefused, http_error, refusal_code
+from .errors import MESSAGES, STATUS_FOR_CODE, IdentityTaken, SignInRefused, http_error, refusal_code
 from .finish import CookiePolicy, clear_session_cookies, finish_session
 from .order import sign_in, sign_in_with_first
 from .origin import require_origin
@@ -29,6 +29,7 @@ __all__ = [
     "CookiePolicy",
     "HandoffStore",
     "IdentityFlow",
+    "IdentityTaken",
     "IssuedSession",
     "OidcIdentity",
     "ScopePolicy",

@@ -58,8 +58,10 @@ def test_empty_allowlist_refuses_every_redirect_with_400(tmp_path, monkeypatch):
 
     monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/e.db")
     monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "")
+    monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "http://testserver")  # the API's own origin: the only one allowed
     c = TestClient(create_app())
-    h = headers(c)
+    token = c.post("/auth/demo", json={"user_id": "demo-user-1"}, headers={"Origin": "http://testserver"}).json()["token"]
+    h = {"Authorization": f"Bearer {token}"}
     for params in ({}, {"redirect_to": APP}):
         reply = c.get("/connections/fake-google/start", params=params, headers=h)
         assert reply.status_code == 400 and reply.json()["detail"]["code"] == "redirect_not_allowed"

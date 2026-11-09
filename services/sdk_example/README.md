@@ -44,7 +44,9 @@ names. Everything else is the same wiring. Environment:
 | --- | --- |
 | `SDK_EXAMPLE_SIGNIN_PROVIDERS` | Fake mode default `fake-google,fake-microsoft`; real mode none unless named (`google`, `microsoft`); a name starting `fake` is refused outside fake mode |
 | `SDK_EXAMPLE_PUBLIC_BASE` | This API's public address; the OAuth callbacks are built on it. Default `http://localhost:8012` in fake mode, required `https` in real mode |
-| `SDK_EXAMPLE_NATIVE_RETURN_BASE`, `SDK_EXAMPLE_NATIVE_SCHEMES` | Phone return link (default `<base>/app/return`) and the reverse-domain scheme fallback (default `org.example.sdkdemo`) |
+| `SDK_EXAMPLE_NATIVE_RETURN_BASE`, `SDK_EXAMPLE_NATIVE_SCHEMES` | Phone return link (default `<base>/app/return`) and the reverse-domain scheme fallback (default `org.example.sdkdemo` in fake mode ONLY; none in real mode) |
+| `SDK_EXAMPLE_SIGNIN_PREFIX` | Where the library routes mount (default `/auth`) |
+| `SDK_EXAMPLE_CONNECTIONS` | `0` mounts sign-in only: no `/connections*` routes (default `1`) |
 | `SDK_EXAMPLE_ALLOW_FAKE_PUBLIC` | `1` allows fake mode on an https `SDK_EXAMPLE_PUBLIC_BASE` (a disposable demo host only; otherwise startup refuses it) |
 | `SDK_EXAMPLE_REDIRECT_ALLOWLIST`, `SDK_EXAMPLE_CORS_ORIGINS`, `SDK_EXAMPLE_NATIVE_REDIRECTS` | Defaults (`http://localhost:8078`, `sdkdemo://connections`) apply in fake mode ONLY. Real mode must set the allowlist (startup raises when empty), and every CORS origin must be in it or the public base |
 | `SDK_EXAMPLE_BREAKGLASS` | `1` turns on `POST /auth/firebase` for rows flagged `allow_password` |
@@ -59,8 +61,9 @@ Which sign-in files an app copies:
 
 | File | An app |
 | --- | --- |
-| `signin_wiring.py`, `routes/signin.py`, `session_answer.py`, `connect_helpers.py`, `origin_rule.py`, `signin_prune.py` | copies as is (rename settings) |
-| `routes/connections.py`, `routes/connect_native.py` (drop it with no phone client), `routes/auth.py`, `models/sessions.py`, `models/handoffs.py`, `alembic/versions/0003_signin.py` columns and tables | copies as is |
+| `signin_wiring.py`, `providers_wiring.py`, `routes/signin.py`, `session_answer.py`, `origin_rule.py`, `signin_prune.py` | copies as is (rename settings) |
+| `routes/connections.py`, `connect_helpers.py`, `routes/connect_native.py`, `models/connections.py`, `fake_expiry.py` | copies as is; DELETE all of them in an app without connections (identity-only sign-in), and set `SDK_EXAMPLE_CONNECTIONS=0` or drop the setting. `connect_native.py` also goes when there is no phone client |
+| `routes/auth.py`, `models/sessions.py`, `models/handoffs.py`, `alembic/versions/0003_signin.py` columns and tables | copies as is |
 | `directory.py`, `scope_policy.py`, `oauth_wiring.py` names | REPLACES with its own users table, roles and scopes |
 | `break_glass.py` (and `allow_password`) | REPLACES, or deletes when there is no break-glass |
 | `fake_routes.py` | deletes (fake mode only) |
@@ -72,6 +75,22 @@ allowed `Origin` (`origin_rule.py`); bearer requests do not. An upgraded dev dat
 
 Fake consent page (`GET /connections/fake/consent`): `sdk-consent-identity`, `sdk-consent-email`,
 `sdk-consent-set-<id>`, `sdk-consent-allow`, `sdk-consent-deny`. Fake-mode only: `POST /auth/simulate-reuse`.
+
+## Installed builds and cutover
+
+- `POST /auth/refresh {id_token}` keeps working for installed clients through `legacy_refresh` (break-glass only: it
+  answers 404 unless `SDK_EXAMPLE_BREAKGLASS=1`); new clients refresh with the cookie or `{refresh_token}`.
+- `/auth/providers` keeps every old key (built by `providers_payload`) and adds `signin`, `break_glass`,
+  `default_flow`. `email_password` is true only with break-glass.
+- `GET /connections` changed shape to `{connections, wanted}`: clients must read it with `listAll()`.
+- Break-glass is the only password path; no other route accepts a Firebase token.
+- `client_ip` (`wiring.py`) takes the LAST `X-Forwarded-For` hop, correct behind one proxy. Behind two, an app edits
+  that function to take the hop it trusts (rate limits and the refusal log use it).
+- Hand-offs and dead sessions are deleted by the daily `signin_prune` job: run the job tick or worker loop.
+- The library routes mount under `SDK_EXAMPLE_SIGNIN_PREFIX` (default `/auth`; the universal-link files follow it).
+  The app's own routers (`/auth/me`, `/auth/demo`, break-glass) keep their own prefix: change them together.
+- Cookies are same-site (`SameSite=Lax`): the web app and the API must share a registrable domain, or the web client
+  cannot sign in with cookies.
 
 ## Fake mode
 
