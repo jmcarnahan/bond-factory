@@ -8,9 +8,10 @@ The server half is `bond_oauth`; the migration notes are in `docs/migration/bond
 |---|---|
 | `ConnectionStatus` | One row: `provider`, `connected`, `email`, `connectedAt`, `needsReconnect`, `scopes` |
 | `ConnectionPhase` | `disconnected`, `connected`, `needsReconnect`; `status.phase` (a needed reconnect wins, even when `connected` is false) |
-| `ConnectionsApi(ApiClient, {prefix})` | `list()`, `startUrl(provider, {redirectTo})`, `disconnect(provider)` |
+| `ConnectionsApi(ApiClient, {prefix})` | `list()`, `listAll()`, `wanted()`, `startUrl(provider, {redirectTo, native, set})`, `redeem`, `disconnect(provider)` |
+| `WantedSet`, `ConnectionList` | Scope sets the role wants (`id`, `provider`, `label`, `scopes`, `granted`); `listAll()` reads `{connections, wanted}` or a bare array |
 | `DemoConnectionsApi` | `simulateExpiry(provider)`; only the example server in fake mode has the route |
-| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`; null when absent. `cleaned(Uri)` drops them |
+| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`, `code`, `attempt`; null when absent. `cleaned(Uri)` drops them all |
 | `ConnectionLabels` | Every string with English defaults; `{provider}` placeholders; plain words for error reasons |
 
 The enum is not called `ConnectionState` because Flutter exports that name.
@@ -28,6 +29,7 @@ final back = ConnectionReturn.parse(Uri.base); // null on an ordinary visit
 final fresh = await api.list();                // the truth comes from the server
 ```
 
+- A role ask: `startUrl(provider, set: wanted.id)` for each `WantedSet` with `granted` false. `list()` still returns the bare list; use `listAll()` or `wanted()` for the sets.
 - Nothing is kept across the redirect. Read `list()` again after every return, disconnect or reconnect.
 - The start address is a top-level navigation (`/connections/{provider}/go?state=...`). It needs the API session
   cookie, so on web the HTTP client must send credentials to the API origin. Native apps have no such cookie; see

@@ -23,7 +23,8 @@ from sqlalchemy.orm import Session
 from bond_oauth import pkce
 from bond_oauth.cipher import TokenCipher
 from bond_oauth.errors import OAuthError, ProviderError, ReconnectRequired, RetryableError
-from bond_oauth.providers import OAuthProvider
+from bond_oauth.identity import ensure_subject
+from bond_oauth.providers import OAuthProvider, TokenSet
 from bond_oauth.scopes import split_scopes
 from bond_oauth.state import decode_state, encode_state
 
@@ -80,7 +81,8 @@ class StartedFlow:
 
 def start_flow(session: Session, *, user_id: str, provider_name: str, provider: OAuthProvider, scopes: list[str],
                redirect_to: str, cipher: TokenCipher, redirect_uri: str, shared: bool = False,
-               connection_name: str | None = None, native: bool = False) -> StartedFlow:
+               connection_name: str | None = None, native: bool = False, login_hint: str | None = None,
+               expected_subject: str | None = None, set_id: str | None = None) -> StartedFlow:
     """The state, the provider's consent URL and the state's nonce. ``redirect_to`` rides inside the encrypted
     state; the app validates it first.
 
@@ -90,12 +92,16 @@ def start_flow(session: Session, *, user_id: str, provider_name: str, provider: 
     ``shared=True`` connects a shared mailbox (``user_id`` NULL on the row); who may do that is the app's call.
     ``native=True`` is for a phone app that opens the system browser: the state is marked native, no cookie binds it,
     and the app hands the result over with ``handoff.issue_handoff`` / ``redeem_handoff`` instead.
+    ``login_hint`` (the signed-in e-mail) goes to the provider. ``expected_subject`` binds the account: ``complete``
+    refuses ``account_mismatch`` when the consenting account's identity subject differs (skipped when ``shared``).
     """
     verifier = pkce.new_verifier()
     state = encode_state(cipher, sub=user_id, provider=provider_name, connection_name=connection_name or provider_name,
-                         verifier=verifier, redirect_to=redirect_to, shared=shared, native=native)
+                         verifier=verifier, redirect_to=redirect_to, shared=shared, native=native,
+                         login_hint=login_hint, expected_subject=expected_subject, set_id=set_id)
+    extra = {"login_hint": login_hint} if login_hint else {}
     url = provider.authorize_url(state=state, challenge=pkce.challenge(verifier), scopes=list(scopes),
-                                 redirect_uri=redirect_uri)
+                                 redirect_uri=redirect_uri, **extra)
     return StartedFlow(state=state, authorize_url=url, nonce=decode_state(cipher, state).nonce)
 
 
@@ -122,6 +128,8 @@ def complete(session: Session, *, state: str, code: str, providers: Mapping[str,
     inserted only when ``redeem_handoff`` is called by the user who started the flow."""
     stamp = now or utcnow()
     payload = decode_state(cipher, state)
+    if payload.intent != "connect":
+        raise OAuthError("invalid_state", "The sign-in link is not for a connection")
     unbound_native = expected_nonce is None and payload.native
     if not unbound_native and (not expected_nonce
                                or not hmac.compare_digest(expected_nonce.encode(), payload.nonce.encode())):
@@ -139,20 +147,27 @@ def complete(session: Session, *, state: str, code: str, providers: Mapping[str,
     if not tokens.refresh_token:
         raise OAuthError("no_refresh_token", "The provider gave no long-lived access; connect again and allow it")
     info = provider.userinfo(tokens.access_token)
+    if payload.expected_subject and not payload.shared:
+        ensure_subject(payload.provider, provider, tokens, info, payload.expected_subject)
     email = str(info.get("email") or "").strip().lower()
     if not email:
         raise OAuthError("no_email", "The provider did not share the account address")
     owner = None if payload.shared else payload.sub
-    fields = {
-        "account_email": email, "scopes": tokens.scope, "access_token_enc": cipher.encrypt(tokens.access_token),
-        "refresh_token_enc": cipher.encrypt(tokens.refresh_token), "token_type": tokens.token_type,
-        "expires_at": (stamp + timedelta(seconds=tokens.expires_in)).isoformat(),
-        "provider_metadata": json.dumps({"name": info.get("name")}) if info.get("name") else None}
+    fields = connection_fields(cipher, tokens, email=email, name=info.get("name"), stamp=stamp)
     if payload.native:  # nothing is stored until the app redeems the hand-off as the user who started the flow
         return PendingConnection(owner=owner, provider=payload.provider, connection_name=payload.connection_name,
                                  fields=fields)
     return store_connection(session, connection_model, owner=owner, provider=payload.provider,
                             connection_name=payload.connection_name, fields=fields, stamp=stamp)
+
+
+def connection_fields(cipher: TokenCipher, tokens: TokenSet, *, email: str, name: Any, stamp: datetime) -> dict:
+    """The column values of a new connection row (encrypted tokens, ISO ``expires_at``)."""
+    return {
+        "account_email": email, "scopes": tokens.scope, "access_token_enc": cipher.encrypt(tokens.access_token),
+        "refresh_token_enc": cipher.encrypt(tokens.refresh_token or ""), "token_type": tokens.token_type,
+        "expires_at": (stamp + timedelta(seconds=tokens.expires_in)).isoformat(),
+        "provider_metadata": json.dumps({"name": name}) if name else None}
 
 
 @dataclass(frozen=True)

@@ -36,6 +36,12 @@ shape into the app. They are never shipped. `README.md` in this folder covers co
 | `BOND_GOOGLE_CLIENT_ID`, `BOND_GOOGLE_CLIENT_SECRET` | unset | real mode: Google is offered only when both are set |
 | `BOND_MS_CLIENT_ID`, `BOND_MS_CLIENT_SECRET` | unset | real mode: Microsoft is offered only when both are set |
 | `BOND_MS_TENANT` | `common` | Microsoft tenant |
+| `SDK_EXAMPLE_SIGNIN_PROVIDERS` | `fake-google,fake-microsoft` | sign-in providers offered; real names (`google`, `microsoft`) need their `BOND_GOOGLE_*` / `BOND_MS_*` pairs; a `fake*` name is refused outside fake mode | <!-- check -->
+| `SDK_EXAMPLE_NATIVE_RETURN_BASE` | `<public base>/app/return` | native return base; https app link in production | <!-- check -->
+| `SDK_EXAMPLE_NATIVE_SCHEMES` | `sdkdemo` | reverse-domain scheme fallback for the native return (dev, TestFlight); empty in production | <!-- check -->
+| `SDK_EXAMPLE_BREAKGLASS` | off | `1` serves the Firebase e-mail route as break-glass and shows the link on the sign-in screen | <!-- check -->
+| `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS` | unset | values for `/.well-known/apple-app-site-association` and `assetlinks.json` (`pkg:sha,sha;pkg2:sha`) | <!-- check -->
+| `BOND_AUTH_REFRESH_*`, `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES` | 60 d, 180 d, 20 s, 10, 60 min | refresh lifetimes, grace, families per user, access lifetime | <!-- check -->
 | `BOND_SYNC_*` | unset | read by `SyncTokenSettings.from_env()`: `PRIVATE_KEY`, `PRIVATE_KEY_FILE`, `KID`, `PREVIOUS_KEY`, `PREVIOUS_KEY_FILE`, `PREVIOUS_KID`, `AUDIENCE`, `MINUTES`; in fake mode a missing key is generated into `out/sync_key.pem` |
 
 ## Which module shows where
@@ -46,7 +52,8 @@ shape into the app. They are never shipped. `README.md` in this folder covers co
 | `bond_ui` | none | `ui_page.dart` and `ui/`: every widget once | `/ui` |
 | `bond_test_support` | none | every `test/<page>_test.dart` (`pumpApp`, `expectNoOverlays`) | none |
 | `bond_service_kit` | `wiring.py`: error handlers, middleware, clock, limiters; `db.py` | none | none |
-| `bond_auth_py`, `bond_auth`, `bond_auth_firebase` | `routes/auth.py`, `auth_dep.py`, `models/auth.py` | `auth_page.dart`: sign in, refresh, forced 401, not-invited, sign out | `/auth` |
+| `bond_auth_py`, `bond_auth`, `bond_auth_firebase` | `routes/auth.py` (`/auth/firebase` break-glass, `/auth/demo`, `/auth/me`), `auth_dep.py`, `models/auth.py`, `models/sessions.py` | `auth_page.dart`: sign in, refresh, forced 401, simulate reuse, sign out | `/auth` |
+| `bond_signin` (lib), `bond_signin`, `bond_signin_ui` | `signin_wiring.py` (`UserDirectory`, `ScopePolicy`, `SignInFlow`, the mount of `make_signin_router` and `well_known_router`), `models/handoffs.py`, `models/sessions.py`; routes `POST /auth/signin/{p}/start`, `GET /auth/signin/{p}/callback`, `POST /auth/signin/redeem`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/sessions/revoke-all`, `POST /auth/simulate-reuse` (fake mode), `GET /connections/fake/consent` (identity picker) | `auth_page.dart` on `BondSignInScreen`; `connections_page.dart` with `BondScopeAskCard` | `/auth`, `/connections` | <!-- check -->
 | `bond_storage` | `routes/storage.py` (upload, share, `GET /d/{token}`), `models/grants.py` | none; see `tests/test_storage.py` | none |
 | `bond_jobs` | `models/jobs.py`, the registry in `wiring.py` | none | none |
 | `bond_sync_py`, `bond_sync`, `bond_sync_powersync` | `routes/sync.py`, `models/sync.py` | `sync_page.dart`: rows, upload verdicts, token | `/sync` |
@@ -66,6 +73,7 @@ shape into the app. They are never shipped. `README.md` in this folder covers co
 | `auth_dep.py` | `current_claims`, `current_user`, `require_capability`, the revocation check before `is_active` |
 | `models/<module>.py` | one file per lib that attaches its mixin to `Base`; `models/__init__.py` imports them all |
 | `routes/<module>.py` | `def register(app)` per module, thin handlers over library functions |
+| `signin_wiring.py` | the reference adapter: `UserDirectory` (~80 lines), `ScopePolicy`, the flow and mount; copy this, write nothing else for sign-in | <!-- check -->
 | `alembic/versions/` | one revision chain; `tests/test_schema.py` fails on any drift |
 | `tests/conftest.py` | a fake-mode app on a temporary SQLite file, built from the environment alone |
 
@@ -75,7 +83,7 @@ shape into the app. They are never shipped. `README.md` in this folder covers co
 |---|---|
 | `lib/main.dart` | path URL strategy, `ensureSemantics()`, error capture before `runApp` (a walk harness only) |
 | `lib/src/pages.dart` | the `demoPages` registry: path, title, id, builder, module, phase |
-| `lib/src/example_api.dart` | `DemoSession`: one shared `ApiClient`, an in-memory token store, gateways, `ensureSignedIn()`, renewal on 401 |
+| `lib/src/example_api.dart` | `DemoSession`: one shared `ApiClient`, `OidcAuthGateway`, `NoRefreshTokenStore` on web (the cookie carries it), `ensureSignedIn()`, renewal on 401 | <!-- check -->
 | `lib/src/errors.dart` | `DemoErrors`: framework errors shown in an inline strip, so no dialog is needed |
 | `lib/src/theme.dart` | `BondTheme.build(BondTokens.fallback)` and a `DemoScope` that installs tokens and labels |
 | `lib/src/pages/page_scaffold.dart` | `PageFrame`, `PlaceholderPage` |
@@ -92,6 +100,8 @@ The identifier is the DOM attribute `flt-semantics-identifier`, so a walk select
 | `sdk.<page>.<element>` | `sdk.api.result`, `sdk.sync.rows`, `sdk.ui.button` |
 | `sdk.nav.<id>` and `sdk.home.route-<id>` | `sdk.nav.auth` |
 | `sdk.tasks.<element>` (also per row: `mirror-<id>`, `delete-<id>`) | `sdk.tasks.quick-add`, `sdk.tasks.summary`, `sdk.tasks.run-due-jobs`, `sdk.tasks.show-notices` |
+| `sdk.signin.<element>` | `sdk.signin.fake-google`, `sdk.signin.fake-microsoft`, `sdk.signin.error`, `sdk.signin.break-glass` |
+| `sdk.scopes.ask-<set>` | `sdk.scopes.ask-mail_send` (one button per ungranted wanted set) |
 | `sdk.connections.<element>` | `sdk.connections.list`, `sdk.connections.start-url`, `sdk.connections.return`, `sdk.connections.simulate-expiry-<provider>` |
 | `<key>-<value>` for segmented and select options | `<key>` is the field id |
 | `sdk.errors` | the error strip; it must be absent after every step |

@@ -10,7 +10,10 @@
 - `ConnectionLabels` with English defaults, including the `not_confirmed` reason ("Nothing changed") for a
   return address whose claim the live list does not back.
 
-## Unreleased
+## 0.2.0 - unreleased
 - `WantedSet(id, provider, label, scopes, granted)` with `fromJson`.
 - `ConnectionList(connections, wanted)` with `fromJson` (bare array or `{connections, wanted}`); `wanted` defaults to `const []`.
-- `ConnectionReturn.attempt` read from the `attempt` query parameter and dropped by `cleaned`.
+- `ConnectionsApi.listAll()` (the whole answer), `ConnectionsApi.wanted()`; `list()` is unchanged.
+- `ConnectionsApi.startUrl(..., set:)` adds the `set` query parameter (a wanted set id).
+- `ConnectionReturn.attempt` read from the `attempt` query parameter; `cleaned` drops `attempt` and `code` too.
+- The pubspec version is bumped to 0.2.0 by the director (builders do not edit pubspecs).

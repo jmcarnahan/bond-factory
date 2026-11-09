@@ -146,4 +146,13 @@ class AuthProviders {
 
   /// Which flow the app starts with: `firebase` or `signin` (`default_flow`).
   final String defaultFlow;
+
+  /// The direct sign-in method with registered name [id], or null when the
+  /// server does not offer it.
+  SignInProvider? signinById(String id) {
+    for (final p in signin) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
 }

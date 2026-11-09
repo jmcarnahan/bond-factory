@@ -2,7 +2,7 @@
 
 `bond_auth` is pure Dart: token stores, `AuthSession`, `AuthFailure`, the id-token seam, gateways, capability policy, providers parsing. Few-shot reference: `demos/sdk_demo/lib/src/example_api.dart` (wiring) and `pages/auth_page.dart`, with `services/sdk_example/sdk_example/routes/auth.py` as the server. Legend: `docs/migration/README.md`.
 
-Contracts: `docs/contracts/auth.md`.
+Contracts: `docs/contracts/auth.md`, `docs/contracts/signin.md`. Direct Google/Microsoft sign-in: `bond_signin.md`.
 
 ## 1. What it replaces
 
@@ -43,7 +43,22 @@ No database change. Config:
 - No generated options file: the app calls `GET /auth/providers` and passes `AuthProviders.firebase` to `initFirebaseFromRuntimeConfig`. Delete `firebase_options.dart` from the build.
 - Provider flags (`demo`, `email_password`, `google`, `apple`, `mock`) come from the same call.
 
-## 5. Acceptance
+## 5. Refresh sessions (0.2.0, for apps on direct sign-in)
+
+The one-string `TokenStore` stays for apps without sessions. With sessions:
+- `RefreshTokenStore` (`load`, `save`, `clear`, `reload`) holds the refresh token: `InMemoryRefreshTokenStore`, `NoRefreshTokenStore`
+  (web: the HttpOnly cookie carries it; delivery is decided by the injected store, never by `Platform`), and
+  `bond_signin_ui`'s `SecureRefreshTokenStore` over `flutter_secure_storage` on a phone, so the app writes no storage code.
+- `AuthSession.refreshToken` is nullable. `GatewayBase` saves the NEW refresh token before the access token (write-ahead) and
+  `LiveTokenForgetter.forget` clears both slots. `reload()` runs before every rotate so two isolates share one token.
+- Renewal is single-flight (five concurrent 401s make one `POST /auth/refresh`). 401 `refresh_reused`, `refresh_expired` or
+  `refresh_revoked` clears both slots and fires `onSessionExpired`; network errors and 5xx keep both and return null.
+- `GatewayBase.lastEndReason` and an `onSessionEnded(String code)` callback let the UI show the `refresh_reused` message.
+- `OidcAuthGateway` (in `bond_signin`) implements `AuthGateway`: it posts `/auth/refresh` with the stored token on a phone and `{}`
+  with credentials on web, then reads `/auth/me`. E-mail and password methods throw `UnsupportedError`; use `FirebaseAuthGateway`
+  for break-glass. `AuthProviders` gains `signin`, `breakGlass` and `defaultFlow`; unknown keys are ignored. <!-- check -->
+
+## 6. Acceptance
 
 - [ ] `bond_auth` imports replace the files above; the old files are deleted.
 - [ ] Two concurrent 401s cause one `POST /auth/refresh`.
@@ -52,6 +67,8 @@ No database change. Config:
 - [ ] Offline refresh keeps the session; a 401 from `/auth/refresh` signs out.
 - [ ] The app's auth tests pass unchanged except imports.
 
-## 6. Known gaps
+- [ ] With sessions: the three refresh codes sign out; a phone restart keeps the session; a web reload keeps it through the cookie.
+
+## 7. Known gaps
 
 For A and P, none beyond the call-site changes in section 3. For S, the dialect differences listed under App S in section 1 are the gaps; S migrates its server contract first.

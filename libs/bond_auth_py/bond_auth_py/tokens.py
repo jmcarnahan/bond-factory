@@ -79,10 +79,25 @@ def cookie_name(app: str) -> str:
     return f"{app}_access_token"
 
 
-def session_cookie_params(settings: AuthSettings, *, secure: bool) -> dict:
-    """Keyword arguments for ``response.set_cookie`` (HttpOnly, SameSite=Lax, lives as long as the token)."""
-    return {"httponly": True, "secure": secure, "samesite": "lax", "path": "/",
-            "max_age": settings.access_ttl_minutes * 60}
+def session_cookie_params(settings: AuthSettings, *, secure: bool, ttl_minutes: int | None = None) -> dict:
+    """Keyword arguments for ``response.set_cookie`` (HttpOnly, SameSite=Lax, lives as long as the token).
+    ``ttl_minutes`` overrides ``settings.access_ttl_minutes`` (a session's access token uses
+    ``settings.session_access_ttl_minutes``)."""
+    minutes = settings.access_ttl_minutes if ttl_minutes is None else ttl_minutes
+    return {"httponly": True, "secure": secure, "samesite": "lax", "path": "/", "max_age": minutes * 60}
+
+
+def refresh_cookie_name(app: str) -> str:
+    """``<app>_refresh_token``."""
+    return f"{app}_refresh_token"
+
+
+def refresh_cookie_params(settings: AuthSettings, secure: bool) -> dict:
+    """Keyword arguments for the refresh cookie: HttpOnly, SameSite=Lax, ``Path=settings.refresh_cookie_path``
+    (so it is sent only to the auth routes), ``Max-Age`` the sliding refresh lifetime. Set it again on every
+    rotation."""
+    return {"httponly": True, "secure": secure, "samesite": "lax", "path": settings.refresh_cookie_path,
+            "max_age": settings.refresh_ttl_days * 86400}
 
 
 def read_bearer_or_cookie(request_headers: Mapping[str, str], cookies: Mapping[str, str] | None,

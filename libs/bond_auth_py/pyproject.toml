@@ -1,10 +1,11 @@
 [project]
 name = "bond_auth_py"
-version = "0.1.0"
+version = "0.2.0"
 description = "Firebase ID token verification and auth dependencies"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "PyJWT>=2.10",
+    "sqlalchemy>=2.0.36",
 ]
 
 [project.optional-dependencies]

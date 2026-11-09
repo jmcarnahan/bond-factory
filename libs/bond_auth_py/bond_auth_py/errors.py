@@ -14,6 +14,24 @@ FIREBASE_NOT_CONFIGURED = "firebase_not_configured"
 PROVIDER_NOT_ALLOWED = "provider_not_allowed"
 COMPANY_SUSPENDED = "company_suspended"
 AUTH_UNAVAILABLE = "auth_unavailable"
+# Refresh sessions (401): every one means "sign in again".
+REFRESH_REUSED = "refresh_reused"
+REFRESH_EXPIRED = "refresh_expired"
+REFRESH_REVOKED = "refresh_revoked"
+# Direct sign-in refusals. bond_signin maps codes to statuses from REFUSALS (the one home for strings and statuses).
+TENANT_MISMATCH = "tenant_mismatch"
+CONSENT_DECLINED = "consent_declined"
+SIGNIN_EXPIRED = "signin_expired"
+ACCOUNT_MISMATCH = "account_mismatch"
+INVALID_ORIGIN = "invalid_origin"
+# The rest of the sign-in codes bond_signin answers with (it keeps no status table of its own).
+INVALID_REQUEST = "invalid_request"
+INVALID_STATE = "invalid_state"
+INVALID_HANDOFF = "invalid_handoff"
+UNKNOWN_PROVIDER = "unknown_provider"
+INVALID_CODE = "invalid_code"
+INVALID_ID_TOKEN = "invalid_id_token"
+PROVIDER_ERROR = "provider_error"
 
 #: ``code -> (http status, default message)``.
 REFUSALS: dict[str, tuple[int, str]] = {
@@ -28,6 +46,21 @@ REFUSALS: dict[str, tuple[int, str]] = {
     COMPANY_SUSPENDED: (403, "This company is suspended."),
     # A provider outage, not a rejected sign-in: clients must keep the person signed in and retry.
     AUTH_UNAVAILABLE: (503, "Sign-in is temporarily unavailable. Try again shortly."),
+    REFRESH_REUSED: (401, "This session was ended for your security. Sign in again."),
+    REFRESH_EXPIRED: (401, "Your session expired. Sign in again."),
+    REFRESH_REVOKED: (401, "This session was ended. Sign in again."),
+    TENANT_MISMATCH: (403, "This account does not belong to the organization this app is set up for."),
+    CONSENT_DECLINED: (403, "Sign-in needs the requested permissions. Start again and allow them."),
+    SIGNIN_EXPIRED: (400, "This sign-in took too long or was already used. Start again."),
+    ACCOUNT_MISMATCH: (403, "This is not the account you signed in with. Use the same account."),
+    INVALID_ORIGIN: (403, "This request came from a page that is not allowed."),
+    INVALID_REQUEST: (400, "The request was not valid."),
+    INVALID_STATE: (400, "This sign-in could not be matched to this browser or device. Start again."),
+    INVALID_HANDOFF: (401, "This sign-in hand-off is invalid or already used. Start again."),
+    UNKNOWN_PROVIDER: (404, "That sign-in provider is not available."),
+    INVALID_CODE: (400, "The sign-in code was not accepted. Start again."),
+    INVALID_ID_TOKEN: (400, "The identity token from the provider could not be verified."),
+    PROVIDER_ERROR: (502, "The sign-in provider did not answer correctly. Try again shortly."),
 }
 
 HINT_APPLE_RELAY = "apple_relay"
@@ -59,6 +92,28 @@ class SessionRevoked(AuthRefused):
 
     def __init__(self, message: str | None = None):
         super().__init__(SESSION_REVOKED, message)
+
+
+class ReuseDetected(AuthRefused):
+    """A rotated refresh token was replayed outside the grace window: the whole family is revoked.
+    401 ``refresh_reused``. ``rotate`` commits the revocation before raising this."""
+
+    def __init__(self, message: str | None = None):
+        super().__init__(REFRESH_REUSED, message)
+
+
+class RefreshExpired(AuthRefused):
+    """The refresh token passed its sliding expiry or the family's absolute cap: 401 ``refresh_expired``."""
+
+    def __init__(self, message: str | None = None):
+        super().__init__(REFRESH_EXPIRED, message)
+
+
+class RefreshRevoked(AuthRefused):
+    """Unknown, malformed, revoked or invalidated refresh token: 401 ``refresh_revoked`` (never says which)."""
+
+    def __init__(self, message: str | None = None):
+        super().__init__(REFRESH_REVOKED, message)
 
 
 class TokenError(Exception):

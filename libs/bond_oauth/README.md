@@ -59,3 +59,43 @@ disconnect(session, user_id=uid, provider_name="google", connection_model=OAuthC
 - `FakeOAuth` needs no network: its consent page is the app's, `exchange(code="mock")` mints tokens.
 - `scope_drift(granted, wanted)` lists missing scopes, comparing short names case-insensitively.
 - `ConnectionsMixin.user_id` references `users.id`; set `user_fk_target` on the subclass to change or drop it.
+
+## Sign-in (0.2.0)
+
+`SignInFlow` identifies a person with the provider's code flow. It stores nothing; the app decides who the person is,
+then calls `store`.
+
+```python
+flow = SignInFlow(providers={"google": google}, cipher=cipher, client_ids={"google": GOOGLE_CLIENT_ID},
+                  public_base="https://api.example.org", pinned_tenants={"microsoft": TENANT_GUID})
+started = flow.start(provider="google", scopes=GOOGLE_SIGNIN, redirect_to=app_page)   # .url, .nonce, .state
+# web: the start POST sets .nonce as a cookie; native: pass device_hash=sha256_hex(device_secret) instead
+result = flow.complete(state=state, code=code, expected_nonce=cookie, expected_device_hash=None)
+result.identity            # OidcIdentity: provider, subject, tenant, email, email_verified, name, auth_time, hd
+result.pending             # PendingConnection when mail/calendar scopes came with a refresh token, else None
+flow.store(session, OAuthConnection, owner=user_id, result=result)   # one live row per (owner, provider, name)
+```
+
+- The callback is `<public_base>/auth/signin/<provider>/callback`. Identity-only scopes (`is_identity_only`:
+  Google openid/email/profile; Microsoft those plus `User.Read` and no `offline_access`) ask Google for
+  `access_type=online`, `prompt=select_account`, so a login never mints a refresh token. Microsoft always sends
+  `prompt=select_account`. Sets: `GOOGLE_SIGNIN`, `MICROSOFT_SIGNIN`, `MICROSOFT_SIGNIN_FULL`, `GOOGLE_MAIL_SEND`,
+  `GOOGLE_CALENDAR`. A sign-in never uses `GOOGLE_DEFAULT`.
+- `complete` refuses a `connect` state (`invalid_state`), a wrong cookie nonce or device hash (`invalid_state`) and an
+  old state (`signin_expired`). The OIDC `nonce` sent to the provider is sha256 hex of the state nonce.
+- `identity_from_token_response` checks `iss`, `aud`, `exp`, `nonce` and reads `sub` (Google) or `tid:oid` (Microsoft).
+  The signature is NOT checked (the token came straight from the token endpoint over TLS); `alg: none` is refused
+  unless the provider sets `unsigned_ids_ok` (only `FakeOAuth`). Never call it with a token from anywhere else.
+  Microsoft: a `tid` other than the pinned tenant, a guest (`idtyp`, `#EXT#`) is `tenant_mismatch`; `email_verified` is
+  true only when a tenant is pinned. Google `email_verified` may be a bool or `"true"`/`"false"`.
+- `flow.peek(state=)` decodes a state with no network (`StateInfo`, incl. `expired`; unauthentic is `invalid_state`).
+  A real Microsoft provider needs a GUID tenant pin at construction (`common` and the like are refused).
+  Connect-native still uses the old process-local registry until the example moves to `HandoffStore` (phase 2).
+- Role asks (connect) bind to the account: `start_flow(login_hint=, expected_subject=)`; `complete` raises
+  `account_mismatch` for another account, except `shared=True`.
+- `HandoffStore(model, cipher)` over `HandoffsMixin` (table `oauth_handoffs`): `issue` (sealed payload, device hash,
+  120 s), `redeem(code, device_secret, purpose)` (one `UPDATE` claims the row; a wrong secret or purpose burns it;
+  `invalid_handoff`), `prune`. The module `handoff.py` (process-local registry) is deprecated, removed in 0.3.0.
+- `FakeOAuth(consent_base, email, *, client_id, kind="google"|"microsoft", pinned_tenant, set_scopes)`: the code
+  `mock` or `fake.mock_code(email, decline_set_ids)` picks the identity and the declined sets; it returns an unsigned
+  `id_token`, and a refresh token only for an offline flow (Microsoft: `offline_access`).

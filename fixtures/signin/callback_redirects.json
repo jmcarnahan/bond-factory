@@ -1,0 +1,6 @@
+{
+  "web_ok": "https://app.example.org/done?signin=ok",
+  "web_error": "https://app.example.org/done?signin=error&reason=not_invited",
+  "native_return": "https://api.example.org/app/return/google?attempt=att_1&code=handoff-code",
+  "native_error": "https://api.example.org/app/return/google?attempt=att_1&error=not_invited"
+}

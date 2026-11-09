@@ -10,7 +10,14 @@ import 'gateway_support.dart';
 import 'session.dart';
 
 class DemoAuthGateway extends GatewayBase implements AuthGateway {
-  DemoAuthGateway({required super.api, required super.tokens});
+  DemoAuthGateway({
+    required super.api,
+    required super.tokens,
+    super.refreshTokens,
+    super.onSessionEnded,
+    super.onStorageFailure,
+    super.rotationIds,
+  });
 
   static const AuthFailure _unsupported = AuthFailure(AuthFailureReason.notConfigured, code: 'demo_only');
 

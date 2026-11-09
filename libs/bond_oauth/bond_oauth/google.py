@@ -19,12 +19,25 @@ class GoogleOAuth:
     def __init__(self, client_id: str, client_secret: str, http: httpx.Client) -> None:
         self._id, self._secret, self._http = client_id, client_secret, http
 
-    def authorize_url(self, *, state: str, challenge: str, scopes: list[str], redirect_uri: str) -> str:
-        return AUTH_URL + "?" + urlencode({
+    def authorize_url(self, *, state: str, challenge: str, scopes: list[str], redirect_uri: str,
+                      offline: bool = True, prompt: str | None = None, nonce: str | None = None,
+                      login_hint: str | None = None) -> str:
+        """``offline`` (a connection) asks for a refresh token: ``access_type=offline``, ``prompt=consent`` and
+        ``include_granted_scopes=true``. Not offline (an identity-only sign-in) is ``access_type=online`` with
+        ``prompt=select_account``, so a login never mints a refresh token. ``prompt`` overrides either default."""
+        params = {
             "client_id": self._id, "redirect_uri": redirect_uri, "response_type": "code",
             "scope": " ".join(scopes), "state": state, "code_challenge": challenge,
-            "code_challenge_method": "S256", "access_type": "offline", "prompt": "consent",
-            "include_granted_scopes": "true"})
+            "code_challenge_method": "S256"}
+        if offline:
+            params.update({"access_type": "offline", "prompt": prompt or "consent", "include_granted_scopes": "true"})
+        else:
+            params.update({"access_type": "online", "prompt": prompt or "select_account"})
+        if nonce:
+            params["nonce"] = nonce
+        if login_hint:
+            params["login_hint"] = login_hint
+        return AUTH_URL + "?" + urlencode(params)
 
     def exchange(self, *, code: str, verifier: str, redirect_uri: str) -> TokenSet:
         return token_set(post_form(self._http, TOKEN_URL, {
