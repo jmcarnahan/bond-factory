@@ -24,8 +24,8 @@ PROVIDER_REFUSALS = frozenset({"invalid_grant", "unauthorized_client", "invalid_
 
 
 class Directory:
-    def __init__(self, wiring: OAuthWiring, *, fake: bool) -> None:
-        self.wiring, self.fake = wiring, fake
+    def __init__(self, wiring: OAuthWiring, *, fake: bool, probe: bool = False) -> None:
+        self.wiring, self.fake, self.probe = wiring, fake, probe
 
     # --- finding the person -----------------------------------------------------------------------------
     def find_by_identity(self, session: Session, provider: str, subject: str) -> User | None:
@@ -86,11 +86,13 @@ class Directory:
         user.sessions_valid_after = at.replace(tzinfo=None)
 
     def provider_alive(self, session: Session, user: User, provider: str) -> bool | None:
-        """Is the person's provider account still good? None = unknown (fake mode; identity-only sign-in, which
+        """OPTIONAL, off by default (SDK_EXAMPLE_PROBE=1): deactivating the user in the app already ends access, so
+        the daily provider probe is only for an app that wants a provider-side removal to end sessions too.
+        Is the person's provider account still good? None = unknown (fake mode; identity-only sign-in, which
         keeps no connection). Real mode asks the provider through the live connection: a refused refresh token
         (account removed or access revoked) is False and ends the session family. The connection is the ask's, not the identity's: an identity-only
         sign-in has none, so this stays None for it."""
-        if self.fake:  # no real provider to ask: the fake accounts never go away
+        if self.fake or not self.probe:  # fake: the accounts never go away; probe off: see the docstring
             return None
         from .models.connections import (
             OAuthConnection,  # lazily: an app without connections has no such model

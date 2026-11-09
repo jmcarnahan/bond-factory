@@ -224,3 +224,24 @@ def test_prune_drops_old_expired_revoked_and_rotated_rows_and_keeps_recent_ones(
     assert store.prune(db, now=T0 + 68 * DAY) == 2  # expired 8 d ago
     db.commit()
     assert rows(db) == []
+
+
+def test_no_cap_never_expires_while_the_person_keeps_using_it(db):
+    uncapped = SessionStore(AuthSession, settings_with(refresh_max_days=None, refresh_ttl_days=90))
+    first = issue(uncapped, db)
+    assert rows(db)[0].family_expires_at is None
+    token, now = first.refresh_token, T0
+    for _ in range(42):  # over ten years, one refresh every 89 days
+        now += 89 * DAY
+        token = rotate(uncapped, db, token, now=now).refresh_token
+    assert now - T0 > 3650 * DAY and rows(db)[-1].family_expires_at is None
+    with pytest.raises(RefreshExpired):  # 90 idle days still end it
+        rotate(uncapped, db, token, now=now + 90 * DAY)
+
+
+def test_an_explicit_cap_still_applies(db):
+    capped = SessionStore(AuthSession, settings_with(refresh_max_days=30, refresh_ttl_days=90))
+    first = issue(capped, db)
+    assert rows(db)[0].family_expires_at is not None
+    with pytest.raises(RefreshExpired):
+        rotate(capped, db, first.refresh_token, now=T0 + 30 * DAY)

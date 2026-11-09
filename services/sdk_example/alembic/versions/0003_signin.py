@@ -39,7 +39,7 @@ def upgrade() -> None:
     sa.Column("parent_id", sa.String(), nullable=True),
     sa.Column("provider", sa.String(length=16), nullable=False),
     sa.Column("auth_time", sa.DateTime(), nullable=False),
-    sa.Column("family_expires_at", sa.DateTime(), nullable=False),
+    sa.Column("family_expires_at", sa.DateTime(), nullable=True),
     sa.Column("expires_at", sa.DateTime(), nullable=False),
     sa.Column("created_at", sa.DateTime(), nullable=False),
     sa.Column("last_used_at", sa.DateTime(), nullable=True),

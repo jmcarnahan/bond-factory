@@ -38,11 +38,11 @@ shape into the app. They are never shipped. `README.md` in this folder covers co
 | `BOND_MS_TENANT` | unset | Microsoft tenant; sign-in needs a GUID and refuses `common`, `organizations`, `consumers` at startup |
 | `SDK_EXAMPLE_SIGNIN_PROVIDERS` | fake mode: `fake-google,fake-microsoft`; real mode: none | sign-in providers offered; real names (`google`, `microsoft`) need their `BOND_GOOGLE_*` / `BOND_MS_*` pairs; a `fake*` name is refused outside fake mode |
 | `SDK_EXAMPLE_NATIVE_RETURN_BASE` | `<public base>/app/return` | native return base; https app link in production |
-| `SDK_EXAMPLE_NATIVE_SCHEMES` | `org.example.sdkdemo` | device-bound reverse-domain scheme fallback for the native return (the lib needs a dot); allowed in production too, list only what the app registers. `SDK_EXAMPLE_NATIVE_REDIRECTS` is a deprecated alias |
+| `SDK_EXAMPLE_NATIVE_SCHEMES` | `org.example.sdkdemo` | device-bound reverse-domain scheme for the native return (the lib needs a dot); a dev and test fallback only, the https app link is production. `SDK_EXAMPLE_NATIVE_REDIRECTS` is a deprecated alias |
 | `SDK_EXAMPLE_ALLOW_FAKE_PUBLIC` | unset | fake mode on an https public base is refused at startup unless this is set |
 | `SDK_EXAMPLE_BREAKGLASS` | off | `1` serves `POST /auth/firebase` as break-glass for rows with `allow_password` (the demo user only), shows the link on the sign-in screen and sets `email_password` true in `/auth/providers` |
 | `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS` | unset | values for `/.well-known/apple-app-site-association` and `assetlinks.json` (`BOND_APPLE_APP_IDS` csv; `BOND_ANDROID_APPS` as `package=FP;FP,pkg2=FP`); both answer 404 while empty |
-| `BOND_AUTH_REFRESH_TTL_DAYS`, `BOND_AUTH_REFRESH_MAX_DAYS`, `BOND_AUTH_REFRESH_REUSE_GRACE_SECONDS`, `BOND_AUTH_REFRESH_MAX_SESSIONS_PER_USER`, `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES` | 60, 180, 20, 10, 60 | refresh lifetimes, grace, families per user, access lifetime |
+| `BOND_AUTH_REFRESH_TTL_DAYS`, `BOND_AUTH_REFRESH_MAX_DAYS`, `BOND_AUTH_REFRESH_PROBE_HOURS`, `BOND_AUTH_REFRESH_REUSE_GRACE_SECONDS`, `BOND_AUTH_REFRESH_MAX_SESSIONS_PER_USER`, `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES` | 90, none, 0 (off), 20, 10, 60 | idle window, absolute cap, IdP probe hours, grace, families per user, access lifetime |
 | `BOND_SYNC_*` | unset | read by `SyncTokenSettings.from_env()`: `PRIVATE_KEY`, `PRIVATE_KEY_FILE`, `KID`, `PREVIOUS_KEY`, `PREVIOUS_KEY_FILE`, `PREVIOUS_KID`, `AUDIENCE`, `MINUTES`; in fake mode a missing key is generated into `out/sync_key.pem` |
 
 ## Which module shows where

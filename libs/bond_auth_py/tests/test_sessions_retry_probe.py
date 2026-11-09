@@ -13,10 +13,11 @@ from sessions_support import (
     rotate,
     rows,
     scope,
+    settings_with,
     store,
 )
 
-from bond_auth_py import RefreshRevoked, ReuseDetected
+from bond_auth_py import RefreshRevoked, ReuseDetected, SessionStore
 
 __all__ = ["db", "factory", "store"]
 
@@ -171,3 +172,11 @@ def test_empty_and_oversized_tokens_are_refused_before_any_query(store, token):
         store.rotate(NoTouch(), refresh_token=token, rotation_id=None, loader=loader, revocation=Revocation(),
                      now=T0)
     assert store.revoke_token(NoTouch(), refresh_token=token) is False
+
+
+def test_probe_is_never_called_when_hours_is_zero(db):
+    off = SessionStore(AuthSession, settings_with(refresh_probe_hours=0))
+    first = issue(off, db)
+    calls = []
+    rotate(off, db, first.refresh_token, now=T0 + 10, probe=lambda u, p: calls.append(p) or False)
+    assert calls == [] and rows(db)[1].revoked_at is None and rows(db)[1].last_probed_at is None

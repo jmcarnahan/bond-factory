@@ -42,7 +42,10 @@ def loader(user_id):
 
 
 def settings_with(**overrides) -> AuthSettings:
-    return AuthSettings(jwt_secret=SECRET, **overrides)
+    """Settings for the tests: the lifetimes the boundary tests were written for (60 d sliding, 180 d cap, probe 24 h);
+    the shipped defaults are 90 d, no cap, probe off (see test_sessions_surface)."""
+    values = {"refresh_ttl_days": 60, "refresh_max_days": 180, "refresh_probe_hours": 24, **overrides}
+    return AuthSettings(jwt_secret=SECRET, **values)
 
 
 @pytest.fixture

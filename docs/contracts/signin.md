@@ -82,8 +82,8 @@ carrying a string `code` through its own table; an unknown code is a 500 and log
 - The app makes a 32-byte secret (`Random.secure()`, base64url) and an `attempt` (16 random bytes, hex). It sends
   `device_challenge = sha256 hex of the base64url text of the secret` at start and the secret itself only in the redeem body, over TLS.
 - Return URL: `https://<api host>/app/return/<provider>` (universal or app link, system auth session). A reverse-domain
-  scheme listed in `native_schemes` is allowed as the fallback, in production too, because the device secret makes an intercepted code useless (the residual
-  risk is denial of service). Connect-native accepts the same return forms. Embedded web views are never used.
+  scheme listed in `native_schemes` is a dev and test fallback only (iOS 17.4 is the production floor); the device secret makes an
+  intercepted code useless, the residual risk is denial of service. Connect-native accepts the same return forms. Embedded web views are never used.
 - `attempt` is opaque to the server: echoed only, at most 64 characters of `[A-Za-z0-9_-]`. The client drops any
   return whose `attempt` is not the pending one.
 - `code` is `token_urlsafe(32)`. The server stores only its sha256. Sign-in payloads hold `{user_id, provider,

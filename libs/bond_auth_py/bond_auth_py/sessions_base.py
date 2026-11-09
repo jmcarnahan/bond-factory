@@ -81,15 +81,17 @@ def mint_access(spec: SessionSpec, *, family_id: str, settings: AuthSettings, t:
 
 
 def add_row(session, model, *, user_id: str, family_id: str, provider: str, auth_time: datetime,
-            family_expires_at: datetime, t: float, settings: AuthSettings, parent_id: str | None,
+            family_expires_at: datetime | None, t: float, settings: AuthSettings, parent_id: str | None,
             rotation_id: str | None, device_label: str | None, last_probed_at: datetime | None) -> str:
-    """Insert a refresh-token row and return the plaintext token. ``expires_at`` slides but never passes the cap."""
+    """Insert a refresh-token row and return the plaintext token. ``expires_at`` slides but never passes the cap
+    (``family_expires_at`` is None when there is none)."""
     token = secrets.token_urlsafe(32)
     sliding = t + settings.refresh_ttl_days * DAY
     session.add(model(
         id=str(uuid.uuid4()), family_id=family_id, user_id=user_id, token_hash=token_hash(token),
         parent_id=parent_id, provider=provider, auth_time=auth_time, family_expires_at=family_expires_at,
-        expires_at=min(to_naive(sliding), family_expires_at), created_at=to_naive(t), rotation_id=rotation_id,
+        expires_at=to_naive(sliding) if family_expires_at is None else min(to_naive(sliding), family_expires_at),
+        created_at=to_naive(t), rotation_id=rotation_id,
         device_label=(device_label or None) and device_label[:MAX_DEVICE_LABEL_CHARS],
         last_probed_at=last_probed_at))
     session.flush()

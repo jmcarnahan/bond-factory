@@ -78,6 +78,7 @@ class Settings:
     native_return_base: str = ""  # empty = `<public_base>/app/return`
     native_schemes: tuple[str, ...] = ()  # reverse-domain schemes a phone may return to (fallback); fake mode defaults to DEFAULT_SCHEME
     signin_prefix: str = "/auth"  # where the library mounts its routes; the app's own /auth/* routers keep /auth
+    probe: bool = False  # SDK_EXAMPLE_PROBE=1: ask the provider daily whether the account still exists
     connections: bool = True  # SDK_EXAMPLE_CONNECTIONS=0: sign-in only, no connect routes (an app without mail)
     breakglass: bool = False  # the Firebase e-mail and password route (admin rows and the store reviewer)
     apple_app_ids: tuple[str, ...] = ()  # `<TEAMID>.<bundle id>` for the universal link file; empty = 404
@@ -124,6 +125,7 @@ class Settings:
             native_return_base=env("SDK_EXAMPLE_NATIVE_RETURN_BASE", ""),
             native_schemes=_split(env("SDK_EXAMPLE_NATIVE_SCHEMES", DEFAULT_SCHEME if fake else "")),  # no default in real mode
             signin_prefix="/" + env("SDK_EXAMPLE_SIGNIN_PREFIX", "/auth").strip("/"),
+            probe=env("SDK_EXAMPLE_PROBE", "").lower() in ("1", "true", "yes", "on"),
             connections=env("SDK_EXAMPLE_CONNECTIONS", "1").lower() not in ("0", "false", "no", "off"),
             breakglass=env("SDK_EXAMPLE_BREAKGLASS", "").lower() in ("1", "true", "yes", "on"),
             apple_app_ids=_split(env("BOND_APPLE_APP_IDS", "")),

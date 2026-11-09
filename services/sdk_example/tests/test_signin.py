@@ -387,7 +387,7 @@ def test_provider_alive_maps_only_a_provider_refusal_to_false(app):
     client = browser(app)
     consent(client, start_web(client, MICROSOFT), "demo.microsoft@example.com")
     wiring, fake = app.state.oauth, app.state.oauth.fakes[MICROSOFT]
-    directory = Directory(wiring, fake=False)  # the real-mode branch, over the fake provider
+    directory = Directory(wiring, fake=False, probe=True)  # the real-mode branch, over the fake provider
     import bond_oauth as oauth
 
     with session_scope(app.state.session_factory) as session:
@@ -455,3 +455,15 @@ def test_a_custom_prefix_moves_the_routes_and_the_link_files_together(tmp_path, 
     assert cb.headers["location"].endswith("signin=ok")  # the fake consent page followed the prefix
     assert client.post("/api/v1/auth/refresh", json={}, headers=ORIGIN).status_code == 200
     assert client.delete(f"/connections/{GOOGLE}", headers={"Origin": "https://evil.test"}).status_code == 403
+
+
+def test_the_provider_probe_is_off_unless_asked_for(app):
+    from sdk_example.directory import Directory
+
+    off = Directory(app.state.oauth, fake=False)  # the real-mode branch with the default probe flag
+    with session_scope(app.state.session_factory) as session:
+        user = session.query(User).filter_by(email="demo@example.com").one()
+        assert off.provider_alive(session, user, GOOGLE) is None
+    from sdk_example.settings import Settings
+
+    assert Settings().probe is False

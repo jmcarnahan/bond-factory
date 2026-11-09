@@ -57,10 +57,9 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
   `<TEAMID>.<bundle id>` served by `well_known_router`. A private dev host needs the suffix in the entitlement string: `applinks:<api host>?mode=developer`.
 - **Android (optional; S and A have no `android/` today).** `autoVerify` https intent filter for `/app/return/*`,
   `android:taskAffinity=""`, and `assetlinks.json` with debug and Play-signing SHA-256 fingerprints.
-- **iOS floor.** The apps build for iOS 15.0; the https return is honoured from iOS 17.4 and below it the plugin
-  silently never returns. The app picks the return per device through `NativeReturn.choose(...)`: https on 17.4+, a
-  device-bound reverse-domain scheme below it. Whether the apps raise their iOS floor to 17.4 is the owners' decision (the open
-  iOS-floor question in the decision note). Not verified on a device.
+- **iOS floor (decided: 17.4).** The apps build for iOS 15.0 today; raise `IPHONEOS_DEPLOYMENT_TARGET` and the Podfile platform to
+  17.4 at migration. The https universal-link return is production; below 17.4 the plugin silently never returns, so the
+  device-bound reverse-domain scheme (`NativeReturn.choose`) is for dev builds only. Not verified on a device.
 - Apple sign-in is dropped from A. Apple guideline 4.8: Google sign-in must be paired with an equivalent option unless it is
   an enterprise or business app requiring an existing enterprise account. S fits; A and P rely on reviewer judgment, with
   the break-glass password form as the reviewer path.
@@ -86,13 +85,13 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
 - [ ] `alembic upgrade head` then `alembic revision --autogenerate` shows an empty diff.
 - [ ] First LIVE run per provider (never run so far; only `MockTransport` and `FakeOAuth` have been): sign in, read the `sid` and
       refresh cookies, rotate once, wait for a provider refresh, role ask, disconnect, sign out. Record it in `docs/sdk/sdk-pins.md`.
-- [ ] A phone: https return on iOS 17.4+, scheme fallback below, wrong-secret redeem refused.
+- [ ] A phone: https return on iOS 17.4, wrong-secret redeem refused; the scheme only in a dev build.
 - [ ] No use of Firebase sign-in outside the break-glass route; no embedded web view.
 
 ## 7. Known gaps
 
 - Claims-only id_token check (no JWKS signature); a JWKS check is an additive follow-up (~80 lines).
-- IdP liveness (`provider_alive`) runs at most once per 24 h per family; identity-only apps skip it.
-- The scheme fallback can be claimed by another app on Android: denial of service, not takeover (the secret binds).
+- IdP liveness (`provider_alive`) is opt-in (`refresh_probe_hours`, default 0); identity-only apps skip it. Sessions have no absolute cap.
+- The dev scheme fallback can be claimed by another app: denial of service, not takeover (the secret binds).
 - Register placeholder PyPI names `bond-oauth`, `bond-auth-py`, `bond-signin`; an app that omits a sibling declaration would
   otherwise pull a squatter. Not done in this build.

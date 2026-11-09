@@ -46,6 +46,7 @@ names. Everything else is the same wiring. Environment:
 | `SDK_EXAMPLE_PUBLIC_BASE` | This API's public address; the OAuth callbacks are built on it. Default `http://localhost:8012` in fake mode, required `https` in real mode |
 | `SDK_EXAMPLE_NATIVE_RETURN_BASE`, `SDK_EXAMPLE_NATIVE_SCHEMES` | Phone return link (default `<base>/app/return`) and the reverse-domain scheme fallback (default `org.example.sdkdemo` in fake mode ONLY; none in real mode) |
 | `SDK_EXAMPLE_SIGNIN_PREFIX` | Where the library routes mount (default `/auth`) |
+| `SDK_EXAMPLE_PROBE` | `1` makes `provider_alive` ask the provider through the live connection (default off) |
 | `SDK_EXAMPLE_CONNECTIONS` | `0` mounts sign-in only: no `/connections*` routes (default `1`) |
 | `SDK_EXAMPLE_ALLOW_FAKE_PUBLIC` | `1` allows fake mode on an https `SDK_EXAMPLE_PUBLIC_BASE` (a disposable demo host only; otherwise startup refuses it) |
 | `SDK_EXAMPLE_REDIRECT_ALLOWLIST`, `SDK_EXAMPLE_CORS_ORIGINS`, `SDK_EXAMPLE_NATIVE_REDIRECTS` | Defaults (`http://localhost:8078`, `sdkdemo://connections`) apply in fake mode ONLY. Real mode must set the allowlist (startup raises when empty), and every CORS origin must be in it or the public base |
@@ -86,6 +87,9 @@ Fake consent page (`GET /connections/fake/consent`): `sdk-consent-identity`, `sd
 - Break-glass is the only password path; no other route accepts a Firebase token.
 - `client_ip` (`wiring.py`) takes the LAST `X-Forwarded-For` hop, correct behind one proxy. Behind two, an app edits
   that function to take the hop it trusts (rate limits and the refusal log use it).
+- Sessions have no absolute cap by default and a 90-day idle window (the library defaults). The only involuntary
+  sign-outs are reuse detection, an admin revoke-all or deactivation, and 90 idle days. The daily provider probe is off;
+  `SDK_EXAMPLE_PROBE=1` turns it on (deactivating the user in the app already ends access).
 - Hand-offs and dead sessions are deleted by the daily `signin_prune` job: run the job tick or worker loop.
 - The library routes mount under `SDK_EXAMPLE_SIGNIN_PREFIX` (default `/auth`; the universal-link files follow it).
   The app's own routers (`/auth/me`, `/auth/demo`, break-glass) keep their own prefix: change them together.

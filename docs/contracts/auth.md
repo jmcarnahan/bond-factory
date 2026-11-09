@@ -47,10 +47,10 @@ Always compare on the real clock.
 ## Refresh sessions
 
 Table `auth_sessions` (mixin `SessionsMixin`), one row per refresh token; only the sha256 is stored. Lifetimes
-(env `BOND_AUTH_`): `refresh_ttl_days` 60 sliding, `refresh_max_days` 180 absolute from the sign-in, `refresh_reuse_grace_seconds`
+(env `BOND_AUTH_`): `refresh_ttl_days` 90 sliding idle, `refresh_max_days` unset (no absolute cap; set it to cap from the sign-in), `refresh_probe_hours` 0 (IdP liveness probe off; opt-in), `refresh_reuse_grace_seconds`
 20, `refresh_max_sessions_per_user` 10 families (the least recently used is revoked, reason `limit`),
 `refresh_cookie_path` `/auth`, `session_access_ttl_minutes` 60. Env names: `BOND_AUTH_REFRESH_TTL_DAYS`, `_MAX_DAYS`,
-`_REUSE_GRACE_SECONDS`, `_MAX_SESSIONS_PER_USER`, `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES`.
+`_MAX_DAYS` (0 or empty: none), `_PROBE_HOURS`, `_REUSE_GRACE_SECONDS`, `_MAX_SESSIONS_PER_USER`, `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES`.
 
 - Body: `refresh_token` wins over the cookie. The delivery follows the client's token source: a client with no refresh-token store (web) gets the
   token in a cookie and not in the JSON; a client with a store (phone) sends `delivery: body` and gets it in `refresh_token`. The answer is `{token, user,

@@ -3,8 +3,9 @@
 ## 0.2.0 - unreleased
 - Refresh sessions: `SessionsMixin` (table `auth_sessions`, one row per refresh token), `SessionStore`,
   `issue_session`, `rotate`, `revoke_token`, `revoke_family`, `revoke_user`, `prune_sessions`, `SessionSpec`,
-  `IssuedSession`. Rotating tokens with reuse detection (20 s grace, `rotation_id` retry), 60-day sliding and
-  180-day absolute lifetimes, 10 families per user, daily IdP liveness probe, access JWT 60 min with a `sid` claim.
+  `IssuedSession`. Rotating tokens with reuse detection (20 s grace, `rotation_id` retry), 90-day sliding idle window,
+  no absolute cap by default (`refresh_max_days` optional, NULL `family_expires_at`), 10 families per user, opt-in IdP
+  liveness probe (`refresh_probe_hours`, default 0 = off), access JWT 60 min with a `sid` claim.
 - Errors: `REFRESH_REUSED`, `REFRESH_EXPIRED`, `REFRESH_REVOKED` (401; `ReuseDetected`, `RefreshExpired`,
   `RefreshRevoked`), `TENANT_MISMATCH`, `CONSENT_DECLINED`, `SIGNIN_EXPIRED`, `ACCOUNT_MISMATCH`, `INVALID_ORIGIN` (403; `SIGNIN_EXPIRED` is 400).
 - Also in REFUSALS: `invalid_request`, `invalid_state`, `invalid_code`, `invalid_id_token`, `signin_expired` (400), `invalid_handoff` (401),
