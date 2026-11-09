@@ -1,0 +1,11 @@
+[
+  {
+    "id": "mail",
+    "provider": "google",
+    "label": "Send e-mail",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.send"
+    ],
+    "granted": false
+  }
+]

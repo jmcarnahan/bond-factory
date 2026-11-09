@@ -10,12 +10,23 @@ import 'gateway_support.dart';
 import 'session.dart';
 
 class DemoAuthGateway extends GatewayBase implements AuthGateway {
-  DemoAuthGateway({required super.api, required super.tokens});
+  DemoAuthGateway({
+    required super.api,
+    required super.tokens,
+    super.refreshTokens,
+    super.onSessionEnded,
+    super.onStorageFailure,
+    super.authPrefix,
+    super.rotationIds,
+  });
 
   static const AuthFailure _unsupported = AuthFailure(AuthFailureReason.notConfigured, code: 'demo_only');
 
   Future<AuthSession> _post(String userId) async =>
-      sessionFromAuthBody(await api.postJson('/auth/demo', body: {'user_id': userId}), path: '/auth/demo');
+      sessionFromAuthBody(
+        await api.postJson('$authPrefix/demo', body: {'user_id': userId}),
+        path: '$authPrefix/demo',
+      );
 
   @override
   Future<AuthSession> signInDemo(String userId) => asAuthFailure(() async {

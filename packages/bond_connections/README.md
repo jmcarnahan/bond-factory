@@ -8,16 +8,17 @@ The server half is `bond_oauth`; the migration notes are in `docs/migration/bond
 |---|---|
 | `ConnectionStatus` | One row: `provider`, `connected`, `email`, `connectedAt`, `needsReconnect`, `scopes` |
 | `ConnectionPhase` | `disconnected`, `connected`, `needsReconnect`; `status.phase` (a needed reconnect wins, even when `connected` is false) |
-| `ConnectionsApi(ApiClient, {prefix})` | `list()`, `startUrl(provider, {redirectTo})`, `disconnect(provider)` |
+| `ConnectionsApi(ApiClient, {prefix})` | `listAll()`, `wanted()`, `list()` (legacy bare array only), `startUrl(provider, {redirectTo, native, set, deviceChallenge, attempt})`, `redeem(provider, code, {deviceSecret, deviceLabel})`, `disconnect(provider)` |
+| `WantedSet`, `ConnectionList` | Scope sets the role wants (`id`, `provider`, `label`, `scopes`, `granted`); `listAll()` reads `{connections, wanted}` or a bare array |
 | `DemoConnectionsApi` | `simulateExpiry(provider)`; only the example server in fake mode has the route |
-| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`; null when absent. `cleaned(Uri)` drops them |
+| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`, `code`, `attempt`; null when absent. `cleaned(Uri)` drops them all |
 | `ConnectionLabels` | Every string with English defaults; `{provider}` placeholders; plain words for error reasons |
 
 The enum is not called `ConnectionState` because Flutter exports that name.
 
 ```dart
 final api = ConnectionsApi(apiClient);
-final statuses = await api.list();
+final all = await api.listAll(); // statuses + wanted sets; the new server answers {connections, wanted}
 
 // Connect: ask for the address, then send the whole browser window to it.
 final url = await api.startUrl('google', redirectTo: 'https://app.example.com/connections');
@@ -25,10 +26,12 @@ navigateTopLevel(url); // app code: window.location.href = url
 
 // After the provider sends the browser back, the app loads afresh:
 final back = ConnectionReturn.parse(Uri.base); // null on an ordinary visit
-final fresh = await api.list();                // the truth comes from the server
+final fresh = await api.listAll();             // the truth comes from the server
 ```
 
-- Nothing is kept across the redirect. Read `list()` again after every return, disconnect or reconnect.
+- A role ask: `startUrl(provider, set: wanted.id)` for each `WantedSet` with `granted` false. `list()` reads only the legacy bare array and rejects the new `{connections, wanted}` answer; use `listAll()` or `wanted()`.
+- Native connect: `startUrl(p, native: true, deviceChallenge: sha256hex(secret), attempt: id)` (both required, else `ArgumentError`), then `redeem(p, code, deviceSecret: secret)`. The app keeps the 32-byte secret; `bond_signin`'s `SignInAttempt` makes all three.
+- Nothing is kept across the redirect. Read `listAll()` again after every return, disconnect or reconnect.
 - The start address is a top-level navigation (`/connections/{provider}/go?state=...`). It needs the API session
   cookie, so on web the HTTP client must send credentials to the API origin. Native apps have no such cookie; see
   section 4 of `docs/migration/bond_connections.md`.

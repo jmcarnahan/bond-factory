@@ -1,0 +1,5 @@
+{
+  "refresh_token": "token-refresh",
+  "rotation_id": "rotation-1",
+  "delivery": "body"
+}

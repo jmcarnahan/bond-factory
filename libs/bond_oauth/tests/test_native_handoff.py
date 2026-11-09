@@ -15,6 +15,9 @@ from bond_oauth import (
 )
 from bond_oauth.handoff import forget_handoffs
 
+# the registry functions are deprecated (removed in 0.3.0); these tests keep covering them until then
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 
 @pytest.fixture(autouse=True)
 def _clean_handoffs():
@@ -130,3 +133,15 @@ def test_shared_native_flow_gets_no_handoff(session, cipher, fake, providers):
                      expected_nonce=None)
     with pytest.raises(OAuthError):
         issue_handoff(pending, cipher=cipher)
+
+
+def test_the_registry_functions_warn_that_they_are_deprecated(session, cipher, fake, providers):
+    from bond_oauth.handoff import forget_handoffs as forget
+    with pytest.warns(DeprecationWarning, match="forget_handoffs"):
+        forget()
+    pending = finish(session, cipher, providers, begin(session, cipher, fake, native=True), expected_nonce=None)
+    with pytest.warns(DeprecationWarning, match="issue_handoff") as seen:
+        code = issue_handoff(pending, cipher=cipher)
+    assert seen[0].filename == __file__  # the warning points at the caller
+    with pytest.warns(DeprecationWarning, match="redeem_handoff"):
+        redeem(session, cipher, code)

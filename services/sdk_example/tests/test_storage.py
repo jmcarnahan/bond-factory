@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from fastapi.testclient import TestClient
+from signin_util import ORIGIN
 
 from sdk_example.db import session_scope
 from sdk_example.models.auth import utcnow
@@ -10,7 +11,7 @@ PDF = b"%PDF-1.4 example bytes"
 
 
 def signed_in(app, user_id: str = "demo-user-1") -> TestClient:
-    who = TestClient(app)
+    who = TestClient(app, headers=ORIGIN)
     assert who.post("/auth/demo", json={"user_id": user_id}).status_code == 200
     return who
 
@@ -40,7 +41,7 @@ def test_upload_returns_the_document_and_stores_the_bytes(app):
 
 
 def test_upload_needs_a_session_and_a_sane_file(app):
-    assert upload(TestClient(app)).status_code == 401
+    assert upload(TestClient(app, headers=ORIGIN)).status_code == 401
     who = signed_in(app)
     assert upload(who, content=b"").json()["detail"]["code"] == "empty_file"
     assert upload(who, content=b"x" * (5 * 1024 * 1024 + 1)).status_code == 413
@@ -62,7 +63,7 @@ def test_share_gives_a_link_that_downloads_without_a_session(app):
     document = upload(owner).json()
     link = share(owner, document["id"])
     assert link["url"].startswith("/d/") and link["expires_at"].endswith("Z")
-    stranger = TestClient(app)
+    stranger = TestClient(app, headers=ORIGIN)
     answer = stranger.get(link["url"])
     assert answer.status_code == 200
     assert answer.content == PDF
@@ -74,7 +75,7 @@ def test_share_gives_a_link_that_downloads_without_a_session(app):
 def test_an_exhausted_link_is_410_and_identical_to_an_unknown_one(app):
     owner = signed_in(app)
     link = share(owner, upload(owner).json()["id"], max_downloads=1)
-    stranger = TestClient(app)
+    stranger = TestClient(app, headers=ORIGIN)
     assert stranger.get(link["url"]).status_code == 200
     used_up = stranger.get(link["url"])
     unknown = stranger.get("/d/not-a-real-token")
@@ -93,7 +94,7 @@ def test_an_expired_or_revoked_link_is_410_with_the_same_body(app):
         grants = session.query(DownloadGrant).order_by(DownloadGrant.created_at).all()
         grants[0].expires_at = utcnow() - timedelta(seconds=1)
         grants[1].revoked_at = utcnow()
-    stranger = TestClient(app)
+    stranger = TestClient(app, headers=ORIGIN)
     first, second, unknown = stranger.get(expired["url"]), stranger.get(revoked["url"]), stranger.get("/d/zzz")
     assert first.status_code == second.status_code == 410
     assert first.content == second.content == unknown.content
@@ -104,7 +105,7 @@ def test_a_link_to_a_file_that_left_storage_is_410_and_keeps_its_download(app):
     document = upload(owner).json()
     link = share(owner, document["id"], max_downloads=1)
     app.state.storage.delete(f"documents/demo-user-1/{document['id']}")
-    assert TestClient(app).get(link["url"]).status_code == 410
+    assert TestClient(app, headers=ORIGIN).get(link["url"]).status_code == 410
     with session_scope(app.state.session_factory) as session:
         assert session.query(DownloadGrant).one().download_count == 0
 

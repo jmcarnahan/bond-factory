@@ -1,5 +1,7 @@
 import 'package:bond_api/bond_api.dart';
 import 'package:bond_auth/bond_auth.dart';
+import 'package:bond_signin/bond_signin.dart';
+import 'package:bond_signin_ui/bond_signin_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -9,8 +11,9 @@ import 'example_http_client_io.dart' if (dart.library.js_interop) 'example_http_
 /// token lives in an [InMemoryTokenStore] and whose 401 renewal goes through
 /// the gateway the person signed in with.
 ///
-/// The example runs in mock mode, so the identity provider is a
-/// [FakeIdTokenSource] whose id tokens read `mock:<email>`.
+/// The example runs in fake mode. Direct sign-in goes through the example's fake
+/// providers and its consent page ([OidcAuthGateway]); the break-glass e-mail
+/// form uses a [FakeIdTokenSource] whose id tokens read `mock:<email>`.
 class DemoSession {
   const DemoSession._();
 
@@ -34,6 +37,13 @@ class DemoSession {
   /// How many silent renewals ran since start (or the last [reset]).
   static final ValueNotifier<int> renewals = ValueNotifier<int>(0);
 
+  /// The server's code when a renewal ended the session for good (for example
+  /// `refresh_reused`); the auth page words it inline. Cleared by a sign-in.
+  static final ValueNotifier<String?> endedReason = ValueNotifier<String?>(null);
+
+  /// The system-browser port; tests replace it. On web this navigates the window.
+  static BrowserAuth Function() browserAuth = defaultBrowserAuth;
+
   // On web this client sends cookies to the API origin (see example_http_client_web.dart).
   static http.Client _http = makeExampleHttpClient();
   static _Wiring? _wiring;
@@ -49,6 +59,9 @@ class DemoSession {
 
   /// The mock identity provider behind the e-mail sign-in.
   static FakeIdTokenSource get idSource => _w.source;
+
+  /// The direct sign-in gateway (cookie delivery on web).
+  static OidcAuthGateway get oidc => _w.oidc;
 
   static AuthGateway get demoGateway => _w.demo;
 
@@ -70,19 +83,103 @@ class DemoSession {
     _session = null;
     _signingIn = null;
     renewals.value = 0;
+    endedReason.value = null;
+    useCookieSession = kIsWeb;
   }
 
-  /// Signs in as [defaultUserId] through `POST /auth/demo` unless a session
-  /// already exists. Concurrent callers share one request.
+  /// Uses the session that exists. Otherwise, on web, picks up a cookie session
+  /// ([completeWeb]); failing that signs in as [defaultUserId] through
+  /// `POST /auth/demo`. Concurrent callers share one request.
   static Future<AuthSession> ensureSignedIn() {
     final existing = _session;
     if (existing != null && tokens.token != null) return Future.value(existing);
-    return _signingIn ??= _signInDemo(defaultUserId).whenComplete(() => _signingIn = null);
+    return _signingIn ??= _establish().whenComplete(() => _signingIn = null);
+  }
+
+  /// Whether [ensureSignedIn] first tries the cookie session; web only (tests flip it).
+  static bool useCookieSession = kIsWeb;
+
+  /// Codes that mean a session existed and was ended: never answered by a demo sign-in.
+  static const Set<String> _endedCodes = {
+    'refresh_reused',
+    'refresh_expired',
+    'refresh_revoked',
+    'session_revoked',
+    'deactivated',
+    'not_invited',
+  };
+
+  static Future<AuthSession> _establish() async {
+    if (useCookieSession) {
+      try {
+        return await completeWeb();
+      } on Object catch (e) {
+        final code = switch (e) {
+          AuthFailure() => e.code,
+          ApiException() => AuthFailure.fromApi(e).code,
+          _ => null,
+        };
+        if (code != null && _endedCodes.contains(code)) {
+          // An ended session shows as such; it must not turn into the demo user.
+          endedReason.value = code;
+          rethrow;
+        }
+        // No cookie session (or no answer): fall back to the demo route below.
+      }
+    }
+    return _signInDemo(defaultUserId);
+  }
+
+  /// Web: asks the server for the access token of the cookie session
+  /// (`POST /auth/refresh` with `{}`), after a return with `signin=ok` or a reload.
+  static Future<AuthSession> completeWeb() async {
+    final s = await _w.oidc.completeWeb();
+    _w.active = _w.oidc;
+    endedReason.value = null;
+    return _session = s;
+  }
+
+  /// The sign-in providers the example offers (`GET /auth/providers`).
+  static Future<AuthProviders> providers() => _w.oidc.providers();
+
+  /// Starts direct sign-in with [providerId]: the server answers the provider's
+  /// address and the system browser goes there. On web the window leaves the
+  /// app and the next load shows the result (`?signin=ok|error`).
+  static Future<void> signInWith(String providerId, {Uri? origin}) async {
+    final here = origin ?? Uri.base;
+    final back = '${here.origin}/auth';
+    final url = await SignInApi(api).startWeb(providerId, redirectTo: back);
+    await browserAuth().run(url, callback: Uri.parse(back));
+  }
+
+  /// Fake mode only: the server replays an already-rotated refresh token
+  /// (`POST /auth/simulate-reuse`), then the client renews once. The session
+  /// must end with `refresh_reused`, which lands in [endedReason].
+  static Future<void> simulateReuse() async {
+    String? code;
+    try {
+      await api.postJson('/auth/simulate-reuse');
+    } on ApiException catch (e) {
+      code = AuthFailure.fromApi(e).code;
+    } on AuthFailure catch (e) {
+      code = e.code;
+    }
+    try {
+      await _w.active.refreshSession(expectedUserId: _session?.userId);
+    } on AuthFailure {
+      // The expected end: the gateway already recorded the code.
+    }
+    if (code == 'refresh_reused') {
+      // The reuse itself is the reason, whatever word the follow-up renewal got.
+      await _forget();
+      endedReason.value = code;
+    }
   }
 
   static Future<AuthSession> _signInDemo(String userId) async {
     final s = await _w.demo.signInDemo(userId);
     _w.active = _w.demo;
+    endedReason.value = null;
     return _session = s;
   }
 
@@ -97,6 +194,7 @@ class DemoSession {
     try {
       final s = await _w.firebase.signInWithEmail(email, 'mock-password');
       _w.active = _w.firebase;
+      endedReason.value = null;
       return _session = s;
     } catch (_) {
       if (identical(_w.active, _w.demo)) _w.source.token = null;
@@ -127,6 +225,15 @@ class _Wiring {
       : tokens = InMemoryTokenStore(),
         source = FakeIdTokenSource() {
     api = ApiClient(baseUrl: base, http: client, tokens: tokens, isWeb: kIsWeb);
+    // Web: the HttpOnly cookie carries the refresh token. Elsewhere (tests) memory does.
+    oidc = OidcAuthGateway(
+      api: api,
+      tokens: tokens,
+      refreshTokens: kIsWeb ? const NoRefreshTokenStore() : InMemoryRefreshTokenStore(),
+    )..onSessionEnded = (code) {
+        DemoSession._session = null;
+        DemoSession.endedReason.value = code;
+      };
     demo = DemoAuthGateway(api: api, tokens: tokens);
     firebase = FirebaseAuthGateway(api: api, tokens: tokens, source: source);
     active = demo;
@@ -142,6 +249,7 @@ class _Wiring {
   final InMemoryTokenStore tokens;
   final FakeIdTokenSource source;
   late final ApiClient api;
+  late final OidcAuthGateway oidc;
   late final DemoAuthGateway demo;
   late final FirebaseAuthGateway firebase;
   late AuthGateway active;

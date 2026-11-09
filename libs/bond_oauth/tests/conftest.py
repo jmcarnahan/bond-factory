@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from bond_oauth import FakeOAuth, TokenCipher, complete, decode_state, forget_access, start_flow, status
+from bond_oauth.handoff_store import HandoffsMixin
 from bond_oauth.models import ConnectionsMixin
 
 Base = declarative_base()
@@ -10,6 +11,10 @@ Base = declarative_base()
 
 class Connection(ConnectionsMixin, Base):
     user_fk_target = None
+
+
+class Handoff(HandoffsMixin, Base):
+    pass
 
 
 SCOPES = ["gmail.send", "openid", "email"]

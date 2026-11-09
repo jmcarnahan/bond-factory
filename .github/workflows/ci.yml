@@ -42,7 +42,7 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: '3.12'
-      # sdk_example depends on all eight libs, so this installs them without roof_measure's heavy geo stack.
+      # sdk_example depends on all nine libs, so this installs them without roof_measure's heavy geo stack.
       - run: uv sync --locked --all-extras --package sdk_example
       - run: make test-libs
       - run: make lint-libs
@@ -74,10 +74,10 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: '3.12'
-      - name: Build the eight library wheels
+      - name: Build the nine library wheels
         run: |
           mkdir -p dist
-          for pkg in bond_service_kit bond_storage bond_auth_py bond_jobs bond_sync_py bond_oauth bond_calendar bond_tasks_py; do
+          for pkg in bond_service_kit bond_storage bond_auth_py bond_jobs bond_sync_py bond_oauth bond_calendar bond_tasks_py bond_signin; do
             uv build --package "$pkg" --wheel --out-dir dist
           done
           ls -l dist

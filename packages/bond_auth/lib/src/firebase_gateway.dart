@@ -11,7 +11,15 @@ import 'id_token_source.dart';
 import 'session.dart';
 
 class FirebaseAuthGateway extends GatewayBase implements AuthGateway {
-  FirebaseAuthGateway({required super.api, required super.tokens, required this.source});
+  FirebaseAuthGateway({required super.api,
+    required super.tokens,
+    required this.source,
+    super.refreshTokens,
+    super.onSessionEnded,
+    super.onStorageFailure,
+    super.authPrefix,
+    super.rotationIds,
+  });
 
   final IdTokenSource source;
 
@@ -21,8 +29,8 @@ class FirebaseAuthGateway extends GatewayBase implements AuthGateway {
 
   @override
   Future<AuthSession> signInWithIdToken(String idToken, {bool signIn = true}) => asAuthFailure(() async {
-        final body = await api.postJson('/auth/firebase', body: {'id_token': idToken, if (!signIn) 'sign_in': false});
-        return accept(body, '/auth/firebase');
+        final body = await api.postJson('$authPrefix/firebase', body: {'id_token': idToken, if (!signIn) 'sign_in': false});
+        return accept(body, '$authPrefix/firebase');
       });
 
   @override
@@ -48,8 +56,8 @@ class FirebaseAuthGateway extends GatewayBase implements AuthGateway {
   Future<AuthSession> exchangeForRefresh(String? expectedUserId) async {
     final id = await source.currentIdToken(forceRefresh: true);
     if (id == null) throw const AuthFailure(AuthFailureReason.wrongCredentials, code: 'no_identity_session');
-    final body = await api.postJson('/auth/refresh', body: {'id_token': id});
-    return sessionFromAuthBody(body, path: '/auth/refresh');
+    final body = await api.postJson('$authPrefix/refresh', body: {'id_token': id});
+    return sessionFromAuthBody(body, path: '$authPrefix/refresh');
   }
 
   @override

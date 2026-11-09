@@ -18,6 +18,12 @@ Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`).
 | `sync/upload_request_mixed.json` | Upload body that yields every verdict kind (ok, invalid, skipped, conflict, not_found, unsupported). Needs a `note-taken` row owned by another user. | hand-written |
 | `sync/upload_response_mixed.json` | The exact answer to the mixed request. | hand-written |
 | `sync/upload_response_all_codes.json` | Shape fixture: one result per verdict code, including `resolved_id`. For client parsers. | hand-written |
+| `signin/start_request_web.json`, `start_request_native.json`, `start_response.json` | Sign-in start bodies (web and native) and the `{url}` answer. Asserted by bond_signin (py and Dart) and the example. | hand-written |
+| `signin/callback_redirects.json` | The four redirect shapes after a sign-in callback (web ok, web error, native return, native error). | hand-written |
+| `signin/redeem_request.json`, `redeem_response.json` | Native hand-off redeem body and the session answer. | hand-written |
+| `signin/refresh_request_body.json`, `refresh_response.json` | Body-delivery refresh request (refresh_token, rotation_id, delivery) and its answer. | hand-written |
+| `signin/error_envelope.json`, `providers_payload.json`, `wanted_list.json`, `labels_codes.json` | Error body, `/auth/providers` with the sign-in keys, the `wanted` scope-set list, and the refusal-code list every client label table must cover. | hand-written |
+| `signin/seed_identities.json` | The example's fake-mode identities (invited or not, provider, capabilities, wanted sets); asserted against the example's seeds by its tests, and the identities the walk signs in as. | hand-written |
 | `sync/upload_request_too_many_ops.json` | 101 ops: refused with a 422. | generated |
 | `sync/upload_request_dup_seq.json` | Two ops with the same `seq`: refused with a 422. | hand-written |
 | `sync/bad_ids.json` | Id strings with the expected result: accepted, an `invalid` verdict, or a 422. | hand-written |

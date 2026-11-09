@@ -19,4 +19,6 @@ workspace:
   - packages/bond_tasks_ui
   - packages/bond_connections
   - packages/bond_connections_ui
+  - packages/bond_signin
+  - packages/bond_signin_ui
   - demos/sdk_demo

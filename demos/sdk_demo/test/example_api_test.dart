@@ -64,4 +64,32 @@ void main() {
     expect(DemoSession.tokens.token, 't-three');
     expect(http.requestsTo('POST', '/auth/demo'), hasLength(3));
   });
+
+  test('a cookie session that ended is not answered by a demo sign-in', () async {
+    final r = CannedResponses()
+      ..json('POST', '/auth/refresh', {'detail': {'code': 'refresh_revoked', 'message': 'Gone'}}, status: 401)
+      ..json('POST', '/auth/demo', answer('t-demo'));
+    final http = useCanned(r);
+    DemoSession.useCookieSession = true;
+
+    await expectLater(DemoSession.ensureSignedIn(), throwsA(isA<AuthFailure>()));
+
+    expect(DemoSession.endedReason.value, 'refresh_revoked');
+    expect(http.requestsTo('POST', '/auth/demo'), isEmpty);
+    expect(DemoSession.session, isNull);
+  });
+
+  test('no cookie session falls back to the demo sign-in', () async {
+    final r = CannedResponses()
+      ..json('POST', '/auth/refresh', {'detail': {'code': 'invalid_token', 'message': 'None'}}, status: 401)
+      ..json('POST', '/auth/demo', answer('t-demo'));
+    final http = useCanned(r);
+    DemoSession.useCookieSession = true;
+
+    final s = await DemoSession.ensureSignedIn();
+
+    expect(s.token, 't-demo');
+    expect(http.requestsTo('POST', '/auth/demo'), hasLength(1));
+    expect(DemoSession.endedReason.value, isNull);
+  });
 }

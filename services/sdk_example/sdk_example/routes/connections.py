@@ -1,69 +1,40 @@
-"""OAuth connections: list, start, callback, disconnect, and the fake-mode consent page and expiry switch."""
+"""COPY AS IS. Web connect: list (with the wanted scope sets), start, go, callback, disconnect.
+
+The fake-mode consent page and the expiry switch live in `fake_routes.py`. Sign-in is the library's
+(`signin_wiring.py`); this is the ROLE ASK: after sign-in, a person whose role needs mail or calendar connects it
+through `start?set=<id>`, bound to the account they signed in with.
+"""
 
 from __future__ import annotations
 
 import hmac
-import html
 import logging
-from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import quote
 
 import bond_oauth as oauth
+from bond_auth_py import has
 from bond_service_kit import ApiError
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, RedirectResponse
 
-from ..auth_dep import current_user_id, require_capability
+from .. import connect_helpers as helpers
+from ..auth_dep import current_user, current_user_id, require_capability
 from ..db import session_scope
+from ..fake_expiry import register_expiry
+from ..models.auth import User, utcnow
 from ..models.connections import OAuthConnection
-from ..oauth_wiring import OAuthWiring, build_wiring, callback_url, public_base
+from ..oauth_wiring import OAuthWiring, callback_url
+from ..providers_wiring import ensure_wiring
 from ..settings import Settings
+from .connect_native import check_start, native_callback
 
 LOGGER = logging.getLogger("sdk_example.connections")
-NONCE_COOKIE = "sdk_example_oauth_nonce"
-COOKIE_PATH = "/connections"
-manage = require_capability("connections.manage")  # start, disconnect and simulate-expiry; listing needs a session only
-
-
-def _origin(url: str) -> str | None:
-    parts = urlsplit(url)
-    if parts.scheme not in ("http", "https") or not parts.netloc or "\\" in url:
-        return None
-    return f"{parts.scheme}://{parts.netloc}".lower()
-
-
-def redirect_allowed(url: str, settings: Settings) -> bool:
-    origin = _origin(url)
-    return origin is not None and origin in {_origin(a) for a in settings.redirect_allowlist}
-
-
-def native_redirect_allowed(url: str, settings: Settings) -> bool:
-    """A phone app's return address: scheme, host and path must equal an entry (the query and fragment are ignored)."""
-    parts = urlsplit(url)
-    if not parts.scheme or "\\" in url:
-        return False
-    bare = urlunsplit((parts.scheme, parts.netloc, parts.path, "", "")).lower()
-    return bare in {urlunsplit(urlsplit(e)[:3] + ("", "")).lower() for e in settings.native_redirects}
-
-
-class RedeemBody(BaseModel):
-    code: str
-
-
-def _status_json(st: oauth.ConnectionStatus) -> dict:
-    return {"provider": st.provider, "connected": st.connected, "email": st.email,
-            "connected_at": st.connected_at.isoformat() + "Z" if st.connected_at else None,
-            "needs_reconnect": st.needs_reconnect, "scopes": st.scopes}
-
-
-def _redirect(target: str, **params: str) -> RedirectResponse:
-    parts = urlsplit(target)
-    query = urlencode([*parse_qsl(parts.query), *params.items()])
-    return RedirectResponse(urlunsplit((parts.scheme, parts.netloc, parts.path, query, "")), status_code=302)
+manage = require_capability("connections.manage")  # start, redeem, disconnect; listing needs a session only
+MANAGE = "connections.manage"
 
 
 def _clear_nonce(reply):
-    reply.delete_cookie(NONCE_COOKIE, path=COOKIE_PATH)
+    reply.delete_cookie(helpers.NONCE_COOKIE, path=helpers.COOKIE_PATH)
     return reply
 
 
@@ -73,59 +44,64 @@ def _hook(connection: OAuthConnection, reason: str) -> None:
 
 def register(app: FastAPI) -> None:
     settings: Settings = app.state.settings
-    wiring: OAuthWiring = build_wiring(settings)
-    app.state.oauth = wiring
+    if not settings.connections:  # SDK_EXAMPLE_CONNECTIONS=0: an app with sign-in only (identity, no mail)
+        return
+    wiring: OAuthWiring = ensure_wiring(app)
+    factory = app.state.session_factory
 
     def provider_or_404(name: str) -> oauth.OAuthProvider:
-        provider = wiring.providers.get(name)
-        if provider is None:
-            raise ApiError("unknown_provider", "That provider is not configured here.", status=404)
-        return provider
+        return helpers.provider_or_404(wiring, name)
 
-    def status_of(session, user_id: str, name: str) -> oauth.ConnectionStatus:
-        return oauth.status(session, user_id=user_id, provider=name, connection_model=OAuthConnection)
+    def redirect_uri(provider: str) -> str:
+        return callback_url(settings, provider)
 
     @app.get("/connections")
-    def list_connections(request: Request, user_id: str = Depends(current_user_id)) -> list[dict]:
-        with session_scope(request.app.state.session_factory) as session:
-            return [_status_json(status_of(session, user_id, name)) for name in wiring.providers]
+    def list_connections(request: Request) -> dict:
+        user = current_user(request)
+        with session_scope(factory) as session:
+            return {"connections": [helpers.status_json(helpers.status_of(session, user.id, n))
+                                    for n in wiring.providers],
+                    "wanted": helpers.wanted_for(wiring, session, user)}
 
     @app.get("/connections/{provider}/start")
     def start(provider: str, request: Request, redirect_to: str | None = None, mode: str = "",
+              set: str | None = None, device_challenge: str | None = None, attempt: str | None = None,
               user_id: str = Depends(manage)) -> dict:
-        impl = provider_or_404(provider)
-        native = mode == "native"
-        if mode not in ("", "native", "web"):
-            raise ApiError("invalid_mode", "mode must be web or native.", status=400)
-        if native:
-            target = redirect_to or (settings.native_redirects[0] if settings.native_redirects else "")
-            allowed = native_redirect_allowed(target, settings) if target else False
-        elif redirect_to:
-            target = redirect_to
-        elif settings.redirect_allowlist:
-            target = f"{settings.redirect_allowlist[0].rstrip('/')}/connections"
-        else:
-            target = ""
-        if not native:
-            allowed = bool(target) and redirect_allowed(target, settings)
-        if not allowed:
-            raise ApiError("redirect_not_allowed", "That redirect address is not allowed.", status=400)
-        with session_scope(request.app.state.session_factory) as session:
-            flow = oauth.start_flow(session, user_id=user_id, provider_name=provider, provider=impl,
-                                    scopes=wiring.scopes[provider], redirect_to=target, cipher=wiring.cipher,
-                                    redirect_uri=callback_url(request, provider), native=native)
+        provider_or_404(provider)
+        target = helpers.connect_target(settings, app.state.signin.settings, provider, mode, redirect_to)
+        user = current_user(request)
+        set_id = helpers.check_set(wiring, user, provider, set)
+        hint, subject = helpers.account_binding(wiring, user, provider)
+        if mode == "native" and subject is None:  # the hand-off guarantee rests on this binding (see connect_native.py)
+            raise ApiError("invalid_request", "A phone connect needs an account bound by sign-in.", status=400)
+        with session_scope(factory) as session:
+            if mode == "native":
+                check_start(device_challenge, attempt)
+            scopes = helpers.scopes_for(wiring, settings, session, user, provider, set_id)
+            native = mode == "native"
+            state = oauth.start_flow(session, user_id=user_id, provider_name=provider,
+                                     provider=provider_or_404(provider), scopes=scopes, redirect_to=target,
+                                     cipher=wiring.cipher, redirect_uri=redirect_uri(provider), set_id=set_id,
+                                     login_hint=hint, expected_subject=subject, native=native,
+                                     device_hash=device_challenge if native else None,
+                                     attempt_id=attempt if native else None).state
         # The browser goes to /go first so the nonce cookie is set in the browser that finishes the flow
         # (a native flow has no cookie: the app opens this URL in the system browser).
-        return {"url": f"{public_base(request)}/connections/{provider}/go?state={quote(flow.state, safe='')}"}
+        return {"url": f"{settings.public_base}/connections/{provider}/go?state={quote(state, safe='')}"}
 
     def read_state(provider: str, state: str) -> oauth.StatePayload:
         try:
             payload = oauth.decode_state(wiring.cipher, state)
         except oauth.OAuthError as exc:  # no trustworthy redirect target exists
             raise ApiError(exc.code, str(exc), status=400) from exc
+        if payload.intent != "connect":
+            raise ApiError("invalid_state", "That link is not for a connection.", status=400)
         if payload.provider != provider:
             raise ApiError("provider_mismatch", "The sign-in belongs to another provider.", status=400)
-        ok = (native_redirect_allowed if payload.native else redirect_allowed)(payload.redirect_to, settings)
+        if payload.native:
+            ok = helpers.native_redirect_allowed(payload.redirect_to, settings, app.state.signin.settings, provider)
+        else:
+            ok = helpers.redirect_allowed(payload.redirect_to, settings)
         if not ok:
             raise ApiError("redirect_not_allowed", "That redirect address is not allowed.", status=400)
         return payload
@@ -142,45 +118,19 @@ def register(app: FastAPI) -> None:
         payload = read_state(provider, state)
         if not payload.native and payload.sub != current_user_id(request):
             raise ApiError("forbidden", "This sign-in link was started by someone else.", status=403)
-        url = impl.authorize_url(state=state, challenge=oauth.pkce.challenge(payload.verifier),
-                                 scopes=wiring.scopes[provider], redirect_uri=callback_url(request, provider))
-        reply = RedirectResponse(public_base(request) + url if url.startswith("/") else url, status_code=302)
+        with session_scope(factory) as session:  # the state names the user; scopes are recomputed, not carried
+            owner = session.get(User, payload.sub)
+            if owner is None or not has(list(owner.capabilities or []), "connections.manage"):
+                raise ApiError("forbidden", "This needs the connections.manage capability.", status=403)
+            scopes = helpers.scopes_for(wiring, settings, session, owner, provider, payload.set_id)
+        url = impl.authorize_url(state=state, challenge=oauth.pkce.challenge(payload.verifier), scopes=scopes,
+                                 redirect_uri=redirect_uri(provider), login_hint=payload.login_hint)
+        reply = RedirectResponse(settings.public_base + url if url.startswith("/") else url, status_code=302)
         if payload.native:  # the system browser has no session; the encrypted state is the only credential
             return reply
-        reply.set_cookie(NONCE_COOKIE, payload.nonce, max_age=600, httponly=True, samesite="lax",
-                         path=COOKIE_PATH, secure=settings.mode != "fake")
+        reply.set_cookie(helpers.NONCE_COOKIE, payload.nonce, max_age=600, httponly=True, samesite="lax",
+                         path=helpers.COOKIE_PATH, secure=settings.mode != "fake")
         return reply
-
-    def native_callback(provider: str, request: Request, payload: oauth.StatePayload, state: str, code: str,
-                        error: str) -> RedirectResponse:
-        target = payload.redirect_to
-        if error:
-            return _redirect(target, connection="error", provider=provider, reason=error[:64])
-        try:
-            with session_scope(request.app.state.session_factory) as session:
-                pending = oauth.complete(session, state=state, code=code, providers=wiring.providers,
-                                     cipher=wiring.cipher, connection_model=OAuthConnection,
-                                     redirect_uri=callback_url(request, provider), expected_provider=provider,
-                                     expected_user_id=None, expected_nonce=None)
-                handoff = oauth.issue_handoff(pending, cipher=wiring.cipher)  # nothing is stored until redeem
-        except oauth.OAuthError as exc:
-            return _redirect(target, connection="error", provider=provider, reason=exc.code)
-        except oauth.RetryableError:
-            return _redirect(target, connection="error", provider=provider, reason="unavailable")
-        return _redirect(target, connection="connected", provider=provider, code=handoff)
-
-    @app.post("/connections/{provider}/redeem")
-    def redeem(provider: str, body: RedeemBody, request: Request, user_id: str = Depends(manage)) -> dict:
-        provider_or_404(provider)
-        with session_scope(request.app.state.session_factory) as session:
-            try:
-                # Single use is enforced by a process-local registry (bond_oauth.handoff): fine for this one-process
-                # example; a multi-process deployment keeps a nonce table instead (docs/migration/bond_oauth.md, section 6).
-                oauth.redeem_handoff(session, code=body.code, user_id=user_id, cipher=wiring.cipher,
-                                     connection_model=OAuthConnection, expected_provider=provider)
-            except oauth.OAuthError as exc:
-                raise ApiError(exc.code, str(exc), status=400) from exc
-            return _status_json(status_of(session, user_id, provider))
 
     @app.get("/connections/{provider}/callback")
     def callback(provider: str, request: Request, state: str = "", code: str = "", error: str = ""):
@@ -188,74 +138,52 @@ def register(app: FastAPI) -> None:
         A native state completes without either, stores nothing and redirects to the app with a one-time hand-off code."""
         payload = read_state(provider, state)
         if payload.native:
-            return native_callback(provider, request, payload, state, code, error)
+            return native_callback(app, provider, payload, state, code, error)
         user_id = current_user_id(request)
-        nonce = request.cookies.get(NONCE_COOKIE, "")
+        nonce = request.cookies.get(helpers.NONCE_COOKIE, "")
         if (payload.sub != user_id or not nonce
                 or not hmac.compare_digest(nonce.encode(), payload.nonce.encode())):
             # Not the person or browser that started the flow: the redirect target comes from an untrusted link.
             return _clear_nonce(JSONResponse(status_code=400, content={"detail": {
                 "code": "invalid_state", "message": "The sign-in was not started in this browser. Start again."}}))
+        target = payload.redirect_to
+        if not has(list(current_user(request).capabilities or []), MANAGE):  # the role may have changed since start
+            return _clear_nonce(helpers.redirect(target, connection="error", provider=provider, reason="forbidden"))
         if error:
-            return _clear_nonce(_redirect(payload.redirect_to, connection="error", provider=provider,
-                                          reason=error[:64]))
+            return _clear_nonce(helpers.redirect(target, connection="error", provider=provider,
+                                                 reason=helpers.reason_of(error)))
         try:
-            with session_scope(request.app.state.session_factory) as session:
-                oauth.complete(session, state=state, code=code, providers=wiring.providers, cipher=wiring.cipher,
-                               connection_model=OAuthConnection, redirect_uri=callback_url(request, provider),
-                               expected_provider=provider, expected_user_id=user_id, expected_nonce=nonce)
+            with session_scope(factory) as session:
+                prior = [r.id for r in session.query(OAuthConnection).filter_by(
+                    user_id=user_id, provider=provider, revoked_at=None)]
+                row = oauth.complete(session, state=state, code=code, providers=wiring.providers,
+                                     cipher=wiring.cipher, connection_model=OAuthConnection,
+                                     redirect_uri=redirect_uri(provider), expected_provider=provider,
+                                     expected_user_id=user_id, expected_nonce=nonce)
+                declined = helpers.set_declined(wiring, payload.set_id, row.scopes)
+                if declined:  # complete stores first, so undo: drop the new row, bring the old grant back
+                    row.revoked_at = utcnow()
+                    session.flush()  # free the partial unique index (one live row per owner/provider/name) first
+                    oauth.forget_access(row.id)
+                    for old in session.query(OAuthConnection).filter(OAuthConnection.id.in_(prior)):
+                        old.revoked_at = None
         except oauth.OAuthError as exc:
-            return _clear_nonce(_redirect(payload.redirect_to, connection="error", provider=provider, reason=exc.code))
+            return _clear_nonce(helpers.redirect(target, connection="error", provider=provider, reason=exc.code))
         except oauth.RetryableError:
-            return _clear_nonce(_redirect(payload.redirect_to, connection="error", provider=provider,
-                                          reason="unavailable"))
-        return _clear_nonce(_redirect(payload.redirect_to, connection="connected", provider=provider))
+            return _clear_nonce(helpers.redirect(target, connection="error", provider=provider,
+                                                 reason="unavailable"))
+        if declined:  # consented, but without the set that was asked: it stays wanted
+            return _clear_nonce(helpers.redirect(target, connection="error", provider=provider,
+                                                 reason="consent_declined"))
+        return _clear_nonce(helpers.redirect(target, connection="connected", provider=provider))
 
     @app.delete("/connections/{provider}")
-    def disconnect(provider: str, request: Request, user_id: str = Depends(manage)) -> dict:
+    def disconnect(provider: str, user_id: str = Depends(manage)) -> dict:
         impl = provider_or_404(provider)
-        with session_scope(request.app.state.session_factory) as session:
+        with session_scope(factory) as session:
             oauth.disconnect(session, user_id=user_id, provider_name=provider, connection_model=OAuthConnection,
                              provider=impl, cipher=wiring.cipher)
-            return _status_json(status_of(session, user_id, provider))
+            return helpers.status_json(helpers.status_of(session, user_id, provider))
 
-    if settings.mode != "fake":
-        return
-
-    @app.get("/connections/fake/consent", response_class=HTMLResponse)
-    def fake_consent(state: str = "") -> HTMLResponse:
-        try:
-            payload = oauth.decode_state(wiring.cipher, state)
-        except oauth.OAuthError as exc:
-            raise ApiError(exc.code, str(exc), status=400) from exc
-        esc = html.escape
-        page = (
-            "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-            "<title>Fake consent</title><body style='font-family:sans-serif;max-width:28rem;margin:3rem auto'>"
-            f"<h1>Allow access?</h1><p>This is the fake {esc(payload.provider)} consent page. Nothing leaves this machine.</p>"
-            f"<form method=get action='/connections/{esc(payload.provider)}/callback'>"
-            f"<input type=hidden name=state value='{esc(state)}'><input type=hidden name=code value=mock>"
-            "<button type=submit id=sdk-consent-allow>Allow</button></form></body>"
-        )
-        return HTMLResponse(page)
-
-    @app.post("/connections/{provider}/simulate-expiry")
-    def simulate_expiry(provider: str, request: Request, user_id: str = Depends(manage)) -> dict:
-        provider_or_404(provider)
-        fake = wiring.fakes[provider]
-        with session_scope(request.app.state.session_factory) as session:
-            rows = session.query(OAuthConnection).filter_by(user_id=user_id, provider=provider, revoked_at=None).all()
-            if not rows:
-                raise ApiError("not_connected", "Connect this provider first.", status=404)
-            fake.fail_refresh_with("invalid_grant")
-            try:
-                for row in rows:
-                    oauth.forget_access(row.id)
-                    try:
-                        oauth.access_token(session, row, provider=fake, cipher=wiring.cipher,
-                                           on_reconnect_needed=_hook)
-                    except oauth.ReconnectRequired:
-                        pass
-            finally:
-                fake.fail_refresh_with(None)
-            return _status_json(status_of(session, user_id, provider))
+    if settings.mode == "fake":
+        register_expiry(app, wiring, provider_or_404, manage, _hook)

@@ -1,0 +1,28 @@
+{
+  "codes": [
+    "account_mismatch",
+    "company_suspended",
+    "consent_declined",
+    "deactivated",
+    "email_not_verified",
+    "identity_mismatch",
+    "invalid_code",
+    "invalid_handoff",
+    "invalid_id_token",
+    "invalid_origin",
+    "invalid_request",
+    "invalid_state",
+    "invalid_token",
+    "not_found",
+    "not_invited",
+    "provider_error",
+    "provider_not_allowed",
+    "refresh_expired",
+    "refresh_reused",
+    "refresh_revoked",
+    "session_revoked",
+    "signin_expired",
+    "tenant_mismatch",
+    "unknown_provider"
+  ]
+}

@@ -123,7 +123,7 @@ def test_a_database_the_fake_app_created_is_already_at_head(app, tmp_path, monke
     config.set_main_option("script_location", str(SERVICE / "alembic"))
     command.upgrade(config, "head")  # would raise "table already exists" if the stamp were missing
     with app.state.engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0002"
+        assert MigrationContext.configure(connection).get_current_revision() == "0003"
 
 
 def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
@@ -131,7 +131,7 @@ def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
     bootstrap_schema(engine)
     assert "users" in inspect(engine).get_table_names()
     with engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0002"
+        assert MigrationContext.configure(connection).get_current_revision() == "0003"
 
 
 def test_bootstrap_leaves_a_stale_database_alone_and_says_so(tmp_path, caplog):

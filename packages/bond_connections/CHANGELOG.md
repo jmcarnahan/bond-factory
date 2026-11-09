@@ -9,3 +9,14 @@
 - `ConnectionReturn.parse` / `cleaned` for the address the browser returns to.
 - `ConnectionLabels` with English defaults, including the `not_confirmed` reason ("Nothing changed") for a
   return address whose claim the live list does not back.
+
+## 0.2.0 - unreleased
+- `WantedSet(id, provider, label, scopes, granted)` with `fromJson`.
+- `ConnectionList(connections, wanted)` with `fromJson` (bare array or `{connections, wanted}`); `wanted` defaults to `const []`.
+- `ConnectionsApi.listAll()` (the whole answer), `ConnectionsApi.wanted()`; `list()` (throws `BadResponse` on the new `{connections, wanted}` answer: use `listAll()`) is unchanged.
+- `ConnectionsApi.startUrl(..., set:)` adds the `set` query parameter (a wanted set id).
+- `ConnectionReturn.attempt` read from the `attempt` query parameter; `cleaned` drops `attempt` and `code` too.
+- BREAKING (unreleased): `redeem(provider, code, {required deviceSecret, deviceLabel})` posts `{code, device_secret, device_label?}`.
+- `startUrl(..., deviceChallenge:, attempt:)` send `device_challenge` and `attempt` on a native start; both are required when `native` is true (`ArgumentError`).
+- `ConnectionLabels.returnReasons` adds `account_mismatch`, `consent_declined` and `forbidden`.
+- The pubspec version is bumped to 0.2.0 by the director (builders do not edit pubspecs).

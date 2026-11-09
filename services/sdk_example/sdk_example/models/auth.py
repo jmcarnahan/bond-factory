@@ -1,24 +1,36 @@
-"""The example's users table and its two demo identities. Datetimes are naive UTC."""
+"""The example's users table and its demo identities. Datetimes are naive UTC."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, String, select
+from sqlalchemy import JSON, Boolean, Column, DateTime, String, UniqueConstraint, false, select
 from sqlalchemy.orm import Session
 
 from ..db import Base
 
 DEMO_USER_ID = "demo-user-1"
 VIEWER_USER_ID = "demo-user-2"
-NOT_INVITED_EMAIL = "notinvited@example.com"
+CREW_USER_ID = "demo-user-3"
+MS_USER_ID = "demo-user-4"
+NOT_INVITED_EMAIL = "notinvited@example.com"  # has a Firebase mock identity but no row
+UNINVITED_EMAIL = "uninvited@example.com"  # the fake provider's uninvited identity: no row
 
-#: The seeded users. ``demo-user-1`` can write tasks, read everyone's tasks and manage connections; ``demo-user-2`` is a viewer.
+#: The seeded users (invited rows: nobody has signed in yet). ``demo-user-1`` can write tasks, read everyone's tasks
+#: and manage connections (so the policy wants mail and calendar from it); ``demo-user-2`` is a viewer;
+#: ``crew@example.com`` has no ``connections.manage`` (nothing wanted); ``demo.microsoft@example.com`` is the
+#: fake-microsoft demo identity, bound on its first sign-in. There is NO row for ``uninvited@example.com``.
+#: `demo@example.com` is also the break-glass owner row (`allow_password`).
+#: The same list, minus ids, is in fixtures/signin/seed_identities.json.
 DEMO_USERS: tuple[dict, ...] = (
     {"id": DEMO_USER_ID, "email": "demo@example.com", "name": "Demo User", "initials": "DU",
-     "capabilities": ["tasks.write", "tasks.read_all", "connections.manage"]},
+     "capabilities": ["tasks.write", "tasks.read_all", "connections.manage"], "allow_password": True},
     {"id": VIEWER_USER_ID, "email": "viewer@example.com", "name": "Viewer User", "initials": "VU",
      "capabilities": []},
+    {"id": CREW_USER_ID, "email": "crew@example.com", "name": "Crew Member", "initials": "CM",
+     "capabilities": ["tasks.write"]},
+    {"id": MS_USER_ID, "email": "demo.microsoft@example.com", "name": "Demo Microsoft", "initials": "DM",
+     "capabilities": ["tasks.write", "connections.manage"]},
 )
 
 #: What the mock verifier knows (written to out/mock_identities.json). ``notinvited@example.com`` has an
@@ -36,6 +48,8 @@ def utcnow() -> datetime:
 
 class User(Base):
     __tablename__ = "users"
+    # One person, one identity per provider account: the pair is unique once bound (both NULL until first sign-in).
+    __table_args__ = (UniqueConstraint("identity_provider", "identity_subject", name="uq_users_identity"),)
 
     id = Column(String, primary_key=True)
     email = Column(String, nullable=False, unique=True)  # always lowercased
@@ -48,8 +62,20 @@ class User(Base):
     last_sign_in_at = Column(DateTime, nullable=True)
     sessions_valid_after = Column(DateTime, nullable=True)
     firebase_uid = Column(String, nullable=True, unique=True)
+    # Bound on the first direct sign-in (Google: sub; Microsoft: tid:oid). The e-mail only finds the invite once.
+    identity_provider = Column(String, nullable=True)
+    identity_subject = Column(String, nullable=True)
+    # Break-glass: only a row with this flag may use the Firebase e-mail and password route.
+    allow_password = Column(Boolean, nullable=False, default=False, server_default=false())
     created_at = Column(DateTime, nullable=False, default=utcnow)
     updated_at = Column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    @property
+    def identity(self) -> tuple[str, str] | None:
+        """The bound ``(provider, subject)``: what ``bond_signin.UserRef`` calls ``identity``."""
+        if self.identity_provider and self.identity_subject:
+            return self.identity_provider, self.identity_subject
+        return None
 
     def public(self) -> dict:
         """The generic ``user`` object of the sign-in answers."""

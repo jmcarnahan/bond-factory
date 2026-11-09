@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from starlette.middleware import Middleware
 from .db import Base, session_scope
 from .models.auth import MOCK_IDENTITIES, ensure_demo_users
 from .models.jobs import BackgroundJob
+from .origin_rule import OriginRule
 from .settings import Settings, out_dir_for
 
 log = logging.getLogger("sdk_example")
@@ -43,11 +45,12 @@ MOCK_FILE = "mock_identities.json"
 def build_auth_settings(settings: Settings, mock_file: Path | None) -> AuthSettings:
     """Fake mode: mock verifier (not tied to pytest) and demo sign-in. Real mode: Firebase from the environment."""
     fake = settings.mode == "fake"
-    return AuthSettings.from_env(
+    auth = AuthSettings.from_env(
         jwt_secret=settings.auth_secret, issuer=APP_NAME, audience=APP_NAME, access_ttl_minutes=10080,
         app_name=APP_NAME, tier="mock" if fake else "firebase", mock_enabled_only_under_test=not fake,
         mock_identities_file=str(mock_file) if fake and mock_file else None, demo_enabled=fake,
     )
+    return replace(auth, email_password_enabled=settings.breakglass)  # the form exists only as break-glass
 
 
 def write_mock_identities(path: Path) -> Path:
@@ -56,25 +59,34 @@ def write_mock_identities(path: Path) -> Path:
     return path
 
 
+def _head(scripts: Path) -> str | None:
+    if not scripts.is_dir():
+        return None
+    config = Config()  # no ini: only the script directory is read, env.py never runs
+    config.set_main_option("script_location", str(scripts))
+    return ScriptDirectory.from_config(config).get_current_head()
+
+
 def bootstrap_schema(engine: Engine) -> None:
     """Fake mode only. An EMPTY database gets the tables and is stamped at the migration head, so a later
     `alembic upgrade head` is a no-op instead of a clash. A migrated database is left alone. A database that has
     tables but no migration record is stale: it is not touched (stamping it would bless a schema nobody checked)
     and a warning says to run `make migrate`."""
     existing = set(inspect(engine).get_table_names())
+    scripts = Path(__file__).resolve().parents[1] / "alembic"
     if "alembic_version" in existing:
+        head = _head(scripts)
+        with engine.connect() as conn:
+            at = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+        if head and at != head:
+            raise RuntimeError(f"database at {at}; run make migrate (head is {head})")
         return
     if existing:
         log.warning("The database has tables but no migration record; not touching it. "
                     "Run `make migrate` (or delete the file) before starting.")
         return
     Base.metadata.create_all(engine)
-    scripts = Path(__file__).resolve().parents[1] / "alembic"
-    if not scripts.is_dir():
-        return
-    config = Config()  # no ini: only the script directory is read, env.py never runs
-    config.set_main_option("script_location", str(scripts))
-    head = ScriptDirectory.from_config(config).get_current_head()
+    head = _head(scripts)
     if head:
         with engine.begin() as conn:
             conn.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"))
@@ -124,3 +136,4 @@ def install(app: FastAPI) -> None:
     # headers, and a browser reads the answer instead of reporting a network error.
     app.user_middleware.append(Middleware(UploadLimit, max_bytes=MAX_UPLOAD_BYTES, paths=("/documents",)))
     app.user_middleware.append(Middleware(UnhandledErrorMiddleware))
+    app.user_middleware.append(Middleware(OriginRule))  # cookie-authenticated mutations need an allowed Origin
