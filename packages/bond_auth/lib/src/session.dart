@@ -12,6 +12,7 @@ class AuthSession {
     this.claims = const {},
     this.capabilities = const [],
     this.user = const {},
+    this.refreshToken,
   });
 
   /// Decodes the JWT payload. Throws [FormatException] when [token] is not a
@@ -46,6 +47,11 @@ class AuthSession {
   /// The `user` object the server returned beside the token (`id`, `email`,
   /// `name`, ...). Empty when the session was made from a bare token.
   final Map<String, Object?> user;
+
+  /// The rotating refresh token that came with the session on a body-delivery
+  /// (native) sign-in. Null on web, where an HttpOnly cookie carries it, and for
+  /// sessions made from a bare token.
+  final String? refreshToken;
 
   /// True when `exp` is in the past on this device's clock. A token without
   /// `exp` never reads as expired here.

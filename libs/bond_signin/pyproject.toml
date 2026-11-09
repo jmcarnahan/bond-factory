@@ -1,0 +1,28 @@
+[project]
+name = "bond_signin"
+version = "0.1.0"
+description = "Direct Google/Microsoft sign-in: Protocol seams, scope policy, router factory"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi>=0.110",
+    "pydantic>=2.8",
+    "sqlalchemy>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.6", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bond_signin*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -74,6 +74,17 @@ class FirebaseRuntimeConfig {
   bool get iosComplete => ios != null && messagingSenderId.isNotEmpty;
 }
 
+/// One direct sign-in method the server offers: `{id, label}`.
+class SignInProvider {
+  const SignInProvider({required this.id, required this.label});
+
+  /// The registered provider name (`google`, `microsoft`).
+  final String id;
+
+  /// The button text the server suggests.
+  final String label;
+}
+
 /// The merged providers answer.
 class AuthProviders {
   const AuthProviders({
@@ -85,6 +96,9 @@ class AuthProviders {
     this.mock = false,
     this.firebase,
     this.syncUrl,
+    this.signin = const [],
+    this.breakGlass = false,
+    this.defaultFlow = 'firebase',
   });
 
   factory AuthProviders.fromJson(Map<Object?, Object?> json) {
@@ -99,7 +113,20 @@ class AuthProviders {
       mock: jbool(json, 'mock') ?? false,
       firebase: FirebaseRuntimeConfig.fromProviders(json),
       syncUrl: url == null || url.isEmpty ? null : Uri.tryParse(url),
+      signin: _signin(json),
+      breakGlass: jbool(json, 'break_glass') ?? false,
+      defaultFlow: jstr(json, 'default_flow') ?? 'firebase',
     );
+  }
+
+  static List<SignInProvider> _signin(Map<Object?, Object?> json) {
+    final raw = json['signin'];
+    if (raw is! List) return const [];
+    return [
+      for (final e in raw)
+        if (e is Map && jstr(e, 'id') != null && jstr(e, 'id')!.isNotEmpty)
+          SignInProvider(id: jstr(e, 'id')!, label: jstr(e, 'label') ?? jstr(e, 'id')!),
+    ];
   }
 
   final bool demo;
@@ -110,4 +137,13 @@ class AuthProviders {
   final bool mock;
   final FirebaseRuntimeConfig? firebase;
   final Uri? syncUrl;
+
+  /// Direct sign-in methods on offer (`signin` key); empty when absent.
+  final List<SignInProvider> signin;
+
+  /// True when the e-mail and password break-glass sign-in is on (`break_glass`).
+  final bool breakGlass;
+
+  /// Which flow the app starts with: `firebase` or `signin` (`default_flow`).
+  final String defaultFlow;
 }

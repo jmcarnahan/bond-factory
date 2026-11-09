@@ -1,0 +1,19 @@
+name: bond_signin
+description: 'Direct Google and Microsoft sign-in client: attempts, returns and the session gateway. Pure Dart, no Flutter.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+dependencies:
+  bond_api:
+    path: ../bond_api
+  bond_auth:
+    path: ../bond_auth
+  bond_json:
+    path: ../bond_json
+  crypto: ^3.0.3
+dev_dependencies:
+  http: ^1.2.0
+  lints: ^6.0.0
+  test: ^1.25.6

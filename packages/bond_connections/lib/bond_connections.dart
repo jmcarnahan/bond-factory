@@ -5,3 +5,4 @@ export 'src/api.dart';
 export 'src/connection_return.dart';
 export 'src/labels.dart';
 export 'src/status.dart';
+export 'src/wanted.dart';

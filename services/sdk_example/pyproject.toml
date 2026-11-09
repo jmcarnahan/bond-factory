@@ -13,12 +13,13 @@ dependencies = [
     "python-multipart>=0.0.9",
     "bond_service_kit",
     "bond_storage",
-    "bond_auth_py",
+    "bond_auth_py[firebase]",
     "bond_jobs",
     "bond_sync_py",
     "bond_oauth",
     "bond_calendar",
     "bond_tasks_py",
+    "bond_signin",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +42,7 @@ bond_sync_py = { workspace = true }
 bond_oauth = { workspace = true }
 bond_calendar = { workspace = true }
 bond_tasks_py = { workspace = true }
+bond_signin = { workspace = true }
 
 [tool.ruff]
 line-length = 110
