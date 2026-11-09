@@ -5,7 +5,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BASE="${BASE:-main}"
-ALL="packages/bond_roof packages/bond_roof_ui demos/roof_demo services/roof_measure"
+if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
+  echo "changed_modules: base ref '$BASE' cannot be resolved (shallow clone? run: git fetch origin $BASE:$BASE, or set BASE=<ref>)" >&2
+  exit 2
+fi
+ALL="packages/bond_roof packages/bond_roof_ui demos/roof_demo services/roof_measure packages/bond_json packages/bond_api packages/bond_test_support packages/bond_ui packages/bond_auth packages/bond_auth_firebase packages/bond_sync packages/bond_sync_powersync packages/bond_tasks packages/bond_tasks_ui packages/bond_connections packages/bond_connections_ui demos/sdk_demo libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py services/sdk_example"
 
 # prefix -> affected modules (reverse dependencies)
 affected() {
@@ -14,9 +18,33 @@ affected() {
     packages/bond_roof_ui/*) echo packages/bond_roof_ui demos/roof_demo ;;
     demos/roof_demo/*)       echo demos/roof_demo ;;
     services/roof_measure/*) echo services/roof_measure ;;
+    packages/bond_json/*)  echo packages/bond_json packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui demos/sdk_demo ;;
+    packages/bond_api/*)   echo packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui demos/sdk_demo ;;
+    packages/bond_test_support/*)  echo packages/bond_test_support packages/bond_ui packages/bond_tasks_ui packages/bond_connections_ui demos/sdk_demo ;;
+    packages/bond_ui/*)    echo packages/bond_ui packages/bond_tasks_ui packages/bond_connections_ui demos/sdk_demo ;;
+    packages/bond_auth/*)  echo packages/bond_auth packages/bond_auth_firebase demos/sdk_demo ;;
+    packages/bond_auth_firebase/*)  echo packages/bond_auth_firebase demos/sdk_demo ;;
+    packages/bond_sync/*)  echo packages/bond_sync packages/bond_sync_powersync demos/sdk_demo ;;
+    packages/bond_sync_powersync/*)  echo packages/bond_sync_powersync demos/sdk_demo ;;
+    packages/bond_tasks/*)  echo packages/bond_tasks packages/bond_tasks_ui demos/sdk_demo ;;
+    packages/bond_tasks_ui/*)  echo packages/bond_tasks_ui demos/sdk_demo ;;
+    packages/bond_connections/*)  echo packages/bond_connections packages/bond_connections_ui demos/sdk_demo ;;
+    packages/bond_connections_ui/*)  echo packages/bond_connections_ui demos/sdk_demo ;;
+    demos/sdk_demo/*)        echo demos/sdk_demo ;;
+    libs/bond_service_kit/*) echo libs/bond_service_kit services/sdk_example ;;
+    libs/bond_storage/*) echo libs/bond_storage services/sdk_example ;;
+    libs/bond_auth_py/*) echo libs/bond_auth_py services/sdk_example ;;
+    libs/bond_jobs/*) echo libs/bond_jobs services/sdk_example ;;
+    libs/bond_sync_py/*) echo libs/bond_sync_py services/sdk_example ;;
+    libs/bond_oauth/*) echo libs/bond_oauth services/sdk_example ;;
+    libs/bond_calendar/*) echo libs/bond_calendar services/sdk_example ;;
+    libs/bond_tasks_py/*) echo libs/bond_tasks_py services/sdk_example ;;
+    services/sdk_example/*)  echo services/sdk_example ;;
+    fixtures/sync/*)         echo packages/bond_sync libs/bond_sync_py services/sdk_example ;;
+    fixtures/tasks/*)        echo packages/bond_tasks libs/bond_tasks_py services/sdk_example ;;
     fixtures/*)              echo packages/bond_roof services/roof_measure demos/roof_demo ;;
     docs/contracts/*)        echo packages/bond_roof services/roof_measure ;;
-    pyproject.toml|uv.lock)  echo services/roof_measure ;;
+    pyproject.toml|uv.lock)  echo services/roof_measure libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py services/sdk_example ;;
     pubspec.yaml|pubspec.lock|analysis_options.yaml|Makefile|make/*|tool/*) echo "$ALL" ;;
   esac
 }

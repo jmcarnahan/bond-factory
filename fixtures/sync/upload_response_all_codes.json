@@ -1,0 +1,68 @@
+{
+  "_note": "Shape fixture for clients: one example per verdict a device can be told. Not produced by the example app.",
+  "results": [
+    {
+      "seq": 0,
+      "status": "ok"
+    },
+    {
+      "seq": 1,
+      "status": "ok",
+      "resolved_id": "server-row-1"
+    },
+    {
+      "seq": 2,
+      "status": "skipped",
+      "code": "already"
+    },
+    {
+      "seq": 3,
+      "status": "rejected",
+      "code": "invalid",
+      "message": "title_required"
+    },
+    {
+      "seq": 4,
+      "status": "rejected",
+      "code": "unsupported",
+      "message": "Not supported"
+    },
+    {
+      "seq": 5,
+      "status": "rejected",
+      "code": "unsupported",
+      "message": "Use the REST route"
+    },
+    {
+      "seq": 6,
+      "status": "rejected",
+      "code": "conflict",
+      "message": "conflict"
+    },
+    {
+      "seq": 7,
+      "status": "rejected",
+      "code": "not_found",
+      "message": "Not found"
+    },
+    {
+      "seq": 8,
+      "status": "rejected",
+      "code": "forbidden",
+      "message": "That is not your row"
+    },
+    {
+      "seq": 9,
+      "status": "rejected",
+      "code": "rate_limited",
+      "message": "Too many writes"
+    },
+    {
+      "seq": 10,
+      "status": "rejected",
+      "code": "server_error",
+      "message": "server_error"
+    }
+  ],
+  "server_now": "2026-11-08T17:04:05.123Z"
+}

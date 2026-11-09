@@ -10,7 +10,7 @@ export FLUTTER DART
 include make/dart.mk make/python.mk make/gates.mk make/changed.mk
 
 .PHONY: help test
-test: test-dart test-flutter test-service ## Run every test suite (Dart, Flutter, Python)
+test: test-dart test-flutter test-service test-libs test-example ## Run every test suite (Dart, Flutter, Python services, libs, example)
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:[^#]*## /\t/' | sort | awk -F'\t' '{printf "  %-16s %s\n", $$1, $$2}'

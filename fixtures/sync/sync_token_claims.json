@@ -1,0 +1,31 @@
+{
+  "_note": "TEST ONLY. example_token is signed by the key published in jwks_example.json; iat and exp are fixed, so verify with expiry checks off.",
+  "header": {
+    "alg": "ES256",
+    "kid": "bond-sync-1",
+    "typ": "JWT"
+  },
+  "claims": {
+    "sub": "user-1",
+    "aud": "powersync",
+    "iat": 1794157200,
+    "exp": 1794158100
+  },
+  "seconds_valid": 900,
+  "token_response": {
+    "token": "<example_token>",
+    "expires_at": "2026-11-08T17:15:00Z",
+    "endpoint": "http://localhost:8095",
+    "server_now": "2026-11-08T17:04:05.123Z"
+  },
+  "off_response": {
+    "status": 503,
+    "body": {
+      "detail": {
+        "code": "sync_off",
+        "message": "Sync is not set up on this server"
+      }
+    }
+  },
+  "example_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImJvbmQtc3luYy0xIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTEiLCJhdWQiOiJwb3dlcnN5bmMiLCJpYXQiOjE3OTQxNTcyMDAsImV4cCI6MTc5NDE1ODEwMH0.K34QU_CoCNUcAdZdgG9Hjo8VS2GkieVmWfMbT3BlxxRwPZNMIaFIMDiJ8997VadKLTTyJRJkr4lF7xQQeobguQ"
+}

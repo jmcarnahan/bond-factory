@@ -1,0 +1,7 @@
+{
+  "transaction_id": null,
+  "ops": [
+    {"seq": 0, "op": "put", "table": "notes", "id": "note-1", "data": {"title": "a"}},
+    {"seq": 0, "op": "put", "table": "notes", "id": "note-2", "data": {"title": "b"}}
+  ]
+}

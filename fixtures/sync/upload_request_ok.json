@@ -1,0 +1,9 @@
+{
+  "transaction_id": 7,
+  "ops": [
+    {"seq": 0, "op": "put", "table": "notes", "id": "note-1", "data": {"title": "First note", "body": "hello"}},
+    {"seq": 1, "op": "patch", "table": "notes", "id": "note-1", "data": {"title": "First note, edited"}},
+    {"seq": 2, "op": "put", "table": "notes", "id": "note-2", "data": {"title": "Second note"}},
+    {"seq": 3, "op": "delete", "table": "notes", "id": "note-2", "data": {}}
+  ]
+}

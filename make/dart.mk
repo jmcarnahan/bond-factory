@@ -1,8 +1,12 @@
 # Dart and Flutter targets. DART_PKGS are pure Dart; FLUTTER_PKGS need the Flutter SDK.
-DART_PKGS = packages/bond_roof
-FLUTTER_PKGS = packages/bond_roof_ui demos/roof_demo
+DART_PKGS = packages/bond_roof packages/bond_json packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections
+FLUTTER_PKGS = packages/bond_roof_ui demos/roof_demo packages/bond_test_support packages/bond_ui packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui demos/sdk_demo
 
-.PHONY: sync-fixtures demo-web demo-ios build-web test-dart test-flutter analyze
+.PHONY: sync-fixtures demo-web demo-ios build-web demo-sdk-web test-dart test-flutter analyze
+
+demo-sdk-web: ## Serve the SDK demo on :8078 (debug web-server)
+	$(MAKE) -C demos/sdk_demo serve-web
+
 
 sync-fixtures: ## Copy roof-model fixtures into the demo's assets
 	demos/roof_demo/tool/sync_fixtures.sh
