@@ -5,7 +5,9 @@ import 'ui_common.dart';
 
 /// The components section: page-level pieces.
 class UiComponents extends StatefulWidget {
-  const UiComponents({super.key});
+  const UiComponents({super.key, required this.say});
+
+  final UiSay say;
 
   @override
   State<UiComponents> createState() => _UiComponentsState();
@@ -14,7 +16,6 @@ class UiComponents extends StatefulWidget {
 class _UiComponentsState extends State<UiComponents> {
   int _tab = 0;
   String _variant = 'short';
-  String _event = 'nothing yet';
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +48,7 @@ class _UiComponentsState extends State<UiComponents> {
         ),
         const UiTile(
           name: 'table',
+          selfIdentified: false, // the table exposes only its rows (sdk.ui.table-row-<n>), so the tile wears the id
           child: BondTable(
             columns: [BondColumn('Task', flex: 2), BondColumn('Due'), BondColumn('Hours', alignEnd: true)],
             rows: [
@@ -93,7 +95,7 @@ class _UiComponentsState extends State<UiComponents> {
           name: 'stale-banner',
           child: BondStaleBanner(
             asOf: DateTime(2026, 3, 4, 9, 30),
-            onRetry: () => setState(() => _event = 'retry tapped'),
+            onRetry: () => widget.say('retry tapped'),
             formatTime: (d) => '09:30',
             semanticsId: 'sdk.ui.stale-banner',
           ),
@@ -101,7 +103,7 @@ class _UiComponentsState extends State<UiComponents> {
         UiTile(
           name: 'email-sign-in',
           child: BondEmailSignIn(
-            onSignIn: (email, _) => setState(() => _event = 'sign in as $email'),
+            onSignIn: (email, _) => widget.say('sign in as $email'),
             semanticsId: 'sdk.ui.email-sign-in',
           ),
         ),
@@ -110,7 +112,7 @@ class _UiComponentsState extends State<UiComponents> {
           child: BondGoogleSignInButton(
             label: 'Continue with Google',
             notice: 'Mock only in the demo.',
-            onPressed: () => setState(() => _event = 'google tapped'),
+            onPressed: () => widget.say('google tapped'),
             semanticsId: 'sdk.ui.google-sign-in',
           ),
         ),
@@ -121,7 +123,7 @@ class _UiComponentsState extends State<UiComponents> {
             title: 'Nothing here',
             message: 'Add one to get started.',
             actionLabel: 'Add',
-            onAction: () => setState(() => _event = 'add tapped'),
+            onAction: () => widget.say('add tapped'),
             actionSemanticsId: 'sdk.ui.empty-state-action',
           ),
         ),
@@ -130,7 +132,7 @@ class _UiComponentsState extends State<UiComponents> {
           name: 'error-state',
           child: BondErrorState(
             message: 'Could not load.',
-            onRetry: () => setState(() => _event = 'error retry'),
+            onRetry: () => widget.say('error retry'),
             semanticsId: 'sdk.ui.error-state',
             retrySemanticsId: 'sdk.ui.error-state-retry',
           ),
@@ -144,7 +146,7 @@ class _UiComponentsState extends State<UiComponents> {
               title: 'Account deactivated',
               body: 'Ask the owner to turn it back on.',
               signOutLabel: 'Sign out',
-              onSignOut: () => setState(() => _event = 'sign out tapped'),
+              onSignOut: () => widget.say('sign out tapped'),
               signOutSemanticsId: 'sdk.ui.deactivated-sign-out',
             ),
           ),
@@ -157,11 +159,6 @@ class _UiComponentsState extends State<UiComponents> {
             height: 320,
             child: BondStartupFailed(error: 'Connection refused', baseUrl: 'http://localhost:8012', appName: 'Demo'),
           ),
-        ),
-        Semantics(
-          identifier: 'sdk.ui.last-event',
-          container: true,
-          child: Text('Last event: $_event'),
         ),
       ],
     );

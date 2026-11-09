@@ -28,7 +28,7 @@ shape into the app. They are never shipped. `README.md` in this folder covers co
 | `SDK_EXAMPLE_CORS_ORIGINS` | `http://localhost:8078` | `*` is refused (credentials are on) |
 | `SDK_EXAMPLE_REDIRECT_ALLOWLIST` | `http://localhost:8078` | OAuth `redirect_to` must match; no open redirect |
 | `SDK_EXAMPLE_TZ` | `UTC` | time zone the example uses for local times |
-| `SDK_EXAMPLE_SYNC_URL` | empty | sync endpoint handed out by `POST /sync/token`; empty means sync is off |
+| `SDK_EXAMPLE_SYNC_URL` | fake mode: `http://localhost:8012/powersync-fake`; real mode: empty | sync endpoint handed out by `POST /sync/token`; set it to empty to turn sync off (real mode: sync is off until it is set) |
 | `BOND_OAUTH_KEY` | generated in `out/oauth.key` (fake mode) | token encryption key; real mode fails at startup without it |
 | `BOND_OAUTH_REDIRECT_BASE` | the request's own base URL | public base URL for the OAuth callback; must match what the provider registered |
 | `BOND_GOOGLE_CLIENT_ID`, `BOND_GOOGLE_CLIENT_SECRET` | unset | real mode: Google is offered only when both are set |

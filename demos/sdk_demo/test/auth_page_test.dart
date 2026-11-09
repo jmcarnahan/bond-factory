@@ -135,6 +135,53 @@ void main() {
     }
   });
 
+  testWidgets('read-only values expose their text as a semantics label', (tester) async {
+    final handle = tester.ensureSemantics();
+    final r = CannedResponses()
+      ..json('POST', '/auth/demo', answer('t-old111'))
+      ..json('POST', '/auth/firebase', {'detail': {'code': 'not_invited', 'message': 'No'}}, status: 403);
+    await pumpAuthPage(tester, r);
+
+    expect(find.bySemanticsLabel('Signed out'), findsOneWidget);
+    await tap(tester, 'Sign in as demo user');
+    await pumpUntil(tester, find.text('Sign out'));
+    for (final label in [
+      'Demo User (demo@example.com)',
+      'Capabilities: tasks.write, connections.manage',
+      'Token ends old111',
+      'Renewals: 0',
+    ]) {
+      expect(find.bySemanticsLabel(label), findsOneWidget, reason: label);
+    }
+    await tap(tester, 'Sign in as not-invited identity');
+    await pumpUntil(tester, find.textContaining('code: not_invited'));
+    expect(find.bySemanticsLabel(RegExp(r'^code: not_invited')), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('adjacent read-only ids each report only their own label', (tester) async {
+    final handle = tester.ensureSemantics();
+    final r = CannedResponses()..json('POST', '/auth/demo', answer('t-old111'));
+    await pumpAuthPage(tester, r);
+    await tap(tester, 'Sign in as demo user');
+    await pumpUntil(tester, find.text('Sign out'));
+
+    const expected = {
+      'sdk.auth.user': 'Demo User (demo@example.com)',
+      'sdk.auth.capabilities': 'Capabilities: tasks.write, connections.manage',
+      'sdk.auth.token-tail': 'Token ends old111',
+      'sdk.auth.renewals': 'Renewals: 0',
+    };
+    final nodes = <String, String>{
+      for (final id in expected.keys)
+        id: tester
+            .getSemantics(find.byWidgetPredicate((w) => w is Semantics && w.properties.identifier == id))
+            .label,
+    };
+    expect(nodes, expected);
+    handle.dispose();
+  });
+
   testWidgets('sign-out posts logout and returns to the signed-out view', (tester) async {
     final r = CannedResponses()
       ..json('POST', '/auth/demo', answer('t-old111'))

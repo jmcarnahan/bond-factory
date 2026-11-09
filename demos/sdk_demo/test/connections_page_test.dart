@@ -256,6 +256,33 @@ void main() {
     await expectNoOverlays(t);
   });
 
+  testWidgets('the text nodes of the page expose their text as the semantics label', (t) async {
+    final handle = t.ensureSemantics();
+    final r = CannedResponses()
+      ..json('POST', '/auth/demo', session(caps: const []))
+      ..json('GET', '/connections', [row('fake-google', connected: true)])
+      ..json('GET', '/connections/fake-google/start', {'detail': {'code': 'forbidden', 'message': 'No.'}}, status: 403);
+    await pumpPage(t, r);
+    expect(t.getSemantics(byId('sdk.connections.no-manage')).label, startsWith('This account cannot change'));
+    expect(t.getSemantics(byId('sdk.connections.state-fake-google')).label, 'Connected');
+    handle.dispose();
+  });
+
+  testWidgets('an error line and a start address are labelled too', (t) async {
+    final handle = t.ensureSemantics();
+    final r = twoProviders()
+      ..json('GET', '/connections/fake-google/start', {'url': 'http://test.invalid/connections/fake-google/go?state=abc'})
+      ..json('GET', '/connections/fake-microsoft/start', {'detail': {'code': 'unknown_provider', 'message': 'No.'}}, status: 404);
+    await pumpPage(t, r);
+    await t.tap(byId('sdk.connections.connect-fake-google'));
+    await pumpUntil(t, byId('sdk.connections.start-url'));
+    expect(t.getSemantics(byId('sdk.connections.start-url')).label, contains('/go?state=abc'));
+    await t.tap(byId('sdk.connections.connect-fake-microsoft'));
+    await pumpUntil(t, byId('sdk.connections.error'));
+    expect(t.getSemantics(byId('sdk.connections.error')).label, 'code: unknown_provider | message: No.');
+    handle.dispose();
+  });
+
   testWidgets('a manager sees no note', (t) async {
     await pumpPage(t, twoProviders());
     expect(byId('sdk.connections.no-manage'), findsNothing);

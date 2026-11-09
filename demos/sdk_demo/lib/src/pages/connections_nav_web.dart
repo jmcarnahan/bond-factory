@@ -14,9 +14,20 @@ bool navigateTopLevel(Uri url) {
 /// Puts [url] in the address bar without a new page load or history entry
 /// (`history.replaceState`), so a reload no longer carries the return query.
 /// Only the path, query and fragment are used: the origin cannot change.
-void replaceAddress(Uri url) {
-  final target = '${url.path.isEmpty ? '/' : url.path}${url.hasQuery ? '?${url.query}' : ''}'
-      '${url.hasFragment ? '#${url.fragment}' : ''}';
-  final history = globalContext.getProperty<JSObject>('history'.toJS);
-  history.callMethod<JSAny?>('replaceState'.toJS, null, ''.toJS, target.toJS);
+///
+/// Returns null on success, else the failure text. `replaceState` takes three
+/// arguments (state, title, url) and the current state is passed back so the
+/// router's own entry data survives. A Dart `null` in `callMethod`'s optional
+/// parameters counts as "not given", so the arguments go as an explicit list.
+String? replaceAddress(Uri url) {
+  try {
+    final target = '${url.path.isEmpty ? '/' : url.path}${url.hasQuery ? '?${url.query}' : ''}'
+        '${url.hasFragment ? '#${url.fragment}' : ''}';
+    final history = globalContext.getProperty<JSObject>('history'.toJS);
+    final state = history.getProperty<JSAny?>('state'.toJS);
+    history.callMethodVarArgs<JSAny?>('replaceState'.toJS, [state, ''.toJS, target.toJS]);
+    return null;
+  } catch (e) {
+    return 'Could not clean the address bar: $e';
+  }
 }

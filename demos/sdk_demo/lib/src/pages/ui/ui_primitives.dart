@@ -5,7 +5,9 @@ import 'ui_common.dart';
 
 /// The primitives section: every widget of `bond_ui` primitives once.
 class UiPrimitives extends StatefulWidget {
-  const UiPrimitives({super.key});
+  const UiPrimitives({super.key, required this.say});
+
+  final UiSay say;
 
   @override
   State<UiPrimitives> createState() => _UiPrimitivesState();
@@ -48,7 +50,7 @@ class _UiPrimitivesState extends State<UiPrimitives> {
         UiTile(
           name: 'button',
           child: Wrap(spacing: uiGap, runSpacing: uiGap, children: [
-            BondButton(label: 'Primary', onPressed: () {}, semanticsId: 'sdk.ui.button'),
+            BondButton(label: 'Primary', onPressed: () => widget.say('button tapped'), semanticsId: 'sdk.ui.button'),
             BondButton(label: 'Secondary', variant: BondButtonVariant.secondary, onPressed: () {}),
             BondButton(label: 'Strong', variant: BondButtonVariant.strong, onPressed: () {}),
             BondButton(label: 'Quiet', variant: BondButtonVariant.quiet, onPressed: () {}),
@@ -62,7 +64,7 @@ class _UiPrimitivesState extends State<UiPrimitives> {
             icon: Icons.refresh,
             label: 'Refresh',
             showLabel: true,
-            onPressed: () {},
+            onPressed: () => widget.say('icon button tapped'),
             semanticsId: 'sdk.ui.icon-button',
           ),
         ),
@@ -73,7 +75,10 @@ class _UiPrimitivesState extends State<UiPrimitives> {
               label: 'Open',
               selected: _chip,
               count: 3,
-              onTap: () => setState(() => _chip = !_chip),
+              onTap: () {
+                setState(() => _chip = !_chip);
+                widget.say(_chip ? 'chip on' : 'chip off');
+              },
               semanticsId: 'sdk.ui.chip',
             ),
             const BondChip(label: 'Overdue', tone: BondToneRole.danger, count: 1),
@@ -125,8 +130,11 @@ class _UiPrimitivesState extends State<UiPrimitives> {
                   message: 'Banners show state inline.',
                   tone: BondToneRole.caution,
                   actionLabel: 'Details',
-                  onAction: () {},
-                  onDismiss: () => setState(() => _bannerOpen = false),
+                  onAction: () => widget.say('banner action tapped'),
+                  onDismiss: () {
+                    setState(() => _bannerOpen = false);
+                    widget.say('banner dismissed');
+                  },
                   dismissLabel: 'Dismiss',
                   stackAction: true,
                   semanticsId: 'sdk.ui.banner',
@@ -157,7 +165,10 @@ class _UiPrimitivesState extends State<UiPrimitives> {
             title: 'Remind the owner',
             contextText: 'Last notified yesterday.',
             actionLabel: 'Remind',
-            onAction: () => setState(() => _acted = true),
+            onAction: () {
+              setState(() => _acted = true);
+              widget.say('reminder queued');
+            },
             result: _acted ? const Text('Reminder queued') : null,
             semanticsId: 'sdk.ui.action-row',
           ),
@@ -174,16 +185,24 @@ class _UiPrimitivesState extends State<UiPrimitives> {
               // Idle: this is `sdk.ui.confirm`; armed: `sdk.ui.confirm-confirm` and `sdk.ui.confirm-cancel`.
               semanticsId: 'sdk.ui.confirm',
             ),
-            onConfirm: () => setState(() => _confirmed++),
+            onConfirm: () {
+              setState(() => _confirmed++);
+              widget.say('confirmed ($_confirmed sent)');
+            },
+            onCancel: () => widget.say('confirm cancelled'),
             undoWindow: const Duration(seconds: 5),
           ),
         ),
         UiTile(
           name: 'segmented',
+          selfIdentified: false, // the widget names only its options (<id>-<value>); the tile wears the id
           child: BondSegmented<String>(
             segments: const [BondSegment('day', 'Day'), BondSegment('week', 'Week'), BondSegment('month', 'Month')],
             value: _segment,
-            onChanged: (v) => setState(() => _segment = v),
+            onChanged: (v) {
+              setState(() => _segment = v);
+              widget.say('segment $v');
+            },
             semanticsId: 'sdk.ui.segmented',
           ),
         ),
@@ -200,28 +219,39 @@ class _UiPrimitivesState extends State<UiPrimitives> {
             variant: BondSelectVariant.expanding,
             label: 'Expanding (opens inline)',
             searchable: true,
-            onChanged: (v) => setState(() => _expanding = v),
+            onChanged: (v) {
+              setState(() => _expanding = v);
+              widget.say('select $v');
+            },
             semanticsId: 'sdk.ui.select',
           ),
         ),
         UiTile(
           name: 'select-chips',
+          selfIdentified: false, // the widget names only its options (<id>-<value>); the tile wears the id
           child: BondSelect<String>(
             options: _options,
             value: _chips,
             label: 'Chips',
-            onChanged: (v) => setState(() => _chips = v),
+            onChanged: (v) {
+              setState(() => _chips = v);
+              widget.say('chips $v');
+            },
             semanticsId: 'sdk.ui.select-chips',
           ),
         ),
         UiTile(
           name: 'select-radio',
+          selfIdentified: false, // the widget names only its options (<id>-<value>); the tile wears the id
           child: BondSelect<String>(
             options: _options,
             value: _radio,
             variant: BondSelectVariant.radioList,
             label: 'Radio list',
-            onChanged: (v) => setState(() => _radio = v),
+            onChanged: (v) {
+              setState(() => _radio = v);
+              widget.say('radio $v');
+            },
             semanticsId: 'sdk.ui.select-radio',
           ),
         ),
@@ -260,7 +290,10 @@ class _UiPrimitivesState extends State<UiPrimitives> {
             today: _today,
             label: 'Due date',
             placeholder: 'Pick a date',
-            onChanged: (v) => setState(() => _date = v),
+            onChanged: (v) {
+              setState(() => _date = v);
+              widget.say('date picked');
+            },
             onCleared: () => setState(() => _date = null),
             semanticsId: 'sdk.ui.date-field',
           ),

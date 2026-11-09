@@ -32,6 +32,15 @@ void main() {
     await expectNoOverlays(t);
   });
 
+  testWidgets('the result text is also a semantics label', (t) async {
+    final sem = t.ensureSemantics();
+    await _pump(t, (r) => r.json('GET', '/health', {'status': 'ok'}));
+    await _tap(t, 'Health');
+    expect(find.bySemanticsLabel(RegExp('"status": "ok"')), findsOneWidget);
+    expect(find.bySemanticsIdentifier('sdk.api.result'), findsOneWidget);
+    sem.dispose();
+  });
+
   testWidgets('health shows the answer as JSON', (t) async {
     final client = await _pump(t, (r) => r.json('GET', '/health', {'status': 'ok', 'mode': 'fake'}));
     await _tap(t, 'Health');

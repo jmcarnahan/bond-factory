@@ -126,6 +126,26 @@ void main() {
     expect(got.single.dueTime, '09:00');
   });
 
+  testWidgets('the mirror toggle is never struck through, a done checklist line is', (t) async {
+    await pumpAt(
+      t,
+      BondTaskForm(
+        today: kToday,
+        onSubmit: (_) {},
+        initial: Task(
+          id: 'x',
+          title: 'T',
+          mirrorEnabled: true,
+          checklist: [ChecklistItem(id: 'a', text: 'Done line', doneAt: DateTime.utc(2026, 3, 10))],
+        ),
+      ),
+    );
+    TextDecoration? decoration(String text) => t.widget<Text>(find.text(text)).style?.decoration;
+    expect(find.byIcon(Icons.check_box), findsNWidgets(2));
+    expect(decoration('Add to my calendar'), isNot(TextDecoration.lineThrough));
+    expect(decoration('Done line'), TextDecoration.lineThrough);
+  });
+
   testWidgets('the 1 minute reminder lands in the draft', (t) async {
     final got = <TaskDraft>[];
     await pumpAt(

@@ -71,14 +71,21 @@ class DemoShell extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final narrow = constraints.maxWidth < 600;
+                  // Narrow screens: the page gets the full width, the nav is a scrolling strip below it.
+                  if (constraints.maxWidth < 600) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: child),
+                        const Divider(height: 1),
+                        _NavStrip(location: location),
+                      ],
+                    );
+                  }
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SizedBox(
-                        width: narrow ? 120 : 200,
-                        child: _Nav(location: location),
-                      ),
+                      SizedBox(width: 200, child: _Nav(location: location)),
                       const VerticalDivider(width: 1),
                       Expanded(child: child),
                     ],
@@ -113,6 +120,47 @@ class _Nav extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Compact nav for narrow screens: a horizontal strip, no overlays.
+class _NavStrip extends StatelessWidget {
+  const _NavStrip({required this.location});
+
+  final String location;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (final page in demoPages)
+            Semantics(
+              identifier: 'sdk.nav.${page.id}',
+              button: true,
+              selected: location == page.path,
+              child: InkWell(
+                onTap: () => context.go(page.path),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Center(
+                    child: Text(
+                      page.title,
+                      style: TextStyle(
+                        color: location == page.path ? scheme.primary : scheme.onSurface,
+                        fontWeight: location == page.path ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

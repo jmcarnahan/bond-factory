@@ -76,7 +76,13 @@ class BondConnectionCard extends StatelessWidget {
             if (logo != null) ...[logo!, BondSpace.w12],
             Expanded(child: Text(labels.providerName(status.provider), style: text.bodyStrong)),
             BondSpace.w8,
-            BondStatusChip(_chip, semanticsId: _id('state')),
+            // The identifier node carries the text as its label (a walk reads labels).
+            Semantics(
+              identifier: _id('state'),
+              label: _chip.label,
+              excludeSemantics: true,
+              child: BondStatusChip(_chip),
+            ),
           ]),
           for (final line in lines) ...[BondSpace.h4, Text(line, style: text.small)],
           if (state == ConnectionPhase.needsReconnect) ...[

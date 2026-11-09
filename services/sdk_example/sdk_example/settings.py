@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 OUT_DIR = Path("out")
+FAKE_SYNC_URL = "http://localhost:8012/powersync-fake"  # fake mode: a stand-in endpoint so /sync/token can mint
 DEV_SECRET = "dev-secret-change-me-dev-secret-change-me"  # >= 32 bytes so PyJWT does not warn; never use in real mode
 
 
@@ -50,7 +51,7 @@ class Settings:
     redirect_allowlist: tuple[str, ...] = ("http://localhost:8078",)
     oauth_key: str = ""
     tz: str = "UTC"
-    sync_url: str = ""  # PowerSync endpoint handed to clients by POST /sync/token; empty = sync off
+    sync_url: str = ""  # PowerSync endpoint handed to clients by POST /sync/token; empty = sync off (fake mode defaults to a stand-in endpoint)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -71,5 +72,5 @@ class Settings:
             redirect_allowlist=_split(env("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "http://localhost:8078")),
             oauth_key=_oauth_key(mode, out_dir_for(database_url)),
             tz=env("SDK_EXAMPLE_TZ", "UTC"),
-            sync_url=env("SDK_EXAMPLE_SYNC_URL", ""),
+            sync_url=env("SDK_EXAMPLE_SYNC_URL", FAKE_SYNC_URL if mode == "fake" else ""),
         )

@@ -129,6 +129,8 @@ void main() {
     // The undo window is a 5 s timer; let it end so the test leaves nothing pending.
     await t.pump(const Duration(seconds: 6));
     expect(find.text('Send (1 sent)'), findsOneWidget);
+    await _show(t, find.byKey(const Key('ui-last-event'))); // back to the top, where the page shows it
+    expect(t.widget<Text>(find.byKey(const Key('ui-last-event'))).data, 'Last event: confirmed (1 sent)');
   });
 
   testWidgets('the date field opens its calendar in the flow around a fixed today', (t) async {
@@ -155,6 +157,28 @@ void main() {
     await t.tap(find.bySemanticsIdentifier('sdk.ui.banner-dismiss'));
     await t.pump();
     expect(find.text('Banner dismissed'), findsOneWidget);
+    sem.dispose();
+  });
+
+  testWidgets('every id the web walk names exists, and last-event is a semantics label', (t) async {
+    setWideScreen(t);
+    final sem = t.ensureSemantics();
+    await _pumpPage(t);
+    const ids = [
+      'sdk.ui.section-primitives', 'sdk.ui.section-shell', 'sdk.ui.section-components', 'sdk.ui.button',
+      'sdk.ui.text-field', 'sdk.ui.select', 'sdk.ui.select-chips', 'sdk.ui.select-radio', 'sdk.ui.segmented',
+      'sdk.ui.confirm', 'sdk.ui.banner', 'sdk.ui.table', 'sdk.ui.bottom-tasks', 'sdk.ui.nav-tasks',
+      'sdk.ui.error-state-retry', 'sdk.ui.last-event',
+    ];
+    for (final id in ids) {
+      await _show(t, find.bySemanticsIdentifier(id));
+      expect(find.bySemanticsIdentifier(id), findsWidgets, reason: id);
+    }
+    await _show(t, find.bySemanticsIdentifier('sdk.ui.button'));
+    await t.tap(find.text('Primary'));
+    await t.pump();
+    await _show(t, find.bySemanticsLabel('Last event: button tapped'));
+    expect(find.bySemanticsLabel('Last event: button tapped'), findsOneWidget);
     sem.dispose();
   });
 }
