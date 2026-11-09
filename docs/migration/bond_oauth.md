@@ -95,6 +95,9 @@ attacker's `/go` link. The session cookie (same-site, SameSite=Lax) says who; th
 
 ## 6. Known gaps
 
+- `GoogleOAuth` and `MicrosoftOAuth` have run only against `httpx.MockTransport`; no live exchange, refresh or revoke has
+  been made. The first adopter does the first live run: connect, wait for expiry (or shorten the cache), send one request,
+  disconnect. Record the outcome in the app's `docs/sdk/sdk-pins.md` so the next app can skip it.
 - The native hand-off keeps its single-use registry in process memory (`bond_oauth.handoff`). With several server
   processes, or a restart inside the 120 s life of a code, a replayed code re-stores the connection and can undo a disconnect made
   in between; use a database table (unique on the nonce) in the app for multi-process deployments. A native flow has no browser binding (see "Phone apps" in section 2).

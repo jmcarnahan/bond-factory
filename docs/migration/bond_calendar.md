@@ -65,3 +65,10 @@ use it inside the block that loaded the connection. Read-only paths may pass `ma
 4. A write, then an edit in the provider's own app, then a write with the old etag fails with `EtagMismatch`.
 5. A revoked connection raises `ReconnectRequired`; the app shows its reconnect banner.
 6. `bash tool/boundary_gate.sh` and `bash tool/public_hygiene.sh --worktree` print nothing for `libs/bond_calendar`.
+
+## 7. Known gaps
+
+- Both real providers have run only against `httpx.MockTransport`. `MsGraphCalendarProvider` is lifted from app S's
+  working client; `GoogleCalendarProvider` reads are lifted from app A, but its writes (`create_event`, `update_event`,
+  `delete_event`) are new code never sent to Google. Acceptance steps 3 and 4 above are the first live run; do them in a
+  test calendar first.
