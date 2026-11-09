@@ -1,0 +1,49 @@
+[project]
+name = "sdk_example"
+version = "0.1.0"
+description = "Reference FastAPI app wiring every bond Python lib."
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.13",
+    "pydantic>=2.8",
+    "httpx>=0.27",
+    "bond_service_kit",
+    "bond_storage",
+    "bond_auth_py",
+    "bond_jobs",
+    "bond_sync_py",
+    "bond_oauth",
+    "bond_calendar",
+    "bond_tasks_py",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.6", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sdk_example*"]
+
+[tool.uv.sources]
+bond_service_kit = { workspace = true }
+bond_storage = { workspace = true }
+bond_auth_py = { workspace = true }
+bond_jobs = { workspace = true }
+bond_sync_py = { workspace = true }
+bond_oauth = { workspace = true }
+bond_calendar = { workspace = true }
+bond_tasks_py = { workspace = true }
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

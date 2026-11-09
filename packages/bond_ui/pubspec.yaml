@@ -1,0 +1,17 @@
+name: bond_ui
+description: 'Shared Flutter widgets and design tokens for the bond app family.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bond_test_support:
+    path: ../bond_test_support
