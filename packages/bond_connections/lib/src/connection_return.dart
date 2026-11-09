@@ -2,9 +2,10 @@
 enum ConnectionOutcome { connected, error }
 
 /// What the browser comes back with after the provider's consent page:
-/// `<redirect_to>?connection=connected|error&provider=<name>[&reason=<code>]`.
+/// `<redirect_to>?connection=connected|error&provider=<name>[&reason=<code>][&code=<handoff>]`.
+/// A native-app flow adds `code`, the one-time hand-off for `ConnectionsApi.redeem`.
 class ConnectionReturn {
-  const ConnectionReturn(this.outcome, {this.provider, this.reason});
+  const ConnectionReturn(this.outcome, {this.provider, this.reason, this.code});
 
   /// Reads the returned address. Null when it carries no `connection`
   /// parameter or a value other than `connected` and `error`, so an ordinary
@@ -18,7 +19,7 @@ class ConnectionReturn {
     };
     if (outcome == null) return null;
     String? clean(String? v) => v == null || v.isEmpty ? null : v;
-    return ConnectionReturn(outcome, provider: clean(params['provider']), reason: clean(params['reason']));
+    return ConnectionReturn(outcome, provider: clean(params['provider']), reason: clean(params['reason']), code: clean(params['code']));
   }
 
   final ConnectionOutcome outcome;
@@ -29,14 +30,18 @@ class ConnectionReturn {
   /// The short code the server gave for an error (`access_denied`, `unavailable`).
   final String? reason;
 
+  /// The one-time hand-off code of a native flow; null for a web flow or an error.
+  final String? code;
+
   bool get isError => outcome == ConnectionOutcome.error;
 
-  /// [url] without the three return parameters, to put back in the address bar.
+  /// [url] without the return parameters (`connection`, `provider`, `reason`, `code`), to put back in the address bar.
   static Uri cleaned(Uri url) {
     final rest = Map<String, String>.of(url.queryParameters)
       ..remove('connection')
       ..remove('provider')
-      ..remove('reason');
+      ..remove('reason')
+      ..remove('code');
     // Uri.replace keeps the old query when given null, so rebuild without one.
     final bare = Uri(scheme: url.scheme, userInfo: url.userInfo, host: url.hasAuthority ? url.host : null,
         port: url.hasPort ? url.port : null, path: url.path, fragment: url.hasFragment ? url.fragment : null);

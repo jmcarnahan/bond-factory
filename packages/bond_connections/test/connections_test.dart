@@ -117,6 +117,30 @@ void main() {
       await expectLater(ConnectionsApi(f.api).startUrl('google'), throwsA(isA<BadResponse>()));
     });
 
+    test('startUrl native adds mode=native next to redirect_to', () async {
+      final f = Fake()..body = {'url': 'http://x.test/go?state=s'};
+      await ConnectionsApi(f.api).startUrl('google', redirectTo: 'sdkdemo://connections', native: true);
+      expect(f.seen.single.url.queryParameters, {'redirect_to': 'sdkdemo://connections', 'mode': 'native'});
+      await ConnectionsApi(f.api).startUrl('google', native: true);
+      expect(f.seen.last.url.queryParameters, {'mode': 'native'});
+    });
+
+    test('redeem is POST .../redeem with the code and reads the status', () async {
+      final f = Fake()..body = row(connected: true, email: 'demo@example.com');
+      final s = await ConnectionsApi(f.api).redeem('fake-google', 'abc.def');
+      expect(f.seen.single.method, 'POST');
+      expect(f.seen.single.url.path, '/connections/fake-google/redeem');
+      expect(jsonDecode(f.seen.single.body), {'code': 'abc.def'});
+      expect(s.phase, ConnectionPhase.connected);
+    });
+
+    test('redeem maps a refused code to an ApiException subtype', () async {
+      final f = Fake()
+        ..status = 400
+        ..body = {'detail': {'code': 'invalid_handoff', 'message': 'no'}};
+      await expectLater(ConnectionsApi(f.api).redeem('google', 'x'), throwsA(isA<ApiException>()));
+    });
+
     test('disconnect is DELETE /connections/{provider} and reads the status', () async {
       final f = Fake()..body = row();
       final s = await ConnectionsApi(f.api).disconnect('fake-google');
@@ -148,6 +172,15 @@ void main() {
   });
 
   group('ConnectionReturn', () {
+    test('parse reads the native hand-off code; cleaned drops it', () {
+      final u = Uri.parse('sdkdemo://connections?connection=connected&provider=google&code=abc.def&keep=1');
+      final r = ConnectionReturn.parse(u)!;
+      expect(r.code, 'abc.def');
+      expect(r.provider, 'google');
+      expect(ConnectionReturn.cleaned(u).queryParameters, {'keep': '1'});
+      expect(ConnectionReturn.parse(Uri.parse('http://app.test/c?connection=connected'))!.code, isNull);
+    });
+
     test('reads connected and the provider', () {
       final r = ConnectionReturn.parse(Uri.parse('http://app.test/connections?connection=connected&provider=fake-google'))!;
       expect(r.outcome, ConnectionOutcome.connected);

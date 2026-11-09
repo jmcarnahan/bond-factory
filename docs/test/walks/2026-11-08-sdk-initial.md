@@ -50,9 +50,9 @@ Defects (round 1):
 | 07p Tasks at 390 | phone-on-web | demo-user-1 | PASS | |
 | 08 Errors: dialogs 0, no pageerror, no console error, `sdk.errors` never seen | all | | PASS | |
 
-Open item for a hand test (not reproduced in isolation): in one round-2 run the complete button still read "Complete"
-after the first tap although the row had already moved to Done, and the second tap left it Done. A label lag or a tap
-during the list reload; the isolated check (complete, reopen, complete on the same row id) passed both directions.
+Open item from round 2, resolved after the walk: the complete button stayed enabled while its request was in flight, so a
+second tap posted again (complete then reopen) and the row went back to open with the label reading "Complete". Reproduced
+10/10 with Playwright, fixed in the tasks page (action disabled while pending, in-flight guard), regression widget test added.
 
 Walkability change made during the fix round: every `sdk.*` text node now exposes its visible text as the semantics
 label (`container: true`, inner text excluded), so a walker reads the accessible name instead of screenshots.

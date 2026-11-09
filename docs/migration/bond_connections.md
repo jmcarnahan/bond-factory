@@ -10,9 +10,9 @@ list and the return banner. The server half is `bond_oauth` (see `bond_oauth.md`
 |---|---|
 | `ConnectionStatus` | One row of `GET /connections`: provider, connected, email, connectedAt, needsReconnect, scopes |
 | `ConnectionPhase` | disconnected, connected, needsReconnect (derived; a needed reconnect wins). Not called `ConnectionState`: Flutter exports that name |
-| `ConnectionsApi(ApiClient)` | `list()`, `startUrl(provider, redirectTo:)`, `disconnect(provider)` |
+| `ConnectionsApi(ApiClient)` | `list()`, `startUrl(provider, redirectTo:, native:)`, `redeem(provider, code)`, `disconnect(provider)` |
 | `DemoConnectionsApi` | `simulateExpiry(provider)`, fake mode only |
-| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason` from the address the browser came back to; null when absent |
+| `ConnectionReturn.parse(Uri)` | Reads `connection=connected\|error`, `provider`, `reason`, `code` (native) from the address the browser came back to; null when absent |
 | `ConnectionLabels` | Every string, English defaults, `{provider}` placeholders, reason codes in plain words |
 | `BondConnectionCard`, `BondConnectionsList`, `BondConnectionReturnBanner` | The widgets; `semanticsId` is a prefix (`sdk.connections` gives `.card-<p>`, `.connect-<p>`, `.reconnect-<p>`, `.disconnect-<p>`) |
 
@@ -51,8 +51,17 @@ list and the return banner. The server half is `bond_oauth` (see `bond_oauth.md`
 
 On web the HTTP client must send cookies to the API origin (the demo uses a browser client with credentials, see
 `demos/sdk_demo/lib/src/example_http_client_web.dart`) and the API and app must be same-site (SameSite=Lax).
-Native apps have no browser session cookie, so `/go` answers them 401. They need the code-exchange variant that
-`bond_oauth.md` lists as not built. Until then a phone app opens the web app's connections page in the system browser.
+Native apps have no browser session cookie, so they use the code-exchange variant below.
+
+### Phone apps
+
+1. `startUrl(provider, redirectTo: 'sdkdemo://connections', native: true)` with the bearer token (`redirectTo` must be on
+   the server's native allowlist, `SDK_EXAMPLE_NATIVE_REDIRECTS`; omit it for the first entry).
+2. Open that URL in the system browser (ASWebAuthenticationSession or a custom tab); no cookie is needed or set.
+3. The server redirects to the app scheme with `connection=connected&provider=<p>&code=<handoff>` (or `connection=error`).
+   Read it with `ConnectionReturn.parse(uri)`; `ConnectionReturn.code` is the hand-off.
+4. Call `redeem(provider, code)` with the bearer token. The connection is stored only now, and only for the user who
+   started the flow; the code works once, within 120 s. It returns the status.
 
 ## 5. Acceptance
 
@@ -64,7 +73,7 @@ Native apps have no browser session cookie, so `/go` answers them 401. They need
 
 ## 6. Known gaps
 
-- Native code-exchange variant is not built (section 4).
+- The native hand-off single-use registry is process-local; see `bond_oauth.md` section 6.
 - The demo navigates with `dart:js_interop`; an app that already depends on `package:web` can use `window.location.href`.
 - The return parameters stay in the address bar after the banner is dismissed; `ConnectionReturn.cleaned` gives the
   address without them for apps whose router can replace the location.

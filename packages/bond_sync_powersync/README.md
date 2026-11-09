@@ -23,3 +23,5 @@ await open.powerSync!.connect(connector: connector);
 - Uploading never throws for a permanent outcome; anything to retry reaches the SDK as a plain `Exception`.
 - Refused writes become notes in the local-only `sync_rejections` table; read them through `open.store`.
 - Unit tested against a fake `SyncDb`; PowerSync on the web needs sqlite wasm assets this package does not ship.
+
+The `real_db` test opens a real PowerSync database: the first run needs network to download `libpowersync_core`, and paths over about 150 characters break the `install_name_tool` step.

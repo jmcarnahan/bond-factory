@@ -34,6 +34,30 @@ Four app routes over the service functions (see the example):
   and do not redirect (the target comes from an untrusted link). Clear the cookie on every outcome.
 - `DELETE /connections/{provider}`: `disconnect(...)` (best-effort provider revoke).
 
+### Phone apps (native flow)
+
+A phone app has no browser session, so the web binding cannot apply. The variant exchanges a one-time code:
+1. The app calls `GET /connections/{provider}/start?mode=native&redirect_to=<app-scheme url>` with its bearer token.
+   The route runs `start_flow(..., native=True)`; `redirect_to` must match an entry of
+   `SDK_EXAMPLE_NATIVE_REDIRECTS` (default `sdkdemo://connections`).
+2. The app opens the returned URL in the system browser (ASWebAuthenticationSession or a custom tab). `/go` needs no
+   session for a native state and sets no cookie.
+3. The callback completes with `expected_nonce=None, expected_user_id=None` (accepted only for a native state). That
+   exchanges the provider code but STORES NOTHING: it returns a `PendingConnection`, which `issue_handoff(pending)`
+   seals (encrypted tokens included) into a one-time code. It redirects to
+   `redirect_to?connection=connected&provider=<p>&code=<handoff>`.
+4. The app receives the scheme redirect and calls `POST /connections/{provider}/redeem {code}` with its bearer token.
+   `redeem_handoff` inserts the row (revoking older live rows) only for the user who started the flow, and only once.
+   The answer is the connection status.
+
+Guarantee: nothing is stored until the starting user redeems. A victim lured through an attacker's native link gets a
+code bound to the attacker's user; the code goes to the victim's app scheme, the victim redeems as themself and is
+refused (`invalid_handoff`), and no row is written. The attacker does not receive the code over the web. The residual risk is on the phone: a custom URL scheme can be
+claimed by another app, and a malicious app holding the attacker's bearer token could redeem a code delivered to it.
+Use universal links / app links in production; a consent screen cannot prevent this. The code carries the encrypted tokens and can reach about 5 KB with
+provider-sized tokens (fine for iOS and Android intents, but long). The route passes
+`expected_provider`, so a code redeemed at another provider's route is refused before anything is stored.
+
 Why both cookies: a nonce cookie set by an open `/go` does not bind, because an attacker can send the victim the
 attacker's `/go` link. The session cookie (same-site, SameSite=Lax) says who; the nonce says which flow.
 
@@ -71,9 +95,9 @@ attacker's `/go` link. The session cookie (same-site, SameSite=Lax) says who; th
 
 ## 6. Known gaps
 
-- Native-app variant not built: phone apps need a code-exchange callback (the callback redirects to the app with a
-  one-time code the app exchanges with its bearer token); not built in this plan. Native apps have no browser session
-  cookie, so the web binding does not apply to them.
+- The native hand-off keeps its single-use registry in process memory (`bond_oauth.handoff`). With several server
+  processes, or a restart inside the 120 s life of a code, a replayed code re-stores the connection and can undo a disconnect made
+  in between; use a database table (unique on the nonce) in the app for multi-process deployments. A native flow has no browser binding (see "Phone apps" in section 2).
 - Microsoft has no per-token revoke call: disconnect closes the row only.
 - `FakeOAuth` keeps requested scopes in memory; a restart between start and callback gives `invalid_code`.
 - The state is expired at its `exp`, not after it (10 minutes, real clock).

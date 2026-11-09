@@ -1,5 +1,6 @@
 # roof_measure service. `make setup` once, then `make test`, `make measure ADDR="..."`.
-VENV := .venv
+# Module venv from `make setup`, else the root workspace venv (`uv sync --all-packages`, what CI uses).
+VENV := $(if $(wildcard .venv/bin/python),.venv,../../.venv)
 PY := $(VENV)/bin/python
 # real sites: local/sites.json
 ADDR ?= 100 Example Ave, Sampletown, CA 90000

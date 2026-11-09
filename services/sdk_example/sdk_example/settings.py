@@ -49,6 +49,7 @@ class Settings:
     auth_secret: str = DEV_SECRET
     cors_origins: tuple[str, ...] = ("http://localhost:8078",)
     redirect_allowlist: tuple[str, ...] = ("http://localhost:8078",)
+    native_redirects: tuple[str, ...] = ("sdkdemo://connections",)  # where a phone app's OAuth flow may return (exact match)
     oauth_key: str = ""
     tz: str = "UTC"
     sync_url: str = ""  # PowerSync endpoint handed to clients by POST /sync/token; empty = sync off (fake mode defaults to a stand-in endpoint)
@@ -70,6 +71,7 @@ class Settings:
             auth_secret=auth_secret,
             cors_origins=cors_origins,
             redirect_allowlist=_split(env("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "http://localhost:8078")),
+            native_redirects=_split(env("SDK_EXAMPLE_NATIVE_REDIRECTS", "sdkdemo://connections")),
             oauth_key=_oauth_key(mode, out_dir_for(database_url)),
             tz=env("SDK_EXAMPLE_TZ", "UTC"),
             sync_url=env("SDK_EXAMPLE_SYNC_URL", FAKE_SYNC_URL if mode == "fake" else ""),
