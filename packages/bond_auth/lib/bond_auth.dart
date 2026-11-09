@@ -10,5 +10,6 @@ export 'src/firebase_gateway.dart';
 export 'src/gateway.dart';
 export 'src/id_token_source.dart';
 export 'src/providers.dart';
+export 'src/refresh_token_store.dart';
 export 'src/session.dart';
 export 'src/token_store.dart';

@@ -9,6 +9,7 @@ members = [
     "bond-jobs",
     "bond-oauth",
     "bond-service-kit",
+    "bond-signin",
     "bond-storage",
     "bond-sync-py",
     "bond-tasks-py",
@@ -94,26 +95,30 @@ name = "bond-auth-py"
 version = "0.1.0"
 source = { editable = "libs/bond_auth_py" }
 dependencies = [
-    { name = "firebase-admin" },
     { name = "pyjwt" },
 ]
 
 [package.optional-dependencies]
 dev = [
+    { name = "firebase-admin" },
     { name = "httpx" },
     { name = "pytest" },
     { name = "ruff" },
 ]
+firebase = [
+    { name = "firebase-admin" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "firebase-admin", specifier = ">=6.5" },
+    { name = "firebase-admin", marker = "extra == 'dev'", specifier = ">=6.5" },
+    { name = "firebase-admin", marker = "extra == 'firebase'", specifier = ">=6.5" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "pyjwt", specifier = ">=2.10" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["firebase", "dev"]
 
 [[package]]
 name = "bond-calendar"
@@ -214,6 +219,34 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
+]
+provides-extras = ["dev"]
+
+[[package]]
+name = "bond-signin"
+version = "0.1.0"
+source = { editable = "libs/bond_signin" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "pydantic", specifier = ">=2.8" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
+    { name = "sqlalchemy", specifier = ">=2.0" },
 ]
 provides-extras = ["dev"]
 
@@ -1764,11 +1797,12 @@ version = "0.1.0"
 source = { editable = "services/sdk_example" }
 dependencies = [
     { name = "alembic" },
-    { name = "bond-auth-py" },
+    { name = "bond-auth-py", extra = ["firebase"] },
     { name = "bond-calendar" },
     { name = "bond-jobs" },
     { name = "bond-oauth" },
     { name = "bond-service-kit" },
+    { name = "bond-signin" },
     { name = "bond-storage" },
     { name = "bond-sync-py" },
     { name = "bond-tasks-py" },
@@ -1790,11 +1824,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
-    { name = "bond-auth-py", editable = "libs/bond_auth_py" },
+    { name = "bond-auth-py", extras = ["firebase"], editable = "libs/bond_auth_py" },
     { name = "bond-calendar", editable = "libs/bond_calendar" },
     { name = "bond-jobs", editable = "libs/bond_jobs" },
     { name = "bond-oauth", editable = "libs/bond_oauth" },
     { name = "bond-service-kit", editable = "libs/bond_service_kit" },
+    { name = "bond-signin", editable = "libs/bond_signin" },
     { name = "bond-storage", editable = "libs/bond_storage" },
     { name = "bond-sync-py", editable = "libs/bond_sync_py" },
     { name = "bond-tasks-py", editable = "libs/bond_tasks_py" },

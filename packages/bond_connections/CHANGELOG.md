@@ -9,3 +9,8 @@
 - `ConnectionReturn.parse` / `cleaned` for the address the browser returns to.
 - `ConnectionLabels` with English defaults, including the `not_confirmed` reason ("Nothing changed") for a
   return address whose claim the live list does not back.
+
+## Unreleased
+- `WantedSet(id, provider, label, scopes, granted)` with `fromJson`.
+- `ConnectionList(connections, wanted)` with `fromJson` (bare array or `{connections, wanted}`); `wanted` defaults to `const []`.
+- `ConnectionReturn.attempt` read from the `attempt` query parameter and dropped by `cleaned`.

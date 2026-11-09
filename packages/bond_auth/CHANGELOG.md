@@ -13,3 +13,8 @@
 - A renewal that finishes after `signOut` stores nothing and returns null.
 - `AuthFailure.fromApi` keeps the server `code` for every status; 501, `firebase_not_configured` and a 404 (demo off) map to notConfigured; 503 maps to network.
 - Gateways expose `exchangeForRefresh` (one unstored exchange) for the shared renewal; apps call `refreshSession`.
+
+## Unreleased
+- `RefreshTokenStore` (load, save, clear, reload), `InMemoryRefreshTokenStore`, `NoRefreshTokenStore` (web: the cookie carries the token).
+- `AuthSession.refreshToken` (nullable).
+- `SignInProvider(id, label)`; `AuthProviders.signin`, `breakGlass`, `defaultFlow` read from `signin`, `break_glass`, `default_flow` (absent keys give `[]`, false, `firebase`).
