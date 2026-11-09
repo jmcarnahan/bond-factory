@@ -133,7 +133,8 @@ void main() {
     await tapId(tester, 'sdk.signin.fake-google');
     await pumpUntil(tester, byId('sdk.auth.error'));
 
-    expect(find.textContaining('code: invalid_origin'), findsOneWidget);
+    expect(find.text('No'), findsOneWidget);
+    expect(find.bySemanticsLabel('No (invalid_origin)'), findsOneWidget);
     await expectNoOverlays(tester);
   });
 
@@ -171,7 +172,7 @@ void main() {
     await expectNoOverlays(tester);
   });
 
-  testWidgets('break-glass refusal shows code, message and hint inline', (tester) async {
+  testWidgets('break-glass refusal shows the message inline and keeps the code in the label', (tester) async {
     final r = CannedResponses()
       ..json('GET', '/auth/providers', providers(breakGlass: true))
       ..json('POST', '/auth/firebase',
@@ -179,13 +180,16 @@ void main() {
     await pumpAuthPage(tester, r);
     await pumpUntil(tester, byId('sdk.signin.break-glass'));
     await tapId(tester, 'sdk.signin.break-glass');
+    final handle = tester.ensureSemantics();
     await tapId(tester, 'sdk.auth.not-invited');
-    await pumpUntil(tester, find.textContaining('code: not_invited'));
+    await pumpUntil(tester, find.text('No invitation'));
 
-    expect(find.textContaining('message: No invitation'), findsOneWidget);
-    expect(find.textContaining('hint: apple_relay'), findsOneWidget);
+    expect(find.textContaining('code:'), findsNothing);
+    expect(find.textContaining('hint:'), findsNothing);
+    expect(tester.getSemantics(byId('sdk.auth.error')).label, 'No invitation (not_invited; apple_relay)');
     expect(byId('sdk.auth.signed-out'), findsOneWidget);
     await expectNoOverlays(tester);
+    handle.dispose();
   });
 
   testWidgets('a return with signin=error shows the inline strip with the label text and cleans the address',
