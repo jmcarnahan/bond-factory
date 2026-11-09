@@ -1,6 +1,6 @@
 # Migrating to bond_sync
 
-Contract: `docs/contracts/sync_upload.md`. Fixtures: `fixtures/sync/`. `bond_sync` is the pure-Dart half (no database,
+Contracts: `docs/contracts/sync_upload.md`. Fixtures: `fixtures/sync/`. `bond_sync` is the pure-Dart half (no database,
 no Flutter, no `dart:io`); the PowerSync half is `bond_sync_powersync` (see `bond_sync_powersync.md`).
 
 ## 1. What it replaces

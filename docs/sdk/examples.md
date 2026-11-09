@@ -2,7 +2,9 @@
 
 `services/sdk_example` (FastAPI, port 8012) and `demos/sdk_demo` (Flutter web, port 8078) wire every module end to
 end in fake mode. Use them as few-shot examples: find the module in the table, open the files named for it, copy the
-shape into the app. They are never shipped. `README.md` in this folder covers consuming the modules.
+shape into the app. They are never shipped. `README.md` in this folder covers consuming the modules, and
+`docs/migration/README.md` points to the per-app adapters. The `*Labels` objects (`ApiLabels`, `BondLabels`,
+`TaskLabels`, `ConnectionLabels`) are documented in each package README; mapping them to an app's translations is the app's job.
 
 ## Run both
 
@@ -95,6 +97,12 @@ The identifier is the DOM attribute `flt-semantics-identifier`, so a walk select
 | `sdk.errors` | the error strip; it must be absent after every step |
 
 `bond_ui` widgets take an optional `semanticsId` and wrap themselves, so an app inherits walkable widgets.
+
+## Real mode
+
+The examples run in fake mode only. For a real Firebase id-token source, real identity-provider settings and PowerSync
+endpoints, read `docs/contracts/` (`auth.md`, `sync_upload.md`, `error_body.md`) and the module READMEs
+(`packages/bond_auth_firebase`, `packages/bond_sync_powersync`, `libs/bond_auth_py`, `libs/bond_sync_py`).
 
 ## Walking it
 

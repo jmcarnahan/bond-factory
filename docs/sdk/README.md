@@ -6,6 +6,8 @@ adapters (see `docs/decisions/2026-11-08-shared-modules-policy.md`).
 
 ## Dart and Flutter (git + full SHA + `path:`)
 
+Minimum toolchain: Dart ^3.11 and Flutter >= 3.47.8.
+
 ```yaml
 dependencies:
   bond_api:
@@ -27,6 +29,8 @@ dependencies:
 - Packages never pin `intl`, `flutter_localizations`, `flutter_riverpod` or `go_router`. Strings enter shared
   widgets through a `*Labels` object with English defaults, and routing and providers stay in the app.
 - `tool/consumer_check.sh` (`make consumer-check`) proves each package resolves outside the workspace.
+- Toolchain: consumers need Flutter >= 3.47.8 and Dart >= 3.11 (the packages declare `sdk: ^3.11.0`; CI and this
+  branch use Flutter 3.47.8 / Dart 3.13.7). Apps still on Flutter 3.47.2 should bump when they adopt a module.
 
 ### Local development against a checkout
 
@@ -54,6 +58,7 @@ pubspec_overrides.yaml
 
 ```toml
 [tool.poetry.dependencies]
+python = ">=3.12,<3.14"   # bond_storage requires it; "^3.12" fails `poetry lock`
 bond_storage = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "<sha>", subdirectory = "libs/bond_storage" }
 ```
 
@@ -68,6 +73,9 @@ bond_storage = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
   own engine; the app writes its own Alembic revisions.
 
 ## Versioning and upgrades
+
+- A git ref or `rev` pins the COMMITTED state of bond-factory, not the working tree. Land docs and code in one
+  commit before an app pins it, and read the docs at the pinned SHA.
 
 - Each module is SemVer-versioned in its own `pubspec.yaml` or `pyproject.toml` and keeps a `CHANGELOG.md`.
   A public API change updates the barrel and the changelog in the same commit.

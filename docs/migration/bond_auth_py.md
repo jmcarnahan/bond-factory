@@ -1,10 +1,10 @@
 # Migrating to bond_auth_py
 
 Firebase id-token verification (injected, mock, firebase-admin tiers), session JWT, revocation checks, identity admin,
-identity janitor and capability policies (`libs/bond_auth_py`). Contract: `docs/contracts/auth.md`. Legend: `docs/migration/README.md`.
+identity janitor and capability policies (`libs/bond_auth_py`). Legend: `docs/migration/README.md`.
+Contracts: `docs/contracts/auth.md`.
 
 ## 1. What it replaces
-
 Paths: A `backend/avalon/`, P `backend/pagatime/`, S `sbelcrm/`.
 
 | App | Goes away or shrinks | Stays app-side |

@@ -28,6 +28,11 @@ Status: accepted. Dated, append-only. The full plan lives outside the repo; thes
 - **D14 Scaffold first.** All modules are scaffolded and registered once, so parallel builders never edit a
   registry file.
 
+## Toolchain
+
+CI and the branch are built and tested with Flutter 3.47.8 (Dart 3.13.7), Python 3.12 and uv. Packages declare
+Dart `^3.11.0`; consumers on Flutter 3.47.2 bump when they adopt a module.
+
 ## Module list
 
 Dart core: `bond_json`, `bond_api`, `bond_auth`, `bond_sync`, `bond_tasks`, `bond_connections`, `bond_roof`.

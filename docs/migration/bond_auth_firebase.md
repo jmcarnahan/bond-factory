@@ -2,6 +2,8 @@
 
 `bond_auth_firebase` is the Flutter adapter: `FirebaseIdTokenSource` (implements `IdTokenSource` and `FederatedSignIn`), `failureFor`, `initFirebaseFromRuntimeConfig`, `AppleNonce`. Few-shot reference: `demos/sdk_demo` runs in mock mode and uses `FakeIdTokenSource` from `bond_auth` instead; the adapter is unit tested with a fake `FirebaseAuthLike`. Legend: `docs/migration/README.md`.
 
+Contracts: `docs/contracts/auth.md`.
+
 ## 1. What it replaces
 
 **App A (avalon).** `flutterui/packages/avalon_core/lib/src/auth/real_id_token_source.dart` (245) and `apple_nonce.dart` (44). `firebase_options.dart` goes away (see section 4).

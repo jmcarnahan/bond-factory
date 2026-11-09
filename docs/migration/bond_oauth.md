@@ -71,8 +71,9 @@ attacker's `/go` link. The session cookie (same-site, SameSite=Lax) says who; th
 
 ## 6. Known gaps
 
-- Native apps have no browser session cookie, so the web binding does not apply. They finish through an authenticated
-  API call (the callback redirects with a one-time code the app exchanges with its bearer token). Not implemented.
+- Native-app variant not built: phone apps need a code-exchange callback (the callback redirects to the app with a
+  one-time code the app exchanges with its bearer token); not built in this plan. Native apps have no browser session
+  cookie, so the web binding does not apply to them.
 - Microsoft has no per-token revoke call: disconnect closes the row only.
 - `FakeOAuth` keeps requested scopes in memory; a restart between start and callback gives `invalid_code`.
 - The state is expired at its `exp`, not after it (10 minutes, real clock).

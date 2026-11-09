@@ -1,6 +1,6 @@
 # Migrating to bond_storage
 
-Object storage, download grants and image helpers (`libs/bond_storage`). Needs `fastapi` and `sqlalchemy`;
+Object storage, download grants and image helpers (`libs/bond_storage`). Needs `boto3`, `pillow`, `fastapi` and `sqlalchemy`;
 no sibling lib. Legend: `docs/migration/README.md`.
 
 ## 1. What it replaces
@@ -15,7 +15,7 @@ Paths: A `backend/avalon/`, P `backend/pagatime/`, S `sbelcrm/`.
 
 ## 2. The adapter
 
-A `services/storage.py` shrinks to this, so the 20 import lines of `get_storage_service` are untouched (P: 14 with `PT_`,
+A `services/storage.py` shrinks to this, so the 19 files that import `get_storage_service` are untouched (P: 14 with `PT_`,
 S: 17 uses with `VIDEO_S3_BUCKET`). It restores A's old defaults, which differ from the lib's:
 
 ```python
@@ -31,6 +31,7 @@ def get_storage_service(backend: str | None = None) -> StorageService:
         s = replace(s, addressing_style="path")  # A used path style whenever an endpoint was set
     if not any(os.getenv(n) for n in ("AVALON_S3_REGION", "S3_REGION", "AWS_REGION")):
         s = replace(s, region="us-west-1")  # the lib defaults to us-east-1
+    s = replace(s, local_dir=str(Config.config().uploads_dir()))  # the lib's default is cwd-relative "uploads"; A's is absolute
     return build_storage(replace(s, bucket=s.bucket or "avalon-crm-files"))  # the lib has no default bucket
 ```
 
@@ -60,7 +61,7 @@ rate_limit=allow_hit)`. `allow_hit(token_hash, ip) -> bool`, `attachment_kinds` 
 | Old | New | Find |
 |---|---|---|
 | `get_storage_service(...)` | unchanged through the adapter | |
-| `reset_storage_clients()` (A 3) | `reset_clients()` | `grep -rn reset_storage_clients` |
+| `reset_storage_clients()` (A 4 lines) | `reset_clients()` | `grep -rn reset_storage_clients` |
 | `LocalStorageService()` (no argument) | `LocalStorageService(config.uploads_dir())` | `grep -rn "LocalStorageService("` |
 | `grants.mint/resolve/revoke_for_owner/has_live_link` (A 21) | unchanged through the partials; `revoke_for_owner(..., purpose=x)` by keyword | `grep -rn "grants\."` |
 | `photos.sniff`, `_open(data, kind)`, `make_thumb(img)` | `images.sniff`, `images.image_from_bytes(data)`, `images.encode(images.thumbnail(img, 400))` | `grep -rn "photos\.\(sniff\|make_thumb\)"` |
@@ -74,15 +75,15 @@ rate_limit=allow_hit)`. `allow_hit(token_hash, ip) -> bool`, `attachment_kinds` 
   `S3_REGION`, `S3_ENDPOINT_URL`, `S3_ADDRESSING_STYLE` and `VIDEO_S3_BUCKET`. All keep their names.
   Set `S3_ADDRESSING_STYLE` explicitly where an endpoint is used, so the adapter's rule can go.
   New inputs for A and P: the lib also reads plain `S3_ENDPOINT_URL` and `AWS_ENDPOINT_URL_S3`, which they never read.
-- Table: A and P already have `download_grants` with the same 15 columns. The mixin differs in string lengths, and
+- Table: A and P already have `download_grants` with the same 15 columns (read from both models; compare with `libs/bond_storage/tests/test_schema.py`). The mixin differs in string lengths, and
   `created_at`/`updated_at` are NOT NULL (A and P: nullable). Override those two columns in the subclass
   (`Column(DateTime, default=func.now())`) and no Alembic revision is needed; otherwise backfill NULLs first. P's default
   `purpose` was `view`; the mixin's is `share`: pass it. S creates nothing.
 
 ## 5. Acceptance
 
-- `schema_contract(Base.metadata, tables=["download_grants"]).assert_matches(engine)` (from `bond_service_kit`) on the migrated engine.
-- A `tests/test_uploads_storage.py`, S `tests/test_storage_service_presign.py`, P's grant and photo tests; then `ruff check`.
+- `schema_contract(Base.metadata, tables=["download_grants"]).assert_matches(engine)` (from `bond_service_kit`, which the app adds to its test dependencies) on the migrated engine.
+- A `backend/tests/test_uploads_storage.py`, S `tests/test_storage_service_presign.py` (repo root, not under `sbelcrm/`), P's grant and photo tests under `backend/tests/`; then `ruff check`.
 - `GET /d/<bad token>` answers 410 `text/html` with the same bytes for unknown, expired, revoked and exhausted links.
 
 ## 6. Known gaps
