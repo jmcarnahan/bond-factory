@@ -88,7 +88,7 @@ class BondTaskRow extends StatelessWidget {
           Expanded(
             child: BondPressable(
               onTap: onTap,
-              semanticLabel: onTap == null ? null : task.title,
+              semanticLabel: task.title,
               semanticsId: semanticsId,
               child: body,
             ),

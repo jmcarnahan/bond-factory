@@ -123,7 +123,14 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     _return = claim.isError || confirmed
         ? claim
         : ConnectionReturn(ConnectionOutcome.error, provider: provider, reason: 'not_confirmed');
-    (widget.replaceUrl ?? replaceAddress)(ConnectionReturn.cleaned(_here));
+    final cleaned = ConnectionReturn.cleaned(_here);
+    final custom = widget.replaceUrl;
+    if (custom != null) {
+      custom(cleaned);
+    } else {
+      final failure = replaceAddress(cleaned);
+      if (failure != null) _error = failure;
+    }
   }
 
   /// The server's error code when the answer carried one, else the exception type.
@@ -161,6 +168,20 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     }
   }
 
+  static const String _noManage = 'This account cannot change connections (it needs the connections.manage capability).';
+
+  /// A text node a walk can find: the identifier AND the text as the semantics
+  /// label, on its own node (`container`) so it never merges into an ancestor.
+  /// [keepChild] leaves the child's own semantics in place (selectable text keeps
+  /// its selection actions); the text is then read by the child as well.
+  static Widget _labeled(String id, String text, Widget child, {bool keepChild = false}) => Semantics(
+        identifier: 'sdk.connections.$id',
+        label: text,
+        container: true,
+        excludeSemantics: !keepChild,
+        child: child,
+      );
+
   @override
   Widget build(BuildContext context) {
     final statuses = _statuses;
@@ -178,25 +199,22 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
             BondSpace.h12,
           ],
           if (_canManage == false)
-            Semantics(
-              identifier: 'sdk.connections.no-manage',
-              child: const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text('This account cannot change connections (it needs the connections.manage capability).'),
-              ),
+            _labeled(
+              'no-manage',
+              _noManage,
+              const Padding(padding: EdgeInsets.only(bottom: 12), child: Text(_noManage)),
             ),
           if (_error != null)
-            Semantics(
-              identifier: 'sdk.connections.error',
-              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ),
+            _labeled('error', _error!, Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
           if (_startUrl != null)
-            Semantics(
-              identifier: 'sdk.connections.start-url',
-              child: SelectableText('Open this address in a browser: $_startUrl'),
+            _labeled(
+              'start-url',
+              'Open this address in a browser: $_startUrl',
+              SelectableText('Open this address in a browser: $_startUrl'),
+              keepChild: true,
             ),
           if (statuses == null && _error == null)
-            Semantics(identifier: 'sdk.connections.loading', child: const Text('Loading connections...')),
+            _labeled('loading', 'Loading connections...', const Text('Loading connections...')),
           if (statuses != null)
             Semantics(
               identifier: 'sdk.connections.list',

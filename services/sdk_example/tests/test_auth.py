@@ -162,7 +162,7 @@ def test_logout_clears_the_cookie(client):
 def test_providers_has_the_merged_shape_in_fake_mode(client):
     assert client.get("/auth/providers").json() == {
         "demo": True, "email_password": True, "google": False, "google_web_client_id": None, "apple": False,
-        "mock": True, "firebase": None, "sync": {"url": None},
+        "mock": True, "firebase": None, "sync": {"url": "http://localhost:8012/powersync-fake"},
     }
 
 

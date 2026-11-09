@@ -167,11 +167,7 @@ class _TasksPageState extends State<TasksPage> {
             children: [
               Expanded(
                 child: t.mirrorEnabled
-                    ? Semantics(
-                        identifier: '$_id.external-${t.id}',
-                        container: true,
-                        child: Text(external, style: text.caption.copyWith(color: tokens.muted)),
-                      )
+                    ? _labelled('$_id.external-${t.id}', external, text.caption.copyWith(color: tokens.muted))
                     : Text('Calendar: off', style: text.caption.copyWith(color: tokens.muted)),
               ),
               BondTaskDeleteControl(
@@ -189,12 +185,17 @@ class _TasksPageState extends State<TasksPage> {
   Widget _notice(int n, Map<String, Object?> m) {
     final title = m['title'] ?? m['message'] ?? m['task_id'] ?? m['id'] ?? m.toString();
     final id = m['task_id'];
-    return Semantics(
-      identifier: '$_id.notice-$n',
-      container: true,
-      child: Text(id == null || id == title ? '$title' : '$title ($id)'),
-    );
+    return _labelled('$_id.notice-$n', id == null || id == title ? '$title' : '$title ($id)');
   }
+
+  /// A text whose words are also the semantics label: a browser driver reads
+  /// labels, not identifiers. The inner text is excluded so it is read once.
+  Widget _labelled(String id, String text, [TextStyle? style]) => Semantics(
+        identifier: id,
+        label: text,
+        container: true,
+        child: ExcludeSemantics(child: Text(text, style: style)),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -213,12 +214,8 @@ class _TasksPageState extends State<TasksPage> {
             }),
           ),
           if (_error != null)
-            Semantics(
-              identifier: '$_id.error',
-              container: true,
-              child: Text(_error!, style: TextStyle(color: BondTokens.of(context).danger.press)),
-            ),
-          if (_info != null) Semantics(identifier: '$_id.info', container: true, child: Text(_info!)),
+            _labelled('$_id.error', _error!, TextStyle(color: BondTokens.of(context).danger.press)),
+          if (_info != null) _labelled('$_id.info', _info!),
           BondSpace.h8,
           BondTaskList(
             tasks: _error != null && tasks == null ? null : tasks,
@@ -261,6 +258,7 @@ class _TasksPageState extends State<TasksPage> {
           BondSpace.h8,
           Semantics(
             identifier: '$_id.notices',
+            label: _notices.isEmpty ? 'No reminders delivered yet.' : 'Reminders delivered',
             container: true,
             explicitChildNodes: true,
             child: Column(

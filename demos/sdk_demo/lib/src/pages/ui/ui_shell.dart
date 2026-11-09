@@ -5,7 +5,9 @@ import 'ui_common.dart';
 
 /// The shell section: navigation and rail pieces.
 class UiShell extends StatefulWidget {
-  const UiShell({super.key});
+  const UiShell({super.key, required this.say});
+
+  final UiSay say;
 
   @override
   State<UiShell> createState() => _UiShellState();
@@ -38,7 +40,10 @@ class _UiShellState extends State<UiShell> {
               child: BondSideNav(
                 groups: const [BondNavGroup(label: 'Work', items: _destinations)],
                 selectedId: _selected,
-                onSelected: (id) => setState(() => _selected = id),
+                onSelected: (id) {
+                  setState(() => _selected = id);
+                  widget.say('nav $id');
+                },
                 userCard: BondAccountCard(
                   name: 'Demo User',
                   subtitle: 'demo@example.com',
@@ -78,7 +83,10 @@ class _UiShellState extends State<UiShell> {
               BondBottomNavItem(icon: Icons.person_outline, label: 'Me', semanticsId: 'sdk.ui.bottom-me'),
             ],
             currentIndex: _bottom,
-            onTap: (i) => setState(() => _bottom = i),
+            onTap: (i) {
+              setState(() => _bottom = i);
+              widget.say('bottom nav $i');
+            },
           ),
         ),
         const UiTile(

@@ -101,6 +101,42 @@ void main() {
     await expectNoOverlays(t);
   });
 
+  testWidgets('walked texts expose their visible text as the semantics label', (t) async {
+    final transport = FakeSyncTransport()..enqueueUpload(serverRule(now: DateTime.utc(2026, 11, 8, 17, 4, 5, 123)));
+    await pumpFake(t, transport);
+    await tapLabel(t, 'Add bad row');
+    await tapLabel(t, 'Upload');
+    await pumpUntil(t, find.textContaining('Sent 1'));
+
+    String labelOf(String id) => t.widget<Semantics>(byId(id)).properties.label!;
+    for (final id in ['sdk.sync.queued', 'sdk.sync.info', 'sdk.sync.server-clock', 'sdk.sync.verdict-0']) {
+      expect(labelOf(id), textOf(t, id), reason: id);
+      expect(t.widget<Semantics>(byId(id)).excludeSemantics, isTrue, reason: id);
+    }
+    expect(labelOf('sdk.sync.verdict-0'), contains('rejected: invalid'));
+  });
+
+  testWidgets('adjacent verdicts are separate semantics nodes, each with its own label', (t) async {
+    final handle = t.ensureSemantics();
+    final transport = FakeSyncTransport()..enqueueUpload(serverRule());
+    await pumpFake(t, transport);
+    await tapLabel(t, 'Add row');
+    await tapLabel(t, 'Add bad row');
+    await tapLabel(t, 'Upload');
+    await pumpUntil(t, find.textContaining('Sent 2'));
+
+    for (final id in ['sdk.sync.verdict-0', 'sdk.sync.verdict-1']) {
+      expect(t.widget<Semantics>(byId(id)).container, isTrue, reason: id);
+    }
+    final ok = t.getSemantics(byId('sdk.sync.verdict-0'));
+    final bad = t.getSemantics(byId('sdk.sync.verdict-1'));
+    expect(ok.id, isNot(bad.id));
+    expect(ok.label, 'ok');
+    expect(bad.label, contains('rejected: invalid'));
+    expect(ok.label, isNot(contains('rejected')));
+    handle.dispose();
+  });
+
   testWidgets('the server clock shows server_now and the skew after an upload', (t) async {
     final now = DateTime.utc(2026, 11, 8, 17, 4, 5, 123);
     final transport = FakeSyncTransport()..enqueueUpload(serverRule(now: now));

@@ -27,11 +27,13 @@ the connect flow's top-level navigation carries it. Reloading the page signs in 
 ## Page setup
 
 - After EVERY full page load (`goto`, `reload`, a redirect back from the consent page) switch the semantics
-  tree on: `page.locator('flt-semantics-placeholder').dispatchEvent('click')`. With the MCP server:
+  tree on when the placeholder is present: `page.locator('flt-semantics-placeholder').dispatchEvent('click')`
+  (the demo calls `ensureSemantics()`, so it is usually already gone; click only if present). With the MCP server:
   `browser_evaluate` of `() => { document.querySelector('flt-semantics-placeholder').click(); return 'ok'; }`.
   A real click fails with "outside of the viewport". In-app navigation keeps semantics on. The demo also
   calls `ensureSemantics()` in `main()` as a convenience; do not rely on it.
-- Viewports: 1280x800 (desktop) and 390x844 (phone lane, `/ui` and `/tasks`). Nothing may overflow at 390.
+- Viewports: 1280x800 (desktop, left nav) and 390x844 (phone lane, `/ui` and `/tasks`; below 600 px the nav is
+  a scrolling strip under the page, same `sdk.nav.<id>` ids). Nothing may overflow at 390.
 
 ## Selectors
 
@@ -40,6 +42,8 @@ the connect flow's top-level navigation carries it. Reloading the page signs in 
   `getByRole('button', {name: /Sign in/})`. `ValueKey`s are not in the DOM.
 - Select or segmented options are `<id>-<value>`. A confirm control is `<id>`, then `<id>-confirm`
   or `<id>-cancel`. Static text is found by text. A labelled card or button exposes only its label.
+- Every `sdk.*` text node exposes its text as the semantics label, so read `getAttribute('aria-label')` or
+  the accessible name instead of taking screenshots.
 - Elements below the fold are absent from the tree: wheel-scroll until they appear.
 - Helpers in `demos/sdk_demo/e2e/lib.mjs`: `enableSemantics(page)`, `sid(page, id)`, `typeInto(locator,
   text)`, `collectErrors(page)`.
@@ -81,12 +85,12 @@ Zero `[role=dialog],[role=alertdialog]`; empty `pageerror` list; no console mess
 5. **Sync.** Click `sdk.sync.add-row` twice and `sdk.sync.add-bad-row` once; read `sdk.sync.queued`, `sdk.sync.rows`.
    Click `sdk.sync.upload`; read `sdk.sync.verdict-0`, `-1`, `-2` (two accepted, one rejected). Click
    `sdk.sync.fix-row`, then `sdk.sync.resend`: the fixed row is accepted. Read `sdk.sync.server-clock` (skew);
-   `sdk.sync.fetch-token` shows `sdk.sync.token`. Errors land in `sdk.sync.error`, notes in `sdk.sync.info`.
+   `sdk.sync.fetch-token` shows `sdk.sync.token`: the fake example mints a sync token by default (stand-in endpoint), so it always appears. Errors land in `sdk.sync.error`, notes in `sdk.sync.info`.
 6. **Connections.** Wait for `sdk.connections.list`. Click `sdk.connections.connect-fake-google`. The window leaves
    the app: `:8012/connections/fake-google/go?state=...` sets the nonce cookie and redirects to the fake
    consent page `:8012/connections/fake/consent`; click `#sdk-consent-allow` (plain HTML, a normal click).
    The API redirects to `http://localhost:8078/connections?connection=connected&provider=fake-google`, a full load:
-   click the semantics placeholder again. Assert `sdk.connections.return` and
+   click the semantics placeholder again. Assert `sdk.connections.return` (it carries the banner label; dismiss it with `sdk.connections.return-dismiss`) and
    `sdk.connections.state-fake-google` (connected). Click `sdk.connections.simulate-expiry-fake-google`: the
    state becomes needs-reconnect; click `sdk.connections.reconnect-fake-google` and repeat the round trip.
    Disconnect is two steps: `sdk.connections.disconnect-fake-google`, then `...-confirm`. Repeat with

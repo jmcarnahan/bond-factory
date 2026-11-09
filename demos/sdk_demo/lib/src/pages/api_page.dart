@@ -82,7 +82,9 @@ class _ApiPageState extends State<ApiPage> {
           const SizedBox(height: 16),
           Semantics(
             identifier: 'sdk.api.result',
+            label: _result,
             container: true,
+            excludeSemantics: true,
             child: SelectableText(_result, key: const Key('api-result')),
           ),
         ],

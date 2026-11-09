@@ -119,7 +119,7 @@ class _AuthPageState extends State<AuthPage> {
         if (_error != null) _ErrorLine(_error!),
         const SizedBox(height: 16),
         if (session == null)
-          Semantics(identifier: 'sdk.auth.signed-out', child: const Text('Signed out')) else ..._signedIn(session),
+          _read('signed-out', 'Signed out', const Text('Signed out')) else ..._signedIn(session),
       ],
     );
   }
@@ -128,22 +128,25 @@ class _AuthPageState extends State<AuthPage> {
     final name = jsonText(session.user['name']) ?? session.userId;
     final email = jsonText(session.user['email']);
     return [
-      Semantics(
-        identifier: 'sdk.auth.user',
-        child: Text(email == null ? name : '$name ($email)', style: Theme.of(context).textTheme.titleMedium),
+      _read(
+        'user',
+        email == null ? name : '$name ($email)',
+        Text(email == null ? name : '$name ($email)', style: Theme.of(context).textTheme.titleMedium),
       ),
       const SizedBox(height: 8),
-      Semantics(
-        identifier: 'sdk.auth.capabilities',
-        child: Wrap(spacing: 6, runSpacing: 6, children: [
+      _read(
+        'capabilities',
+        session.capabilities.isEmpty ? 'No capabilities' : 'Capabilities: ${session.capabilities.join(', ')}',
+        Wrap(spacing: 6, runSpacing: 6, children: [
           for (final c in session.capabilities) Chip(label: Text(c)),
           if (session.capabilities.isEmpty) const Text('No capabilities'),
         ]),
       ),
       const SizedBox(height: 8),
-      Semantics(
-        identifier: 'sdk.auth.token-tail',
-        child: Text('Token ends ${_tail(DemoSession.tokens.token ?? session.token)}'),
+      _read(
+        'token-tail',
+        'Token ends ${_tail(DemoSession.tokens.token ?? session.token)}',
+        Text('Token ends ${_tail(DemoSession.tokens.token ?? session.token)}'),
       ),
       const SizedBox(height: 12),
       Wrap(spacing: 8, runSpacing: 8, children: [
@@ -151,16 +154,23 @@ class _AuthPageState extends State<AuthPage> {
         _button('force-401', 'Force a 401', _force401),
         _button('sign-out', 'Sign out', _signOut),
       ]),
-      if (_refreshResult != null)
-        Semantics(identifier: 'sdk.auth.refresh-result', child: Text(_refreshResult!)),
-      if (_force401Result != null)
-        Semantics(identifier: 'sdk.auth.force-401-result', child: Text(_force401Result!)),
+      if (_refreshResult != null) _read('refresh-result', _refreshResult!, Text(_refreshResult!)),
+      if (_force401Result != null) _read('force-401-result', _force401Result!, Text(_force401Result!)),
       ValueListenableBuilder<int>(
         valueListenable: DemoSession.renewals,
-        builder: (_, n, _) => Semantics(identifier: 'sdk.auth.renewals', child: Text('Renewals: $n')),
+        builder: (_, n, _) => _read('renewals', 'Renewals: $n', Text('Renewals: $n')),
       ),
     ];
   }
+
+  /// A read-only value a walk must be able to read: the identifier AND the
+  /// visible text as the label (the inner text is hidden so it is not doubled).
+  static Widget _read(String id, String text, Widget child) => Semantics(
+        identifier: 'sdk.auth.$id',
+        label: text,
+        container: true, // its own node: never merged into a neighbour's label
+        child: ExcludeSemantics(child: child),
+      );
 
   Widget _button(String id, String label, VoidCallback onPressed, {bool filled = false}) {
     final tap = _busy ? null : onPressed;
@@ -192,9 +202,10 @@ class _ErrorLine extends StatelessWidget {
     ];
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Semantics(
-        identifier: 'sdk.auth.error',
-        child: Text(parts.join(' | '), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+      child: _AuthPageState._read(
+        'error',
+        parts.join(' | '),
+        Text(parts.join(' | '), style: TextStyle(color: Theme.of(context).colorScheme.error)),
       ),
     );
   }

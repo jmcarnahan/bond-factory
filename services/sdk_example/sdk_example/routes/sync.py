@@ -4,6 +4,9 @@
     POST /sync/token       an ES256 token the sync service accepts (503 sync_off when SDK_EXAMPLE_SYNC_URL is empty)
     GET  /sync/jwks.json   the public key set (404 when sync is off; cacheable)
 
+Fake mode defaults SDK_EXAMPLE_SYNC_URL to a stand-in endpoint, so the token route mints out of the box; setting it to an
+empty value turns sync off. Real mode has sync off until the URL is set.
+
 bond_sync_py raises its own exceptions and returns verdicts; this module is where they become ApiError.
 """
 

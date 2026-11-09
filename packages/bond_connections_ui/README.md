@@ -27,7 +27,8 @@ if (back != null) BondConnectionReturnBanner(back, onDismiss: clear);
 
 - `semanticsId` is a prefix. `app.connections` gives `app.connections.card-<provider>`, `.state-<provider>`,
   `.connect-<provider>`, `.reconnect-<provider>`, `.disconnect-<provider>` (the confirm step adds `-confirm`
-  and `-cancel`), and the banner takes its own id, with `-dismiss` and `-action`.
+  and `-cancel`). The state chip node `.state-<provider>` and the banner node `<id>` carry their text as the
+  semantics label, so a walk can read them; the banner's dismiss button is `<id>-dismiss`.
 - Dates go through `formatDate`; the default is `YYYY-MM-DD` in UTC. Strings come from `ConnectionLabels`.
 - The connect flow itself (start address, top-level navigation, session cookie) is described in
   `docs/migration/bond_connections.md`; `demos/sdk_demo/lib/src/pages/connections_page.dart` is a working page.

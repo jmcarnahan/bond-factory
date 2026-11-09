@@ -156,13 +156,9 @@ class _SyncPageState extends State<SyncPage> {
           _button('fetch-token', 'Fetch token', _fetchToken),
         ]),
         const SizedBox(height: 12),
-        Semantics(identifier: 'sdk.sync.queued', child: Text('Queued writes: $queued')),
-        if (_info != null) Semantics(identifier: 'sdk.sync.info', child: Text(_info!)),
-        if (_error != null)
-          Semantics(
-            identifier: 'sdk.sync.error',
-            child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
+        _labelled('queued', 'Queued writes: $queued'),
+        if (_info != null) _labelled('info', _info!),
+        if (_error != null) _labelled('error', _error!, color: Theme.of(context).colorScheme.error),
         const SizedBox(height: 12),
         Semantics(
           identifier: 'sdk.sync.rows',
@@ -173,14 +169,25 @@ class _SyncPageState extends State<SyncPage> {
           ]),
         ),
         const SizedBox(height: 12),
-        Semantics(identifier: 'sdk.sync.server-clock', child: Text(_clockText())),
+        _labelled('server-clock', _clockText()),
         if (_tokenText != null) ...[
           const SizedBox(height: 8),
-          Semantics(identifier: 'sdk.sync.token', child: Text(_tokenText!)),
+          _labelled('token', _tokenText!),
         ],
       ],
     );
   }
+
+  /// A text a walk reads: the visible text is also the semantics label (the
+  /// identifier carries no text), and the inner Text is hidden from the tree so
+  /// it is not read twice.
+  Widget _labelled(String id, String text, {Color? color}) => Semantics(
+        identifier: 'sdk.sync.$id',
+        label: text,
+        container: true,
+        excludeSemantics: true,
+        child: Text(text, style: color == null ? null : TextStyle(color: color)),
+      );
 
   String _clockText() {
     final now = _serverNow;
@@ -219,10 +226,10 @@ class _SyncPageState extends State<SyncPage> {
             ? '${v.status}: ${v.code}'
             : '${v.status}: ${v.code ?? v.status} | ${verdictText(v.code ?? v.status, message: v.message)}'
                 '${v.message == null ? '' : ' (server said: ${v.message})'}';
-    final bad = v.needsAction;
-    return Semantics(
-      identifier: 'sdk.sync.verdict-${o.op.seq}',
-      child: Text(text, style: TextStyle(color: bad ? Theme.of(context).colorScheme.error : null)),
+    return _labelled(
+      'verdict-${o.op.seq}',
+      text,
+      color: v.needsAction ? Theme.of(context).colorScheme.error : null,
     );
   }
 

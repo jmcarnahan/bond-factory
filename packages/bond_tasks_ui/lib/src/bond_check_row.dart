@@ -11,6 +11,7 @@ class BondCheckRow extends StatelessWidget {
     required this.onChanged,
     this.semanticsId,
     this.trailing,
+    this.strikeWhenChecked = false,
   });
 
   final bool checked;
@@ -23,11 +24,15 @@ class BondCheckRow extends StatelessWidget {
   /// Shown after the text, outside the toggle's hit area.
   final Widget? trailing;
 
+  /// Draws the text muted and struck through while checked (a finished
+  /// checklist line). A switch such as the mirror toggle leaves this off.
+  final bool strikeWhenChecked;
+
   @override
   Widget build(BuildContext context) {
     final t = BondTokens.of(context);
     final text = BondText(t);
-    final style = checked
+    final style = checked && strikeWhenChecked
         ? text.body.copyWith(color: t.muted, decoration: TextDecoration.lineThrough, decorationColor: t.muted)
         : text.body;
     final on = onChanged;

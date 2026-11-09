@@ -4,7 +4,9 @@ from pathlib import Path
 
 import jwt
 import pytest
+from fastapi.testclient import TestClient
 
+from sdk_example.main import create_app
 from sdk_example.models.auth import DEMO_USER_ID
 from sdk_example.models.sync import Note
 
@@ -104,7 +106,11 @@ def test_bad_ids_are_verdicts_not_422(signed_in):
     assert {x["code"] for x in r.json()["results"]} == {"invalid"}
 
 
-def test_token_is_503_sync_off_without_a_url(signed_in):
+def test_token_is_503_sync_off_with_an_explicitly_empty_url(monkeypatch, client):
+    monkeypatch.setenv("SDK_EXAMPLE_SYNC_URL", "")
+    app = create_app()
+    signed_in = TestClient(app)
+    signed_in.headers["Authorization"] = "Bearer " + signed_in.post("/auth/demo", json={"user_id": DEMO_USER_ID}).json()["token"]
     r = signed_in.post("/sync/token")
     assert r.status_code == 503
     assert r.json()["detail"]["code"] == "sync_off"
@@ -142,9 +148,10 @@ def test_key_is_generated_once_and_reused(sync_on, app, signed_in):
     assert first == second
 
 
-def test_jwks_is_public_and_404_when_off(client, signed_in):
-    anonymous = type(client)(client.app)
-    r = anonymous.get("/sync/jwks.json")
+def test_jwks_is_public_and_404_when_off(monkeypatch, tmp_path):
+    monkeypatch.setenv("SDK_EXAMPLE_SYNC_URL", "")
+    monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/off.db")
+    r = TestClient(create_app()).get("/sync/jwks.json")
     assert r.status_code == 404
     assert r.json()["detail"]["code"] == "not_found"
 
@@ -231,3 +238,18 @@ def test_synced_task_with_unknown_assignee_is_refused(app, signed_in):
     with app.state.session_factory() as session:
         assert session.get(Task, "dev-task-5") is None
         assert session.get(Task, "dev-task-6").assigned_user_id == VIEWER_USER_ID
+
+
+def test_fake_mode_defaults_to_a_stand_in_endpoint_and_mints(app, signed_in):
+    r = signed_in.post("/sync/token")
+    assert r.status_code == 200
+    assert r.json()["endpoint"] == "http://localhost:8012/powersync-fake"
+    assert signed_in.get("/sync/jwks.json").status_code == 200
+
+
+def test_real_mode_without_a_url_keeps_sync_off(monkeypatch):
+    from sdk_example.settings import Settings
+
+    monkeypatch.setenv("SDK_EXAMPLE_MODE", "real")
+    monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", "x" * 40)
+    assert Settings.from_env().sync_url == ""

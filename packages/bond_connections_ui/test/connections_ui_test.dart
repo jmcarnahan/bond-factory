@@ -3,6 +3,7 @@ import 'package:bond_connections_ui/bond_connections_ui.dart';
 import 'package:bond_test_support/bond_test_support.dart';
 import 'package:bond_ui/bond_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Finder byId(String id) => find.byWidgetPredicate((w) => w is Semantics && w.properties.identifier == id);
@@ -171,5 +172,58 @@ void main() {
     );
     await t.tap(byId('r-dismiss'));
     expect(dismissed, 1);
+  });
+
+  int nodesWithLabel(WidgetTester t, String fragment) {
+    var n = 0;
+    void visit(SemanticsNode node) {
+      if (node.label.contains(fragment)) n++;
+      node.visitChildren((c) {
+        visit(c);
+        return true;
+      });
+    }
+
+    visit(t.binding.renderViews.first.owner!.semanticsOwner!.rootSemanticsNode!);
+    return n;
+  }
+
+  for (final withId in [true, false]) {
+    testWidgets('the banner title is exposed in exactly one semantics node (id: $withId)', (t) async {
+      final handle = t.ensureSemantics();
+      await pump(
+        t,
+        BondConnectionReturnBanner(
+          const ConnectionReturn(ConnectionOutcome.error, provider: 'google', reason: 'access_denied'),
+          onDismiss: () {},
+          semanticsId: withId ? 'sdk.connections.return' : null,
+        ),
+      );
+      expect(nodesWithLabel(t, 'Could not connect google'), 1);
+      expect(nodesWithLabel(t, 'Access was declined.'), 1);
+      expect(nodesWithLabel(t, 'Dismiss'), 1);
+      handle.dispose();
+    });
+  }
+
+  testWidgets('the state chip and the return banner carry their text as the semantics label', (t) async {
+    final handle = t.ensureSemantics();
+    await pump(
+      t,
+      Column(children: [
+        card(status(connected: true, needs: true)),
+        const BondConnectionReturnBanner(
+          ConnectionReturn(ConnectionOutcome.error, provider: 'google', reason: 'access_denied'),
+          semanticsId: 'sdk.connections.return',
+        ),
+      ]),
+    );
+    expect(t.getSemantics(byId('sdk.connections.state-fake-google')).label, 'Needs reconnect');
+    expect(nodesWithLabel(t, 'Needs reconnect'), 1);
+    expect(
+      t.getSemantics(byId('sdk.connections.return')).label,
+      'Could not connect google. Access was declined.',
+    );
+    handle.dispose();
   });
 }

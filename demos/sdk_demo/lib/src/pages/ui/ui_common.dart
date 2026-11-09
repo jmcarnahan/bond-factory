@@ -1,6 +1,9 @@
 import 'package:bond_ui/bond_ui.dart';
 import 'package:flutter/widgets.dart';
 
+/// Reports what the person just did; the page shows it under `sdk.ui.last-event`.
+typedef UiSay = void Function(String event);
+
 /// A titled group of tiles on the UI page. The heading is found by
 /// `sdk.ui.section-<id>`.
 class UiSection extends StatelessWidget {

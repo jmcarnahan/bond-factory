@@ -319,4 +319,66 @@ void main() {
     expect(t.takeException(), isNull);
     expect(r.canned.requests, isEmpty);
   });
+
+  testWidgets('complete then reopen keeps the same row and button ids with the new label', (t) async {
+    final handle = t.ensureSemantics();
+    final r = TasksRig([
+      [task('a', 'Alpha', date: '2026-03-12'), task('b', 'Beta', date: '2026-03-12')],
+      [task('a', 'Alpha', date: '2026-03-12', status: TaskStatus.done), task('b', 'Beta', date: '2026-03-12')],
+      [task('a', 'Alpha', date: '2026-03-12'), task('b', 'Beta', date: '2026-03-12')],
+    ]);
+    r.canned.responses.json('POST', '/tasks/a/complete', task('a', 'Alpha', status: TaskStatus.done));
+    r.canned.responses.json('POST', '/tasks/a/reopen', task('a', 'Alpha'));
+    await pumpPage(t, r);
+    String label(String id) => t.getSemantics(byId(id).first).label;
+    expect(label('sdk.tasks.complete-a'), 'Complete');
+    await t.tap(byId('sdk.tasks.complete-a').first);
+    await settle(t);
+    expect(find.text('Done (1)'), findsOneWidget);
+    expect(byId('sdk.tasks.row-a'), findsWidgets);
+    expect(label('sdk.tasks.complete-a'), 'Reopen');
+    expect(label('sdk.tasks.complete-b'), 'Complete');
+    await t.tap(byId('sdk.tasks.complete-a').first);
+    await settle(t);
+    expect(r.canned.requestsTo('POST', '/tasks/a/reopen'), hasLength(1));
+    expect(find.textContaining('Done ('), findsNothing);
+    expect(label('sdk.tasks.complete-a'), 'Complete');
+    handle.dispose();
+  });
+
+  testWidgets('the text nodes a driver reads carry their text as the label', (t) async {
+    final handle = t.ensureSemantics();
+    final r = TasksRig([
+      [task('a', 'Mirrored', date: '2026-03-12', provider: 'google', eventId: 'evt-77')],
+    ]);
+    r.canned.responses.json('POST', '/jobs/tick', {'ran': []});
+    r.canned.responses.json('GET', '/tasks/notices', {
+      'items': [
+        {'task_id': 'a', 'title': 'Mirrored'},
+      ],
+    });
+    await pumpPage(t, r);
+    String label(String id) => t.getSemantics(byId(id).first).label;
+    expect(label('sdk.tasks.row-a'), 'Mirrored');
+    expect(label('sdk.tasks.external-a'), 'Calendar: google evt-77');
+    await t.ensureVisible(byId('sdk.tasks.run-due-jobs'));
+    await t.tap(byId('sdk.tasks.run-due-jobs'));
+    await settle(t);
+    expect(label('sdk.tasks.notice-0'), 'Mirrored (a)');
+    expect(label('sdk.tasks.info'), 'Ran the due jobs as of 2026-03-13T00:01:00.000Z');
+    expect(label('sdk.tasks.notices'), isNotEmpty);
+    handle.dispose();
+  });
+
+  testWidgets('an error text carries its words as the label', (t) async {
+    final handle = t.ensureSemantics();
+    final r = TasksRig([<Object?>[]]);
+    r.canned.responses.json('POST', '/tasks', {'detail': {'code': 'title_required', 'message': 'Title is required'}}, status: 422);
+    await pumpPage(t, r);
+    await t.enterText(find.descendant(of: byId('sdk.tasks.quick-add'), matching: find.byType(TextField)), 'x');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await settle(t);
+    expect(t.getSemantics(byId('sdk.tasks.error').first).label, 'Title is required');
+    handle.dispose();
+  });
 }

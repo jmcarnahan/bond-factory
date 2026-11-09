@@ -37,6 +37,7 @@ class BondChecklist extends StatelessWidget {
         for (var i = 0; i < items.length; i++)
           BondCheckRow(
             checked: items[i].done,
+            strikeWhenChecked: true,
             label: items[i].text,
             semanticsId: _id('$i'),
             onChanged: (v) => onToggle(items[i], v),
