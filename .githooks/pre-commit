@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Public-hygiene check before every commit. Installed by `make hooks` (sets core.hooksPath to .githooks).
 # Fast: tracked files only, no network. CI runs the same script through `make gates`.
+# It reads working-tree copies, not the index: a partially staged file is judged by its working copy. CI is authoritative.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 bash tool/public_hygiene.sh || {
