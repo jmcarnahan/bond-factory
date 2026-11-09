@@ -33,6 +33,7 @@ class SignInSettings:
     cookie_secure: bool = True
     delivery_web: str = "cookie"
     allow_http: bool = False
+    prefix: str = "/auth"
 
     def __post_init__(self) -> None:
         base = (self.public_base or "").rstrip("/")
@@ -47,10 +48,16 @@ class SignInSettings:
             bare = scheme.lower().rstrip(":/")
             if bare in _WEB_SCHEMES or not _REVERSE_DOMAIN.fullmatch(bare) or "." not in bare:
                 raise ValueError(f"native scheme {scheme!r} must be a reverse-domain scheme such as org.example.app")
+        object.__setattr__(self, "prefix", "/" + self.prefix.strip("/"))
         object.__setattr__(self, "public_base", base)
         if not self.native_return_base:
-            object.__setattr__(self, "native_return_base", f"{base}/app/return")
+            object.__setattr__(self, "native_return_base", f"{base}{self.prefix.rsplit('/', 1)[0]}/app/return")
         object.__setattr__(self, "native_return_base", self.native_return_base.rstrip("/"))
+
+    @property
+    def return_path_prefix(self) -> str:
+        """Path prefix of the return page, e.g. ``/app/return/`` or ``/api/v1/app/return/``: for the well-known router."""
+        return f"{self.prefix.rsplit('/', 1)[0]}/app/return/"
 
     @property
     def own_origin(self) -> str:
@@ -61,7 +68,7 @@ class SignInSettings:
         return frozenset(o for o in (origin_of(a) for a in self.redirect_allowlist) if o) | {self.own_origin}
 
     def callback_url(self, provider: str) -> str:
-        return f"{self.public_base}/auth/signin/{provider}/callback"
+        return f"{self.public_base}{self.prefix}/signin/{provider}/callback"
 
     def native_scheme_ok(self, url: str) -> bool:
         scheme = urlsplit(url or "").scheme.lower()
@@ -88,4 +95,5 @@ def from_env(prefix: str = "BOND_SIGNIN_", env: Mapping[str, str] | None = None)
         redirect_allowlist=_csv(get("REDIRECT_ALLOWLIST")), native_return_base=get("NATIVE_RETURN_BASE") or "",
         native_schemes=_csv(get("NATIVE_SCHEMES")), break_glass=(get("BREAKGLASS") or "").lower() in _TRUE,
         cookie_secure=(not allow_http) if secure is None else secure.lower() in _TRUE, allow_http=allow_http,
+        prefix=get("PREFIX") or "/auth",
     )

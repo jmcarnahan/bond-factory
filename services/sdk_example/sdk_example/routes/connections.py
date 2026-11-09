@@ -20,10 +20,11 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from .. import connect_helpers as helpers
 from ..auth_dep import current_user, current_user_id, require_capability
 from ..db import session_scope
-from ..fake_routes import register_fake
+from ..fake_expiry import register_expiry
 from ..models.auth import User, utcnow
 from ..models.connections import OAuthConnection
-from ..oauth_wiring import OAuthWiring, build_wiring, callback_url
+from ..oauth_wiring import OAuthWiring, callback_url
+from ..providers_wiring import ensure_wiring
 from ..settings import Settings
 from .connect_native import check_start, native_callback
 
@@ -43,8 +44,9 @@ def _hook(connection: OAuthConnection, reason: str) -> None:
 
 def register(app: FastAPI) -> None:
     settings: Settings = app.state.settings
-    wiring: OAuthWiring = build_wiring(settings)
-    app.state.oauth = wiring
+    if not settings.connections:  # SDK_EXAMPLE_CONNECTIONS=0: an app with sign-in only (identity, no mail)
+        return
+    wiring: OAuthWiring = ensure_wiring(app)
     factory = app.state.session_factory
 
     def provider_or_404(name: str) -> oauth.OAuthProvider:
@@ -184,4 +186,4 @@ def register(app: FastAPI) -> None:
             return helpers.status_json(helpers.status_of(session, user_id, provider))
 
     if settings.mode == "fake":
-        register_fake(app, wiring, provider_or_404, manage, _hook)
+        register_expiry(app, wiring, provider_or_404, manage, _hook)

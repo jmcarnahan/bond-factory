@@ -15,6 +15,8 @@ ME_URL = "https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPr
 
 
 class MicrosoftOAuth:
+    family = "microsoft"
+
     def __init__(self, client_id: str, client_secret: str, tenant: str = "common",
                  http: httpx.Client | None = None, pinned_tenant: str | None = None) -> None:
         if http is None:

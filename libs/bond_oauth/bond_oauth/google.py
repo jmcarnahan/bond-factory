@@ -16,6 +16,8 @@ REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 
 
 class GoogleOAuth:
+    family = "google"
+
     def __init__(self, client_id: str, client_secret: str, http: httpx.Client) -> None:
         self._id, self._secret, self._http = client_id, client_secret, http
 

@@ -29,13 +29,25 @@ Semantics ids: `sdk.signin.<provider>`, `sdk.signin.error`, `sdk.signin.break-gl
 ## Phone recipe
 1. Inject `SecureRefreshTokenStore(appKey: 'app-x')` as `refreshTokens` of `OidcAuthGateway`; this is the only
    storage code the app has. Delivery (cookie or body) follows the store, never `Platform`.
-2. Choose the return with `NativeReturn.choose(httpsReturn: https://<api>/app/return/<provider>, schemeReturn:
-   <reverse.domain>://return/<provider>, httpsSupported: <iOS 17.4+ or Android>)`. The app decides; the SDK never
-   reads the platform. Below iOS 17.4 the plugin cannot return an https callback.
-3. `final (attempt, url) = await SignInApi(api).startNative(id, returnBase: <return base>);` keep `attempt`
-   (`attempt.toJson()` survives a cold start), then `final back = await defaultBrowserAuth().run(url, callback: ret);`
+2. Choose the return, then start with that same URL:
+   ```dart
+   final ret = NativeReturn.choose(
+     httpsReturn: Uri.parse('https://<api>/app/return/$id'),
+     schemeReturn: Uri.parse('<reverse.domain>://return/$id'),
+     httpsSupported: <iOS 17.4+ or Android>, // the app decides; the SDK never reads the platform
+   );
+   final (attempt, url) = await SignInApi(api).startNative(id, returnUrl: ret); // sent as redirect_to unchanged
+   ```
+   Keep `attempt` (`attempt.toJson()` survives a cold start, in secure storage only).
+3. `final back = await defaultBrowserAuth().run(url, callback: ret);`
 4. `final r = SignInReturn.parse(back); if (!r.matches(attempt)) return;` (a return for another attempt is
    ignored), then `await auth.completeNative(attempt, r.code!)` or show `r.reason`.
+
+## Platform minimums
+- `flutter_web_auth_2` 5.1.0 builds for iOS 11, but an https (universal link) return works only at runtime on iOS
+  17.4 and later; below that use the scheme return. Android: https returns need App Links.
+- `flutter_secure_storage` 11.2 needs iOS 13.
+- An identity-only app still pulls `bond_connections` and both plugins; that is by design.
 
 ## iOS and Android setup in the app
 - iOS, Associated Domains entitlement (`Runner.entitlements`):

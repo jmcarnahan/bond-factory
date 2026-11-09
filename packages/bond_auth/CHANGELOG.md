@@ -29,4 +29,5 @@
 - `SignInProvider(id, label)`; `AuthProviders.signin`, `breakGlass`, `defaultFlow` read from `signin`, `break_glass`, `default_flow` (absent keys give `[]`, false, `firebase`); `signinById(id)`.
 - `RefreshTokenStore.loadRotation()` / `saveRotation(String?)` (interface addition): the in-flight rotation id is saved before every rotate, adopted on cold start (`RotationIds.adopt`) and cleared after a stored success, so a crash after the server rotated retries with the same id.
 - Store writes in `accept` and renewal are guarded: a failing write keeps the in-memory session and calls `onStorageFailure(error)`; the rotation id is then NOT retired.
+- `GatewayBase(authPrefix: '/auth')` (also a super param on both gateways): every auth path (`firebase`, `demo`, `refresh`, `logout`, `providers`) is built from it, for servers that mount auth under `/api/v1/auth`. Default unchanged.
 - The pubspec version is bumped to 0.2.0 by the director (builders do not edit pubspecs).

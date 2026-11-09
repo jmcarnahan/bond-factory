@@ -31,8 +31,8 @@ list and the return banner. The server half is `bond_oauth` (see `bond_oauth.md`
 ## 3. App S: connect_microsoft_screen and microsoft_status
 
 - `MicrosoftStatus` and `GET /connections/microsoft/status` become `ConnectionStatus` and `GET /connections`.
-- `needsConnect` (not connected, or stale scopes) is `phase != connected`. The server reports stale scopes as
-  `needs_reconnect`; until the server does, compare `ConnectionStatus.scopes` with the wanted scopes in the app.
+- `needsConnect` (not connected, or stale scopes) is `phase != connected`. The server reports stale scopes and
+  dead refresh tokens as `needs_reconnect` (`bond_oauth` `access_token` marks the row's `last_error`); `GET /connections` returns it.
 - `/connections/microsoft/authorize?token=` (a token in the query string) is replaced by `startUrl` and `/go`, which use
   the session cookie. No token is put in an address.
 - `?connection=microsoft&status=success|error&message=` becomes `connection=connected|error&provider=microsoft&reason=`.

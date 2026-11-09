@@ -65,7 +65,8 @@ def _run(session: Any, directory: UserDirectory, identity: OidcIdentity, provide
     invited = user is None
     if user is None:
         emails = [identity.email.strip().lower(), normalize_email(provider, identity.email)]
-        user = directory.find_invite(session, list(dict.fromkeys(e for e in emails if e)), provider)
+        user = directory.find_invite(session, list(dict.fromkeys(e for e in emails if e)), provider,
+                                     subject=subject)
         if user is None:
             raise _refuse("not_invited", None)
     try:
@@ -86,8 +87,6 @@ def _run(session: Any, directory: UserDirectory, identity: OidcIdentity, provide
         try:
             directory.link_identity(session, user, provider, subject)
         except Exception as exc:
-            if type(exc).__name__ == "IdentityTaken" and refusal_code(exc) is None:
-                raise _refuse("identity_mismatch", user) from exc
             if refusal_code(exc) is not None:
                 exc.user = user  # type: ignore[attr-defined]
             raise

@@ -11,7 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from . import routes_native
 from ._callback import issue_for, run_callback
-from ._common import NONCE_MAX_AGE, NONCE_PATH, Deps, read_json, redirect
+from ._common import NONCE_MAX_AGE, Deps, read_json, redirect
 from .errors import http_error, raise_for
 from .finish import finish_session
 from .origin import require_origin
@@ -34,7 +34,7 @@ def start_web(deps: Deps, request: Request, provider: str, body: dict) -> Respon
                           redirect_to=redirect_to)
     reply = JSONResponse({"url": started.url}, headers={"Cache-Control": "no-store"})
     reply.set_cookie(deps.nonce_cookie(started.nonce), started.nonce, httponly=True, samesite="lax",
-                     path=NONCE_PATH, max_age=NONCE_MAX_AGE, secure=deps.settings.cookie_secure)
+                     path=deps.nonce_path, max_age=NONCE_MAX_AGE, secure=deps.settings.cookie_secure)
     return reply
 
 
@@ -57,7 +57,7 @@ def callback_web(deps: Deps, request: Request, provider: str, state: str, code: 
         # the target came from an untrusted link: no redirect, nothing recorded; drop the flow's cookie if it has one
         reply = _invalid_state()
         if nonce:
-            reply.delete_cookie(name, path=NONCE_PATH, secure=deps.settings.cookie_secure, httponly=True,
+            reply.delete_cookie(name, path=deps.nonce_path, secure=deps.settings.cookie_secure, httponly=True,
                                 samesite="lax")
         return reply
 
@@ -76,12 +76,12 @@ def callback_web(deps: Deps, request: Request, provider: str, state: str, code: 
     else:
         reply = redirect(info.redirect_to, signin="ok")
         finish_session(reply, outcome, settings=deps.settings, cookies=deps.cookies, delivery="cookie")
-    reply.delete_cookie(name, path=NONCE_PATH, secure=deps.settings.cookie_secure, httponly=True, samesite="lax")
+    reply.delete_cookie(name, path=deps.nonce_path, secure=deps.settings.cookie_secure, httponly=True, samesite="lax")
     return reply
 
 
 def register(router: APIRouter, deps: Deps) -> None:
-    @router.post("/auth/signin/{provider}/start")
+    @router.post(f"{deps.prefix}/signin/{{provider}}/start")
     async def start(provider: str, request: Request) -> Response:
         deps.limit(request, "signin_start")
         deps.require_provider(provider)
@@ -92,7 +92,7 @@ def register(router: APIRouter, deps: Deps) -> None:
         handler = start_web if mode == "web" else routes_native.start_native
         return await run_in_threadpool(handler, deps, request, provider, body)
 
-    @router.get("/auth/signin/{provider}/callback")
+    @router.get(f"{deps.prefix}/signin/{{provider}}/callback")
     def callback(provider: str, request: Request, state: str | None = None, code: str | None = None,
                  error: str | None = None) -> Response:
         deps.limit(request, "signin_callback")

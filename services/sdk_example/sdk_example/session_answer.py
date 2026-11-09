@@ -12,6 +12,14 @@ from sqlalchemy.orm import Session
 from .models.auth import User
 
 
+def require_cookie_origin(request: Request, delivery: str | None) -> None:
+    """Login-CSRF guard for the routes that ISSUE a session (demo, break-glass): when the answer sets cookies
+    (`delivery` None or "cookie") the request must come from an allowed origin, even though the caller is signed out
+    and carries no cookie yet. Body delivery (a phone) sets no cookie and needs no Origin."""
+    if (delivery or "cookie") == "cookie":
+        bond_signin.require_origin(request, request.app.state.signin.settings)
+
+
 def session_answer(request: Request, session: Session, response: Response, user: User, *, provider: str,
                    auth_time: float | None, delivery: str | None) -> dict:
     """`provider` is recorded on the session row (`demo`, `password`, or the IdP's name)."""

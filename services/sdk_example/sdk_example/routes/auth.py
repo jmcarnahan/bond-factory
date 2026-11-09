@@ -20,7 +20,7 @@ from ..break_glass import Delivery
 from ..break_glass import register as register_break_glass
 from ..db import session_scope
 from ..models.auth import User, utcnow
-from ..session_answer import session_answer
+from ..session_answer import require_cookie_origin, session_answer
 
 LANGUAGE = re.compile(r"^[a-z]{2}(-[A-Z]{2})?$")
 CurrentUser = Annotated[User, Depends(current_user)]
@@ -44,6 +44,7 @@ def register(app: FastAPI) -> None:
     def demo(body: DemoBody, request: Request, response: Response) -> dict:
         if not auth_settings(request).demo_enabled:
             raise ApiError("not_found", "Not found", status=404)
+        require_cookie_origin(request, body.delivery)
         with session_scope(request.app.state.session_factory) as session:
             user = session.get(User, body.user_id)
             if user is None:

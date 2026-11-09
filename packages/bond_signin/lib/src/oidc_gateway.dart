@@ -22,8 +22,9 @@ class OidcAuthGateway extends GatewayBase implements AuthGateway {
     super.refreshTokens,
     super.onSessionEnded,
     super.onStorageFailure,
+    super.authPrefix,
     super.rotationIds,
-  }) : _signIn = SignInApi(api);
+  }) : _signIn = SignInApi(api, prefix: authPrefix);
 
   final SignInApi _signIn;
 
@@ -31,8 +32,8 @@ class OidcAuthGateway extends GatewayBase implements AuthGateway {
   /// the server for the access token (`POST /auth/refresh` with `{}`) and
   /// stores it. Throws [AuthFailure] when the server refuses.
   Future<AuthSession> completeWeb() => asAuthFailure(() async {
-        final body = await api.postJson('/auth/refresh', body: <String, Object?>{});
-        return accept(body, '/auth/refresh');
+        final body = await api.postJson('$authPrefix/refresh', body: <String, Object?>{});
+        return accept(body, '$authPrefix/refresh');
       });
 
   /// Native: the return carried [code] for [attempt]. Redeems it with the
@@ -41,7 +42,7 @@ class OidcAuthGateway extends GatewayBase implements AuthGateway {
   Future<AuthSession> completeNative(SignInAttempt attempt, String code, {String? deviceLabel}) =>
       asAuthFailure(() async {
         final body = await _signIn.redeem(attempt, code, deviceLabel: deviceLabel);
-        return accept(body, '/auth/signin/redeem');
+        return accept(body, '$authPrefix/signin/redeem');
       });
 
   @override
@@ -55,8 +56,11 @@ class OidcAuthGateway extends GatewayBase implements AuthGateway {
             'rotation_id': rotationIds.current,
             'delivery': 'body',
           };
-    return sessionFromAuthBody(await api.postJson('/auth/refresh', body: body), path: '/auth/refresh');
+    return sessionFromAuthBody(await api.postJson('$authPrefix/refresh', body: body), path: '$authPrefix/refresh');
   }
+
+  @override
+  Future<AuthProviders> providers() => asAuthFailure(_signIn.providers);
 
   @override
   Future<void> signOut() => endServerSession();

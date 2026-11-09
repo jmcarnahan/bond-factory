@@ -41,6 +41,12 @@ def test_returning_user_found_by_identity_is_not_linked_again():
     assert d.links == [] and d.invite_calls == []
 
 
+def test_find_invite_gets_the_identity_subject():
+    d = FakeDirectory()
+    run(d, subject="g-77")
+    assert d.invite_subjects == ["g-77"]
+
+
 def test_email_not_verified():
     d = FakeDirectory()
     assert reason(d, email_verified=False) == "email_not_verified"
@@ -95,7 +101,7 @@ def test_identity_mismatch_when_invited_row_is_bound_to_another_account():
     assert d.links == []
 
 
-def test_identity_mismatch_when_link_raises_identity_taken_without_code():
+def test_identity_mismatch_when_link_raises_identity_taken():
     d = FakeDirectory()
     d.by_id["u-alice"].taken_by_other = True
     assert reason(d) == "identity_mismatch"

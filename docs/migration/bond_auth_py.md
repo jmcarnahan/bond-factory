@@ -36,7 +36,7 @@ OWNER = ClaimListPolicy(superuser="owner")
 def has(caps, *any_of): return has_any(caps, *any_of, policy=OWNER)  # same call shape as capabilities.has
 ```
 
-P's policy: a `ClaimListPolicy(superuser="admin")` subclass whose `has` also lets `foreman` pass a `worker` check.
+P's roles: `RolePolicy` fits (admin passes all, foreman passes worker); a `ClaimListPolicy(superuser="admin")` subclass with a `has` override also works.
 A's `auth/firebase.py` can stay as a shim for its 114 `firebase.<name>` uses (excerpt; it returns the dict A callers index):
 
 ```python

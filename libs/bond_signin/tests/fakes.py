@@ -12,17 +12,13 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
-from bond_signin import IssuedSession, SessionSpec
+from bond_signin import IdentityTaken, IssuedSession, SessionSpec
 
 
 class Coded(Exception):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
-
-
-class IdentityTaken(Exception):  # no ``code`` on purpose
-    pass
 
 
 @dataclass
@@ -69,6 +65,7 @@ class FakeDirectory:
         self.refusals: list[dict] = []
         self.invalidated: list[tuple[str, datetime]] = []
         self.invite_calls: list[list[str]] = []
+        self.invite_subjects: list[str | None] = []
 
     def find_by_identity(self, session, provider, subject):
         return next((u for u in self.by_id.values() if u.identity == (provider, subject)), None)
@@ -76,8 +73,9 @@ class FakeDirectory:
     def find_by_id(self, session, user_id):
         return self.by_id.get(user_id)
 
-    def find_invite(self, session, emails, provider):
+    def find_invite(self, session, emails, provider, *, subject=None):
         self.invite_calls.append(list(emails))
+        self.invite_subjects.append(subject)
         found = {self.by_email[e].id: self.by_email[e] for e in emails if e in self.by_email}
         return next(iter(found.values())) if len(found) == 1 else None
 

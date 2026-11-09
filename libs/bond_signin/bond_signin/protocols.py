@@ -136,9 +136,12 @@ class UserDirectory(Protocol):
 
     def find_by_id(self, session: Any, user_id: str) -> UserRef | None: ...
 
-    def find_invite(self, session: Any, emails: Sequence[str], provider: str) -> UserRef | None:
+    def find_invite(self, session: Any, emails: Sequence[str], provider: str, *,
+                    subject: str | None = None) -> UserRef | None:
         """Candidates are lowercased and normalised. None means ``not_invited``; two candidates resolving to
-        DIFFERENT users must also give None. May create or promote a row inside the transaction."""
+        DIFFERENT users must also give None. ``subject`` is the IdP subject of the identity, so an app can also match a
+        pre-known subject (for example a backfill from an earlier sign-in system). May create or promote a row
+        inside the transaction."""
 
     def link_identity(self, session: Any, user: UserRef, provider: str, subject: str) -> None:
         """Raises ``identity_mismatch`` when the identity belongs to another user."""

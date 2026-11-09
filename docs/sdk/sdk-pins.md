@@ -24,6 +24,9 @@ Fill in a row only for modules the app imports; delete the rest. Update this fil
 | bond_jobs | | | |
 | bond_sync_py | | | |
 | bond_oauth | | | |
+| bond_signin (Python lib) | | | |
+| bond_signin (Dart) | | | |
+| bond_signin_ui | | | |
 | bond_calendar | | | |
 | bond_tasks_py | | | |
 

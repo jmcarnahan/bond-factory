@@ -20,11 +20,16 @@ final url = await SignInApi(api).startWeb('google', redirectTo: origin); // POST
 final session = await OidcAuthGateway(api: api, tokens: tokens).completeWeb(); // POST /auth/refresh {}
 ```
 Use no refresh store (the default `NoRefreshTokenStore`): delivery is the HttpOnly cookie. The ApiClient's http
-client must send credentials.
+client must send credentials, and the client is built with `ApiClient(isWeb: true, ...)` so a blocked cross-origin
+call reads as a CORS problem. The app must use the path URL strategy (`usePathUrlStrategy()`): with fragment
+routes (`/#/home`) the return query is lost.
+
+`OidcAuthGateway` takes `authPrefix` (default `/auth`) and `SignInApi` takes `prefix` when the routes are mounted
+elsewhere (`'/api/v1/auth'`); one `authPrefix` drives every path of the gateway, logout included.
 
 ## Phone
 ```dart
-final (attempt, url) = await SignInApi(api).startNative('google', returnBase: 'https://<api>/app/return');
+final (attempt, url) = await SignInApi(api).startNative('google', returnUrl: ret); // ret = NativeReturn.choose(...) from bond_signin_ui
 // system browser returns; ignore it unless SignInReturn.parse(back).matches(attempt)
 final session = await gateway.completeNative(attempt, ret.code!); // redeem, refresh token saved first
 ```

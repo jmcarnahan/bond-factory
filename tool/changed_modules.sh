@@ -35,7 +35,7 @@ affected() {
     demos/sdk_demo/*)        echo demos/sdk_demo ;;
     libs/bond_service_kit/*) echo libs/bond_service_kit services/sdk_example ;;
     libs/bond_storage/*) echo libs/bond_storage services/sdk_example ;;
-    libs/bond_auth_py/*) echo libs/bond_auth_py services/sdk_example ;;
+    libs/bond_auth_py/*) echo libs/bond_auth_py libs/bond_signin services/sdk_example ;;
     libs/bond_jobs/*) echo libs/bond_jobs services/sdk_example ;;
     libs/bond_sync_py/*) echo libs/bond_sync_py services/sdk_example ;;
     libs/bond_oauth/*) echo libs/bond_oauth services/sdk_example ;;
@@ -45,6 +45,7 @@ affected() {
     services/sdk_example/*)  echo services/sdk_example ;;
     fixtures/sync/*)         echo packages/bond_sync libs/bond_sync_py services/sdk_example ;;
     fixtures/tasks/*)        echo packages/bond_tasks libs/bond_tasks_py services/sdk_example ;;
+    fixtures/signin/*)       echo libs/bond_signin packages/bond_signin packages/bond_signin_ui services/sdk_example demos/sdk_demo ;;
     fixtures/*)              echo packages/bond_roof services/roof_measure demos/roof_demo ;;
     docs/contracts/*)        echo packages/bond_roof services/roof_measure ;;
     pyproject.toml|uv.lock)  echo services/roof_measure libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin services/sdk_example ;;

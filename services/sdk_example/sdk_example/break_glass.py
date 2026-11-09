@@ -34,7 +34,7 @@ from sqlalchemy import select
 from .auth_dep import UsersRevocation, auth_settings, invalid_token, refusal
 from .db import session_scope
 from .models.auth import User, utcnow
-from .session_answer import session_answer
+from .session_answer import require_cookie_origin, session_answer
 from .wiring import client_ip
 
 Delivery = Annotated[str | None, Field(pattern="^(cookie|body)$")]
@@ -111,6 +111,9 @@ def register(app: FastAPI) -> None:
 
     @router.post("/firebase")
     def firebase(body: IdTokenBody, request: Request) -> Response:
+        if not app.state.settings.breakglass:
+            raise ApiError("not_found", "Not found", status=404)  # off means off, whatever the Origin
+        require_cookie_origin(request, body.delivery)
         app.state.limiters["auth"].check(f"firebase:{client_ip(request)}")
         return _reply(request, body.id_token, sign_in=body.sign_in, delivery=body.delivery)
 

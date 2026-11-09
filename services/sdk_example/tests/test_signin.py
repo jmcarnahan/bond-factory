@@ -196,9 +196,9 @@ def test_break_glass_is_404_without_the_flag_and_only_for_flagged_rows(app, tmp_
     with session_scope(flagged.app.state.session_factory) as session:
         session.execute(User.__table__.update().where(User.email == "demo@example.com").values(allow_password=True))
     assert flagged.get("/auth/providers").json()["break_glass"] is True
-    refused = flagged.post("/auth/firebase", json={"id_token": "mock:crew@example.com"})
+    refused = flagged.post("/auth/firebase", json={"id_token": "mock:crew@example.com"}, headers=ORIGIN)
     assert refused.status_code == 403 and refused.json()["detail"]["code"] == "provider_not_allowed"  # no flag on crew
-    ok = flagged.post("/auth/firebase", json={"id_token": "mock:demo@example.com"})
+    ok = flagged.post("/auth/firebase", json={"id_token": "mock:demo@example.com"}, headers=ORIGIN)
     assert ok.status_code == 200 and flagged.get("/auth/me").status_code == 200
     assert {r.provider for r in rows(flagged.app, AuthSession)} == {"password"}
 
@@ -313,9 +313,9 @@ def test_break_glass_form_sign_in_is_for_the_seeded_owner_only(tmp_path, monkeyp
     monkeypatch.setenv("SDK_EXAMPLE_BREAKGLASS", "1")
     monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/owner.db")
     client = browser(create_app())
-    owner = client.post("/auth/firebase", json={"id_token": "mock:demo@example.com"})
+    owner = client.post("/auth/firebase", json={"id_token": "mock:demo@example.com"}, headers=ORIGIN)
     assert owner.status_code == 200 and owner.json()["user"]["email"] == "demo@example.com"
-    crew = browser(client.app).post("/auth/firebase", json={"id_token": "mock:crew@example.com"})
+    crew = browser(client.app).post("/auth/firebase", json={"id_token": "mock:crew@example.com"}, headers=ORIGIN)
     assert crew.status_code == 403 and crew.json()["detail"]["code"] == "provider_not_allowed"
 
 
@@ -412,3 +412,46 @@ def test_the_consent_page_escapes_the_hint_and_the_state(app):
     page = client.get("/connections/fake/consent", params={"state": state, "hint": '"><script>x()</script>'})
     assert page.status_code == 200 and "<script>x()" not in page.text and "&lt;script&gt;" in page.text
     assert f"value='{state}'" in page.text  # a valid state is plain base64 text, rendered inside quotes
+
+
+def test_session_issuing_routes_need_an_allowed_origin_for_cookie_delivery(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("SDK_EXAMPLE_BREAKGLASS", "1")
+    monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/lc.db")
+    client = TestClient(create_app())  # signed out, no default Origin
+    demo, firebase = ("/auth/demo", {"user_id": "demo-user-1"}), ("/auth/firebase", {"id_token": "mock:demo@example.com"})
+    for path, body in (demo, firebase):
+        for origin in ({"Origin": "https://evil.test"}, {}):
+            refused = client.post(path, json=body, headers=origin)
+            assert refused.status_code == 403 and refused.json()["detail"]["code"] == "invalid_origin", (path, origin)
+            assert not refused.headers.get_list("set-cookie")
+        ok = client.post(path, json=body, headers=ORIGIN)
+        assert ok.status_code == 200 and len(ok.headers.get_list("set-cookie")) == 2, path
+        phone = TestClient(create_app()).post(path, json={**body, "delivery": "body"})  # no Origin needed
+        assert phone.status_code == 200 and phone.json()["refresh_token"] and not phone.headers.get_list("set-cookie")
+
+
+def test_sign_in_works_without_the_connections_module(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDK_EXAMPLE_CONNECTIONS", "0")
+    monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/noconn.db")
+    client = browser(create_app())
+    assert sign_in(client).headers["location"].endswith("signin=ok")  # identity-only, no connection table needed
+    assert client.get("/auth/me").status_code == 200
+    assert client.get("/connections").status_code == 404
+    assert client.get(f"/connections/{GOOGLE}/start").status_code == 404
+
+
+def test_a_custom_prefix_moves_the_routes_and_the_link_files_together(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDK_EXAMPLE_SIGNIN_PREFIX", "/api/v1/auth")
+    monkeypatch.setenv("BOND_APPLE_APP_IDS", "ABCDE12345.org.example.app")
+    monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/prefix.db")
+    client = browser(create_app())
+    aasa = client.get("/.well-known/apple-app-site-association").json()
+    assert aasa["applinks"]["details"][0]["components"] == [{"/": "/api/v1/app/return/*"}]
+    assert client.get(f"/api/v1/app/return/{GOOGLE}").status_code == 200  # where the files point
+    started = client.post(f"/api/v1/auth/signin/{GOOGLE}/start", json={"redirect_to": "http://localhost:8078/auth"},
+                          headers=ORIGIN)
+    assert started.status_code == 200
+    cb = consent(client, state_in(started.json()["url"]), "demo@example.com")
+    assert cb.headers["location"].endswith("signin=ok")  # the fake consent page followed the prefix
+    assert client.post("/api/v1/auth/refresh", json={}, headers=ORIGIN).status_code == 200
+    assert client.delete(f"/connections/{GOOGLE}", headers={"Origin": "https://evil.test"}).status_code == 403

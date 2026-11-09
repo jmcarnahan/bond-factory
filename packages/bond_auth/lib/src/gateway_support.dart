@@ -77,6 +77,7 @@ abstract class GatewayBase {
     this.refreshTokens = const NoRefreshTokenStore(),
     this.onSessionEnded,
     this.onStorageFailure,
+    this.authPrefix = '/auth',
     RotationIds? rotationIds,
   }) : rotationIds = rotationIds ?? RotationIds();
 
@@ -86,6 +87,10 @@ abstract class GatewayBase {
   /// Where the rotating refresh token lives. [NoRefreshTokenStore] (the
   /// default) means the web cookie carries it; delivery follows this store.
   final RefreshTokenStore refreshTokens;
+
+  /// Where the server mounts the auth routes (`/api/v1/auth` for the apps).
+  /// Every path this package calls is built from it.
+  final String authPrefix;
 
   /// The id sent with a rotation. Reused when the same rotation is retried
   /// after no answer, replaced after a stored success.
@@ -218,7 +223,7 @@ abstract class GatewayBase {
   }
 
   Future<AuthProviders> providers() async =>
-      AuthProviders.fromJson(await asAuthFailure(() => api.getJson('/auth/providers')));
+      AuthProviders.fromJson(await asAuthFailure(() => api.getJson('$authPrefix/providers')));
 
   /// `POST /auth/logout` (failures ignored; the refresh token goes in the body
   /// when this device holds one), then forget both tokens. A renewal still in
@@ -232,7 +237,7 @@ abstract class GatewayBase {
       refresh = null;
     }
     try {
-      await api.postJson('/auth/logout', body: refresh == null ? null : {'refresh_token': refresh});
+      await api.postJson('$authPrefix/logout', body: refresh == null ? null : {'refresh_token': refresh});
     } on ApiException {
       // The session is ending anyway; the cookie or token dies with the client.
     }

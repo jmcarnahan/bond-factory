@@ -346,3 +346,67 @@ def test_a_real_microsoft_provider_fails_closed_when_me_fails(cipher):
     from bond_oauth import RetryableError
     with pytest.raises((OAuthError, RetryableError)):
         flow.complete(state=started.state, code="c", expected_nonce=started.nonce, expected_device_hash=None)
+
+
+def test_a_microsoft_provider_registered_under_another_name_keeps_microsoft_rules(cipher):
+    import httpx
+    from jwt_util import CLIENT
+
+    from bond_oauth import MicrosoftOAuth
+
+    def make(pin):
+        return MicrosoftOAuth("c", "s", tenant=TID, pinned_tenant=pin,
+                              http=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(500))))
+
+    with pytest.raises(ValueError, match="entra"):  # no pin: refused although the name has no "microsoft"
+        SignInFlow(providers={"entra": make(None)}, cipher=cipher, client_ids={"entra": CLIENT}, public_base=BASE)
+    flow = SignInFlow(providers={"entra": make(TID)}, cipher=cipher, client_ids={"entra": CLIENT}, public_base=BASE)
+    seen = {}
+    flow._providers["entra"].authorize_url = lambda **kw: seen.update(kw) or "u"
+    flow.start(provider="entra", scopes=MICROSOFT_SIGNIN_FULL, redirect_to="r")
+    assert seen["prompt"] == "select_account" and seen["offline"] is True
+
+
+def test_identity_for_a_renamed_microsoft_provider_is_tid_colon_oid_and_a_renamed_google_uses_sub():
+    from jwt_util import OID, google, google_claims, microsoft, microsoft_claims, token_set
+
+    from bond_oauth import identity_from_token_response
+    who = identity_from_token_response("entra", microsoft(), token_set(microsoft_claims()), expected_nonce="n1",
+                                       client_id="client-1", now=1_800_000_000.0)
+    assert who.subject == f"{TID}:{OID}" and who.tenant == TID and who.email_verified is True
+    work = identity_from_token_response("work", google(), token_set(google_claims()), expected_nonce="n1",
+                                        client_id="client-1", now=1_800_000_000.0)
+    assert work.subject == "g-123" and work.tenant is None
+
+
+def test_identity_only_follows_the_family_not_the_name():
+    from bond_oauth import is_identity_only
+    assert is_identity_only("entra", ["openid", "User.Read"], family="microsoft") is True
+    assert is_identity_only("work", ["openid", "User.Read"], family="google") is False
+    assert is_identity_only("entra", ["openid", "offline_access"], family="microsoft") is False
+
+
+def test_a_provider_with_an_unknown_family_is_refused_at_construction(cipher):
+    odd = FakeOAuth("/c")
+    odd.family = "okta"
+    with pytest.raises(ValueError, match="family"):
+        SignInFlow(providers={"x": odd}, cipher=cipher, client_ids={"x": "c"}, public_base=BASE)
+
+
+def test_family_attributes_and_the_legacy_name_fallback():
+    from bond_oauth import GoogleOAuth, MicrosoftOAuth
+    from bond_oauth.family import family_of
+    assert GoogleOAuth.family == "google" and MicrosoftOAuth.family == "microsoft"
+    assert FakeOAuth("/c", kind="microsoft").family == "microsoft" and FakeOAuth("/c").family == "google"
+    legacy = object()  # no family attribute: only then is the name consulted
+    assert family_of("my-microsoft", legacy) == "microsoft" and family_of("x", legacy) == "google"
+
+
+def test_callback_url_honours_the_router_prefix(cipher):
+    fakes = {"fake-google": FakeOAuth("/c")}
+    kw = {"providers": fakes, "cipher": cipher, "client_ids": {"fake-google": "c"}, "public_base": BASE + "/"}
+    assert SignInFlow(**kw).callback_url("fake-google") == f"{BASE}/auth/signin/fake-google/callback"
+    flow = SignInFlow(**kw, prefix="/api/v1/auth")
+    assert flow.callback_url("fake-google") == f"{BASE}/api/v1/auth/signin/fake-google/callback"
+    started = flow.start(provider="fake-google", scopes=GOOGLE_SIGNIN, redirect_to="r")
+    assert started.state and SignInFlow(**kw, prefix="api/v1/auth/").callback_url("g") == f"{BASE}/api/v1/auth/signin/g/callback"

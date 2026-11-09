@@ -20,7 +20,6 @@ from .policy import ScopePolicy
 from .protocols import HandoffStore, IdentityFlow, SessionIssuer, UserDirectory, UserRef
 from .settings import SignInSettings
 
-NONCE_PATH = "/auth/signin"
 NONCE_MAX_AGE = 600
 
 
@@ -42,6 +41,11 @@ class Deps:
     providers_payload: Callable[[], dict] | None = None
     labels: Mapping[str, str] = field(default_factory=dict)
     clock: Callable[[], float] | None = None
+    prefix: str = "/auth"
+
+    @property
+    def nonce_path(self) -> str:
+        return f"{self.prefix}/signin"
 
     def now(self) -> float | None:
         """The injected clock's epoch seconds, or None so the sibling libs use their own real clock."""
@@ -81,10 +85,10 @@ async def read_json(request: Request, *, strict: bool = True) -> dict:
 
 
 def with_params(target: str, **params: str | None) -> str:
-    """``target`` with the non-None ``params`` appended to its query; a fragment is dropped."""
+    """``target`` with the non-None ``params`` appended to its query; a fragment (``#/route``) stays after it."""
     parts = urlsplit(target)
     query = urlencode([*parse_qsl(parts.query), *((k, v) for k, v in params.items() if v is not None)])
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, ""))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
 
 
 def redirect(target: str, **params: str | None) -> RedirectResponse:

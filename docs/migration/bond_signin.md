@@ -3,10 +3,11 @@
 Direct Google/Microsoft sign-in with our own refresh sessions, replacing Firebase sign-in. Server: `libs/bond_signin`
 (Protocol-only router factory, check order, `ScopePolicy`) over `bond_oauth` (`SignInFlow`, `HandoffStore`) and
 `bond_auth_py` (`SessionStore`). Client: `bond_signin`, `bond_signin_ui`. Contract: `docs/contracts/signin.md`.
-Reference adapter: `services/sdk_example/sdk_example/signin_wiring.py`. Legend: `docs/migration/README.md`.
+Reference adapter: `services/sdk_example/sdk_example/signin_wiring.py`. Decision: `docs/decisions/2026-11-09-direct-signin.md`.
+Order of work, prefix mount, installed-build cutover, Postgres run: `bond_signin-cutover.md`. Legend: `docs/migration/README.md`.
 
 The app writes ONLY a `UserDirectory`, a `ScopePolicy`, settings and a mount. Order of work: land the SDK pin and
-`bond_auth`/`bond_auth_py` first, then this (see README order). The first LIVE provider run happens here (section 6).
+`bond_auth`/`bond_auth_py` first, then this (see README order). The first LIVE provider run happens here (section 6). S moves to the SDK auth contract before any of this.
 
 ## 1. What each app writes (INFERENCE sizes; before to after: A ~3,080 to ~940, S ~4,580 to ~1,100, P ~2,000 to ~625 lines)
 
@@ -48,11 +49,12 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
   `<api host>/connections/google/callback`. The app is External (users are on plain Gmail). The identity-only sign-in
   client carries no sensitive scope and needs no scope verification. The role asks (`gmail.send`, `calendar.events`)
   are sensitive: brand and scope verification is the app's console task before more than 100 test users. Any Gmail
-  READ scope would be restricted (annual assessment); do not add one. Testing mode shortens refresh tokens to 7 days.
+  READ scope would be restricted (annual assessment); do not add one. Publish the app out of Testing before real users: Testing caps 100 users and expires refresh tokens in 7 days.
 - **Microsoft (S).** Single-tenant registration, tenant GUID `<tenant GUID>`. Both callbacks under Web. Grant tenant-wide
-  admin consent for the five Graph scopes. Guests are refused; everyone signs in on the company tenant.
+  admin consent for the five Graph scopes. Guests are refused; everyone signs in on the company tenant. The lib matches invites on Graph `mail`, then the token
+  `email`, then the UPN: key invites on the mailbox address or store both.
 - **Apple (A, P, S phones).** Associated Domains entitlement `applinks:<api host>` and `webcredentials:<api host>`; AASA for
-  `<TEAMID>.<bundle id>` served by `well_known_router`. A private dev host needs the `?mode=developer` suffix.
+  `<TEAMID>.<bundle id>` served by `well_known_router`. A private dev host needs the suffix in the entitlement string: `applinks:<api host>?mode=developer`.
 - **Android (optional; S and A have no `android/` today).** `autoVerify` https intent filter for `/app/return/*`,
   `android:taskAffinity=""`, and `assetlinks.json` with debug and Play-signing SHA-256 fingerprints.
 - **iOS floor.** The apps build for iOS 15.0; the https return is honoured from iOS 17.4 and below it the plugin

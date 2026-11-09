@@ -11,22 +11,16 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import bond_oauth as oauth
+import bond_signin
 from bond_auth_py import SessionSpec
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .models.auth import User, utcnow
-from .models.connections import OAuthConnection
 from .oauth_wiring import OAuthWiring
 
 LOGGER = logging.getLogger("sdk_example.signin")
 PROVIDER_REFUSALS = frozenset({"invalid_grant", "unauthorized_client", "invalid_client"})
-
-
-class IdentityTaken(Exception):
-    """The provider account is already linked to a different user. The lib reads `code`, never the class."""
-
-    code = "identity_mismatch"
 
 
 class Directory:
@@ -41,17 +35,21 @@ class Directory:
     def find_by_id(self, session: Session, user_id: str) -> User | None:
         return session.get(User, user_id)
 
-    def find_invite(self, session: Session, emails: Sequence[str], provider: str) -> User | None:
+    def find_invite(self, session: Session, emails: Sequence[str], provider: str, *,
+                    subject: str | None = None) -> User | None:
         """The invited row for the verified address(es) (already lowercased; the stored e-mail is compared lowercased too). Two different users behind the
         candidates is ambiguous: None, so the person is refused as not invited. An app with an admin e-mail list
-        (or a `removed` flag) applies it here, and may create or promote the row inside this transaction."""
+        (or a `removed` flag) applies it here, and may create or promote the row inside this transaction.
+
+        `subject` is the provider's id for the person. This example matches by e-mail only; an app that backfilled
+        Firebase identities (provider uid to subject) would look the subject up here first and return that row."""
         rows = {u.id: u for u in session.scalars(select(User).where(func.lower(User.email).in_(list(emails))))}
         return next(iter(rows.values())) if len(rows) == 1 else None
 
     def link_identity(self, session: Session, user: User, provider: str, subject: str) -> None:
         """Bind the provider account to the user, once. The lib calls this only after the identity checks."""
         if self.find_by_identity(session, provider, subject) not in (None, user):
-            raise IdentityTaken(f"{provider} account already linked")
+            raise bond_signin.IdentityTaken(f"{provider} account already linked")
         user.identity_provider, user.identity_subject = provider, subject
 
     # --- rules and the session's content ----------------------------------------------------------------
@@ -94,6 +92,9 @@ class Directory:
         sign-in has none, so this stays None for it."""
         if self.fake:  # no real provider to ask: the fake accounts never go away
             return None
+        from .models.connections import (
+            OAuthConnection,  # lazily: an app without connections has no such model
+        )
         row = session.scalar(select(OAuthConnection).where(
             OAuthConnection.user_id == user.id, OAuthConnection.provider == provider,
             OAuthConnection.revoked_at.is_(None)))

@@ -32,7 +32,7 @@ from bond_oauth import (
     TokenCipher,
 )
 from bond_oauth.fake import FAKE_TENANT, mock_code
-from bond_signin import CookiePolicy, ScopePolicy, SignInSettings, make_signin_router
+from bond_signin import CookiePolicy, IdentityTaken, ScopePolicy, SignInSettings, make_signin_router
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from sqlalchemy import JSON, Boolean, Column, DateTime, String, create_engine, func, select
@@ -91,11 +91,14 @@ class Directory:
     def find_by_id(self, s, user_id):
         return s.get(User, user_id)
 
-    def find_invite(self, s, emails, provider):
+    def find_invite(self, s, emails, provider, *, subject=None):
         rows = {u.id: u for u in s.scalars(select(User).where(func.lower(User.email).in_(list(emails))))}
         return next(iter(rows.values())) if len(rows) == 1 else None
 
     def link_identity(self, s, user, provider, subject):
+        if s.scalar(select(User).where(User.idp_provider == provider, User.idp_subject == subject,
+                                       User.id != user.id)):
+            raise IdentityTaken()
         user.idp_provider, user.idp_subject = provider, subject
 
     def check_allowed(self, s, user, provider):
@@ -183,7 +186,7 @@ def device_pair(secret: str = "device-secret-0123456789") -> tuple[str, str]:
     return secret, hashlib.sha256(secret.encode()).hexdigest()
 
 
-def build_stack(db_path: str) -> Stack:
+def build_stack(db_path: str, prefix: str = "/auth") -> Stack:
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
@@ -193,7 +196,7 @@ def build_stack(db_path: str) -> Stack:
                           pinned_tenant=FAKE_TENANT)
     flow = SignInFlow(providers={GOOGLE: google, MICROSOFT: microsoft}, cipher=cipher,
                       client_ids={GOOGLE: CLIENT_ID, MICROSOFT: CLIENT_ID}, public_base=API_BASE,
-                      pinned_tenants={MICROSOFT: FAKE_TENANT})
+                      pinned_tenants={MICROSOFT: FAKE_TENANT}, prefix=prefix)
     handoffs = HandoffStore(Handoff, cipher)
     auth = AuthSettings(jwt_secret=SECRET, app_name=APP)
     store = SessionStore(AuthSession, auth)
@@ -229,11 +232,11 @@ def build_stack(db_path: str) -> Stack:
         directory=directory, flow=flow, handoffs=handoffs, sessions=sessions, policy=policy, settings=settings,
         cookies=cookies, session_dep=session_dep, client_ip=client_ip, session_scope=stack.db,
         connection_model=Connection, rate_limit=lambda request, key: stack.rate_calls.append(key),
-        include_providers=True, legacy_refresh=lambda request, body: {"legacy": True},
+        prefix=prefix, include_providers=True, legacy_refresh=lambda request, body: {"legacy": True},
         labels={GOOGLE: "Fake Google", MICROSOFT: "Fake Microsoft"})
     stack.app.include_router(router)
 
-    @stack.app.get("/auth/me")
+    @stack.app.get(f"{prefix}/me")
     def me(request: Request):
         user = session_dep(request)
         if user is None:
