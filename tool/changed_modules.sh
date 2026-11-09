@@ -5,6 +5,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BASE="${BASE:-main}"
+if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
+  echo "changed_modules: base ref '$BASE' cannot be resolved (shallow clone? run: git fetch origin $BASE:$BASE, or set BASE=<ref>)" >&2
+  exit 2
+fi
 ALL="packages/bond_roof packages/bond_roof_ui demos/roof_demo services/roof_measure packages/bond_json packages/bond_api packages/bond_test_support packages/bond_ui packages/bond_auth packages/bond_auth_firebase packages/bond_sync packages/bond_sync_powersync packages/bond_tasks packages/bond_tasks_ui packages/bond_connections packages/bond_connections_ui demos/sdk_demo libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py services/sdk_example"
 
 # prefix -> affected modules (reverse dependencies)

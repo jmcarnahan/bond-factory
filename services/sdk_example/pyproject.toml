@@ -1,7 +1,7 @@
 [project]
 name = "sdk_example"
 version = "0.1.0"
-description = "Reference FastAPI app wiring every bond Python lib."
+description = "Reference FastAPI app wiring every bond Python lib (phase 1: skeleton with /health; routes land in phases 2 and 3)."
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "fastapi>=0.115",
