@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Public-hygiene check before every push; same scan as pre-commit so an amended or rebased tree is re-checked.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+bash tool/public_hygiene.sh || { echo "pre-push: public hygiene failed; nothing pushed" >&2; exit 1; }

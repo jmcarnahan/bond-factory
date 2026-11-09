@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Public-hygiene gate. This repo is public. Scans tracked files under
-#   packages libs services demos fixtures tool make .github docs/sdk docs/decisions docs/contracts docs/test
+#   packages libs services demos fixtures tool make .github .githooks docs/sdk docs/decisions docs/contracts docs/test
 #   and the root files pubspec.yaml pyproject.toml Makefile (README.md and CLAUDE.md name the apps on purpose)
 # for e-mail addresses, API keys, private keys, cloud access keys, Firebase
 # hosting names and the brand denylist, and fails on fixtures over 100 KB.
@@ -27,7 +27,7 @@ case "${1:-}" in
   *) echo "unknown argument: $1 (try --help)" >&2; exit 2 ;;
 esac
 
-ROOTS=(packages libs services demos fixtures tool make .github docs/sdk docs/decisions docs/contracts docs/test
+ROOTS=(packages libs services demos fixtures tool make .github .githooks docs/sdk docs/decisions docs/contracts docs/test
        pubspec.yaml pyproject.toml Makefile)
 
 list="$(mktemp)"
