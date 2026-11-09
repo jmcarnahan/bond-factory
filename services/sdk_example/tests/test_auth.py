@@ -44,7 +44,7 @@ def test_demo_sign_in_returns_token_and_user(client):
     body = demo(client)
     assert body["user"] == {
         "id": "demo-user-1", "email": "demo@example.com", "name": "Demo User", "initials": "DU",
-        "language": "en", "capabilities": ["tasks.write", "connections.manage"],
+        "language": "en", "capabilities": ["tasks.write", "tasks.read_all", "connections.manage"],
     }
     me = client.get("/auth/me", headers=bearer(body["token"]))
     assert me.status_code == 200

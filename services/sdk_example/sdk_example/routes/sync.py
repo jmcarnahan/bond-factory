@@ -14,6 +14,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
+import bond_tasks_py as tasks
 from bond_service_kit import ApiError
 from bond_sync_py import (
     Ctx,
@@ -28,17 +29,21 @@ from bond_sync_py import (
     is_configured,
     jwks,
     mint_sync_token,
+    rejected,
     server_now_iso,
     upload,
     written_by,
 )
+from bond_tasks_py import sync_routes, verdict_for
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from .. import tasks_wiring
 from ..auth_dep import current_user_id
 from ..models.sync import Note
+from ..models.tasks import Task
 
 KEY_FILE = "sync_key.pem"
 
@@ -85,12 +90,60 @@ def _notes(session, ctx: Ctx, op, data: dict) -> None:
     note.updated_at = _now()
 
 
-def build_host() -> Host:
+class _LazyScheduler:
+    """The tasks routes build their scheduler later than this module registers (routes load alphabetically), so look it
+    up on the app when a task write needs it."""
+
+    def __init__(self, app: FastAPI) -> None:
+        self.app = app
+
+    def enqueue(self, session, **kwargs) -> None:
+        self.app.state.tasks_scheduler.enqueue(session, **kwargs)
+
+    def cancel(self, session, **kwargs) -> None:
+        self.app.state.tasks_scheduler.cancel(session, **kwargs)
+
+
+def _reject_for(session, user, op, exc):
+    """Map the tasks lib's TaskError to the sync vocabulary (forbidden, not_found, conflict, invalid)."""
+    verdict = verdict_for(exc)
+    return rejected(op.seq, verdict[0], verdict[1]) if verdict else None
+
+
+def _already_written(session, user, op) -> bool:
+    model = Task if op.table == "tasks" else Note
+    return written_by(session, model, "owner_user_id", user, op.id)
+
+
+def build_host(app: FastAPI) -> Host:
+    """Two synced tables: ``notes`` (handled here) and ``tasks`` (routes shipped by bond_tasks_py)."""
+    routes = {("notes", None): Route(frozenset({"put", "patch", "delete"}), _notes, ("title", "body"))}
+    tz = app.state.settings.tz
+
+    def after_write(ctx, session, task) -> None:
+        """Queue the calendar mirror for after the response (the ops have committed by then), as the REST routes do."""
+        if task.mirror_status == "pending" and ctx.background is not None:
+            ctx.background.add_task(tasks.sync_mirror, app.state.session_factory, Task, task.id,
+                                    app.state.mirror_providers, tz=tz)
+
+    def after_delete(ctx, session, pointer) -> None:
+        if pointer is not None and ctx.background is not None:
+            ctx.background.add_task(tasks.remove_event, app.state.session_factory, app.state.mirror_providers, pointer)
+
+    def user_exists(user_id: str) -> bool:
+        """The assignee must be an active user. A short read on its own session: the routes get no session to hand over."""
+        with app.state.session_factory() as session:
+            return tasks_wiring.user_exists(session)(user_id)
+
+    task_routes = sync_routes(Task, scheduler=_LazyScheduler(app), tz=tz, user_exists=user_exists,
+                              after_write=after_write, after_delete=after_delete)
+    routes.update({key: Route(r.ops, r.handler, r.reads) for key, r in task_routes.items()})
     return Host(
-        routes={("notes", None): Route(frozenset({"put", "patch", "delete"}), _notes, ("title", "body"))},
-        tables={"notes": Note.__table__},
-        single_action=frozenset({"notes"}),
-        already_written=lambda session, user, op: written_by(session, Note, "owner_user_id", user, op.id),
+        routes=routes,
+        tables={"notes": Note.__table__, "tasks": Task.__table__},
+        single_action=frozenset({"notes", "tasks"}),
+        reject_for=_reject_for,
+        already_written=_already_written,
     )
 
 
@@ -132,13 +185,14 @@ def _sync_off() -> ApiError:
 
 def register(app: FastAPI) -> None:
     router = APIRouter(prefix="/sync", tags=["sync"])
-    host = build_host()
+    host = build_host(app)
 
     @router.post("/upload")
-    def upload_route(body: UploadRequest, request: Request, user_id: str = Depends(current_user_id)):
+    def upload_route(body: UploadRequest, request: Request, background: BackgroundTasks,
+                     user_id: str = Depends(current_user_id)):
         """Always 200 with one verdict per op; only an unavailable database answers 503 so the client retries."""
         try:
-            return upload(request.app.state.session_factory, host, Ctx(user=user_id), body).wire()
+            return upload(request.app.state.session_factory, host, Ctx(user=user_id, background=background), body).wire()
         except DbUnavailable:
             error = ApiError("db_unavailable", "The database is not answering. Try again in a few seconds", status=503)
             return JSONResponse({"detail": error.detail()}, status_code=503, headers={"Retry-After": "5"})

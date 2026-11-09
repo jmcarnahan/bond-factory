@@ -10,6 +10,7 @@ from bond_jobs import JobsMixin
 from bond_oauth.models import ConnectionsMixin
 from bond_service_kit import SchemaContract, schema_contract
 from bond_storage import GrantsMixin
+from bond_tasks_py import TasksMixin
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import declarative_base
 
@@ -42,6 +43,10 @@ def test_grants_table_matches_the_storage_lib(engine):
 
 def test_connections_table_matches_the_oauth_lib(engine):
     lib_contract(ConnectionsMixin, "oauth_connections").assert_matches(engine)
+
+
+def test_tasks_table_matches_the_tasks_lib(engine):
+    lib_contract(TasksMixin, "tasks").assert_matches(engine)
 
 
 def test_users_table_has_what_the_auth_lib_reads(engine):
@@ -94,7 +99,7 @@ def test_a_missing_index_is_noticed(engine):
 
 def test_the_example_tables_are_the_expected_set(engine):
     names = set(inspect(engine).get_table_names()) - {"alembic_version"}
-    assert {"users", "background_jobs", "download_grants", "documents", "notes", "oauth_connections"} <= names
+    assert {"users", "background_jobs", "download_grants", "documents", "notes", "oauth_connections", "tasks"} <= names
 
 
 def test_upgrade_head_on_a_fresh_database_matches_the_models(tmp_path, monkeypatch):
@@ -118,7 +123,7 @@ def test_a_database_the_fake_app_created_is_already_at_head(app, tmp_path, monke
     config.set_main_option("script_location", str(SERVICE / "alembic"))
     command.upgrade(config, "head")  # would raise "table already exists" if the stamp were missing
     with app.state.engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0001"
+        assert MigrationContext.configure(connection).get_current_revision() == "0002"
 
 
 def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
@@ -126,7 +131,7 @@ def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
     bootstrap_schema(engine)
     assert "users" in inspect(engine).get_table_names()
     with engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0001"
+        assert MigrationContext.configure(connection).get_current_revision() == "0002"
 
 
 def test_bootstrap_leaves_a_stale_database_alone_and_says_so(tmp_path, caplog):

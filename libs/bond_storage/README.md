@@ -32,7 +32,7 @@ A name is read as `<prefix><NAME>` first, then `<NAME>`. The bucket variable is 
 
 Pass the bucket variable your app already uses, each app its own:
 `StorageSettings.from_env(bucket_env="MYAPP_S3_BUCKET")`. The per-app names (and the migration steps) belong in
-`docs/migration/bond_storage.md` (written in phase 2). Set the addressing style explicitly when an endpoint is set: with a custom endpoint
+`docs/migration/bond_storage.md`. Set the addressing style explicitly when an endpoint is set: with a custom endpoint
 most providers want `path`.
 
 ## Grants

@@ -49,9 +49,9 @@ shape into the app. They are never shipped. `README.md` in this folder covers co
 | `bond_jobs` | `models/jobs.py`, the registry in `wiring.py` | none | none |
 | `bond_sync_py`, `bond_sync`, `bond_sync_powersync` | `routes/sync.py`, `models/sync.py` | `sync_page.dart`: rows, upload verdicts, token | `/sync` |
 | `bond_oauth` | `routes/connections.py`, `oauth_wiring.py`, `models/connections.py`; routes: `GET /connections`, `GET /connections/{provider}/start`, `GET /connections/{provider}/go?state=` (sets the nonce cookie, then redirects to the provider), `GET /connections/{provider}/callback`, `DELETE /connections/{provider}`, `GET /connections/fake/consent`, `POST /connections/{provider}/simulate-expiry` | `connections_page.dart` | `/connections` |
-| tasks, calendar, connections UI | the same pattern: a `routes/<module>.py` and a `models/<module>.py` | `tasks_page.dart`, `connections_page.dart` | `/tasks` |
-
-A page whose module has not landed shows a placeholder under `sdk.<id>.placeholder`.
+| `bond_tasks_py`, `bond_tasks`, `bond_tasks_ui` | `tasks_wiring.py` (scheduler, `task_reminder` handler, mirror providers), `routes/tasks.py` (CRUD, `/tasks/summary`, `/tasks/notices`), `routes/jobs.py` (`POST /jobs/tick`), `models/tasks.py` | `tasks_page.dart`: quick add, list, mirror, summary, run due jobs, notices | `/tasks` |
+| `bond_calendar` | `calendar_wiring.py` (one provider per OAuth connection, fake calendars in fake mode), `routes/calendar.py` (`GET /calendar/events`) | none; the task mirror shows the external id | none |
+| `bond_connections`, `bond_connections_ui` | the `bond_oauth` routes above | `connections_page.dart` (with `connections_nav_web.dart` and `connections_nav_io.dart`): status list, start URL, return banner, simulate expiry | `/connections` |
 
 ## services/sdk_example
 
@@ -89,7 +89,8 @@ The identifier is the DOM attribute `flt-semantics-identifier`, so a walk select
 |---|---|
 | `sdk.<page>.<element>` | `sdk.api.result`, `sdk.sync.rows`, `sdk.ui.button` |
 | `sdk.nav.<id>` and `sdk.home.route-<id>` | `sdk.nav.auth` |
-| `sdk.<id>.placeholder` | `sdk.tasks.placeholder` |
+| `sdk.tasks.<element>` (also per row: `mirror-<id>`, `delete-<id>`) | `sdk.tasks.quick-add`, `sdk.tasks.summary`, `sdk.tasks.run-due-jobs`, `sdk.tasks.show-notices` |
+| `sdk.connections.<element>` | `sdk.connections.list`, `sdk.connections.start-url`, `sdk.connections.return`, `sdk.connections.simulate-expiry-<provider>` |
 | `<key>-<value>` for segmented and select options | `<key>` is the field id |
 | `sdk.errors` | the error strip; it must be absent after every step |
 

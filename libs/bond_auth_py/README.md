@@ -76,7 +76,8 @@ verify_id_token("tok", settings)                   # or the literal "mock:a@exam
 ```
 
 `default_mock().load_file(path)` seeds identities from a JSON list of `{email, name?, uid?, token?}`.
-`MockIdentityAdmin` is the in-memory admin; `fail_mail`, `fail_link`, `unavailable` force error paths.
+`MockIdentityAdmin` is the in-memory admin over `default_mock()`; set `fail_mail`, `fail_link` or `unavailable`
+on `default_mock()` (the `MockIdentities` store it wraps) to force error paths.
 
 ## Environment (`AuthSettings.from_env(prefix="BOND_AUTH_", firebase_prefix="FIREBASE_")`)
 
@@ -85,6 +86,7 @@ verify_id_token("tok", settings)                   # or the literal "mock:a@exam
 | `BOND_AUTH_JWT_SECRET` (or `JWT_SECRET_KEY`) | `jwt_secret` |
 | `BOND_AUTH_ISSUER`, `_AUDIENCE` | `issuer` (`bond`), `audience` (`bond-api`) |
 | `BOND_AUTH_ACCESS_TTL_MINUTES` (or `ACCESS_TOKEN_EXPIRE_MINUTES`) | `access_ttl_minutes` (10080) |
+| `BOND_AUTH_AUTH_TIME_SKEW_SECONDS` | `auth_time_skew_seconds` (5) |
 | `BOND_AUTH_MOCK`, `_TEST_ENV`, `_MOCK_IDENTITIES_FILE` | mock tier, second switch, identities file |
 | `BOND_AUTH_GOOGLE`, `_GOOGLE_WEB_CLIENT_ID`, `_APPLE`, `_EMAIL_PASSWORD`, `_DEMO` | provider flags |
 | `FIREBASE_PROJECT_ID`, `_SERVICE_ACCOUNT_JSON`, `_SERVICE_ACCOUNT_FILE`, `_WEB_API_KEY` | server config |

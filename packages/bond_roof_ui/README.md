@@ -1,14 +1,14 @@
 # bond_roof_ui
 
 Flutter widgets that draw a `bond_roof` scene on a canvas and turn a roof model into a
-printable two-page report. Pure drawing: the geometry, labels and totals come from
+printable three-page report (length diagram, area diagram, summary). Pure drawing: the geometry, labels and totals come from
 `packages/bond_roof` (see `docs/contracts/roof_model.md`).
 
 ## Public API (`package:bond_roof_ui/bond_roof_ui.dart`)
 
 - `RoofDiagramView(scene, {fit})`: a widget that paints a `Scene` with `ScenePainter`
   (a `CustomPainter`), scaled to fit.
-- `RoofReport.pages(model, {style})`: the length diagram and the area diagram as two
+- `RoofReport.pages(model, {style})`: the length diagram, the area diagram and the summary block as three
   `Scene`s at `RoofReport.pageWidth` x `RoofReport.pageHeight` (1650 x 1275 px, US Letter
   landscape at 150 dpi).
 - `printReport(model, ...)` and `shareReport(model, ...)`: build the PDF with

@@ -11,7 +11,7 @@ Status: accepted. Dated, append-only. The full plan lives outside the repo; thes
 - **D3 Tokens.** Colours and fonts live in a `BondTokens` theme extension. Spacing, radius and text scale are
   plain constants (`BondSpace`, `BondRadius`, `BondText`). Alias tricks belong in app migrations, not packages.
 - **D4 Auth contract.** `sub` is the user id, the `capabilities` claim, `/auth/refresh`, and revocation by
-  `sessions_valid_after`, with an `extra_claims(user)` hook. Capability vocabularies stay per app.
+  `sessions_valid_after`, with an `extra_claims` dict argument on `create_access_token`. Capability vocabularies stay per app.
 - **D5 Firebase config.** Clients read it at runtime from `GET /auth/providers`. No `firebase_options.dart`.
 - **D6 Sync.** `bond_sync` is pure Dart with a store seam. `bond_sync_powersync` is the adapter.
 - **D7 Error body.** `{"detail": {"code", "message", "hint"?}}`. `bond_api` also parses the legacy string form.

@@ -6,7 +6,7 @@ Role: Shared Flutter design tokens, theme, labels and widgets for the bond app f
 - `lib/src/tokens/`: `BondTokens` (colours, font), `BondSpace`, `BondRadius`, `BondText`, `BondLayout`. Raw colours live only here.
 - `lib/src/theme/`: `BondTheme.build`, `BondScope` (the one injection point).
 - `lib/src/labels.dart`: `BondLabels`, every string a widget shows. `lib/src/semantics.dart`: `bondSemantics`.
-- `lib/src/primitives/`: 19 `Bond<Name>` widgets. Tests in `test/primitives/`.
+- `lib/src/primitives/`: the `Bond<Name>` primitive widgets (plus small internal helpers: confirm line, date calendar, date format). Tests in `test/primitives/`.
 
 ## Commands
 - `make test T=test/primitives/bond_button_test.dart` (one file)

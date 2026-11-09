@@ -38,7 +38,7 @@ void setPhone(WidgetTester tester) => bts.setPhone(tester, dpr: 3); // test_host
 
 | Old | New | Find |
 |---|---|---|
-| `expectNoOverlays(tester);` (A 1,422, P 361) | `await expectNoOverlays(tester);` (now returns a `Future`) | `grep -rn "expectNoOverlays(" flutterui \| grep -v await` |
+| `expectNoOverlays(tester);` (A 1,422, P 357) | `await expectNoOverlays(tester);` (now returns a `Future`) | `grep -rn "expectNoOverlays(" flutterui \| grep -v await` |
 | `setPhone(tester)` (A 98, P 10, S 71) | unchanged: 390 x 844 at dpr 1; S passes `dpr: 3` | |
 | `setWideScreen(tester)` (A 85, P 9, S 473) | unchanged through the shim above | |
 | a hand-rolled canned `http.Client` | `CannedHttpClient(CannedResponses()..json('GET', '/x', {...}))` | |

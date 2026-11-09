@@ -2,7 +2,7 @@
 
 ## 0.1.0 - unreleased
 
-Tokens, theme, labels, semantics helper and the 19 primitives, lifted from the two near-identical app UI packages.
+Tokens, theme, labels, semantics helper and the primitive widgets, lifted from the two near-identical app UI packages.
 
 ### Added
 - Tokens: `BondTokens` (ThemeExtension for colours and font), `BondTone`, `BondToneRole`, `BondToneColors`, `BondSpace`, `BondRadius`, `BondShadows`, `BondText`, `BondLayout`, `BondSize`.
