@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
+import pytest
 from bond_auth_py import create_access_token
 from fastapi import Depends
 from fastapi.testclient import TestClient
@@ -12,6 +13,24 @@ from sdk_example.main import create_app
 from sdk_example.models.auth import User, utcnow
 
 STRONG_SECRET = "a-test-secret-that-is-at-least-32-bytes-long"
+WEB = {"Origin": "http://localhost:8078"}  # cookie-delivery POSTs of the sign-in lib need an allowed Origin
+
+
+REAL_WEB = {"Origin": "https://app.example.org"}  # the real-mode tests' allowlist
+
+
+@pytest.fixture(autouse=True)
+def _breakglass(monkeypatch):
+    """`/auth/firebase` is the break-glass route: off unless SDK_EXAMPLE_BREAKGLASS=1, and only for rows flagged
+    `allow_password`. These tests are about that route, so the flag is on and the two demo rows carry the flag."""
+    monkeypatch.setenv("SDK_EXAMPLE_BREAKGLASS", "1")
+
+
+@pytest.fixture
+def app(app):
+    for user_id in ("demo-user-1", "demo-user-2"):
+        edit_user(app, user_id, allow_password=True)
+    return app
 
 
 def demo(client: TestClient, user_id: str = "demo-user-1") -> dict:
@@ -61,14 +80,18 @@ def test_demo_unknown_user_is_404_and_empty_body_is_422(client):
 def test_demo_route_is_404_outside_fake_mode(tmp_path, monkeypatch):
     monkeypatch.setenv("SDK_EXAMPLE_MODE", "real")
     monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", STRONG_SECRET)
+    monkeypatch.setenv("SDK_EXAMPLE_PUBLIC_BASE", "https://api.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "https://app.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "https://app.example.org")
     monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/real.db")
     real = TestClient(create_app())
-    assert real.post("/auth/demo", json={"user_id": "demo-user-1"}).status_code == 404
-    answer = real.post("/auth/firebase", json={"id_token": "mock:demo@example.com"})
+    assert real.post("/auth/demo", json={"user_id": "demo-user-1"}, headers=REAL_WEB).status_code == 404
+    answer = real.post("/auth/firebase", json={"id_token": "mock:demo@example.com"}, headers=REAL_WEB)
     assert answer.status_code == 501
     assert code_of(answer) == "firebase_not_configured"
     providers = real.get("/auth/providers").json()
     assert providers["demo"] is False and providers["mock"] is False
+    assert providers["signin"] == [] and providers["default_flow"] == "firebase"  # real mode: no sign-in provider unless named and configured
 
 
 def test_mock_firebase_sign_in_links_the_identity(app, client):
@@ -103,7 +126,7 @@ def test_an_unverifiable_token_is_401_invalid_token(client):
 def test_refresh_renews_without_counting_a_sign_in(app, client):
     client.post("/auth/firebase", json={"id_token": "mock:demo@example.com"})
     before = read_user(app, "demo-user-1").last_sign_in_at
-    answer = client.post("/auth/refresh", json={"id_token": "mock:demo@example.com"})
+    answer = client.post("/auth/refresh", json={"id_token": "mock:demo@example.com"}, headers=WEB)
     assert answer.status_code == 200
     assert answer.json()["token"]
     assert read_user(app, "demo-user-1").last_sign_in_at == before
@@ -153,7 +176,7 @@ def test_the_cookie_works_and_an_explicit_bearer_wins_over_it(client):
 
 def test_logout_clears_the_cookie(client):
     demo(client)
-    answer = client.post("/auth/logout")
+    answer = client.post("/auth/logout", headers=WEB)
     assert answer.json() == {"status": "logged_out"}
     assert COOKIE not in client.cookies
     assert client.get("/auth/me").status_code == 401
@@ -163,6 +186,8 @@ def test_providers_has_the_merged_shape_in_fake_mode(client):
     assert client.get("/auth/providers").json() == {
         "demo": True, "email_password": True, "google": False, "google_web_client_id": None, "apple": False,
         "mock": True, "firebase": None, "sync": {"url": "http://localhost:8012/powersync-fake"},
+        "signin": [{"id": "fake-google", "label": "Fake Google"}, {"id": "fake-microsoft", "label": "Fake Microsoft"}],
+        "break_glass": True, "default_flow": "signin",
     }
 
 
@@ -175,13 +200,16 @@ def test_me_language_patch(client):
     assert bad.status_code == 422 and code_of(bad) == "validation_error"
 
 
-def test_firebase_and_refresh_are_limited_to_20_a_minute(client):
+def test_firebase_and_refresh_are_each_limited_to_20_a_minute(client):
     for _ in range(20):
         assert client.post("/auth/firebase", json={"id_token": "garbage"}).status_code == 401
-    limited = client.post("/auth/refresh", json={"id_token": "garbage"})
+    limited = client.post("/auth/firebase", json={"id_token": "garbage"})
     assert limited.status_code == 429
     assert limited.headers["retry-after"] == "60"
     assert code_of(limited) == "rate_limited"
+    for _ in range(20):  # the lib's refresh route has its own bucket ("refresh"), same limiter
+        assert client.post("/auth/refresh", json={"id_token": "garbage"}, headers=WEB).status_code == 401
+    assert client.post("/auth/refresh", json={"id_token": "garbage"}, headers=WEB).status_code == 429
 
 
 def test_require_capability_uses_the_users_row(app, client):
@@ -235,7 +263,7 @@ def test_refresh_never_counts_as_a_sign_in_even_when_asked(app, client):
     client.post("/auth/firebase", json={"id_token": "mock:demo@example.com"})
     before = read_user(app, "demo-user-1").last_sign_in_at
     for body in ({}, {"sign_in": True}, {"sign_in": False}):
-        answer = client.post("/auth/refresh", json={"id_token": "mock:demo@example.com", **body})
+        answer = client.post("/auth/refresh", json={"id_token": "mock:demo@example.com", **body}, headers=WEB)
         assert answer.status_code == 200, answer.text
     assert read_user(app, "demo-user-1").last_sign_in_at == before
 
@@ -243,15 +271,28 @@ def test_refresh_never_counts_as_a_sign_in_even_when_asked(app, client):
 def test_session_cookie_attributes(client):
     for answer in (client.post("/auth/demo", json={"user_id": "demo-user-1"}),
                    client.post("/auth/firebase", json={"id_token": "mock:demo@example.com"})):
-        cookie = answer.headers["set-cookie"].lower()
-        assert cookie.startswith(f"{COOKIE}=")
-        assert "httponly" in cookie and "samesite=lax" in cookie and "path=/" in cookie
-        assert "secure" not in cookie  # fake mode is plain http on localhost
+        access, refresh = answer.headers.get_list("set-cookie")
+        for cookie in (access.lower(), refresh.lower()):
+            assert "httponly" in cookie and "samesite=lax" in cookie
+            assert "secure" not in cookie  # fake mode is plain http on localhost
+        assert access.lower().startswith(f"{COOKIE}=") and "path=/;" in access.lower() + ";"
+        assert "max-age=3600" in access.lower()  # the session access token lives 60 minutes
+        assert refresh.lower().startswith("sdk_example_refresh_token=") and "path=/auth" in refresh.lower()
+        assert "refresh_token" not in answer.json()  # cookie delivery keeps it out of the body
+
+
+def test_body_delivery_returns_the_refresh_token_and_sets_no_cookie(client):
+    answer = client.post("/auth/demo", json={"user_id": "demo-user-1", "delivery": "body"})
+    assert answer.status_code == 200 and answer.json()["refresh_token"]
+    assert not answer.headers.get_list("set-cookie")
 
 
 def test_session_cookie_is_secure_outside_fake_mode(tmp_path, monkeypatch):
     monkeypatch.setenv("SDK_EXAMPLE_MODE", "real")
     monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", STRONG_SECRET)
+    monkeypatch.setenv("SDK_EXAMPLE_PUBLIC_BASE", "https://api.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "https://app.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "https://app.example.org")
     monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/real.db")
     real = create_app()
     from sdk_example.models.auth import ensure_demo_users
@@ -260,15 +301,17 @@ def test_session_cookie_is_secure_outside_fake_mode(tmp_path, monkeypatch):
     bootstrap_schema(real.state.engine)
     with session_scope(real.state.session_factory) as session:
         ensure_demo_users(session)
+    edit_user(real, "demo-user-1", allow_password=True)
     from bond_auth_py import set_verifier
 
     set_verifier(lambda token: {"uid": "u1", "email": "demo@example.com", "auth_time": datetime.now(UTC).timestamp()})
     try:
-        answer = TestClient(real).post("/auth/firebase", json={"id_token": "any"})
+        answer = TestClient(real).post("/auth/firebase", json={"id_token": "any"}, headers=REAL_WEB)
     finally:
         set_verifier(None)
     assert answer.status_code == 200, answer.text
-    assert "secure" in answer.headers["set-cookie"].lower()
+    cookies = [c.lower() for c in answer.headers.get_list("set-cookie")]
+    assert len(cookies) == 2 and all("secure" in c for c in cookies)  # access and refresh
 
 
 def test_revocation_is_answered_before_deactivation(app, client):

@@ -13,6 +13,7 @@ def clean_env(monkeypatch):
         if name.startswith("SDK_EXAMPLE_"):
             monkeypatch.delenv(name)
     monkeypatch.setenv("BOND_OAUTH_KEY", "test-oauth-key")
+    monkeypatch.setenv("SDK_EXAMPLE_PUBLIC_BASE", "http://testserver")  # one host: cookies set by the API come back
 
 
 @pytest.fixture
@@ -24,4 +25,5 @@ def app(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(app):
-    return TestClient(app)
+    # A browser always sends Origin on a cookie-authenticated mutation; tests that need none build their own client.
+    return TestClient(app, headers={"Origin": "http://localhost:8078"})

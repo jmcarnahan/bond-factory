@@ -4,6 +4,8 @@ Role: OAuth2 flows (Google, Microsoft, fake) and encrypted token storage. Contra
 ## Key files
 - `service.py` start/complete/status/disconnect/access_token; `state.py` + `pkce.py` + `cipher.py`
 - `google.py`, `microsoft.py`, `fake.py` providers behind `providers.py`; `models.py` mixin; `scopes.py`
+- Sign-in: `signin.py` (`SignInFlow`), `identity.py` (`identity_from_token_response`, no signature check, D13),
+  `handoff_store.py` (`HandoffStore`, table `oauth_handoffs`); `handoff.py` is deprecated (removed in 0.3.0)
 
 ## Commands
 - `make setup-py` at the repo root, once (workspace venv)

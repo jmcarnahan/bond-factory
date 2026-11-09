@@ -1,0 +1,13 @@
+{
+  "token": "token-access-2",
+  "expires_in": 3600,
+  "refresh_token": "token-refresh-2",
+  "user": {
+    "id": "user-1",
+    "email": "person@example.com",
+    "name": "Example Person",
+    "capabilities": [
+      "connections.manage"
+    ]
+  }
+}

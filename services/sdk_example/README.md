@@ -17,16 +17,84 @@ fake mode and logs one warning. Real mode needs `SDK_EXAMPLE_AUTH_SECRET`, and a
 | Piece | Where | Lib |
 | --- | --- | --- |
 | Error body, security headers, upload cap | `wiring.py` (installed by `routes/a0_wiring.py`) | bond_service_kit |
-| Sign-in, session, `/auth/*` | `routes/auth.py`, `auth_dep.py`, `models/auth.py` | bond_auth_py |
+| Session routes (`demo`, `/auth/me`), break-glass | `routes/auth.py`, `break_glass.py`, `session_answer.py`, `auth_dep.py`, `models/auth.py` | bond_auth_py |
+| Direct sign-in (Google, Microsoft), refresh sessions, native hand-off | `signin_wiring.py`, `directory.py`, `scope_policy.py`, `models/sessions.py`, `models/handoffs.py` | bond_signin, bond_oauth, bond_auth_py |
+| Connections, role asks (`wanted`, `?set=`), fake consent page | `routes/connections.py`, `connect_helpers.py`, `fake_routes.py`, `oauth_wiring.py` | bond_oauth, bond_signin |
 | Documents, share links, `/d/<token>` | `routes/storage.py`, `models/grants.py` | bond_storage |
 | Job table and handler registry | `models/jobs.py`, `wiring.py` | bond_jobs |
 | Tasks, reminders | `routes/tasks.py`, `tasks_wiring.py` | bond_tasks_py |
 | Calendar events | `routes/calendar.py`, `calendar_wiring.py` | bond_calendar |
 | Job tick (fake mode) | `routes/jobs.py` | bond_jobs |
-| Migrations | `alembic/versions/0001_phase2.py`, `0002_phase3.py` | |
+| Migrations | `alembic/versions/0001_phase2.py`, `0002_phase3.py`, `0003_signin.py` | |
 
 `routes/a0_wiring.py` is named so it sorts before every other route module: middleware and error handlers have
 to be in place before the first request, and `main.py` imports route modules alphabetically.
+
+## Direct sign-in
+
+The people who sign in are invited rows in `users`; the lib refuses everyone else (`not_invited`). Sign-in asks the
+provider for identity only (fake-microsoft: the full set, as a pre-consented tenant would). Roles that need mail or
+calendar are asked AFTER sign-in: `GET /connections` returns `{connections, wanted}` and the app sends the person
+through `GET /connections/{p}/start?set=<id>`, bound to the account they signed in with.
+
+What an app replaces: `directory.py` (its users table), `scope_policy.py` (its roles and scopes), the settings
+names. Everything else is the same wiring. Environment:
+
+| Variable | Meaning |
+| --- | --- |
+| `SDK_EXAMPLE_SIGNIN_PROVIDERS` | Fake mode default `fake-google,fake-microsoft`; real mode none unless named (`google`, `microsoft`); a name starting `fake` is refused outside fake mode |
+| `SDK_EXAMPLE_PUBLIC_BASE` | This API's public address; the OAuth callbacks are built on it. Default `http://localhost:8012` in fake mode, required `https` in real mode |
+| `SDK_EXAMPLE_NATIVE_RETURN_BASE`, `SDK_EXAMPLE_NATIVE_SCHEMES` | Phone return link (default `<base>/app/return`) and the reverse-domain scheme fallback (default `org.example.sdkdemo` in fake mode ONLY; none in real mode) |
+| `SDK_EXAMPLE_SIGNIN_PREFIX` | Where the library routes mount (default `/auth`) |
+| `SDK_EXAMPLE_PROBE` | `1` makes `provider_alive` ask the provider through the live connection (default off) |
+| `SDK_EXAMPLE_CONNECTIONS` | `0` mounts sign-in only: no `/connections*` routes (default `1`) |
+| `SDK_EXAMPLE_ALLOW_FAKE_PUBLIC` | `1` allows fake mode on an https `SDK_EXAMPLE_PUBLIC_BASE` (a disposable demo host only; otherwise startup refuses it) |
+| `SDK_EXAMPLE_REDIRECT_ALLOWLIST`, `SDK_EXAMPLE_CORS_ORIGINS`, `SDK_EXAMPLE_NATIVE_REDIRECTS` | Defaults (`http://localhost:8078`, `sdkdemo://connections`) apply in fake mode ONLY. Real mode must set the allowlist (startup raises when empty), and every CORS origin must be in it or the public base |
+| `SDK_EXAMPLE_BREAKGLASS` | `1` turns on `POST /auth/firebase` for rows flagged `allow_password` |
+| `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS` | Universal-link files; empty answers 404. Android format: `package=FP;FP,other=FP` |
+| `BOND_GOOGLE_CLIENT_ID/SECRET`, `BOND_MS_CLIENT_ID/SECRET/TENANT` | Real providers; Microsoft sign-in needs the tenant GUID |
+
+Phone clients: the device secret is hashed as a STRING (sha256 of the secret's base64url text, lowercase hex), the
+same as the Dart `SignInAttempt`. Connect-native accepts the same return addresses as sign-in (the https app link
+`<base>/app/return/<provider>` or a configured scheme); `SDK_EXAMPLE_NATIVE_REDIRECTS` is a deprecated alias.
+
+Which sign-in files an app copies:
+
+| File | An app |
+| --- | --- |
+| `signin_wiring.py`, `providers_wiring.py`, `routes/signin.py`, `session_answer.py`, `origin_rule.py`, `signin_prune.py` | copies as is (rename settings) |
+| `routes/connections.py`, `connect_helpers.py`, `routes/connect_native.py`, `models/connections.py`, `fake_expiry.py` | copies as is; DELETE all of them in an app without connections (identity-only sign-in), and set `SDK_EXAMPLE_CONNECTIONS=0` or drop the setting. `connect_native.py` also goes when there is no phone client |
+| `routes/auth.py`, `models/sessions.py`, `models/handoffs.py`, `alembic/versions/0003_signin.py` columns and tables | copies as is |
+| `directory.py`, `scope_policy.py`, `oauth_wiring.py` names | REPLACES with its own users table, roles and scopes |
+| `break_glass.py` (and `allow_password`) | REPLACES, or deletes when there is no break-glass |
+| `fake_routes.py` | deletes (fake mode only) |
+
+Startup refuses: a database behind the migration head (`run make migrate`), a sign-in provider named `fake*` outside
+fake mode, and fake mode on an https public base. A daily `signin_prune` job (`signin_prune.py`, scheduled from the job
+tick's `before` hook) deletes spent hand-offs and dead sessions. Cookie-authenticated POST/PUT/PATCH/DELETE need an
+allowed `Origin` (`origin_rule.py`); bearer requests do not. An upgraded dev database: `rm out/*.db` is the simple path.
+
+Fake consent page (`GET /connections/fake/consent`): `sdk-consent-identity`, `sdk-consent-email`,
+`sdk-consent-set-<id>`, `sdk-consent-allow`, `sdk-consent-deny`. Fake-mode only: `POST /auth/simulate-reuse`.
+
+## Installed builds and cutover
+
+- `POST /auth/refresh {id_token}` keeps working for installed clients through `legacy_refresh` (break-glass only: it
+  answers 404 unless `SDK_EXAMPLE_BREAKGLASS=1`); new clients refresh with the cookie or `{refresh_token}`.
+- `/auth/providers` keeps every old key (built by `providers_payload`) and adds `signin`, `break_glass`,
+  `default_flow`. `email_password` is true only with break-glass.
+- `GET /connections` changed shape to `{connections, wanted}`: clients must read it with `listAll()`.
+- Break-glass is the only password path; no other route accepts a Firebase token.
+- `client_ip` (`wiring.py`) takes the LAST `X-Forwarded-For` hop, correct behind one proxy. Behind two, an app edits
+  that function to take the hop it trusts (rate limits and the refusal log use it).
+- Sessions have no absolute cap by default and a 90-day idle window (the library defaults). The only involuntary
+  sign-outs are reuse detection, an admin revoke-all or deactivation, and 90 idle days. The daily provider probe is off;
+  `SDK_EXAMPLE_PROBE=1` turns it on (deactivating the user in the app already ends access).
+- Hand-offs and dead sessions are deleted by the daily `signin_prune` job: run the job tick or worker loop.
+- The library routes mount under `SDK_EXAMPLE_SIGNIN_PREFIX` (default `/auth`; the universal-link files follow it).
+  The app's own routers (`/auth/me`, `/auth/demo`, break-glass) keep their own prefix: change them together.
+- Cookies are same-site (`SameSite=Lax`): the web app and the API must share a registrable domain, or the web client
+  cannot sign in with cookies.
 
 ## Fake mode
 
@@ -34,7 +102,10 @@ to be in place before the first request, and `main.py` imports route modules alp
 - `POST /auth/firebase {"id_token": "mock:<email>"}` runs the mock verifier. The addresses it knows live in
   `out/mock_identities.json`, written at start: `demo@example.com` and `viewer@example.com` have a users row,
   `notinvited@example.com` has none (403 `not_invited`).
-- Seeded users: `demo-user-1` (capabilities `tasks.write`, `tasks.read_all`, `connections.manage`) and `demo-user-2` (none).
+- `POST /auth/firebase` is the break-glass route: 404 unless `SDK_EXAMPLE_BREAKGLASS=1`, and only for rows with `allow_password`.
+- Seeded users (invited, unbound until first sign-in): `demo@example.com` (`tasks.write`, `tasks.read_all`,
+  `connections.manage`), `viewer@example.com` (none), `crew@example.com` (`tasks.write`),
+  `demo.microsoft@example.com` (`tasks.write`, `connections.manage`). `uninvited@example.com` has no row.
 - An EMPTY database gets its tables created and is stamped at the migration head, so `make migrate` later
   is a no-op. A migrated database is left alone. One that has tables but no `alembic_version` is left alone
   too, with a warning to run `make migrate`.

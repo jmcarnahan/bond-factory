@@ -4,6 +4,8 @@ library;
 
 import 'package:bond_api/bond_api.dart';
 
+import 'refresh_token_store.dart';
+
 /// A storage failure (the platform store refused or lost the value).
 class TokenStoreException implements Exception {
   const TokenStoreException(this.message);
@@ -70,18 +72,25 @@ class ReloadableTokenStore implements TokenStore {
   }
 }
 
-/// Clears a store when a sign-out signal arrives, so a session that ended on
-/// the server does not linger. Wire [forget] to `ApiClient.onSessionExpired`,
+/// Clears the stores when a sign-out signal arrives, so a session that ended on
+/// the server does not linger. Pass [refreshTokens] when the app keeps a
+/// refresh token, so both slots are cleared. Wire [forget] to `ApiClient.onSessionExpired`,
 /// `onSessionRevoked` and `onDeactivated`.
 class LiveTokenForgetter {
-  LiveTokenForgetter(this._store, {this.onForgotten});
+  LiveTokenForgetter(this._store, {this.onForgotten, this.refreshTokens});
 
   final TokenStore _store;
+
+  /// The second slot, cleared with the access token. Null when the app has none.
+  final RefreshTokenStore? refreshTokens;
 
   /// Runs after the token was cleared (route to the sign-in screen here).
   final void Function()? onForgotten;
 
   Future<void> forget() async {
+    // Refresh token first: a lingering access token expires, a lingering
+    // refresh token mints new ones.
+    await refreshTokens?.clear();
     await _store.clear();
     onForgotten?.call();
   }

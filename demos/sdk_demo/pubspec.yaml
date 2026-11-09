@@ -37,6 +37,10 @@ dependencies:
     path: ../../packages/bond_connections
   bond_connections_ui:
     path: ../../packages/bond_connections_ui
+  bond_signin:
+    path: ../../packages/bond_signin
+  bond_signin_ui:
+    path: ../../packages/bond_signin_ui
 dev_dependencies:
   flutter_test:
     sdk: flutter

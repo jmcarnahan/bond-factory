@@ -10,7 +10,7 @@ import logging
 import os
 import threading
 
-from bond_auth_py.errors import AuthUnavailable
+from bond_auth_py.errors import AuthNotConfigured, AuthUnavailable
 from bond_auth_py.settings import AuthSettings, mock_active
 
 LOGGER = logging.getLogger(__name__)
@@ -18,6 +18,18 @@ LOGGER = logging.getLogger(__name__)
 _apps: dict[str, object] = {}
 _apps_lock = threading.Lock()
 _sa_cache: dict = {}
+
+
+INSTALL_HINT = "install bond_auth_py[firebase]"
+
+
+def require_firebase_admin() -> None:
+    """Import ``firebase_admin`` or raise ``AuthNotConfigured`` (501): it is the optional ``firebase`` extra."""
+    try:
+        import firebase_admin  # noqa: F401
+        from firebase_admin import auth  # noqa: F401
+    except ImportError as exc:
+        raise AuthNotConfigured(INSTALL_HINT) from exc
 
 
 def reset_cache() -> None:
@@ -82,6 +94,7 @@ def check_service_account(settings: AuthSettings) -> None:
     if info is None:
         raise RuntimeError("The Firebase service-account setting is set but is not a usable key (malformed JSON, "
                            "missing file, or no private_key). Fix it, or unset it to run verify-only.")
+    require_firebase_admin()
     try:
         from firebase_admin import credentials
 
@@ -98,6 +111,7 @@ def firebase_app(settings: AuthSettings):
         return app
     with _apps_lock:
         if settings.app_name not in _apps:
+            require_firebase_admin()
             import firebase_admin
             from firebase_admin import credentials
 

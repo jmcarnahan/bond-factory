@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 GOOGLE_DEFAULT = (
     "https://www.googleapis.com/auth/gmail.send",
@@ -14,6 +14,16 @@ MICROSOFT_BASE = ("Mail.Send", "Mail.Read", "Calendars.ReadWrite", "MailboxSetti
                   "offline_access")
 MICROSOFT_OFFICE = ("Contacts.ReadWrite", "Files.ReadWrite")
 
+GOOGLE_SIGNIN = ("openid", "email", "profile")
+MICROSOFT_SIGNIN = ("openid", "profile", "email")
+MICROSOFT_SIGNIN_FULL = MICROSOFT_SIGNIN + ("offline_access", "User.Read", "Mail.Send", "Mail.Read",
+                                            "Calendars.ReadWrite")
+GOOGLE_MAIL_SEND = ("https://www.googleapis.com/auth/gmail.send",)
+GOOGLE_CALENDAR = ("https://www.googleapis.com/auth/calendar.events",)
+
+# compared by ``_short`` names, where "email" and "profile" are the aliases of their userinfo forms
+_GOOGLE_IDENTITY = frozenset({"openid", "userinfo.email", "userinfo.profile"})
+_MICROSOFT_IDENTITY = _GOOGLE_IDENTITY | {"user.read"}
 _ALIASES = {"email": "userinfo.email", "profile": "userinfo.profile"}
 
 
@@ -33,3 +43,16 @@ def scope_drift(granted: str | Iterable[str] | None, wanted: str | Iterable[str]
     """The ``wanted`` scopes missing from ``granted`` (both a space-separated string or a list), sorted."""
     have = {_short(s) for s in split_scopes(granted)}
     return sorted(s for s in split_scopes(wanted) if _short(s) not in have)
+
+
+def is_identity_only(provider_name: str, scopes: Sequence[str], *, family: str | None = None) -> bool:
+    """True when ``scopes`` ask for nothing beyond who the person is: no mail, calendar or long-lived access.
+
+    Google: a subset of openid, email, profile. Microsoft: a subset of
+    openid, profile, email and User.Read, and never ``offline_access`` (that asks for a refresh token). ``family`` ("google" or "microsoft", from
+    ``family_of``) decides which; without it a name containing ``microsoft`` means Microsoft.
+    """
+    names = [_short(s) for s in split_scopes(list(scopes))]
+    family = family or ("microsoft" if "microsoft" in provider_name.lower() else "google")
+    allowed = _MICROSOFT_IDENTITY if family == "microsoft" else _GOOGLE_IDENTITY
+    return all(name in allowed for name in names)

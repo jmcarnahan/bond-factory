@@ -20,9 +20,10 @@ Rules for the server:
   cycles and pages stay blank (dart-lang/sdk#60289). Recover by killing the pid and restarting.
 - A debug build does not rebuild while running. Restart it (or `kill -USR2 <pid>`) after code changes.
 
-Sign-in: the first page that needs the API calls `DemoSession.ensureSignedIn()`, which does `POST /auth/demo`
-as `demo-user-1`. The session cookie is same-site between :8078 and :8012 (same host, different port), so
-the connect flow's top-level navigation carries it. Reloading the page signs in again.
+Sign-in: `/auth` and `/connections` use real sign-in against the fake providers: see "Sign-in walk" below. A page that is
+opened signed out first tries `completeWeb()` (the refresh cookie), then `DemoSession.ensureSignedIn()` falls back to
+`POST /auth/demo` as `demo-user-1`; `/connections` still does this fallback. Opening `/connections` while signed out therefore silently signs in as the demo user, so the signed-out and uninvited steps must stay on `/auth`. The session cookies are same-site between :8078
+and :8012 (same host, different port), so the connect flow's top-level navigation carries them.
 
 ## Page setup
 
@@ -63,9 +64,9 @@ Zero `[role=dialog],[role=alertdialog]`; empty `pageerror` list; no console mess
 | `/` | `sdk.nav.home` | The seven routes, one line each with module and phase |
 | `/ui` | `sdk.nav.ui` | `bond_ui` gallery: primitives, inputs, select, confirm, navigation, states; `sdk.ui.last-event` |
 | `/api` | `sdk.nav.api` | Three probe buttons and one inline result line |
-| `/auth` | `sdk.nav.auth` | Sign-in (mock identity, demo user, not-invited), claims, refresh, forced 401, sign out |
+| `/auth` | `sdk.nav.auth` | Sign-in buttons per fake provider, claims chips, refresh, simulate reuse, break-glass link (flag), sign out |
 | `/sync` | `sdk.nav.sync` | Row editor, upload with per-row verdicts, server clock, sync token |
-| `/connections` | `sdk.nav.connections` | A card per fake provider, return banner, simulate expiry |
+| `/connections` | `sdk.nav.connections` | A card per fake provider, return banner, simulate expiry, the wanted-scope ask card |
 | `/tasks` | `sdk.nav.tasks` | Landing: summary, list, quick add, form, run due jobs, reminder notices, mirror ids |
 
 ## Walk steps (ids are `[flt-semantics-identifier=...]`)
@@ -77,16 +78,18 @@ Zero `[role=dialog],[role=alertdialog]`; empty `pageerror` list; no console mess
    `sdk.ui.confirm`, then `sdk.ui.confirm-confirm` (or `-cancel`). Read `sdk.ui.last-event`. Repeat at 390x844.
 3. **API.** Click `sdk.api.health`, then `sdk.api.not-found`, then `sdk.api.validation`; after each, read
    `sdk.api.result` (health ok; a not-found message; code, message and hint for validation).
-4. **Auth.** Type the e-mail into `sdk.auth.email`; click `sdk.auth.sign-in`; assert `sdk.auth.user`,
-   `sdk.auth.capabilities`, `sdk.auth.token-tail`. Click `sdk.auth.refresh` then read `sdk.auth.refresh-result`.
-   Click `sdk.auth.force-401`: read `sdk.auth.force-401-result` and `sdk.auth.renewals` (one renewal).
-   Click `sdk.auth.not-invited`: read `sdk.auth.error`. Click `sdk.auth.sign-out`: `sdk.auth.signed-out`.
-   `sdk.auth.sign-in-demo` signs in as the demo user.
+4. **Auth.** The sign-in chain, steps 1 to 5 and 7 of "Sign-in walk" below, in that order. Ids: `sdk.signin.fake-google`,
+   `sdk.signin.fake-microsoft`, `sdk.signin.error`, `sdk.signin.break-glass`, `sdk.auth.user`, `sdk.auth.capabilities`,
+   `sdk.auth.token-tail`, `sdk.auth.refresh`, `sdk.auth.refresh-result`, `sdk.auth.simulate-reuse`, `sdk.auth.sign-out`,
+   `sdk.auth.signed-out`, `sdk.auth.loading`, `sdk.auth.ended`, `sdk.auth.error`, `sdk.auth.force-401` with
+   `sdk.auth.force-401-result` and `sdk.auth.renewals`. The break-glass form holds `sdk.auth.email`, `sdk.auth.sign-in`,
+   `sdk.auth.sign-in-demo` and `sdk.auth.not-invited`.
 5. **Sync.** Click `sdk.sync.add-row` twice and `sdk.sync.add-bad-row` once; read `sdk.sync.queued`, `sdk.sync.rows`.
    Click `sdk.sync.upload`; read `sdk.sync.verdict-0`, `-1`, `-2` (two accepted, one rejected). Click
    `sdk.sync.fix-row`, then `sdk.sync.resend`: the fixed row is accepted. Read `sdk.sync.server-clock` (skew);
    `sdk.sync.fetch-token` shows `sdk.sync.token`: the fake example mints a sync token by default (stand-in endpoint), so it always appears. Errors land in `sdk.sync.error`, notes in `sdk.sync.info`.
-6. **Connections.** Wait for `sdk.connections.list`. Click `sdk.connections.connect-fake-google`. The window leaves
+6. **Connections.** Start with steps 6 and 8 of "Sign-in walk" (role asks, then Microsoft), then the plain connect round trip. Wait for
+   `sdk.connections.list`. Click `sdk.connections.connect-fake-google`. The window leaves
    the app: `:8012/connections/fake-google/go?state=...` sets the nonce cookie and redirects to the fake
    consent page `:8012/connections/fake/consent`; click `#sdk-consent-allow` (plain HTML, a normal click).
    The API redirects to `http://localhost:8078/connections?connection=connected&provider=fake-google`, a full load:
@@ -109,6 +112,47 @@ Zero `[role=dialog],[role=alertdialog]`; empty `pageerror` list; no console mess
    mirror runs after the response as a background task, so the first answer does not carry its result yet.
    Delete is two steps: `sdk.tasks.delete-<id>`, then `-confirm`. Messages: `sdk.tasks.info`, `sdk.tasks.error`.
 8. **Error check** after every step (section above).
+
+## Sign-in walk (`/auth` and `/connections`)
+
+State chain: each step starts from the state the previous one left, so run them in order in ONE browser context. The example
+runs in fake mode with its seeded rows: `demo@example.com` (capabilities include `connections.manage`, `allow_password` true),
+`crew@example.com` (no mail asks, `allow_password` false), `demo.microsoft@example.com` (fake-microsoft) and NO row for
+`uninvited@example.com`. Lanes: 1280x800 and 390x844. After every full load (including each return from the consent page)
+click the semantics placeholder. The fake consent page (`:8012/connections/fake/consent`) is plain HTML: `#sdk-consent-identity`
+(select, preselected per provider), `#sdk-consent-email` (free text, wins over the select), `#sdk-consent-set-mail_send` and
+`#sdk-consent-set-calendar` (connect only, ticked by default), `#sdk-consent-allow`, `#sdk-consent-deny`.
+
+1. **Surface, signed out.** `/auth` shows `sdk.signin.fake-google` and `sdk.signin.fake-microsoft`, the invite-only line and
+   no e-mail form. `sdk.signin.break-glass` is ABSENT (flag off). No dialog.
+2. **Sign in.** Click `sdk.signin.fake-google`. The window leaves the app (`POST /auth/signin/fake-google/start` set the nonce
+   cookie, then the browser goes to the consent page). Keep the preselected demo identity, click `#sdk-consent-allow`. The
+   API redirects to `http://localhost:8078/auth?signin=ok` (full load). Assert `sdk.auth.user`, `sdk.auth.capabilities`,
+   `sdk.auth.token-tail`. Cookie proof is behavioural: `document.cookie` holds neither `sdk_example_access_token` nor
+   `sdk_example_refresh_token` (both HttpOnly); after a full reload `fetch('http://localhost:8012/auth/me', {credentials:
+   'include'})` answers 200 with no bearer, and `POST /auth/refresh` with body `{}`, credentials and the demo origin succeeds.
+   Not executed in a browser by the builders: the walker proves it.
+3. **Refresh.** Click `sdk.auth.refresh`: `sdk.auth.refresh-result` reads "Refreshed: token ends <tail>" with a new tail, the
+   chips are unchanged, no error strip.
+4. **Simulate reuse.** Click `sdk.auth.simulate-reuse` (`POST /auth/simulate-reuse`: the example rotates, ages the old row past
+   the grace, replays it and answers 401 `refresh_reused`). The page signs out; `sdk.auth.ended` shows "You were signed out
+   because this session was used somewhere else. Sign in again." Sign in again as in step 2: it works (a new family).
+5. **Uninvited.** Click `sdk.auth.sign-out` first (start signed out). Click `sdk.signin.fake-google`, type `uninvited@example.com`
+   into `#sdk-consent-email`, allow. The return is `/auth?signin=error&reason=not_invited`: `sdk.signin.error` shows the inline
+   message and `GET /auth/me` answers 401. No user row exists.
+6. **Role asks.** Sign in as the demo identity again. Open `/connections`: two sets are wanted and ungranted, "Send mail"
+   (`sdk.scopes.ask-mail_send`) and "Calendar" (`sdk.scopes.ask-calendar`). Click the mail ask. First decline: untick
+   `#sdk-consent-set-mail_send` (or click `#sdk-consent-deny`) and allow. The return is `/connections?connection=error&reason=
+   consent_declined`, the banner reads "You did not allow that access. You can allow it later.", NO row was stored and the set is
+   still wanted. Ask again, leave both ticked, allow: the set is granted and the Google connection is connected. The ask stays
+   inline, no dialog.
+7. **Break-glass.** Sign out. Stop the example and restart it with `SDK_EXAMPLE_BREAKGLASS=1 make serve-example`, then reload `/auth`:
+   `sdk.signin.break-glass` is visible and opens the inline e-mail form (no dialog). `demo@example.com` signs in
+   (`sdk.auth.sign-in`); `crew@example.com` answers 403 `provider_not_allowed` in `sdk.auth.error`. Restart without the flag afterwards.
+8. **Microsoft.** Sign out, then `sdk.signin.fake-microsoft` with its preselected demo identity. `/connections` shows the Microsoft
+   connection connected at once (full scopes at sign-in) and the wanted list is empty.
+9. **Phone lane (390x844).** Steps 1, 2 and 6 wrap without horizontal overflow; the ask card and buttons stay reachable.
+10. **Error check** after every step: no dialog, no console error, no `pageerror`, `sdk.errors` absent.
 
 ## Cleanup
 

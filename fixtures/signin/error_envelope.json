@@ -1,0 +1,6 @@
+{
+  "detail": {
+    "code": "not_invited",
+    "message": "This address was not invited."
+  }
+}

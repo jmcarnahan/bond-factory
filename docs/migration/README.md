@@ -35,6 +35,7 @@ otherwise. Re-run the grep given in each file's section 3 before you start; the 
 | `bond_tasks_py` | `bond_tasks_py.md` | S, A |
 | `bond_tasks`, `bond_tasks_ui` | `bond_tasks.md` | S web, S phone, A |
 | `bond_connections`, `bond_connections_ui` | `bond_connections.md` | A, S |
+| `bond_signin`, `bond_signin_ui` (Dart) and `libs/bond_signin` | `bond_signin.md`, `bond_signin-cutover.md` | S, A, P, after `bond_auth(_py)`, `bond_oauth`, `bond_connections` |
 
 ## Dart and Python pairs
 
@@ -46,6 +47,7 @@ A wire contract has a client half and a server half. Migrate both halves of a pa
 | `bond_sync`, `bond_sync_powersync` | `bond_sync_py` |
 | `bond_tasks`, `bond_tasks_ui` | `bond_tasks_py`, with `bond_calendar` for the mirror |
 | `bond_connections`, `bond_connections_ui` | `bond_oauth` |
+| `bond_signin`, `bond_signin_ui`, `bond_auth` (sessions) | `libs/bond_signin`, `bond_oauth`, `bond_auth_py` (sessions) |
 | `bond_api` | `bond_service_kit` (the error body) |
 
 ## Suggested order
@@ -58,6 +60,11 @@ whose core already has the shape the lib took, and last for A and P. The order k
 3. `bond_service_kit`, then `bond_storage`, `bond_jobs`, `bond_auth_py` (they use its error body and clock).
 4. `bond_ui` once the token adapter is written.
 5. Sync and OAuth last; both need decisions of the owning app.
+6. Direct sign-in (`bond_signin.md`) after the modules it sits on, in the same SHA bump as their 0.2.0 versions. It replaces
+   Firebase sign-in and keeps Firebase only as the break-glass route and for push. All SDK work lands before any app migrates
+   to it, so an app takes one step per module. Order inside it: S (single tenant, full scopes at sign-in, its phone is the
+   main surface), then A (identity-only sign-in plus role asks), then P (identity only). Each app's first LIVE provider run
+   is part of its acceptance (`bond_signin.md` section 6); nothing in the SDK has run against a live provider yet.
 
 P is the cheapest first adopter for anything that touches the backend (2 Alembic revision files against 24 in A and 83 in S).
 

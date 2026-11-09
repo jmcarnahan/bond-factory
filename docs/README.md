@@ -4,8 +4,12 @@
 - decisions/2026-11-07-roof-poc-summary.md — what the roof POC proved and what was decided
 - contracts/error_body.md — the shared error body, status codes and Retry-After rules (bond_api, bond_service_kit)
 - contracts/auth.md — auth routes, user shape, session JWT, revocation, error codes, providers payload
+- contracts/signin.md — direct sign-in routes, cookies, device-bound hand-offs, refusal codes, security model
 - decisions/2026-11-08-shared-modules-policy.md — shared modules are consumed by pinned SHA; divergence only in per-app adapters
 - decisions/2026-11-08-sdk-architecture.md — the shared SDK decisions D1 to D14 and the module list
+- ../libs/bond_signin/README.md — direct Google/Microsoft sign-in lib: Protocol seams, scope policy, router factory (no sibling bond_* imports)
+- ../packages/bond_signin/README.md — pure-Dart sign-in client: attempts, returns, OIDC session gateway
+- ../packages/bond_signin_ui/README.md — sign-in screen, buttons, scope-ask card, system-browser port
 - sdk/README.md — how an app consumes bond-factory (Dart git + SHA, Python Poetry or wheel), versioning, module index
 - sdk/sdk-pins.md — template an app copies to record its pins and local patches
 - test/WEB.md — Playwright walk recipe for demos/sdk_demo

@@ -119,26 +119,60 @@ void main() {
 
     test('startUrl native adds mode=native next to redirect_to', () async {
       final f = Fake()..body = {'url': 'http://x.test/go?state=s'};
-      await ConnectionsApi(f.api).startUrl('google', redirectTo: 'sdkdemo://connections', native: true);
-      expect(f.seen.single.url.queryParameters, {'redirect_to': 'sdkdemo://connections', 'mode': 'native'});
-      await ConnectionsApi(f.api).startUrl('google', native: true);
-      expect(f.seen.last.url.queryParameters, {'mode': 'native'});
+      await ConnectionsApi(f.api)
+          .startUrl('google', redirectTo: 'sdkdemo://connections', native: true, deviceChallenge: 'dc', attempt: 'at');
+      expect(f.seen.single.url.queryParameters, {
+        'redirect_to': 'sdkdemo://connections',
+        'mode': 'native',
+        'device_challenge': 'dc',
+        'attempt': 'at',
+      });
+      await ConnectionsApi(f.api).startUrl('google', native: true, deviceChallenge: 'dc', attempt: 'at');
+      expect(f.seen.last.url.queryParameters, {'mode': 'native', 'device_challenge': 'dc', 'attempt': 'at'});
     });
 
     test('redeem is POST .../redeem with the code and reads the status', () async {
       final f = Fake()..body = row(connected: true, email: 'demo@example.com');
-      final s = await ConnectionsApi(f.api).redeem('fake-google', 'abc.def');
+      final s = await ConnectionsApi(f.api).redeem('fake-google', 'abc.def', deviceSecret: 'sec');
       expect(f.seen.single.method, 'POST');
       expect(f.seen.single.url.path, '/connections/fake-google/redeem');
-      expect(jsonDecode(f.seen.single.body), {'code': 'abc.def'});
+      expect(jsonDecode(f.seen.single.body), {'code': 'abc.def', 'device_secret': 'sec'});
       expect(s.phase, ConnectionPhase.connected);
+    });
+
+    test('redeem sends the optional device_label', () async {
+      final f = Fake()..body = row(connected: true);
+      await ConnectionsApi(f.api).redeem('google', 'c', deviceSecret: 's', deviceLabel: 'Phone');
+      expect(jsonDecode(f.seen.single.body), {'code': 'c', 'device_secret': 's', 'device_label': 'Phone'});
+    });
+
+    test('native start sends device_challenge and attempt; a missing one is an ArgumentError', () async {
+      final f = Fake()..body = {'url': 'http://x.test/go'};
+      final api = ConnectionsApi(f.api);
+      await api.startUrl('google', native: true, deviceChallenge: 'abc123', attempt: 'att_1', set: 'mail');
+      expect(f.seen.single.url.queryParameters, {
+        'mode': 'native',
+        'device_challenge': 'abc123',
+        'attempt': 'att_1',
+        'set': 'mail',
+      });
+      expect(() => api.startUrl('google', native: true, attempt: 'a'), throwsArgumentError);
+      expect(() => api.startUrl('google', native: true, deviceChallenge: 'c'), throwsArgumentError);
+      expect(() => api.startUrl('google', native: true), throwsArgumentError);
+      expect(f.seen, hasLength(1)); // the refused calls sent nothing
+    });
+
+    test('web start ignores device arguments', () async {
+      final f = Fake()..body = {'url': 'http://x.test/go'};
+      await ConnectionsApi(f.api).startUrl('google', deviceChallenge: 'c', attempt: 'a');
+      expect(f.seen.single.url.hasQuery, isFalse);
     });
 
     test('redeem maps a refused code to an ApiException subtype', () async {
       final f = Fake()
         ..status = 400
         ..body = {'detail': {'code': 'invalid_handoff', 'message': 'no'}};
-      await expectLater(ConnectionsApi(f.api).redeem('google', 'x'), throwsA(isA<ApiException>()));
+      await expectLater(ConnectionsApi(f.api).redeem('google', 'x', deviceSecret: 's'), throwsA(isA<ApiException>()));
     });
 
     test('disconnect is DELETE /connections/{provider} and reads the status', () async {
@@ -221,6 +255,16 @@ void main() {
       expect(l.reasonText('not_confirmed'), startsWith('Nothing changed'));
       expect(l.reasonText('weird'), l.returnErrorGeneric);
       expect(l.reasonText(null), l.returnErrorGeneric);
+    });
+
+    test('every known return reason has its own text', () {
+      const l = ConnectionLabels();
+      const known = ['access_denied', 'unavailable', 'invalid_state', 'expired_state', 'not_confirmed', 'account_mismatch', 'consent_declined', 'forbidden'];
+      for (final r in known) {
+        expect(l.reasonText(r), isNot(l.returnErrorGeneric), reason: r);
+      }
+      expect(l.reasonText('consent_declined'), 'You did not allow that access. You can allow it later.');
+      expect(l.reasonText('account_mismatch'), 'That is a different account than the one you signed in with.');
     });
   });
 }

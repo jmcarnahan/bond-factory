@@ -1,7 +1,7 @@
 # bond_auth_py
 
 Firebase ID token verification, the app's own session JWT, revocation, identity admin and an opt-in janitor.
-Framework-free: no FastAPI, no service kit, no database. The app wires these pieces into its routes.
+No web framework (no FastAPI, no service kit); sessions are SQLAlchemy mixins the app attaches. The app wires the routes.
 
 ## Pieces
 
@@ -14,6 +14,7 @@ Framework-free: no FastAPI, no service kit, no database. The app wires these pie
 | `capabilities` | `ClaimListPolicy`, `RolePolicy`, `has`, `has_any` |
 | `errors` | code strings, `AuthRefused(code, message, hint, status)`, `not_invited(email)` |
 | `providers` | `providers_payload` for `GET /auth/providers` |
+| `sessions`, `sessions_model` | refresh sessions: `SessionStore`, `SessionsMixin` (table `auth_sessions`) |
 | `admin`, `janitor` | `IdentityAdmin` (Firebase or mock), `janitor_after_refusal` |
 
 Verifier tiers, in order: an installed verifier (`set_verifier`), the mock (tier `mock` AND pytest running or the
@@ -93,3 +94,27 @@ on `default_mock()` (the `MockIdentities` store it wraps) to force error paths.
 | `FIREBASE_AUTH_DOMAIN`, `_MESSAGING_SENDER_ID`, `_WEB_APP_ID`, `_IOS_API_KEY`, `_IOS_APP_ID`, `_IOS_BUNDLE_ID` | public client config for `/auth/providers` |
 
 An app with its own variable names builds `AuthSettings(...)` directly or passes a different prefix.
+
+## Refresh sessions (`SessionStore(model, settings)`, model = a class built on `SessionsMixin`)
+
+One row per refresh token (only its sha256 is stored). Sessions end only by sign-out, reuse detection, an admin
+action or 90 idle days; the probe is opt-in. `issue` after a sign-in, `rotate` on refresh, `revoke_token` on logout,
+`revoke_user(..., mark_valid_after=)` for sign-out-everywhere, `prune` from a job.
+| Lifetime (`AuthSettings`) | Default |
+|---|---|
+| access JWT (`session_access_ttl_minutes`, claim `sid` = family id) | 60 min |
+| refresh sliding idle window (`refresh_ttl_days`) / optional absolute cap (`refresh_max_days`) | 90 d / none |
+| replay grace (`refresh_reuse_grace_seconds`) / retry window (`refresh_retry_seconds`) | 20 s / 600 s |
+| live families per user, LRU revoked as `limit` (`refresh_max_sessions_per_user`) | 10 |
+| IdP liveness probe per family, opt-in (`refresh_probe_hours`; 0 = off) | off |
+
+`rotate` raises `RefreshRevoked`, `RefreshExpired` or `ReuseDetected` (401, all `AuthRefused`; clients treat all
+as "sign in again"). A replay of a rotated token: same `rotation_id` and the child still unused is a lost
+response (sibling issued, child revoked as `retry`); inside the grace a sibling; else reuse revokes the family.
+The revocation mark is compared with the family's `auth_time`, never with now.
+
+**Commit before raise.** Functions flush and never commit, except `rotate`: it commits the family revocation
+before it raises `ReuseDetected` (and when it ends a family: user gone, mark, probe `False`). Without that, a
+`session_scope` that rolls back on exception would undo the revocation. Keep the route's scope as it is; do not
+wrap `rotate` in a savepoint. An expired or failing rotate un-claims the token (not burned). Cookie helpers:
+`refresh_cookie_params(settings, secure)`, `refresh_cookie_name(app)`. `bond_auth_py[firebase]` only for Firebase.

@@ -58,8 +58,10 @@ def test_empty_allowlist_refuses_every_redirect_with_400(tmp_path, monkeypatch):
 
     monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/e.db")
     monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "")
+    monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "http://testserver")  # the API's own origin: the only one allowed
     c = TestClient(create_app())
-    h = headers(c)
+    token = c.post("/auth/demo", json={"user_id": "demo-user-1"}, headers={"Origin": "http://testserver"}).json()["token"]
+    h = {"Authorization": f"Bearer {token}"}
     for params in ({}, {"redirect_to": APP}):
         reply = c.get("/connections/fake-google/start", params=params, headers=h)
         assert reply.status_code == 400 and reply.json()["detail"]["code"] == "redirect_not_allowed"
@@ -76,7 +78,7 @@ def test_provider_error_redirects_with_error(client):
     reply = client.get("/connections/fake-google/callback", params={"state": state, "error": "access_denied"},
                        headers=h, follow_redirects=False)
     query = parse_qs(urlsplit(reply.headers["location"]).query)
-    assert reply.status_code == 302 and query["connection"] == ["error"] and query["reason"] == ["access_denied"]
+    assert reply.status_code == 302 and query["connection"] == ["error"] and query["reason"] == ["consent_declined"]  # the provider error access_denied, as the shared code
     assert not statuses(client, h)["fake-google"]["connected"]
 
 
@@ -158,6 +160,9 @@ def test_fake_routes_absent_in_real_mode(tmp_path, monkeypatch):
 
     monkeypatch.setenv("SDK_EXAMPLE_MODE", "real")
     monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", "x" * 40)
+    monkeypatch.setenv("SDK_EXAMPLE_PUBLIC_BASE", "https://api.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "https://app.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "https://app.example.org")
     monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", f"sqlite:///{tmp_path}/r.db")
     other = TestClient(create_app())
     assert other.get("/connections/fake/consent", params={"state": "s"}).status_code in (404, 422)

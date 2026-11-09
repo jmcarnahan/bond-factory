@@ -110,7 +110,7 @@ def test_token_is_503_sync_off_with_an_explicitly_empty_url(monkeypatch, client)
     monkeypatch.setenv("SDK_EXAMPLE_SYNC_URL", "")
     app = create_app()
     signed_in = TestClient(app)
-    signed_in.headers["Authorization"] = "Bearer " + signed_in.post("/auth/demo", json={"user_id": DEMO_USER_ID}).json()["token"]
+    signed_in.headers["Authorization"] = "Bearer " + signed_in.post("/auth/demo", json={"user_id": DEMO_USER_ID}, headers={"Origin": "http://localhost:8078"}).json()["token"]
     r = signed_in.post("/sync/token")
     assert r.status_code == 503
     assert r.json()["detail"]["code"] == "sync_off"
@@ -252,4 +252,7 @@ def test_real_mode_without_a_url_keeps_sync_off(monkeypatch):
 
     monkeypatch.setenv("SDK_EXAMPLE_MODE", "real")
     monkeypatch.setenv("SDK_EXAMPLE_AUTH_SECRET", "x" * 40)
+    monkeypatch.setenv("SDK_EXAMPLE_PUBLIC_BASE", "https://api.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_REDIRECT_ALLOWLIST", "https://app.example.org")
+    monkeypatch.setenv("SDK_EXAMPLE_CORS_ORIGINS", "https://app.example.org")
     assert Settings.from_env().sync_url == ""

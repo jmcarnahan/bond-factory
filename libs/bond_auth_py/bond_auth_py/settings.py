@@ -7,6 +7,9 @@ from typing import Literal
 
 Tier = Literal["injected", "mock", "firebase"]
 _TRUE = {"1", "true", "yes", "on"}
+#: Integer fields read from ``<prefix><FIELD NAME UPPER>``.
+_INT_FIELDS = ("session_access_ttl_minutes", "refresh_ttl_days", "refresh_reuse_grace_seconds",
+               "refresh_retry_seconds", "refresh_max_sessions_per_user", "refresh_probe_hours")
 
 
 def _flag(env: Mapping[str, str], name: str, default: bool = False) -> bool:
@@ -29,6 +32,16 @@ class AuthSettings:
     audience: str = "bond-api"
     access_ttl_minutes: int = 10080
     auth_time_skew_seconds: int = 5
+    # Refresh sessions (sessions.py). The access JWT of a session is short: logout, reuse and the device limit
+    # reach an access token within ``session_access_ttl_minutes``, a refresh token immediately.
+    session_access_ttl_minutes: int = 60
+    refresh_ttl_days: int = 90  # sliding idle window: the only expiry unless a cap is set
+    refresh_max_days: int | None = None  # absolute cap from the IdP sign-in instant (``auth_time``); None = none
+    refresh_reuse_grace_seconds: int = 20
+    refresh_retry_seconds: int = 600
+    refresh_max_sessions_per_user: int = 10
+    refresh_probe_hours: int = 0  # IdP liveness probe at most every N hours; 0 = off (opt-in)
+    refresh_cookie_path: str = "/auth"
     #: ``injected``: only an installed verifier is used. ``mock``: the mock, if allowed (see ``mock_active``).
     #: ``firebase``: firebase-admin. An installed verifier always wins, whatever the tier.
     tier: Tier = "firebase"
@@ -61,6 +74,9 @@ class AuthSettings:
 
         JWT: ``<prefix>JWT_SECRET`` (else ``JWT_SECRET_KEY``), ``<prefix>ISSUER``, ``<prefix>AUDIENCE``,
         ``<prefix>ACCESS_TTL_MINUTES`` (else ``ACCESS_TOKEN_EXPIRE_MINUTES``), ``<prefix>AUTH_TIME_SKEW_SECONDS``.
+        Sessions: ``<prefix>SESSION_ACCESS_TTL_MINUTES``, ``REFRESH_TTL_DAYS``, ``REFRESH_MAX_DAYS``,
+        ``REFRESH_REUSE_GRACE_SECONDS``, ``REFRESH_RETRY_SECONDS``, ``REFRESH_MAX_SESSIONS_PER_USER``,
+        ``REFRESH_PROBE_HOURS``, ``REFRESH_COOKIE_PATH``.
         Mock: ``<prefix>MOCK``, ``<prefix>TEST_ENV``, ``<prefix>MOCK_IDENTITIES_FILE``.
         Flags: ``<prefix>GOOGLE``, ``<prefix>GOOGLE_WEB_CLIENT_ID``, ``<prefix>APPLE``, ``<prefix>EMAIL_PASSWORD``
         (default on), ``<prefix>DEMO``. Firebase: ``<firebase_prefix>`` + ``PROJECT_ID``, ``SERVICE_ACCOUNT_JSON``,
@@ -105,6 +121,14 @@ class AuthSettings:
             values["access_ttl_minutes"] = int(ttl)
         if skew:
             values["auth_time_skew_seconds"] = int(skew)
+        for key in _INT_FIELDS:
+            raw = own(key.upper())
+            if raw:
+                values[key] = int(raw)
+        if prefix + "REFRESH_MAX_DAYS" in env:
+            values["refresh_max_days"] = int(own("REFRESH_MAX_DAYS") or 0) or None  # "0" or empty: no cap
+        if own("REFRESH_COOKIE_PATH"):
+            values["refresh_cookie_path"] = own("REFRESH_COOKIE_PATH")
         values.update(overrides)
         return cls(**values)
 
