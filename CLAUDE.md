@@ -32,7 +32,7 @@ Shared SDK monorepo for the bond app family (avalon-crm, sbel-crm, paga-time): s
 - A `bond_<x>` core package imports no Flutter. Widgets go in `bond_<x>_ui`, backend adapters in `bond_<x>_<backend>`.
 - Public API change: update the barrel and the module CHANGELOG.md in the same commit.
 - Soft cap 300 lines per source file; split when next touched.
-- Public repo: no personal emails, tokens, customer data, project ids, team ids, or real property addresses/coordinates in tracked files; real sites live in local/sites.json and local/test-data/. The public-hygiene hook checks on commit and push.
+- Public repo: no personal emails, tokens, customer data, project ids, team ids, or real property addresses/coordinates in tracked files; real sites live in local/sites.json and local/test-data/. The public-hygiene hook (`.githooks/`, install once with `make hooks`) checks on commit and push; CI runs the same scan.
 - Never read `services/*/tests/data/`, lockfiles, or `docs/research` images in full.
 
 ## Consuming from an app

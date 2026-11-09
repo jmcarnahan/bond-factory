@@ -1,5 +1,5 @@
 # Repo-wide gates.
-.PHONY: gates consumer-check
+.PHONY: gates consumer-check hooks
 
 gates: ## Run every repo gate (popups, ui tokens, boundaries, line cap, public hygiene)
 	bash tool/no_popups_gate.sh --enforce
@@ -10,3 +10,7 @@ gates: ## Run every repo gate (popups, ui tokens, boundaries, line cap, public h
 
 consumer-check: ## Resolve each Dart package outside the workspace
 	bash tool/consumer_check.sh
+
+hooks: ## Install the committed git hooks (pre-commit and pre-push run the public-hygiene scan)
+	git config core.hooksPath .githooks
+	@echo "hooks installed: core.hooksPath=.githooks"
