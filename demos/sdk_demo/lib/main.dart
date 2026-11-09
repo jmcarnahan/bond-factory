@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
-void main() => runApp(const SdkDemoApp());
+import 'src/app.dart';
+import 'src/errors.dart';
 
-class SdkDemoApp extends StatelessWidget {
-  const SdkDemoApp({super.key});
+export 'src/app.dart' show SdkDemoApp;
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'SDK demo',
-      home: Scaffold(body: Center(child: Text('sdk_demo'))),
-    );
-  }
+void main() {
+  usePathUrlStrategy();
+  WidgetsFlutterBinding.ensureInitialized();
+  // Convenience only: the walk still clicks the semantics placeholder after each full load.
+  // Walk harness only: never call this in a shipped app.
+  SemanticsBinding.instance.ensureSemantics();
+  installErrorCapture();
+  runApp(const SdkDemoApp());
 }

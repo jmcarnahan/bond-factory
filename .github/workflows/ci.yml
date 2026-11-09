@@ -1,0 +1,103 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # A UTC runner hides naive-timestamp regressions in bond_json; run under a non-UTC zone.
+      TZ: America/Los_Angeles
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: make analyze
+      - run: make gates
+      - run: make test-dart
+      - run: make test-flutter
+      - run: bash tool/consumer_check.sh
+
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --all-packages --all-extras
+      - run: make test-libs
+      - run: make lint-libs
+      - run: make test-example
+      - run: make -C services/sdk_example lint
+
+  roof-measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The geo dependencies are heavy and can fail to install on a runner; this
+    # job reports but never blocks a merge.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --all-packages --all-extras
+      - run: make test-service
+
+  wheels:
+    needs: [dart, python]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          python-version: '3.12'
+      - name: Build the eight library wheels
+        run: |
+          mkdir -p dist
+          for pkg in bond_service_kit bond_storage bond_auth_py bond_jobs bond_sync_py bond_oauth bond_calendar bond_tasks_py; do
+            uv build --package "$pkg" --wheel --out-dir dist
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: dist/*.whl
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [wheels]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels
+          path: dist
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: dist/*.whl
