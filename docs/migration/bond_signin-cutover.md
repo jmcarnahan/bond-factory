@@ -78,9 +78,15 @@ Invite matching for S: the lib tries the Graph `mail` address, then the id_token
 address, or store both addresses on the row. `needs_reconnect` is supported on the server: `bond_oauth` `access_token` raises
 `ReconnectRequired` and writes `last_error`, and the status route reports it.
 
+## 8a. Session defaults
+
+Refresh sessions slide over 90 idle days with no absolute cap; they end by sign-out, reuse detection, an admin action or idleness.
+Set `BOND_AUTH_REFRESH_MAX_DAYS` to add a cap (S with Conditional Access may need one). The IdP probe is off; set
+`BOND_AUTH_REFRESH_PROBE_HOURS` and implement `provider_alive` to turn it on.
+
 ## 9. Order
 
-1. SDK pin bump, `bond_auth` and `bond_auth_py` adoption, `bond_oauth` adoption (existing notes).
+1. SDK pin bump, raise `IPHONEOS_DEPLOYMENT_TARGET` and the Podfile platform to 17.4 (https return is production), `bond_auth` and `bond_auth_py` adoption, `bond_oauth` adoption (existing notes).
 2. Models, revision, directory, policy, settings; tests in fake mode; Postgres run (section 5).
 3. Console setup, then the FIRST LIVE provider run in a staging copy.
 4. Client release with the new gateway; then the server mount; then drop `legacy_refresh` after the minimum build date.

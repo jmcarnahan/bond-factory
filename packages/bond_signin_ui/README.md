@@ -12,7 +12,7 @@ phone is the operating system's, an RFC 8252 requirement.
 | `BondScopeAskCard` | Ungranted `WantedSet`s with one Allow button each; nothing when all are granted |
 | `BrowserAuth`, `defaultBrowserAuth()` | The system-browser port; the implementation is chosen at compile time |
 | `replaceAddress(Uri)` | Web: clean the return query out of the address bar; elsewhere a no-op |
-| `NativeReturn.choose(...)` | https return on devices that support it, else the custom scheme |
+| `NativeReturn.choose(...)` | dev builds below iOS 17.4 only: https where supported, else the custom scheme. Production (floor 17.4) passes the https return |
 | `SecureRefreshTokenStore` | `RefreshTokenStore` over `flutter_secure_storage`, key `<appKey>.bond_refresh_token` |
 
 Semantics ids: `sdk.signin.<provider>`, `sdk.signin.error`, `sdk.signin.break-glass`, `sdk.scopes.ask-<set id>`
@@ -45,7 +45,8 @@ Semantics ids: `sdk.signin.<provider>`, `sdk.signin.error`, `sdk.signin.break-gl
 
 ## Platform minimums
 - `flutter_web_auth_2` 5.1.0 builds for iOS 11, but an https (universal link) return works only at runtime on iOS
-  17.4 and later; below that use the scheme return. Android: https returns need App Links.
+  17.4 and later. The apps' floor is 17.4, so production uses the https return; the scheme return is for dev builds below it.
+  Android: https returns need App Links.
 - `flutter_secure_storage` 11.2 needs iOS 13.
 - An identity-only app still pulls `bond_connections` and both plugins; that is by design.
 

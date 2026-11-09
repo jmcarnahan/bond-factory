@@ -1,8 +1,9 @@
 """Own rotating refresh-token sessions (``auth_sessions``), the access JWT they mint, and their revocation.
 
 Lifetimes (``AuthSettings``): access JWT ``session_access_ttl_minutes`` (60); refresh token ``refresh_ttl_days``
-sliding (60), capped at ``refresh_max_days`` (180) from the IdP sign-in instant; ``refresh_max_sessions_per_user``
-(10) live families. The model is passed in (a class built on ``SessionsMixin``); ``SessionStore`` binds it.
+sliding (90 idle days); ``refresh_max_days`` is an optional absolute cap from the IdP sign-in instant (default none);
+``refresh_max_sessions_per_user`` (10) live families. A person is signed out only by their own sign-out, reuse
+detection, an admin action, or the idle window. The model is passed in (a class built on ``SessionsMixin``); ``SessionStore`` binds it.
 Functions flush but never commit, with one exception: ``rotate`` commits before it raises ``ReuseDetected`` or
 ends a family, so a rolling-back ``session_scope`` cannot undo the revocation.
 """
@@ -50,7 +51,8 @@ def issue_session(session, model, *, user_id: str, auth_time: float, provider: s
     family_id = str(uuid.uuid4())
     token = add_row(session, model, user_id=user_id, family_id=family_id, provider=provider,
                     auth_time=to_naive(auth_time),
-                    family_expires_at=to_naive(auth_time + settings.refresh_max_days * DAY),
+                    family_expires_at=(to_naive(auth_time + settings.refresh_max_days * DAY)
+                                       if settings.refresh_max_days else None),
                     t=t, settings=settings, parent_id=None, rotation_id=None, device_label=device_label,
                     last_probed_at=None)
     access, expires_in = mint_access(spec, family_id=family_id, settings=settings, t=t)

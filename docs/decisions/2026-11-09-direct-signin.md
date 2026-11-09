@@ -17,8 +17,8 @@ to 1,100, P about 2,000 to 625 (estimates; each app keeps one directory file, on
   existing connect flow (A's owner, office and sales; crew none; P's policy is empty). Sign-in always succeeds with identity
   scopes alone.
 - **D2 Sessions.** Our own rotating refresh tokens in `bond_auth_py` (`SessionsMixin`, table `auth_sessions`): reuse detection
-  with a 20 s grace and a client `rotation_id` for lost responses, 60 days sliding, 180 days absolute, 10 families per user,
-  access JWT 60 minutes with a `sid` claim. A provider liveness probe runs at most once per 24 h per family.
+  with a 20 s grace and a client `rotation_id` for lost responses, 90 days sliding idle, no absolute cap by default, 10 families per
+  user, access JWT 60 minutes with a `sid` claim. A provider liveness probe is opt-in (`refresh_probe_hours`, default 0).
 - **D3 Break-glass.** Firebase e-mail and password stays behind `BOND_SIGNIN_BREAKGLASS` (default off) for admin rows and the
   store reviewer. Those sign-ins get the same refresh sessions. `firebase-admin` is the optional extra `bond_auth_py[firebase]`.
 - **D4 Identity.** `(identity_provider, identity_subject)` bound on first sign-in: Google `sub`, Microsoft `tid:oid`. E-mail is
@@ -28,8 +28,8 @@ to 1,100, P about 2,000 to 625 (estimates; each app keeps one directory file, on
   link for sign-in, and `Origin` must be allowlisted.
 - **D6 Native binding.** The app is the PKCE client of OUR server: a 32-byte device secret, its sha256 sent at start, the
   secret presented at redeem. Hand-off codes live in a DB table, are single use by one `UPDATE`, burn on mismatch and expire in
-  120 s. Return URL is an https app link where the iOS floor allows it; a device-bound reverse-domain scheme is allowed in
-  production as the fallback (residual risk: denial of service); connect-native accepts the same return forms. Embedded web views are forbidden.
+  120 s. Return URL is an https app link, the production path; a device-bound reverse-domain scheme is a dev and test fallback only
+  (residual risk: denial of service); connect-native accepts the same return forms. Embedded web views are forbidden.
 - **D7 Connect-native** keeps "store nothing until redeem"; sign-in-native stores the connection under the identified user at
   the callback and hands off only `{user_id, provider, auth_time, attempt}`.
 - **D8 `bond_signin`** is a Protocol-only lib with the router factory, the check order and `ScopePolicy`. It imports neither
@@ -76,8 +76,10 @@ Cost: reverse a decision, rewrite a gate, add a per-app rule. The Protocol-only 
 - **PyPI placeholders.** Register `bond-oauth`, `bond-auth-py` and `bond-signin` as empty projects so a missing sibling
   declaration cannot resolve to a squatter. Not done in this build.
 - **JWKS follow-up.** An additive signature check of the id_token against the provider keys (about 80 lines) behind a setting.
-- **iOS floor.** The plugin's https return works from iOS 17.4; below it the app uses the device-bound scheme. Whether the apps
-  raise their floor is the owners' decision.
+- **Answers of 2026-11-09 (John).** (1) iOS floor: the apps raise it to 17.4 at migration; the https universal-link return is
+  production and the custom scheme is dev only. (2) Sessions end only by the person's sign-out, reuse detection, an admin
+  action, or 90 idle days; no absolute cap (`refresh_max_days` unset). (3) The IdP liveness probe is opt-in. (4) The sign-in
+  account is the connect account: a role ask for another account is `account_mismatch` (shared connects exempt).
 - **Live run.** Nothing in this stack has run against a live Google or Microsoft endpoint; the first adopter does the first run.
 
 ## Consequences

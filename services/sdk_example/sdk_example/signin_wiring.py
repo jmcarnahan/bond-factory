@@ -82,7 +82,7 @@ def build_signin(app: FastAPI, wiring: OAuthWiring) -> SignIn:
         cookie_name(APP_NAME), refresh_cookie_name(APP_NAME),
         lambda secure: session_cookie_params(auth, secure=secure, ttl_minutes=auth.session_access_ttl_minutes),
         lambda secure: refresh_cookie_params(auth, secure))
-    return SignIn(settings=signin_settings(settings), directory=Directory(wiring, fake=settings.mode == "fake"),  # FAKE MODE ONLY: `fake=`
+    return SignIn(settings=signin_settings(settings), directory=Directory(wiring, fake=settings.mode == "fake", probe=settings.probe),  # FAKE MODE ONLY: `fake=`
                   flow=flow, handoffs=HandoffStore(OAuthHandoff, wiring.cipher),
                   sessions=SessionStore(AuthSession, auth), cookies=cookies, policy=wiring.policy)
 

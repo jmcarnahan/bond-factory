@@ -41,7 +41,8 @@ def rotate(session, model, *, refresh_token: str, rotation_id: str | None = None
     ``rotation_id`` is the client's random id for this refresh: a replay of the same parent with the same id while
     the child is still unused is a lost response, answered with a fresh sibling (the unused child is revoked).
     Without it, a replay inside ``refresh_reuse_grace_seconds`` also gets a sibling; later is reuse.
-    ``probe(user_id, provider)`` runs at most once per ``refresh_probe_hours`` per family: ``False`` revokes it;
+    ``probe(user_id, provider)`` runs only when ``refresh_probe_hours`` > 0 (default 0 = off), at most once per
+    that many hours per family: ``False`` revokes it;
     ``True``, ``None`` or an exception stamp the family (next probe in 24 h). It runs INSIDE the write transaction:
     keep it fast, or return ``None``.
     The revocation mark is compared with the FAMILY's ``auth_time``, never with ``now``.
@@ -112,7 +113,7 @@ def _issue_child(session, model, row, *, claimed: bool, t: float, rotation_id: s
     parent_id, family_id, user_id = row.id, row.family_id, row.user_id
     provider, auth_time, family_cap = row.provider, row.auth_time, row.family_expires_at
     label, probed = row.device_label, row.last_probed_at
-    if t >= to_epoch(row.expires_at) or t >= to_epoch(family_cap):
+    if t >= to_epoch(row.expires_at) or (family_cap is not None and t >= to_epoch(family_cap)):
         if claimed:
             _unclaim(session, model, row, stamp)  # an expired token is not burned
         raise RefreshExpired()
@@ -120,7 +121,7 @@ def _issue_child(session, model, row, *, claimed: bool, t: float, rotation_id: s
         spec = loader(user_id)
         valid_after = revocation.sessions_valid_after(user_id) if spec is not None else None
         stale = valid_after is not None and _stale(auth_time, valid_after, settings)
-        due = probe is not None and (probed is None or t - to_epoch(probed) >= settings.refresh_probe_hours * HOUR)
+        due = probe is not None and settings.refresh_probe_hours > 0 and (probed is None or t - to_epoch(probed) >= settings.refresh_probe_hours * HOUR)
         alive = _probe(probe, user_id, provider, family_id) if (spec is not None and not stale and due) else None
     except Exception:
         if claimed:

@@ -49,8 +49,8 @@ class SessionsMixin:
     parent_id = Column(String, nullable=True)
     provider = Column(String(16), nullable=False)  # google | microsoft | password | demo
     auth_time = Column(DateTime, nullable=False)  # the IdP sign-in instant, copied to every child
-    family_expires_at = Column(DateTime, nullable=False)  # auth_time + refresh_max_days
-    expires_at = Column(DateTime, nullable=False)  # min(now + refresh_ttl_days, family_expires_at)
+    family_expires_at = Column(DateTime, nullable=True)  # auth_time + refresh_max_days; NULL = no cap
+    expires_at = Column(DateTime, nullable=False)  # now + refresh_ttl_days, never past family_expires_at
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     last_used_at = Column(DateTime, nullable=True)  # set when this token is rotated (claimed)
     rotated_at = Column(DateTime, nullable=True)

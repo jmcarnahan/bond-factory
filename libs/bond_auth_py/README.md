@@ -97,16 +97,16 @@ An app with its own variable names builds `AuthSettings(...)` directly or passes
 
 ## Refresh sessions (`SessionStore(model, settings)`, model = a class built on `SessionsMixin`)
 
-One row per refresh token (only its sha256 is stored). `issue` after a sign-in, `rotate` on refresh,
-`revoke_token` on logout, `revoke_user(..., mark_valid_after=)` for sign-out-everywhere, `prune` from a job.
-
+One row per refresh token (only its sha256 is stored). Sessions end only by sign-out, reuse detection, an admin
+action or 90 idle days; the probe is opt-in. `issue` after a sign-in, `rotate` on refresh, `revoke_token` on logout,
+`revoke_user(..., mark_valid_after=)` for sign-out-everywhere, `prune` from a job.
 | Lifetime (`AuthSettings`) | Default |
 |---|---|
 | access JWT (`session_access_ttl_minutes`, claim `sid` = family id) | 60 min |
-| refresh sliding (`refresh_ttl_days`) / absolute from IdP sign-in (`refresh_max_days`) | 60 d / 180 d |
+| refresh sliding idle window (`refresh_ttl_days`) / optional absolute cap (`refresh_max_days`) | 90 d / none |
 | replay grace (`refresh_reuse_grace_seconds`) / retry window (`refresh_retry_seconds`) | 20 s / 600 s |
 | live families per user, LRU revoked as `limit` (`refresh_max_sessions_per_user`) | 10 |
-| IdP liveness probe per family (`refresh_probe_hours`) | 24 h |
+| IdP liveness probe per family, opt-in (`refresh_probe_hours`; 0 = off) | off |
 
 `rotate` raises `RefreshRevoked`, `RefreshExpired` or `ReuseDetected` (401, all `AuthRefused`; clients treat all
 as "sign in again"). A replay of a rotated token: same `rotation_id` and the child still unused is a lost
@@ -117,4 +117,4 @@ The revocation mark is compared with the family's `auth_time`, never with now.
 before it raises `ReuseDetected` (and when it ends a family: user gone, mark, probe `False`). Without that, a
 `session_scope` that rolls back on exception would undo the revocation. Keep the route's scope as it is; do not
 wrap `rotate` in a savepoint. An expired or failing rotate un-claims the token (not burned). Cookie helpers:
-`refresh_cookie_params(settings, secure)`, `refresh_cookie_name(app)`. Install `bond_auth_py[firebase]` only where the Firebase tier or admin is used.
+`refresh_cookie_params(settings, secure)`, `refresh_cookie_name(app)`. `bond_auth_py[firebase]` only for Firebase.

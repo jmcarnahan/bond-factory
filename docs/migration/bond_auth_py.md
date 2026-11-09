@@ -76,7 +76,7 @@ opt in) the app attaches `SessionsMixin` (`auth_sessions`, hashes only) and writ
 
 Sessions:
 - `SessionStore` (model and settings bound): `issue`, `rotate`, `revoke_token`, `revoke_user`; satisfies `bond_signin.SessionIssuer`
-  by shape. `AuthSettings` adds `refresh_ttl_days` 60, `refresh_max_days` 180, `refresh_reuse_grace_seconds` 20,
+  by shape. `AuthSettings` adds `refresh_ttl_days` 90 (sliding idle), `refresh_max_days` unset (no cap), `refresh_probe_hours` 0 (probe opt-in), `refresh_reuse_grace_seconds` 20,
   `refresh_max_sessions_per_user` 10, `session_access_ttl_minutes` 60.
 - `bond_signin` mounts `/auth/refresh`, `/auth/logout`, `/auth/sessions/revoke-all`; the app deletes its own refresh and logout
   and keeps `/auth/firebase` (break-glass), `/auth/demo`, `/auth/me`, which call `finish_session` so every sign-in issues sessions.

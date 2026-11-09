@@ -28,9 +28,9 @@ PKG = Path(bond_auth_py.__file__).parent
 
 def test_session_defaults():
     s = AuthSettings()
-    assert (s.session_access_ttl_minutes, s.refresh_ttl_days, s.refresh_max_days) == (60, 60, 180)
+    assert (s.session_access_ttl_minutes, s.refresh_ttl_days, s.refresh_max_days) == (60, 90, None)
     assert (s.refresh_reuse_grace_seconds, s.refresh_retry_seconds) == (20, 600)
-    assert (s.refresh_max_sessions_per_user, s.refresh_probe_hours, s.refresh_cookie_path) == (10, 24, "/auth")
+    assert (s.refresh_max_sessions_per_user, s.refresh_probe_hours, s.refresh_cookie_path) == (10, 0, "/auth")
     assert s.access_ttl_minutes == 10080  # unchanged for apps without sessions
 
 
@@ -43,12 +43,15 @@ def test_session_settings_from_env():
     assert (s.session_access_ttl_minutes, s.refresh_ttl_days, s.refresh_max_days) == (30, 14, 90)
     assert (s.refresh_reuse_grace_seconds, s.refresh_retry_seconds, s.refresh_max_sessions_per_user) == (5, 120, 3)
     assert (s.refresh_probe_hours, s.refresh_cookie_path) == (12, "/api/auth")
-    assert AuthSettings.from_env(env={}).refresh_ttl_days == 60
+    assert AuthSettings.from_env(env={}).refresh_ttl_days == 90
+    for raw in ("0", ""):
+        assert AuthSettings.from_env(env={"BOND_AUTH_REFRESH_MAX_DAYS": raw}).refresh_max_days is None
+    assert AuthSettings.from_env(env={}).refresh_max_days is None
 
 
 def test_refresh_cookie_params_and_name():
-    params = refresh_cookie_params(settings_with(), True)
-    assert params == {"httponly": True, "secure": True, "samesite": "lax", "path": "/auth", "max_age": 60 * 86400}
+    params = refresh_cookie_params(AuthSettings(), True)
+    assert params == {"httponly": True, "secure": True, "samesite": "lax", "path": "/auth", "max_age": 90 * 86400}
     assert refresh_cookie_params(settings_with(refresh_cookie_path="/x"), secure=False)["path"] == "/x"
     assert refresh_cookie_name("app") == "app_refresh_token"
     assert session_cookie_params(settings_with(), secure=True)["max_age"] == 10080 * 60  # unchanged
@@ -126,6 +129,8 @@ def test_the_mixin_creates_the_planned_table_on_sqlite():
                 "expires_at", "created_at"}
     optional = {"parent_id", "last_used_at", "rotated_at", "revoked_at", "revoke_reason", "device_label",
                 "rotation_id", "last_probed_at"}
+    optional.add("family_expires_at")  # NULL = no absolute cap
+    required.discard("family_expires_at")
     assert set(cols) == required | optional
     assert all(not cols[n]["nullable"] for n in required if n != "id") and all(cols[n]["nullable"] for n in optional)
     indexes = {i["name"]: (i["column_names"], bool(i["unique"])) for i in insp.get_indexes("auth_sessions")}
