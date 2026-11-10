@@ -1,21 +1,15 @@
 # Reading the SDK examples
 
 `services/sdk_example` (FastAPI, port 8012) and `demos/sdk_demo` (Flutter web, port 8078) wire every module end to
-end in fake mode. Use them as few-shot examples: find the module in the table, open the files named for it, copy the
-shape into the app. They are never shipped. `README.md` in this folder covers consuming the modules, and
-`docs/migration/README.md` points to the per-app adapters. The `*Labels` objects (`ApiLabels`, `BondLabels`,
-`TaskLabels`, `ConnectionLabels`) are documented in each package README; mapping them to an app's translations is the app's job.
+end in fake mode. Use them as few-shot examples: find the module in the table, open its files, copy the shape into the
+app. They are never shipped. `README.md` here covers consuming; `docs/migration/README.md` points to the per-app adapters.
+The `*Labels` objects (`ApiLabels`, `BondLabels`, `TaskLabels`, `ConnectionLabels`) are in each package README; mapping them to an app's translations is the app's job.
 
 ## Run both
 
 - Once: `make setup-py` at the repo root (workspace virtual environment).
 - API: `make serve-example` serves on :8012 through the `create_app` factory. With no environment variables it starts in
-  fake mode (mock identities, demo sign-in, generated keys) and logs one warning. Check it:
-
-  ```
-  curl -s localhost:8012/health
-  ```
-
+  fake mode (mock identities, demo sign-in, generated keys) and logs one warning. Check it with `curl -s localhost:8012/health`.
   The answer is `{"status": "ok", "mode": "fake"}`. The database, uploads and generated keys live in
   `services/sdk_example/out/` (ignored by git); delete that folder to start clean.
 - Demo: `make demo-sdk-web` serves a debug build on :8078 and talks to `http://localhost:8012`. To point it elsewhere, run
@@ -110,13 +104,38 @@ The identifier is the DOM attribute `flt-semantics-identifier`, so a walk select
 
 `bond_ui` widgets take an optional `semanticsId` and wrap themselves, so an app inherits walkable widgets.
 
-## Real mode
+## Riverpod wiring
 
-The examples run in fake mode only. For a real Firebase id-token source, real identity-provider settings and PowerSync
-endpoints, read `docs/contracts/` (`auth.md`, `sync_upload.md`, `error_body.md`) and the module READMEs
-(`packages/bond_auth_firebase`, `packages/bond_sync_powersync`, `libs/bond_auth_py`, `libs/bond_sync_py`).
+Names come from the barrels of `bond_api`, `bond_auth`, `bond_signin` and `bond_signin_ui`; the shape is `DemoSession` in
+`lib/src/example_api.dart`. One `ApiClient`, one `TokenStore`, one `RefreshTokenStore`, and two gateways over them:
+`OidcAuthGateway` (direct sign-in) and `FirebaseAuthGateway` (break-glass). An `AuthGateway` provider names the gateway that
+made the session, so renewal goes through it; gateway and client each keep one single flight, so parallel 401s renew once.
 
-## Walking it
+```dart
+final tokensProvider = Provider<TokenStore>((_) => InMemoryTokenStore());
+final refreshStoreProvider = Provider<RefreshTokenStore>((_) =>
+    kIsWeb ? const NoRefreshTokenStore() : SecureRefreshTokenStore(appKey: 'app'));
+final apiProvider = Provider((r) => ApiClient(baseUrl: base, http: client, isWeb: kIsWeb, tokens: r.watch(tokensProvider)));
+final oidcProvider = Provider((r) => OidcAuthGateway(api: r.watch(apiProvider), authPrefix: '/auth',
+    tokens: r.watch(tokensProvider), refreshTokens: r.watch(refreshStoreProvider)));
+final breakGlassProvider = Provider((r) => FirebaseAuthGateway(api: r.watch(apiProvider), source: idTokenSource,
+    tokens: r.watch(tokensProvider), refreshTokens: r.watch(refreshStoreProvider)));
+final gatewayProvider = StateProvider<AuthGateway>((r) => r.watch(oidcProvider)); // Riverpod 2; Riverpod 3 apps use a Notifier. Break-glass success sets the other
+// AuthNotifier.build: api.onUnauthorized = () => renewalHook(ref.read(gatewayProvider), expectedUserId: state.userId)();
+// AuthNotifier._from(AuthSession s) => AuthState(userId: s.userId, capabilities: s.capabilities, user: s.user);
+```
 
-The recipe (start both servers, enable semantics after each load, selectors, typing into fields, the error check on every route,
-cleanup) is `docs/test/WEB.md`. Servers are started in the background with their pids saved under `tmp/logs/`.
+Also set the client's `onSessionExpired`, `onSessionRevoked`, `onDeactivated` to clear the state; `AuthFailure.code` is the server code.
+
+## Web token delivery
+
+As `example_api.dart` and `example_http_client_web.dart` do: the refresh token is an HttpOnly cookie, so the store is
+`NoRefreshTokenStore` and the client is a `BrowserClient` with `withCredentials = true`; same-origin calls carry the cookie. The
+access token stays in memory; after a `signin=ok` return or a reload, `OidcAuthGateway.completeWeb()` fetches it (`POST /auth/refresh`).
+A cookie-authenticated mutation needs an allowed `Origin` (`origin_rule.py`). A 401 calls `refreshSession()` once, then replays
+(`test/auth_page_test.dart`, "a forced 401 renews exactly once").
+
+## Real mode and walking it
+
+The examples run in fake mode only. Real Firebase, identity-provider and PowerSync settings: `docs/contracts/` (`auth.md`,
+`sync_upload.md`, `error_body.md`) and the package READMEs. Walk recipe: `docs/test/WEB.md` (servers in the background, pids under `tmp/logs/`).

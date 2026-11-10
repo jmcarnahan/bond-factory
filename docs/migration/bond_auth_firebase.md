@@ -12,7 +12,8 @@ Contracts: `docs/contracts/auth.md`.
 
 **App S (sbel).**
 - Web: `flutterui/lib/data/services/firebase_id_token_source.dart` (134). Its `prepare()` fetched `/auth/providers` and called `Firebase.initializeApp` once; that is now `AuthProviders.firebase` plus `initFirebaseFromRuntimeConfig(config, isWeb: true)`.
-- Mobile: `RealFirebaseGateway` in `core/auth/firebase_gateway.dart`; S's gateway sent the e-mail and password itself, now it is `FirebaseAuthGateway(source: FirebaseIdTokenSource())` from `bond_auth`.
+- S does NOT adopt this adapter: it decided on 2026-11-09 against any break-glass and removes Firebase from the backend and both clients with direct sign-in (`docs/migration/sbel.md`). S has no `firebase_options.dart` and no `firebase_messaging`. The dual-gateway wiring in `docs/sdk/examples.md` is for A and P.
+- Mobile (A, P): `RealFirebaseGateway` becomes `FirebaseAuthGateway(source: FirebaseIdTokenSource())` from `bond_auth`. S deletes its `core/auth/firebase_gateway.dart` instead.
 
 ## 2. The adapter
 

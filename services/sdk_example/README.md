@@ -49,14 +49,15 @@ names. Everything else is the same wiring. Environment:
 | `SDK_EXAMPLE_PROBE` | `1` makes `provider_alive` ask the provider through the live connection (default off) |
 | `SDK_EXAMPLE_CONNECTIONS` | `0` mounts sign-in only: no `/connections*` routes (default `1`) |
 | `SDK_EXAMPLE_ALLOW_FAKE_PUBLIC` | `1` allows fake mode on an https `SDK_EXAMPLE_PUBLIC_BASE` (a disposable demo host only; otherwise startup refuses it) |
-| `SDK_EXAMPLE_REDIRECT_ALLOWLIST`, `SDK_EXAMPLE_CORS_ORIGINS`, `SDK_EXAMPLE_NATIVE_REDIRECTS` | Defaults (`http://localhost:8078`, `sdkdemo://connections`) apply in fake mode ONLY. Real mode must set the allowlist (startup raises when empty), and every CORS origin must be in it or the public base |
-| `SDK_EXAMPLE_BREAKGLASS` | `1` turns on `POST /auth/firebase` for rows flagged `allow_password` |
+| `SDK_EXAMPLE_REDIRECT_ALLOWLIST`, `SDK_EXAMPLE_CORS_ORIGINS` | The default (`http://localhost:8078`) applies in fake mode ONLY. Real mode must set the allowlist (startup raises when empty), and every CORS origin must be in it or the public base |
+| `SDK_EXAMPLE_NATIVE_REDIRECTS` | Deprecated alias for older phone clients (exact addresses, query ignored; default `sdkdemo://connections` in fake mode ONLY). New clients return to the https page `<base>/app/return/<provider>` or a reverse-domain scheme from `SDK_EXAMPLE_NATIVE_SCHEMES` |
+| `SDK_EXAMPLE_BREAKGLASS` | Example-only flag (the library's own key is `BOND_SIGNIN_BREAKGLASS`, which this example does not read): `1` turns on `POST /auth/firebase` for rows flagged `allow_password` |
 | `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS` | Universal-link files; empty answers 404. Android format: `package=FP;FP,other=FP` |
 | `BOND_GOOGLE_CLIENT_ID/SECRET`, `BOND_MS_CLIENT_ID/SECRET/TENANT` | Real providers; Microsoft sign-in needs the tenant GUID |
 
 Phone clients: the device secret is hashed as a STRING (sha256 of the secret's base64url text, lowercase hex), the
 same as the Dart `SignInAttempt`. Connect-native accepts the same return addresses as sign-in (the https app link
-`<base>/app/return/<provider>` or a configured scheme); `SDK_EXAMPLE_NATIVE_REDIRECTS` is a deprecated alias.
+`<base>/app/return/<provider>` or a configured reverse-domain scheme); `SDK_EXAMPLE_NATIVE_REDIRECTS` is a deprecated alias (`connect_helpers.py:37-47`).
 
 Which sign-in files an app copies:
 

@@ -6,7 +6,8 @@ adapters (see `docs/decisions/2026-11-08-shared-modules-policy.md`).
 
 ## Dart and Flutter (git + full SHA + `path:`)
 
-Toolchain: 3.47.8 (this branch and CI); the packages' floor is Flutter 3.41 and Dart ^3.11.
+Toolchain: this branch and CI use Flutter 3.47.8 / Dart 3.13.7; the packages' floor is Flutter 3.41 and Dart ^3.11.
+Apps still on Flutter 3.47.2 should bump when they adopt a module.
 
 ```yaml
 dependencies:
@@ -29,8 +30,6 @@ dependencies:
 - Packages never pin `intl`, `flutter_localizations`, `flutter_riverpod` or `go_router`. Strings enter shared
   widgets through a `*Labels` object with English defaults, and routing and providers stay in the app.
 - `tool/consumer_check.sh` (`make consumer-check`) proves each package resolves outside the workspace.
-- Toolchain: this branch and CI use Flutter 3.47.8 / Dart 3.13.7; the packages' floor is Flutter 3.41 and Dart >= 3.11 (`sdk: ^3.11.0`).
-  Apps still on Flutter 3.47.2 should bump when they adopt a module.
 
 ### Local development against a checkout
 
@@ -112,6 +111,9 @@ bond_storage = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
 | `bond_tasks_ui` | Flutter | 3 | Task screens |
 | `bond_connections` | pure Dart | 3 | Connection status models and client |
 | `bond_connections_ui` | Flutter | 3 | Connection status screens |
+| `bond_signin (py)` | Python | 4 | Direct Google/Microsoft sign-in: Protocol seams, scope policy, router factory |
+| `bond_signin (dart)` | pure Dart | 4 | Sign-in client: attempts, returns and the session gateway |
+| `bond_signin_ui` | Flutter | 4 | Sign-in screen, buttons, scope-ask card, system-browser port |
 
 `demos/sdk_demo` (Flutter web, :8078) and `services/sdk_example` (FastAPI, :8012) exercise every module in
 fake mode and are the reference for wiring. The walk recipe is `docs/test/WEB.md`.

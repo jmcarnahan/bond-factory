@@ -54,7 +54,7 @@ inside it so the audit row and the family revoke are committed.
 | `GET /auth/providers` | optional (`include_providers`) | your payload plus `signin`, `break_glass`, `default_flow` | |
 | `GET /app/return/{p}` | | static "Return to the app" page | |
 
-Cookie delivery (web) sets the access cookie and an HttpOnly `SameSite=Lax` refresh cookie and keeps the refresh
+Cookie delivery (web) sets the access cookie and an HttpOnly `SameSite=Lax` refresh cookie (Path is the prefix, default `/auth`: `CookiePolicy(refresh_path)`) and keeps the refresh
 token out of the JSON; body delivery (native) returns it in the JSON and sets no cookie. Every cookie-delivery POST
 needs an `Origin` (or `Referer`) in `redirect_allowlist` or the API's own origin: 403 `invalid_origin` otherwise.
 The web nonce cookie is per flow, `bond_signin_<8 hex of sha256(nonce)>`, set by the start POST, never by a link.
@@ -69,7 +69,7 @@ The web nonce cookie is per flow, `bond_signin_<8 hex of sha256(nonce)>`, set by
 | `legacy_refresh` | `(request, body) -> answer`; REQUIRED while installed builds still post `{id_token}` to refresh |
 | `labels` | optional `{provider: button label}` for the `signin` list |
 | `clock` | optional `() -> epoch seconds`, passed as `now` to sessions, hand-offs and the order |
-| `prefix` | default `settings.prefix` (`/auth`). Routes, the nonce cookie (`<prefix>/signin`) and the refresh cookie (`<prefix>`) move together; the return page is at `<parent>/app/return/{p}`. Set the flow's `public_base` to match |
+| `prefix` | default `settings.prefix` (`/auth`). Routes, the nonce cookie (`<prefix>/signin`) and the refresh cookie's Path (the prefix itself, set into `CookiePolicy(refresh_path)`) move together; the return page is at `<parent>/app/return/{p}`. Set the flow's `public_base` to match |
 
 `from_env(prefix="BOND_SIGNIN_")` names (all prefixed):
 | Name | Default | Meaning |

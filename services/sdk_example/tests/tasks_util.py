@@ -16,7 +16,8 @@ def grant(app, user_id=VIEWER_USER_ID, *caps):
 
 
 def make(client, h, **body):
-    reply = client.post("/tasks", json={"title": "Call back", **body}, headers=h)
+    # ``today`` pinned to TODAY so ``overdue`` does not depend on the wall-clock date the suite runs on.
+    reply = client.post("/tasks", json={"title": "Call back", **body}, headers=h, params={"today": TODAY})
     assert reply.status_code == 201, reply.text
     return reply.json()
 
