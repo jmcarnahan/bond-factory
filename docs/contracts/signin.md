@@ -41,8 +41,8 @@ every outcome.
 | Cookie | Set by | Flags |
 |---|---|---|
 | `<app>_access_token` | callback, refresh | HttpOnly, SameSite=Lax, Path `/`, Secure per setting |
-| `<app>_refresh_token` | callback, refresh | HttpOnly, SameSite=Lax, Path `/auth`, Max-Age = refresh TTL, Secure per setting, never in JSON on web |
-| `bond_signin_<8hex>` | start (web) | HttpOnly, SameSite=Lax, Path `/auth/signin`, Max-Age 600, Secure per setting |
+| `<app>_refresh_token` | callback, refresh | HttpOnly, SameSite=Lax, Path is the sign-in prefix (default `/auth`; `CookiePolicy(refresh_path)`), Max-Age = refresh TTL, Secure per setting, never in JSON on web |
+| `bond_signin_<8hex>` | start (web) | HttpOnly, SameSite=Lax, Path `<prefix>/signin` (default `/auth/signin`), Max-Age 600, Secure per setting |
 
 The nonce cookie name is `bond_signin_` plus the first 8 hex of `sha256(state nonce)`. The callback decodes the
 state, derives the name, compares, clears it. Two tabs do not collide. A sibling subdomain can toss cookies onto

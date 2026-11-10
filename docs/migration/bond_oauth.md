@@ -98,3 +98,5 @@ with the user's bound identity: a different account redirects with `connection=e
   startup outside fake mode. It keeps requested scopes in memory: a restart between start and callback gives `invalid_code`.
 - Microsoft has no per-token revoke call: disconnect closes the row only.
 - The state is expired at its `exp`, not after it (10 minutes, real clock).
+
+S specifics: `sbel.md` §3 to §6.

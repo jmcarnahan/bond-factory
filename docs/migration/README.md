@@ -16,6 +16,8 @@ The policy behind it: `docs/decisions/2026-11-08-shared-modules-policy.md` (dive
 Line counts and call-site counts were measured on 2026-11-08 with `wc -l` and `grep`; they include tests unless the row says
 otherwise. Re-run the grep given in each file's section 3 before you start; the numbers will have moved.
 
+Per-app notes live beside the module notes (`sbel.md`).
+
 ## Index
 
 | Module | File | Adopters, in the order the research recommends |
@@ -28,7 +30,7 @@ otherwise. Re-run the grep given in each file's section 3 before you start; the 
 | `bond_storage` | `bond_storage.md` | A, P, S |
 | `bond_auth_py` | `bond_auth_py.md` | A, P; S after its contract migration |
 | `bond_jobs` | `bond_jobs.md` | A, P |
-| `bond_auth`, `bond_auth_firebase` | `bond_auth.md`, `bond_auth_firebase.md` | A, P; S later |
+| `bond_auth`, `bond_auth_firebase` | `bond_auth.md`, `bond_auth_firebase.md` | A, P; S `bond_auth` after its contract migration, `bond_auth_firebase` for break-glass only, kept |
 | `bond_sync`, `bond_sync_powersync`, `bond_sync_py` | `bond_sync.md`, `bond_sync_powersync.md`, `bond_sync_py.md` | S first, then A |
 | `bond_oauth` | `bond_oauth.md` | A, S |
 | `bond_calendar` | `bond_calendar.md` | S (Microsoft Graph), A (Google read); P adopts nothing |
@@ -60,13 +62,13 @@ whose core already has the shape the lib took, and last for A and P. The order k
 3. `bond_service_kit`, then `bond_storage`, `bond_jobs`, `bond_auth_py` (they use its error body and clock).
 4. `bond_ui` once the token adapter is written.
 5. Sync and OAuth last; both need decisions of the owning app.
-6. Direct sign-in (`bond_signin.md`) after the modules it sits on, in the same SHA bump as their 0.2.0 versions. It replaces
-   Firebase sign-in and keeps Firebase only as the break-glass route and for push. All SDK work lands before any app migrates
+6. Direct sign-in (`bond_signin.md`) AFTER `bond_auth`/`bond_auth_py`, `bond_oauth` and `bond_connections` are adopted, in the same SHA bump as their 0.2.0 versions.
+   It replaces Firebase sign-in and keeps Firebase only as the break-glass route (S: `bond_auth_firebase`, break-glass only) and for push (A, P). All SDK work lands before any app migrates
    to it, so an app takes one step per module. Order inside it: S (single tenant, full scopes at sign-in, its phone is the
    main surface), then A (identity-only sign-in plus role asks), then P (identity only). Each app's first LIVE provider run
    is part of its acceptance (`bond_signin.md` section 6); nothing in the SDK has run against a live provider yet.
 
-P is the cheapest first adopter for anything that touches the backend (2 Alembic revision files against 24 in A and 83 in S).
+P is the cheapest first adopter for anything that touches the backend (2 Alembic revision files against 24 in A and 83 in S, head 082).
 
 ## Common procedure, per module
 
