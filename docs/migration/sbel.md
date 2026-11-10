@@ -25,7 +25,7 @@ S facts for the sign-in, auth, oauth, connections and api notes. Paths are sbel-
 | `NOT_INVITED` (:91) | 403 | `not_invited` | 403 |
 | `USER_DEACTIVATED` (:96) | 403 | `deactivated` | 403 |
 | `INVALID_ID_TOKEN` (:77) | 401 | `invalid_id_token` (sign-in), `invalid_token` (session) | 400, 401 |
-| `AUTH_UNAVAILABLE` (:79) | 503 | `provider_error` (sign-in), `auth_unavailable` (break-glass) | 502, 503 |
+| `AUTH_UNAVAILABLE` (:79) | 503 | `provider_error` (sign-in) | 502 |
 | `EMAIL_NOT_VERIFIED` (:74) | 403 | `email_not_verified` | 403 |
 | `IDENTITY_MISMATCH` (:101, :109, :123) | 409 | `identity_mismatch` | 403 |
 
@@ -43,7 +43,7 @@ S facts for the sign-in, auth, oauth, connections and api notes. Paths are sbel-
 |---|---|---|
 | Access cookie | `access_token`, HttpOnly, SameSite=Lax, path `/`, Secure from `COOKIE_SECURE`, max-age = access minutes (`routers/auth.py:169-176`) | `<app>_access_token` (`bond_auth_py/tokens.py:77`), same flags, Secure from `BOND_SIGNIN_COOKIE_SECURE` |
 | Refresh cookie | none | HttpOnly, SameSite=Lax, path `/auth` (`refresh_cookie_path`, `bond_auth_py/settings.py:44`) |
-| Set by / cleared by | `POST /auth/firebase`; `POST /auth/logout` (`:185`) | the sign-in router and `finish_session`; logout clears both |
+| Set by / cleared by | `POST /auth/firebase` (deleted with the migration); `POST /auth/logout` (`:185`) | the sign-in router and `finish_session`; logout clears both and the old `access_token` |
 | Read | cookie FIRST; a bad cookie is a 401 even with a valid bearer header (`dependencies/auth.py:30-41`) | bearer first, then the new cookie only (`bond_auth_py/tokens.py:103-113`) |
 
 Web renewal: the access token is kept fresh from the refresh cookie (`docs/sdk/examples.md`, Web token delivery); auth routes are called at
@@ -65,13 +65,13 @@ absent. Every web user signs in once more (a one-time web logout); say so in the
 | `MICROSOFT_REDIRECT_URI` (:715) | derived: `<base>/auth/signin/microsoft/callback` (`bond_signin/settings.py:70`) and `<base>/connections/microsoft/callback` (`oauth_wiring.py:78`) | yes |
 | `ADMIN_USERS` (:88) | S writes the promotion inside its own `find_invite`/`record_sign_in` (the example has none; docstring `directory.py:41`) | yes |
 | `MICROSOFT_OFFICE_TOOLS_ENABLED` (:122) | the ScopePolicy list (section 4) | yes |
-| new | `BOND_OAUTH_KEY`, `BOND_SIGNIN_PROVIDERS=microsoft`, `BOND_SIGNIN_NATIVE_SCHEMES` (dev only), `BOND_SIGNIN_BREAKGLASS`, `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS` (`sdk_example/settings.py:131-132`) | yes |
+| new | `BOND_OAUTH_KEY`, `BOND_SIGNIN_PROVIDERS=microsoft`, `BOND_SIGNIN_NATIVE_SCHEMES` (the phone's reverse-domain scheme, always on: S uses the scheme return) | yes; not used by S: `BOND_SIGNIN_BREAKGLASS` (no break-glass), `BOND_APPLE_APP_IDS`/`BOND_ANDROID_APPS` (no app link yet) |
 
 ## 4. Scopes
 
 Requested today: `Mail.Send Mail.Read Calendars.ReadWrite MailboxSettings.Read User.Read`, plus `Contacts.ReadWrite
 Files.ReadWrite` when `microsoft_office_tools_enabled`, plus `offline_access` (`sbelcrm/config.py:707-710`; the flag is
-`MICROSOFT_OFFICE_TOOLS_ENABLED`, default false, `:122`). `microsoft_graph_service.py:35-36` only lists the required
+`MICROSOFT_OFFICE_TOOLS_ENABLED`, default false, `:122`, and stays false: S does not need the office pair yet). `microsoft_graph_service.py:35-36` only lists the required
 subset for drift checks. Decision 2026-11-09: keep the scopes. S's sign-in set is `MICROSOFT_SIGNIN + MICROSOFT_BASE`
 (plus `MICROSOFT_OFFICE` when the flag is on), composed from the named sets in `libs/bond_oauth/bond_oauth/scopes.py:13-18`:
 `MICROSOFT_BASE` is `Mail.Send Mail.Read Calendars.ReadWrite MailboxSettings.Read User.Read offline_access` and `MICROSOFT_OFFICE` is
@@ -108,8 +108,9 @@ subset for drift checks. Decision 2026-11-09: keep the scopes. S's sign-in set i
 Rule: the SDK connections router mounts first under `/connections`. S moves Notion and ByteProbe into their own file
 that mounts after it. Microsoft routes in `connections.py` are removed. The phone hard-gates on
 `GET /connections/microsoft/status` (`mobile/crm_proposals/lib/core/auth/auth_controller.dart:284,301`; web
-`flutterui/lib/data/services/connection_api_service.dart:67`): keep the old response shape (`name`, `display_name`, `connected`, `email`,
-`display_name_user`, `scopes_current`, `missing_scopes`; `connections.py:155-167`) as a compat route until the minimum build date.
+`flutterui/lib/data/services/connection_api_service.dart:67`); both are rewritten against `GET /connections` in the same release,
+and S has no compatibility window (the installed phone build is replaced through TestFlight at cutover), so the old
+status route (`connections.py:155-167`) is deleted, not aliased.
 
 ## 7. Infra
 
@@ -129,27 +130,31 @@ that mounts after it. Microsoft routes in `connections.py` are removed. The phon
 ## 8. Entra checklist (text for the tenant admin)
 
 1. Add the redirect URI `<base>/auth/signin/microsoft/callback` under Web for each host (production, staging).
-2. Keep the existing `<base>/connections/microsoft/callback` redirect URI.
+2. Keep the existing production `<base>/connections/microsoft/callback` redirect URI and add the same path for staging.
 3. Confirm the registration is single-tenant (authority `https://login.microsoftonline.com/<tenant GUID>`).
-4. Confirm the section 4 scopes are consented tenant-wide. Identity scopes (`openid`, `profile`, `email`, `offline_access`) need no admin consent.
+4. Confirm the nine section 4 scopes (without the office pair) are consented tenant-wide. Identity scopes (`openid`, `profile`, `email`, `offline_access`) need no admin consent, but consenting them too keeps the consent screen away.
 5. Tell us the client-secret expiry date and provide at least two test users (invited in the app).
 
 ## 9. iOS
 
-- Raise `IPHONEOS_DEPLOYMENT_TARGET` from 15.0 to 17.4 at the three sites in
+First release: the SCHEME return only (the app's reverse-domain bundle id in `Info.plist` `CFBundleURLTypes`, listed in
+`BOND_SIGNIN_NATIVE_SCHEMES`). The three bullets below (17.4 floor, entitlements, association file) belong to the https app
+link and are post-demo hardening; none is needed for the scheme return.
+
+- Post-demo hardening: raise `IPHONEOS_DEPLOYMENT_TARGET` from 15.0 to 17.4 at the three sites in
   `mobile/crm_proposals/ios/Runner.xcodeproj/project.pbxproj` (lines 454, 585, 637); the Podfile platform line is
   commented out (`ios/Podfile:2`): set `platform :ios, '17.4'`.
-- There is no `Runner.entitlements` and no `CODE_SIGN_ENTITLEMENTS`. Create it with Associated Domains `applinks:<host>`
+- Post-demo hardening: there is no `Runner.entitlements` and no `CODE_SIGN_ENTITLEMENTS`. Create it with Associated Domains `applinks:<host>`
   (host from the build environment, never in docs) and add the capability in Xcode.
-- Serve the association file with `well_known_router` (`libs/bond_service_kit/bond_service_kit/well_known.py:17`); env
+- Post-demo hardening: serve the association file with `well_known_router` (`libs/bond_service_kit/bond_service_kit/well_known.py:17`); env
   `BOND_APPLE_APP_IDS` (`<TEAMID>.<bundle id>`, csv) and `BOND_ANDROID_APPS` (S has no `android/`).
-- Fallback: a reverse-domain scheme in `Info.plist` for dev builds only (`BOND_SIGNIN_NATIVE_SCHEMES`). The embedded
+- The reverse-domain scheme in `Info.plist` is the first-release return, not a dev-only fallback. The embedded
   web view connect screen (`connect_microsoft_screen.dart`) is replaced. SDK side: `local/plan/2026-11-09-direct-signin/reports/phone-flow.md`.
 
 ## 10. Test fixtures and first live run
 
-- Token helpers: `tests/conftest.py:193-200` (`_auth_header`, `sub` = e-mail) and `:352-362` (admin). The Firebase fake is
-  `FakeFirebase` (`:366`) plus fixture `fake_firebase` (`:444`) over `sbelcrm.auth.firebase` mock mode.
+- Token helpers: `tests/conftest.py:193-200` (`_auth_header`, `sub` = e-mail) and `:352-362` (admin). The Firebase fake
+  (`FakeFirebase` `:366`, fixture `fake_firebase` `:444`) and the `FIREBASE_*` pins (`:9-13`) go with `sbelcrm.auth.firebase`.
 - Narrowest lanes: `make tests-for ARGS="<changed files>"` prints the command (`make/tests.mk:115`). A full backend run
   first runs `lenders-pinned` (`Makefile:152`); a scoped `ARGS=` run does not. About 7,600 tests: run once, pre-PR.
 - `demo_local.db` is built by `create_all`, not Alembic: delete it before `make demo-seed-local DEMO_WIPE=1` after a revision.
@@ -158,9 +163,10 @@ that mounts after it. Microsoft routes in `connections.py` are removed. The phon
 
 ## 11. Rollback
 
-The columns are additive (identity columns, `allow_password`, and `sessions_valid_after`, which S adds itself: the directory needs it, `bond_signin/order.py:83`) and so are the tables
+The columns are additive (identity columns and `sessions_valid_after`, which S adds itself: the directory needs it, `bond_signin/order.py:83`; no `allow_password`, S has no break-glass) and so are the tables
 (`auth_sessions`, `oauth_handoffs`, `oauth_connections`), so the previous image runs unchanged on the migrated schema.
-Break-glass needs `allow_password` true on the admin rows (S widens it to every active row while installed phone builds still sign in with Firebase). Unset `BOND_SIGNIN_PROVIDERS` to hide Microsoft sign-in.
+There is no break-glass: a rollback is the previous image (Firebase accounts were never deleted, so Firebase sign-in returns on it).
 `oauth_tokens` is untouched, so the old image still connects (INFERENCE: a token the new image refreshed is not seen by it).
-Client side: after a rollback web users sign in again (the old image never reads the new cookie). The new phone build must not reach
-production users before the go decision: the old server has no `/auth/signin` or body refresh route.
+Client side: after a rollback web users sign in again (the old image never reads the new cookie); phone users reinstall the
+previous TestFlight build. The new phone build must not reach external testers before the server cutover, and the old build
+stops at cutover (no compatibility window): the two releases are done back to back.

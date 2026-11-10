@@ -67,16 +67,16 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
   (Enterprise applications, Permissions, Grant admin consent); the client-secret expiry date is diarised (an expired secret ends every
   sign-in and refresh); the testers are members of the tenant. Guests are refused. The lib matches invites on Graph `mail`, then the token
   `email`, then the UPN: key invites on the mailbox address or store both.
-- **Apple (A, P, S phones).** Associated Domains entitlement `applinks:<api host>` and `webcredentials:<api host>`; AASA for
+- **Apple (A, P phones; S's first release uses the scheme return instead).** Associated Domains entitlement `applinks:<api host>` and `webcredentials:<api host>`; AASA for
   `<TEAMID>.<bundle id>` served by `well_known_router`. A private dev host needs the suffix in the entitlement string: `applinks:<api host>?mode=developer`.
 - **Android (optional; S and A have no `android/` today).** `autoVerify` https intent filter for `/app/return/*`,
   `android:taskAffinity=""`, and `assetlinks.json` with debug and Play-signing SHA-256 fingerprints.
 - **iOS floor (decided: 17.4).** The apps build for iOS 15.0 today; raise `IPHONEOS_DEPLOYMENT_TARGET` and the Podfile platform to
   17.4 at migration. The https universal-link return is production; below 17.4 the plugin silently never returns, so the
-  device-bound reverse-domain scheme (`NativeReturn.choose`) is for dev builds only. Not verified on a device.
+  device-bound reverse-domain scheme (`NativeReturn.choose`) is for dev builds only (S excepted: it is S's first-release return). Not verified on a device.
 - Apple sign-in is dropped from A. Apple guideline 4.8: Google sign-in must be paired with an equivalent option unless it is
   an enterprise or business app requiring an existing enterprise account. S fits; A and P rely on reviewer judgment, with
-  the break-glass password form as the reviewer path.
+  the break-glass password form as the reviewer path (A, P; S has no break-glass).
 
 ## 5. Break-glass, linking, copies, what stays
 
@@ -89,7 +89,7 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
   subject). A second subject for the same row is `identity_mismatch`.
 - **Connections.** One-off copy of the old connection rows into `oauth_connections` (A `user_mail_connections`, S
   `oauth_tokens`; steps in `bond_oauth.md`), so nobody reconnects. Rows that fail to decrypt are listed.
-- **Stays in the app.** FCM push and its Firebase init (A, P; S has no `firebase_messaging`, so Firebase on the S phone exists only for break-glass), users, invites, admin, audit, role mapping, the A shared office mailbox
+- **Stays in the app.** FCM push and its Firebase init (A, P; S has no `firebase_messaging` and removes Firebase from both clients with direct sign-in), users, invites, admin, audit, role mapping, the A shared office mailbox
   connect (`shared=True`), the S Graph REST half, the A estimate-send banner.
 
 ## 6. Acceptance
