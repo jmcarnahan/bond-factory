@@ -98,3 +98,5 @@ None. P's `ServerError` now carries `code` (`db_unavailable`); `bond_service_kit
 - 405 and 429 map to `ServerError` with `statusCode`; there is no rate-limit class. `Conflict.existingDraftId` is gone: read `data`.
 - S: `ErrorBody` reads `code`, not `error_code`, and treats every 401 with a token as session over; S's `PayloadTooLarge`
   (413) becomes `ServerError`, and `errorCode`/`details` become `code`/`data`. S waits for its backend to emit the shared body.
+
+S specifics: `sbel.md` §1 and §6.

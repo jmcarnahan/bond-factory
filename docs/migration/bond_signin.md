@@ -28,7 +28,7 @@ provider)`, `link_identity` (raises `IdentityTaken`), `check_allowed`, `capabili
 | | Sign-in scopes | Asked after sign-in (by capability) | Notes |
 |---|---|---|---|
 | A (Google) | `openid email profile`, `access_type=online` | owner, office, sales: set `mail_send` (`gmail.send`) and `calendar` (`calendar.events`); crew none; owner and office the shared mailbox | identity-only sign-in stores no connection |
-| S (Microsoft) | `openid profile email` plus `offline_access User.Read Mail.Send Mail.Read Calendars.ReadWrite` | none | tenant pinned; `MailboxSettings.Read` dropped (no caller); admin pre-consent shows no consent screen |
+| S (Microsoft) | `openid profile email offline_access User.Read Mail.Send Mail.Read Calendars.ReadWrite MailboxSettings.Read`, plus `Contacts.ReadWrite Files.ReadWrite` when `MICROSOFT_OFFICE_TOOLS_ENABLED` is true (`sbelcrm/config.py:707-710`) | none | S's set is `MICROSOFT_SIGNIN + MICROSOFT_BASE` (+ `MICROSOFT_OFFICE` when the flag is on), composed from the named sets (`libs/bond_oauth/bond_oauth/scopes.py:13-18`); sign-in stores the connection, the old Connect step goes; tenant pinned; admin pre-consent shows no consent screen |
 | P (Google) | `openid email profile` | none (empty policy) | no mail code, no connections table |
 
 Roles are granted after sign-in, so `wanted` is recomputed on every `GET /connections`. Sign-in always succeeds with
@@ -37,9 +37,20 @@ identity scopes alone; a declined ask leaves the set `wanted`.
 ## 3. Settings and env
 
 `SignInSettings` fields: providers, redirect allowlist (origins), public base (https outside fake mode), `native_return_base`, `native_schemes`,
-break-glass flag (default off). Provider env: `BOND_GOOGLE_CLIENT_ID`/`_SECRET`, `BOND_MS_CLIENT_ID`/`_SECRET`, `BOND_MS_TENANT` (a GUID: `common`,
-`organizations`, `consumers` refuse at startup), `BOND_OAUTH_KEY`, `BOND_AUTH_*` refresh lifetimes, `BOND_APPLE_APP_IDS` (csv),
-`BOND_ANDROID_APPS` (`package=FP;FP,pkg2=FP`). The example reads the rest as `SDK_EXAMPLE_*` (`docs/sdk/examples.md`); an app picks its own prefix.
+break-glass flag (default off). `BOND_SIGNIN_BREAKGLASS` is the key the lib's `from_env(prefix="BOND_SIGNIN_")` reads
+(`libs/bond_signin/bond_signin/settings.py:96`). `SDK_EXAMPLE_BREAKGLASS` is the example-only flag (`sdk_example/settings.py:130`): the example
+builds `SignInSettings` itself (`signin_wiring.py:68`) and never reads `BOND_SIGNIN_*`.
+
+Which env family sets what (an app picks its own prefixes; the per-app map is `docs/migration/sbel.md`):
+
+| Family | Names | Read by |
+|---|---|---|
+| `BOND_SIGNIN_*` | `PROVIDERS PUBLIC_BASE REDIRECT_ALLOWLIST NATIVE_RETURN_BASE NATIVE_SCHEMES BREAKGLASS COOKIE_SECURE ALLOW_HTTP PREFIX` | lib `from_env` |
+| `BOND_AUTH_*` | `JWT_SECRET`, `SESSION_ACCESS_TTL_MINUTES`, `REFRESH_TTL_DAYS`, `REFRESH_MAX_DAYS`, `REFRESH_PROBE_HOURS`, `REFRESH_COOKIE_PATH`, more in `bond_auth_py` | `AuthSettings.from_env` |
+| `BOND_MS_CLIENT_ID/_CLIENT_SECRET/_TENANT`, `BOND_GOOGLE_CLIENT_ID/_CLIENT_SECRET` | provider credentials; the tenant is a GUID (`common`, `organizations`, `consumers` refuse at startup) | the example's `oauth_wiring.py` (the libs take arguments) |
+| `BOND_OAUTH_KEY`, `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS` | token key; link files (`package=FP;FP,pkg2=FP`) | the example's `settings.py` |
+| `SDK_EXAMPLE_*` | example-only flags (`docs/sdk/examples.md`) | the example's `settings.py` |
+
 `services/sdk_example/README.md` has a copy-as-is / replace table for every example file (copy `directory.py` and `scope_policy.py`
 as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the app uses them).
 
@@ -50,23 +61,26 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
   client carries no sensitive scope and needs no scope verification. The role asks (`gmail.send`, `calendar.events`)
   are sensitive: brand and scope verification is the app's console task before more than 100 test users. Any Gmail
   READ scope would be restricted (annual assessment); do not add one. Publish the app out of Testing before real users: Testing caps 100 users and expires refresh tokens in 7 days.
-- **Microsoft (S).** Single-tenant registration, tenant GUID `<tenant GUID>`. Both callbacks under Web. Grant tenant-wide
-  admin consent for the five Graph scopes. Guests are refused; everyone signs in on the company tenant. The lib matches invites on Graph `mail`, then the token
+- **Microsoft (S).** Single-tenant registration, tenant GUID `<tenant GUID>`; the SDK refuses a non-GUID tenant. Under Web register BOTH
+  callbacks: sign-in `<base><prefix>/signin/microsoft/callback` and connect `<base>/connections/microsoft/callback` (the app's connections
+  route; the example: `oauth_wiring.py:78`). Check: the registered scope names match section 2; tenant-wide admin consent is granted
+  (Enterprise applications, Permissions, Grant admin consent); the client-secret expiry date is diarised (an expired secret ends every
+  sign-in and refresh); the testers are members of the tenant. Guests are refused. The lib matches invites on Graph `mail`, then the token
   `email`, then the UPN: key invites on the mailbox address or store both.
-- **Apple (A, P, S phones).** Associated Domains entitlement `applinks:<api host>` and `webcredentials:<api host>`; AASA for
+- **Apple (A, P phones; S's first release uses the scheme return instead).** Associated Domains entitlement `applinks:<api host>` and `webcredentials:<api host>`; AASA for
   `<TEAMID>.<bundle id>` served by `well_known_router`. A private dev host needs the suffix in the entitlement string: `applinks:<api host>?mode=developer`.
 - **Android (optional; S and A have no `android/` today).** `autoVerify` https intent filter for `/app/return/*`,
   `android:taskAffinity=""`, and `assetlinks.json` with debug and Play-signing SHA-256 fingerprints.
 - **iOS floor (decided: 17.4).** The apps build for iOS 15.0 today; raise `IPHONEOS_DEPLOYMENT_TARGET` and the Podfile platform to
   17.4 at migration. The https universal-link return is production; below 17.4 the plugin silently never returns, so the
-  device-bound reverse-domain scheme (`NativeReturn.choose`) is for dev builds only. Not verified on a device.
+  device-bound reverse-domain scheme (`NativeReturn.choose`) is for dev builds only (S excepted: it is S's first-release return). Not verified on a device.
 - Apple sign-in is dropped from A. Apple guideline 4.8: Google sign-in must be paired with an equivalent option unless it is
   an enterprise or business app requiring an existing enterprise account. S fits; A and P rely on reviewer judgment, with
-  the break-glass password form as the reviewer path.
+  the break-glass password form as the reviewer path (A, P; S has no break-glass).
 
 ## 5. Break-glass, linking, copies, what stays
 
-- **Break-glass.** The `/auth/firebase` route stays behind `BOND_SIGNIN_BREAKGLASS` for admin rows and the store
+- **Break-glass.** The `/auth/firebase` route stays behind the break-glass flag (section 3) for admin rows and the store
   reviewer. A boolean column `allow_password`, owned by the app, gates who may use it (the example seeds it true for its demo user only; other rows answer
   403 `provider_not_allowed`). It issues the same refresh sessions
   (`finish_session`, provider `password`). `firebase-admin` becomes `bond_auth_py[firebase]`.
@@ -75,7 +89,7 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
   subject). A second subject for the same row is `identity_mismatch`.
 - **Connections.** One-off copy of the old connection rows into `oauth_connections` (A `user_mail_connections`, S
   `oauth_tokens`; steps in `bond_oauth.md`), so nobody reconnects. Rows that fail to decrypt are listed.
-- **Stays in the app.** FCM push and its Firebase init, users, invites, admin, audit, role mapping, the A shared office mailbox
+- **Stays in the app.** FCM push and its Firebase init (A, P; S has no `firebase_messaging` and removes Firebase from both clients with direct sign-in), users, invites, admin, audit, role mapping, the A shared office mailbox
   connect (`shared=True`), the S Graph REST half, the A estimate-send banner.
 
 ## 6. Acceptance
