@@ -97,5 +97,5 @@ Set `BOND_AUTH_REFRESH_MAX_DAYS` to add a cap (S with Conditional Access may nee
 1. SDK pin bump, raise `IPHONEOS_DEPLOYMENT_TARGET` and the Podfile platform to 17.4 (https return is production), `bond_auth` and `bond_auth_py` adoption, `bond_oauth` adoption with `bond_connections` (connections cut over here; existing notes).
 2. Models, revision, directory, policy, settings; tests in fake mode; Postgres run (section 5).
 3. Console setup, then the FIRST LIVE provider run in a staging copy.
-4. Client release with the new gateway; then the server mount; then drop `legacy_refresh` after the minimum build date.
-5. Backfill, prune job, `docs/sdk/sdk-pins.md` row, delete the dead Firebase sign-in code (A, P; S keeps the break-glass path).
+4. Client release with the new gateway; then the server mount; then drop `legacy_refresh` after the minimum build date (not S: no window, see `sbel.md` section 11).
+5. Backfill, prune job, `docs/sdk/sdk-pins.md` row, delete the dead Firebase sign-in code (A, P keep the break-glass route; S deletes Firebase entirely).

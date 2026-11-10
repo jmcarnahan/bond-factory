@@ -10,7 +10,7 @@ identity janitor, capability policies and (0.2.0) rotating refresh sessions (`li
 |---|---|---|
 | A | `auth/firebase.py` 620 becomes a 30-line shim, `auth/capabilities.py` 22 keeps constants, `rest/routers/auth.py` 284 loses `create_access_token` (:40-55) and the janitor (:144-181), `rest/dependencies/auth.py` 212 loses the decode and revocation code (:65-181); `tests/test_firebase_admin.py` 196 | routes, `build_user`, `rest/models/auth.py` 52, `users_admin`, `office_phone`, startup checks (`rest/main.py`), `tests/test_firebase_auth.py` 241 |
 | P | `auth/firebase.py` 544, `auth/capabilities.py` 22, `rest/routers/auth.py` 247 and `rest/dependencies/auth.py` 232 in the same way; `tests/test_firebase_admin.py` (identical to A's) | `company` in the login answer, `company_suspended` and `provider_not_allowed` checks, `test_firebase_auth.py`, `test_firebase_auth_proxy.py` |
-| S | later: `auth/firebase.py` 743, `auth/token_encryption.py` 42 (to `bond_oauth`); with direct sign-in the Firebase half shrinks to break-glass | `sub` = e-mail, no `iat`, `error_code` bodies, no revocation: its contract migration comes first |
+| S | later: `auth/firebase.py` 743, `auth/token_encryption.py` 42 (to `bond_oauth`); with direct sign-in the Firebase half is deleted (S decided against break-glass on 2026-11-09) | `sub` = e-mail, no `iat`, `error_code` bodies, no revocation: its contract migration comes first |
 
 ## 2. The adapter (A; P the same with `PT_` and `pagatime`)
 

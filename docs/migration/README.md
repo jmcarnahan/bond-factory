@@ -30,7 +30,7 @@ Per-app notes live beside the module notes (`sbel.md`).
 | `bond_storage` | `bond_storage.md` | A, P, S |
 | `bond_auth_py` | `bond_auth_py.md` | A, P; S after its contract migration |
 | `bond_jobs` | `bond_jobs.md` | A, P |
-| `bond_auth`, `bond_auth_firebase` | `bond_auth.md`, `bond_auth_firebase.md` | A, P; S `bond_auth` after its contract migration, `bond_auth_firebase` for break-glass only, kept |
+| `bond_auth`, `bond_auth_firebase` | `bond_auth.md`, `bond_auth_firebase.md` | A, P; S `bond_auth` after its contract migration, `bond_auth_firebase` not adopted (S removes Firebase, no break-glass) |
 | `bond_sync`, `bond_sync_powersync`, `bond_sync_py` | `bond_sync.md`, `bond_sync_powersync.md`, `bond_sync_py.md` | S first, then A |
 | `bond_oauth` | `bond_oauth.md` | A, S |
 | `bond_calendar` | `bond_calendar.md` | S (Microsoft Graph), A (Google read); P adopts nothing |
@@ -63,7 +63,7 @@ whose core already has the shape the lib took, and last for A and P. The order k
 4. `bond_ui` once the token adapter is written.
 5. Sync and OAuth last; both need decisions of the owning app.
 6. Direct sign-in (`bond_signin.md`) AFTER `bond_auth`/`bond_auth_py`, `bond_oauth` and `bond_connections` are adopted, in the same SHA bump as their 0.2.0 versions.
-   It replaces Firebase sign-in and keeps Firebase only as the break-glass route (S: `bond_auth_firebase`, break-glass only) and for push (A, P). All SDK work lands before any app migrates
+   It replaces Firebase sign-in and keeps Firebase only as the break-glass route (A, P) and for push (A, P); S removes Firebase entirely (decision 2026-11-09, no break-glass). All SDK work lands before any app migrates
    to it, so an app takes one step per module. Order inside it: S (single tenant, full scopes at sign-in, its phone is the
    main surface), then A (identity-only sign-in plus role asks), then P (identity only). Each app's first LIVE provider run
    is part of its acceptance (`bond_signin.md` section 6); nothing in the SDK has run against a live provider yet.
