@@ -98,3 +98,5 @@ Sessions:
 - A ANDed the Google and Apple flags with "Firebase login is live"; `providers_payload` reports the flag alone. A mock requested
   outside tests falls through to the Firebase tier; only `assert_startup_safe` stops it. `decode_claims` allows 10 s leeway.
 - Access tokens outlive logout, reuse and the device limit by up to 60 minutes.
+
+S specifics: `sbel.md` §1 to §3.

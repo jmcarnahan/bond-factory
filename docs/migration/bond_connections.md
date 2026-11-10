@@ -90,3 +90,5 @@ Native apps have no browser session cookie, so they use the code-exchange varian
 - The navigation helpers moved from the demo into `bond_signin_ui` (`lib/src/browser/`); the demo imports them.
 - `ConnectionReturn.cleaned` gives the address without the return parameters; the demo clears the address after the first read.
 - Display names and logos are the app's: pass `ConnectionLabels.providerNames` and `logo`.
+
+S specifics: `sbel.md` §5 and §6.

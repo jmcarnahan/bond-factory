@@ -28,8 +28,9 @@ app assembles the payload in this shape and adds its own fields. Capability voca
 
 ## Session JWT
 
-- HS256, secret from settings, default lifetime 10080 minutes. With sessions on, the lifetime is
-  `session_access_ttl_minutes` (60) and both `issue_session` and `rotate` mint with it.
+- HS256, secret from settings. With sessions on (the SDK path) the lifetime is `session_access_ttl_minutes`, default 60, and both
+  `issue_session` and `rotate` mint with it; the 10080-minute default of `access_ttl_minutes` applies only to tokens minted outside sessions.
+  An app that kept a 24 h token sets `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES=1440` only as a transition.
 - Claims: `sub` (user id), `user_id` (user id; both required on verify), `name`, `capabilities`
   (informational: authority is re-read from the database per request), `iat` (float epoch, real clock), `exp`,
   `aud` (list), `iss`, and with sessions on `sid` (the refresh family id, for later per-session revocation).
@@ -47,10 +48,9 @@ Always compare on the real clock.
 ## Refresh sessions
 
 Table `auth_sessions` (mixin `SessionsMixin`), one row per refresh token; only the sha256 is stored. Lifetimes
-(env `BOND_AUTH_`): `refresh_ttl_days` 90 sliding idle, `refresh_max_days` unset (no absolute cap; set it to cap from the sign-in), `refresh_probe_hours` 0 (IdP liveness probe off; opt-in), `refresh_reuse_grace_seconds`
-20, `refresh_max_sessions_per_user` 10 families (the least recently used is revoked, reason `limit`),
-`refresh_cookie_path` `/auth`, `session_access_ttl_minutes` 60. Env names: `BOND_AUTH_REFRESH_TTL_DAYS`, `_MAX_DAYS`,
-`_MAX_DAYS` (0 or empty: none), `_PROBE_HOURS`, `_REUSE_GRACE_SECONDS`, `_MAX_SESSIONS_PER_USER`, `BOND_AUTH_SESSION_ACCESS_TTL_MINUTES`.
+(env `BOND_AUTH_` plus the upper-case name): `refresh_ttl_days` 90 sliding idle, `refresh_max_days` unset (no absolute cap; `0` or empty means none; set it to cap from the sign-in), `refresh_probe_hours` 0 (IdP liveness probe off; opt-in), `refresh_reuse_grace_seconds`
+20, `refresh_retry_seconds` 600, `refresh_max_sessions_per_user` 10 families (the least recently used is revoked, reason `limit`),
+`session_access_ttl_minutes` 60, `refresh_cookie_path` `/auth` (the default when the router sets none; see the cookie below).
 
 - Body: `refresh_token` wins over the cookie. The delivery follows the client's token source: a client with no refresh-token store (web) gets the
   token in a cookie and not in the JSON; a client with a store (phone) sends `delivery: body` and gets it in `refresh_token`. The answer is `{token, user,
@@ -60,7 +60,7 @@ Table `auth_sessions` (mixin `SessionsMixin`), one row per refresh token; only t
   (`reason=retry`) and a fresh sibling is issued. Without a matching id the 20 s grace rule applies; after it, reuse.
 - Reuse: the family is revoked and the change committed before `refresh_reused` is raised. Revocation compares the
   family's `auth_time` plus 5 s with `sessions_valid_after`, never `now`.
-- Cookie `<app>_refresh_token`: HttpOnly, SameSite=Lax, Path `/auth`, set again on every rotation. Cookie POSTs need
+- Cookie `<app>_refresh_token`: HttpOnly, SameSite=Lax, Path is the sign-in prefix (default `/auth`; `CookiePolicy(refresh_path)`, which the router sets from its prefix), set again on every rotation. Cookie POSTs need
   the Origin rule of `signin.md`.
 - Break-glass and demo sign-ins issue the same sessions, provider `password` or `demo`.
 - Logout, reuse and the device limit act on refresh at once and on access tokens within 60 minutes.

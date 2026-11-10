@@ -16,7 +16,7 @@ Contracts: `docs/contracts/auth.md`, `docs/contracts/signin.md`. Direct Google/M
 **App P (paga).** Replaces the twins `pt_core/lib/src/auth/{auth_gateway 213, token_store 60}.dart`. P's body has `company` beside `user`: read it from `AuthSession.user` siblings in an app adapter, or keep it in the app's own response model.
 
 **App S (sbel).** Replaces `mobile/crm_proposals/lib/core/auth/{firebase_gateway 211, token_store 110}.dart` and the single-flight in `sync/app/auth_bridge.dart` (`SessionRefresher`; the gateway is single-flight now). `auth_controller.dart` (state machine, gates) stays app-side and calls the gateway.
-Dialect differences S must resolve first (server side, see `bond_auth_py`):
+S specifics: `docs/migration/sbel.md`. Dialect differences S must resolve first (server side, see `bond_auth_py`):
 - `sub` is the e-mail today; the contract has `sub` = user id plus `capabilities` and `iat`. `AuthSession.fromToken` throws when `sub` is missing.
 - `role`, `is_admin`, `provider` claims: map to capabilities in S's `extra_claims`, then `ClaimListPolicy`.
 - Error bodies `{"error_code": "NOT_INVITED", "detail": "..."}` become `{"detail": {"code": "not_invited", ...}}`; 409 for identity mismatch becomes 403 `identity_mismatch`.
@@ -40,7 +40,7 @@ Dialect differences S must resolve first (server side, see `bond_auth_py`):
 ## 4. Data
 
 No database change. Config:
-- No generated options file: the app calls `GET /auth/providers` and passes `AuthProviders.firebase` to `initFirebaseFromRuntimeConfig`. Delete `firebase_options.dart` from the build.
+- No generated options file: the app calls `GET /auth/providers` and passes `AuthProviders.firebase` to `initFirebaseFromRuntimeConfig`. Delete `firebase_options.dart` from the build (A, P; S has none in either tree, so nothing to delete).
 - Provider flags (`demo`, `email_password`, `google`, `apple`, `mock`) come from the same call.
 
 ## 5. Refresh sessions (0.2.0, for apps on direct sign-in)

@@ -12,6 +12,7 @@ Contracts: `docs/contracts/auth.md`.
 
 **App S (sbel).**
 - Web: `flutterui/lib/data/services/firebase_id_token_source.dart` (134). Its `prepare()` fetched `/auth/providers` and called `Firebase.initializeApp` once; that is now `AuthProviders.firebase` plus `initFirebaseFromRuntimeConfig(config, isWeb: true)`.
+- S keeps Firebase e-mail and password as admin break-glass from day one, behind the break-glass flag, so it adopts this adapter alongside direct sign-in and not later; the dual-gateway wiring is in `docs/sdk/examples.md`. S has no `firebase_options.dart` and no `firebase_messaging`.
 - Mobile: `RealFirebaseGateway` in `core/auth/firebase_gateway.dart`; S's gateway sent the e-mail and password itself, now it is `FirebaseAuthGateway(source: FirebaseIdTokenSource())` from `bond_auth`.
 
 ## 2. The adapter
