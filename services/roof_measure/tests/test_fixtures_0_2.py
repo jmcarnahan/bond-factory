@@ -27,7 +27,7 @@ def test_size_and_placeholder_data(name):
     path = FIXTURES / f"{name}.json"
     assert path.stat().st_size <= 100_000
     text = path.read_text()
-    for banned in ("[redacted]", "a Los Angeles County test site", "Roo" + "fr", "@"):
+    for banned in ("Den" + "ker", "Gar" + "dena", "Roo" + "fr", "@"):  # split so the tree never carries the words
         assert banned not in text
 
 

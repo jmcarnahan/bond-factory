@@ -180,6 +180,6 @@ non-empty and at most 256 characters (Microsoft: id_token `name`, else Graph `di
 `sbelcrm/auth/signin/directory.py` as fill-only-when-empty:
 `if not (user.name or '').strip(): user.name = profile.name`. An admin-set name is never overwritten; nothing else
 changes. Move all four pins (bond_signin, bond_oauth, bond_auth_py, bond_service_kit) to the new SHA together; between
-de681b4 and it, only docs, this hook in bond_signin, and the sdk_example reference (not a pin) moved; bond_oauth,
+117e8cc and it, only docs, this hook in bond_signin, and the sdk_example reference (not a pin) moved; bond_oauth,
 bond_auth_py and bond_service_kit code is unchanged. The name is free text the person typed at the identity provider:
 escape it on display like any user text.

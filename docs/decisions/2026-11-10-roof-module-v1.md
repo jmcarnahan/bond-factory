@@ -50,8 +50,11 @@ sufficient. The Roboto font keeps its Apache-2.0 licence.
 ## History
 
 Before 2026-11-11 the git history contained third-party report data (a commercial measurement report, hand-digitised) and a real street
-address. History is rewritten to remove them. Commit SHAs from before the rewrite are void: re-pin to the new `main`
-head, and treat any old SHA as untrusted.
+address. History was rewritten on 2026-11-11 (git-filter-repo, force push of `main`, dependabot branches deleted).
+Commit SHAs from before the rewrite are void: re-pin to the new `main` head and treat any old SHA as untrusted. Map
+for the pins consumers held: 4b26615 → 59055d7e3580a556766cc1879aaa5834ecb2c78c, 3d7b280 →
+f842c5e7d441a358da244a2b8e83d4d9f7d050a7, de681b4 → 117e8cc4b3c8712354ef27d37a789973c06e46b9; the roof module merge
+(old fad8722) is b8ce2e13e91502c4922c8099897c8c62c1f46763.
 
 ## Scrub runbook (summary; run only on John's explicit go)
 

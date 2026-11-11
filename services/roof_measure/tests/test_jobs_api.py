@@ -109,7 +109,13 @@ def test_running_status_exposes_the_stage(tmp_path):
     run = Runs(block=True)
     c = make(tmp_path, run)
     job = c.post("/v1/measurements", json=BODY).json()
-    r = wait(c, job["id"], want=("running",))
+    wait(c, job["id"], want=("running",))
+    end = time.time() + 10  # the stage advances a moment after the status flips; poll for it (CI runners are slow)
+    while time.time() < end:
+        r = c.get(f"/v1/measurements/{job['id']}").json()
+        if r.get("stage") == "measure":
+            break
+        time.sleep(0.02)
     assert r["stage"] == "measure"
     run.gate.set()
     wait(c, job["id"])
