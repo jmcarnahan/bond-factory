@@ -7,39 +7,55 @@ printable three-page report (length diagram, area diagram, summary). Pure drawin
 ## Public API (`package:bond_roof_ui/bond_roof_ui.dart`)
 
 - `RoofDiagramView(scene, {fit})`: a widget that paints a `Scene` with `ScenePainter`
-  (a `CustomPainter`), scaled to fit.
-- `RoofReport.pages(model, {style})`: the length diagram, the area diagram and the summary block as three
-  `Scene`s at `RoofReport.pageWidth` x `RoofReport.pageHeight` (1650 x 1275 px, US Letter
-  landscape at 150 dpi).
-- `printReport(model, ...)` and `shareReport(model, ...)`: build the PDF with
-  `bond_roof`'s `scenesToPdf` and hand it to the OS print dialog or share sheet through
-  package `printing`. Both are OS-owned surfaces, so they are allowed under the no-popups rule.
-- `RoofReportStrip(model, {filename})`: an inline row with Print and Save PDF buttons and
-  inline status text (no toasts, no dialogs).
-- `RoofUiTokens`: page size and the few layout constants.
+  (a `CustomPainter`), scaled to fit. Text is baked into the scene, so labels are chosen when the
+  scene is built.
+- `RoofReportStrip({model | measurement, labels, filename, showActions, showTotals, onStatus})`:
+  Print, Save PDF and Share PDF buttons with inline status, the totals table, then the length
+  diagram, area diagram and summary. Under 600 px wide it builds the compact (400 x 500)
+  scenes. Scenes are cached per model, labels and layout. No dialogs, snackbars or tooltips.
+- `RoofTotalsTable(measurement, {labels})`: inline text rows for the totals, both drip edge and
+  both ridge cap variants, the verification verdict with its first note, and the generated time.
+- `RoofReport.pages(model, {style, labels, layout})`, `pdfBytes`, `printReport`, `saveReport`,
+  `shareReport`: the scenes, the PDF (Letter landscape) and the hand-off to the OS print
+  dialog or share sheet through package `printing`. Both are OS-owned surfaces, so they are
+  allowed under the no-popups rule. `printReport` and `shareReport` also exist as top-level
+  functions. On web, Save PDF and Share PDF both download the file.
+- `RoofLabels` (from `bond_roof`): pass `RoofLabels.fromMap(strings)` as `labels` to translate
+  everything; keys are `RoofLabels.keys`.
+- `RoofUiTokens`: page size, breakpoint and the few layout constants.
 
 The PDF embeds the bundled Roboto Regular (Apache 2.0, `assets/fonts/`) so output is the same
 on every platform.
 
 ## Use from an app
 
+A consumer must depend on BOTH `bond_roof` and `bond_roof_ui`: the UI barrel does not re-export
+`RoofModel`, `RoofMeasurement` or `RoofLabels`, so import those from `package:bond_roof/bond_roof.dart`.
+
 Inside this workspace, depend by path (the root `pubspec.yaml` resolves it):
 
 ```yaml
 dependencies:
+  bond_roof:
+    path: ../../packages/bond_roof
   bond_roof_ui:
     path: ../../packages/bond_roof_ui
 ```
 
-From another repository, pin a commit:
+From another repository, pin the full 40-character commit SHA (tags are labels only):
 
 ```yaml
 dependencies:
+  bond_roof:
+    git:
+      url: https://github.com/jmcarnahan/bond-factory.git
+      ref: <full 40-char sha>
+      path: packages/bond_roof
   bond_roof_ui:
     git:
-      url: <bond-factory git url>
+      url: https://github.com/jmcarnahan/bond-factory.git
+      ref: <full 40-char sha>
       path: packages/bond_roof_ui
-      ref: <commit sha>
 ```
 
 ## Develop

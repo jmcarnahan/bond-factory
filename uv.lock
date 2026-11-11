@@ -1633,7 +1633,7 @@ wheels = [
 
 [[package]]
 name = "roof-measure"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "services/roof_measure" }
 dependencies = [
     { name = "anthropic" },

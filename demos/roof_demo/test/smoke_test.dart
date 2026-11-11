@@ -7,6 +7,8 @@ void main() {
     await tester.pump();
     expect(find.text('Measure'), findsOneWidget);
     expect(find.text('Load fixture'), findsOneWidget);
+    expect(find.text('EN'), findsOneWidget);
+    expect(find.text('ES'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

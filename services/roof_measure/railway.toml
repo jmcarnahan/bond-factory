@@ -1,0 +1,10 @@
+# Railway config as code. One replica only: the job store lives on the volume mounted at /data.
+# Required service variable: RAILWAY_RUN_UID=0. The volume mounts root-owned and the image's non-root user could
+# not create /data/jobs (the container then runs as root).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "services/roof_measure/Dockerfile"
+
+[deploy]
+healthcheckPath = "/healthz"
+numReplicas = 1

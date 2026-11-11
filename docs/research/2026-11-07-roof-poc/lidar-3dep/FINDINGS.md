@@ -1,4 +1,4 @@
-# 3DEP LiDAR for report-style roof reports: findings (lidar-3dep)
+# 3DEP LiDAR for report-style roof measurement: findings (lidar-3dep)
 All paths under S=(session scratch, not in repo)
 
 ## Verdict
@@ -69,7 +69,7 @@ Across the 160 m area, 82 of 10,806 patches (rms<6 cm) are 20-35 deg and 236 are
 | site 2 city | CA_LosAngeles_1_B23 | 2023-10-03 | 15.3 (13.1 first) | 2016: 2.9/m2 |
 | third LA County city | CA_LosAngeles_1_B23 | 2023-10-15..22 | 15.5 (14.7 first) | 2016: 3.0/m2 |
 | Orange County city | USGS_LPC_CA_SoCal_Wildfires_B1_2018 or CA_OrangeCo_2011 | 2018-08-05 / 2011-12-27 | 1.6 / 3.3 | weak; 2023 LA project does not reach it |
-| Irvine, OC ([coordinate withheld]) | CA_OrangeCo_2011 only | 2011-12-26 | 3.0 | old and sparse |
+| a coordinate in Orange County | CA_OrangeCo_2011 only | 2011-12-26 | 3.0 | old and sparse |
 Densities in the 30 m probes are lower than the site 1 60 m box partly because of vegetation/pavement mix and per-box edge effects; they are all ground+objects, not roofs only.
 Class 6 absent in every probe (classes 1, 2, rarely 18).
 Generalisation: LA County (site 1 city, site 2 city, a third city) YES; Orange County NO for roof-edge quality, using 3DEP alone.

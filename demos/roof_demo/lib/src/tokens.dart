@@ -10,8 +10,10 @@ abstract final class DemoTokens {
   static const Color error = Color(0xFFB3261E);
 
   static const String defaultAddress = '100 Example Ave, Sampletown, CA 90000';
-  static const String serviceDefault = 'http://localhost:8011';
+  static const String serviceDefault = 'http://127.0.0.1:8011';
   static const String fixtureAssetDir = 'assets/fixtures/';
-  static const Duration measureTimeout = Duration(seconds: 90);
+  static const Duration pollInterval = Duration(seconds: 2);
+  static const Duration jobTimeout = Duration(minutes: 4);
+  static const Duration requestTimeout = Duration(seconds: 20);
   static const Duration listTimeout = Duration(seconds: 3);
 }

@@ -47,7 +47,8 @@ affected() {
     fixtures/tasks/*)        echo packages/bond_tasks libs/bond_tasks_py services/sdk_example ;;
     fixtures/signin/*)       echo libs/bond_signin packages/bond_signin packages/bond_signin_ui services/sdk_example demos/sdk_demo ;;
     fixtures/*)              echo packages/bond_roof services/roof_measure demos/roof_demo ;;
-    docs/contracts/*)        echo packages/bond_roof services/roof_measure ;;
+    docs/contracts/*|docs/contract-0.2.md) echo packages/bond_roof services/roof_measure demos/roof_demo ;;
+    docs/decisions/2026-11-10-roof-module-v1.md|docs/research/2026-11-10-roof-module-v1/*) echo packages/bond_roof services/roof_measure ;;
     pyproject.toml|uv.lock)  echo services/roof_measure libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin services/sdk_example ;;
     pubspec.yaml|pubspec.lock|analysis_options.yaml|Makefile|make/*|tool/*) echo "$ALL" ;;
   esac

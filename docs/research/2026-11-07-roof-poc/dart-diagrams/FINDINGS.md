@@ -21,7 +21,7 @@ Comparison:
 | web + iOS | yes (web run) | yes, BUT text fidelity issue | pdf: pure Dart. printing: web (browser print / download) and iOS (print + share sheet) per pub tags; I built both targets but did not run printing at runtime |
 | rotated labels | yes, exact | rotated yes, but `dominant-baseline` is not parsed by vector_graphics_compiler (grep of parser.dart: only text-anchor handled) so rotated labels sit off-centre; visible in web.png bottom half vs top half | yes, via Matrix4 on PdfGraphics; verified in rendered PDF |
 | print/save PDF | no, needs a second implementation | via PDF only, SVG itself does not print | native |
-| text along edge | no true text-on-path anywhere; offset-and-rotate label is the report look and works everywhere |
+| text along edge | no true text-on-path anywhere; offset-and-rotate label is the commercial-report look and works everywhere |
 | collision handling | none built in, any approach needs our own layout |
 | one code path for screen + print | needs (c) too | needs (c) too | the Scene is the single layout; three thin painters (Canvas, SVG string, PdfGraphics) of ~25 lines each |
 

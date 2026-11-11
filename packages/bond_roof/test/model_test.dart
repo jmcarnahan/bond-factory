@@ -114,30 +114,49 @@ void main() {
     }
   });
 
+  /// Generated models must agree to 0.5 sq ft / 0.05 ft. A hand-digitised ("manual") model
+  /// copies printed totals that cannot be reproduced from its facets and edges, so it gets 3
+  /// percent on areas and 5 percent on the lengths of eave, hip, ridge, rake and parapet; wall
+  /// and step flashing are expected to fall short and are skipped.
+  void expectTotalsAgree(RoofModel m) {
+    final r = m.recomputeTotals();
+    final manual = m.source.method == 'manual';
+    double area(double v) => manual ? math.max(0.5, v * 0.03) : 0.5;
+    expect(r.totalAreaSqft, closeTo(m.totals.totalAreaSqft, area(r.totalAreaSqft)));
+    expect(r.pitchedAreaSqft, closeTo(m.totals.pitchedAreaSqft, area(r.totalAreaSqft)));
+    expect(r.flatAreaSqft, closeTo(m.totals.flatAreaSqft, area(r.totalAreaSqft)));
+    expect(r.predominantPitchAreaSqft, closeTo(m.totals.predominantPitchAreaSqft, area(r.totalAreaSqft)));
+    expect(r.squares, closeTo(m.totals.squares, manual ? 3.0 : 0.005));
+    const skippedWhenManual = {EdgeType.wallFlashing, EdgeType.stepFlashing};
+    for (final t in EdgeType.values) {
+      if (manual && skippedWhenManual.contains(t)) continue;
+      final want = m.totals.lengthsFt[t]!;
+      expect(r.lengthsFt[t], closeTo(want, manual ? math.max(0.05, want * 0.05) : 0.05), reason: t.json);
+    }
+  }
+
   group('recomputeTotals', () {
     for (final f in loadFixtures()) {
-      test(f.name, () {
-        final m = RoofModel.fromJson(f.json);
-        final r = m.recomputeTotals();
-        // Generated models must agree to 0.5 sq ft / 0.05 ft. The hand-digitised ("manual") report
-        // truth copies printed totals that cannot be reproduced from its facets and edges, so per
-        // fixtures/README.md it gets 3 percent on areas and 5 percent on the lengths of eave, hip,
-        // ridge, rake and parapet; wall and step flashing are expected to fall short and are skipped.
-        final manual = m.source.method == 'manual';
-        double area(double v) => manual ? math.max(0.5, v * 0.03) : 0.5;
-        expect(r.totalAreaSqft, closeTo(m.totals.totalAreaSqft, area(r.totalAreaSqft)));
-        expect(r.pitchedAreaSqft, closeTo(m.totals.pitchedAreaSqft, area(r.totalAreaSqft)));
-        expect(r.flatAreaSqft, closeTo(m.totals.flatAreaSqft, area(r.totalAreaSqft)));
-        expect(r.predominantPitchAreaSqft, closeTo(m.totals.predominantPitchAreaSqft, area(r.totalAreaSqft)));
-        expect(r.squares, closeTo(m.totals.squares, manual ? 3.0 : 0.005));
-        const skippedWhenManual = {EdgeType.wallFlashing, EdgeType.stepFlashing};
-        for (final t in EdgeType.values) {
-          if (manual && skippedWhenManual.contains(t)) continue;
-          final want = m.totals.lengthsFt[t]!;
-          expect(r.lengthsFt[t], closeTo(want, manual ? math.max(0.05, want * 0.05) : 0.05), reason: t.json);
-        }
-      });
+      test(f.name, () => expectTotalsAgree(RoofModel.fromJson(f.json)));
     }
+
+    test('manual-source branch: printed totals within 3 percent of the facets', () {
+      final j = _minimal(); // manual source, one flat 100 sq ft facet, parapet 10 ft, step flashing 10 ft
+      final totals = (j['totals'] as Map<String, dynamic>)
+        ..['total_area_sqft'] = 102.0
+        ..['flat_area_sqft'] = 102.0
+        ..['predominant_pitch_area_sqft'] = 102.0
+        ..['squares'] = 1.02;
+      (totals['lengths_ft'] as Map<String, dynamic>)
+        ..['parapet'] = 10.4
+        ..['step_flashing'] = 14.0; // flashing is skipped for manual models
+      final m = RoofModel.fromJson(j);
+      expect(m.source.method, 'manual');
+      expectTotalsAgree(m);
+      // The same drift on a generated model is a failure.
+      final strict = RoofModel.fromJson(Map.of(j)..['source'] = {'method': 'lidar_skeleton'});
+      expect(() => expectTotalsAgree(strict), throwsA(anything));
+    });
 
     test('predominant pitch groups by half pitch and weights the rise', () {
       final j = _minimal();
@@ -222,9 +241,9 @@ void main() {
 
     test('wrong schema', () => expectPath(_minimal()..['schema'] = 'other/1', 'schema'));
     test('missing schema', () => expectPath(_minimal()..remove('schema'), 'schema'));
-    test('bad edge type', () {
+    test('bad edge type is not a number', () {
       final j = _minimal();
-      (j['edges'] as List)[1]['type'] = 'gutter';
+      (j['edges'] as List)[1]['type'] = 7;
       expectPath(j, 'edges[1].type');
     });
     test('bad point', () {
@@ -242,9 +261,9 @@ void main() {
       (j['edges'] as List)[0]['points'] = [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]];
       expectPath(j, 'edges[0].points');
     });
-    test('unknown totals length key', () {
+    test('non-number totals length value', () {
       final j = _minimal();
-      ((j['totals'] as Map)['lengths_ft'] as Map)['gutter'] = 1.0;
+      (j['totals'] as Map)['lengths_ft'] = <String, dynamic>{'gutter': 'long'};
       expectPath(j, 'totals.lengths_ft.gutter');
     });
     test('units other than ft are rejected', () {

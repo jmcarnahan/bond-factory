@@ -1,0 +1,418 @@
+{
+ "contract": "bond.roof_model/0.2",
+ "pipeline_version": "0.2.0",
+ "method_used": "lidar_skeleton",
+ "footprint_source": "osm",
+ "generated_at": "2026-11-10T00:00:00Z",
+ "model": {
+  "schema": "bond.roof_model/0.1",
+  "generated_at": "2026-11-10T00:00:00Z",
+  "address": {
+   "line1": "100 Example Ave",
+   "city": "Sampletown",
+   "state": "CA",
+   "zip": "90000",
+   "formatted": "100 Example Ave, Sampletown, CA 90000"
+  },
+  "origin": {
+   "lat": 0.0,
+   "lng": 0.0
+  },
+  "north_deg": 0,
+  "units": "ft",
+  "source": {
+   "method": "fixture",
+   "footprint": {
+    "provider": "synthetic",
+    "id": "Synthetic hip 35 x 26 ft at 4/12",
+    "area_sqft": 910.0
+   },
+   "lidar": null,
+   "solar": null
+  },
+  "blocks": [
+   {
+    "id": "b1",
+    "form": "hip",
+    "polygon": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      35.0,
+      0.0
+     ],
+     [
+      35.0,
+      26.0
+     ],
+     [
+      0.0,
+      26.0
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "ridge_azimuth_deg": 90.0,
+    "gable_edges": [],
+    "eave_height_ft": 10.0,
+    "plan_area_sqft": 910.0
+   }
+  ],
+  "facets": [
+   {
+    "id": "f1",
+    "block": "b1",
+    "kind": "sloped",
+    "polygon": [
+     [
+      22.0,
+      13.0
+     ],
+     [
+      13.0,
+      13.0
+     ],
+     [
+      0.0,
+      0.0
+     ],
+     [
+      35.0,
+      0.0
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 180.0,
+    "plan_area_sqft": 286.0,
+    "area_sqft": 301.47047
+   },
+   {
+    "id": "f2",
+    "block": "b1",
+    "kind": "sloped",
+    "polygon": [
+     [
+      22.0,
+      13.0
+     ],
+     [
+      35.0,
+      0.0
+     ],
+     [
+      35.0,
+      26.0
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 90.0,
+    "plan_area_sqft": 169.0,
+    "area_sqft": 178.14164
+   },
+   {
+    "id": "f3",
+    "block": "b1",
+    "kind": "sloped",
+    "polygon": [
+     [
+      13.0,
+      13.0
+     ],
+     [
+      22.0,
+      13.0
+     ],
+     [
+      35.0,
+      26.0
+     ],
+     [
+      0.0,
+      26.0
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 0.0,
+    "plan_area_sqft": 286.0,
+    "area_sqft": 301.47047
+   },
+   {
+    "id": "f4",
+    "block": "b1",
+    "kind": "sloped",
+    "polygon": [
+     [
+      13.0,
+      13.0
+     ],
+     [
+      0.0,
+      26.0
+     ],
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 270.0,
+    "plan_area_sqft": 169.0,
+    "area_sqft": 178.14164
+   }
+  ],
+  "edges": [
+   {
+    "id": "e1",
+    "type": "eave",
+    "points": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      35.0,
+      0.0
+     ]
+    ],
+    "length_ft": 35.0,
+    "facets": [
+     "f1"
+    ]
+   },
+   {
+    "id": "e2",
+    "type": "eave",
+    "points": [
+     [
+      35.0,
+      0.0
+     ],
+     [
+      35.0,
+      26.0
+     ]
+    ],
+    "length_ft": 26.0,
+    "facets": [
+     "f2"
+    ]
+   },
+   {
+    "id": "e3",
+    "type": "eave",
+    "points": [
+     [
+      35.0,
+      26.0
+     ],
+     [
+      0.0,
+      26.0
+     ]
+    ],
+    "length_ft": 35.0,
+    "facets": [
+     "f3"
+    ]
+   },
+   {
+    "id": "e4",
+    "type": "eave",
+    "points": [
+     [
+      0.0,
+      26.0
+     ],
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    "length_ft": 26.0,
+    "facets": [
+     "f4"
+    ]
+   },
+   {
+    "id": "e5",
+    "type": "hip",
+    "points": [
+     [
+      22.0,
+      13.0
+     ],
+     [
+      35.0,
+      0.0
+     ]
+    ],
+    "length_ft": 18.88856,
+    "facets": [
+     "f1",
+     "f2"
+    ]
+   },
+   {
+    "id": "e6",
+    "type": "ridge",
+    "points": [
+     [
+      13.0,
+      13.0
+     ],
+     [
+      22.0,
+      13.0
+     ]
+    ],
+    "length_ft": 9.0,
+    "facets": [
+     "f1",
+     "f3"
+    ]
+   },
+   {
+    "id": "e7",
+    "type": "hip",
+    "points": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      13.0,
+      13.0
+     ]
+    ],
+    "length_ft": 18.88856,
+    "facets": [
+     "f1",
+     "f4"
+    ]
+   },
+   {
+    "id": "e8",
+    "type": "hip",
+    "points": [
+     [
+      22.0,
+      13.0
+     ],
+     [
+      35.0,
+      26.0
+     ]
+    ],
+    "length_ft": 18.88856,
+    "facets": [
+     "f2",
+     "f3"
+    ]
+   },
+   {
+    "id": "e9",
+    "type": "hip",
+    "points": [
+     [
+      13.0,
+      13.0
+     ],
+     [
+      0.0,
+      26.0
+     ]
+    ],
+    "length_ft": 18.88856,
+    "facets": [
+     "f3",
+     "f4"
+    ]
+   }
+  ],
+  "holes": [],
+  "totals": {
+   "total_area_sqft": 959.22422,
+   "pitched_area_sqft": 959.22422,
+   "flat_area_sqft": 0,
+   "predominant_pitch_rise": 4.0,
+   "predominant_pitch_area_sqft": 959.22422,
+   "squares": 9.59224,
+   "lengths_ft": {
+    "eave": 122.0,
+    "rake": 0.0,
+    "ridge": 9.0,
+    "hip": 75.55425,
+    "valley": 0.0,
+    "step_flashing": 0.0,
+    "wall_flashing": 0.0,
+    "parapet": 0.0,
+    "transition": 0.0,
+    "unspecified": 0.0
+   }
+  },
+  "confidence": {
+   "overall": "medium",
+   "notes": [
+    "Wall flashing is not derivable from this data (0 ft here): LiDAR resolves no wall steps and skylight/curb openings are not modelled.",
+    "Total area includes the roof overhang beyond the county wall line (blocks may extend up to 1 m past the footprint)."
+   ]
+  },
+  "warnings": [],
+  "debug": {}
+ },
+ "totals": {
+  "area_sqft": 959.224,
+  "squares": 9.592,
+  "eave_ft": 122.0,
+  "rake_ft": 0.0,
+  "ridge_ft": 9.0,
+  "hip_ft": 75.554,
+  "valley_ft": 0.0,
+  "step_flashing_ft": 0.0,
+  "predominant_pitch": 4.0,
+  "facets": 4,
+  "drip_edge_eave_ft": 122.0,
+  "drip_edge_eave_rake_ft": 122.0,
+  "ridge_cap_ridge_ft": 9.0,
+  "ridge_cap_ridge_hip_ft": 84.554
+ },
+ "verification": {
+  "verdict": "fail",
+  "adjustments": [],
+  "original_totals": {
+   "area_sqft": 1035.962,
+   "squares": 10.36,
+   "eave_ft": 122.0,
+   "rake_ft": 0.0,
+   "ridge_ft": 9.0,
+   "hip_ft": 75.554,
+   "valley_ft": 0.0,
+   "step_flashing_ft": 0.0,
+   "predominant_pitch": 4.0,
+   "facets": 4,
+   "drip_edge_eave_ft": 122.0,
+   "drip_edge_eave_rake_ft": 122.0,
+   "ridge_cap_ridge_ft": 9.0,
+   "ridge_cap_ridge_hip_ft": 84.554
+  },
+  "model": "claude-sonnet-5-5",
+  "rounds": 2,
+  "usage": {
+   "input_tokens": 8200,
+   "output_tokens": 310
+  },
+  "notes": [
+   "SYNTHETIC FIXTURE: original_totals.area_sqft is forced 8% above the model so the fail rule trips; this is not a real measurement."
+  ]
+ },
+ "confidence": 0.3,
+ "warnings": [
+  "Footprint from OpenStreetMap; parcel data unavailable outside Los Angeles County.",
+  "The verifier found the measurement inconsistent: total area moved more than 5%."
+ ],
+ "warning_codes": [
+  "footprint_osm",
+  "verifier_failed"
+ ]
+}

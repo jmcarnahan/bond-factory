@@ -160,3 +160,66 @@ Kill the pids in `tmp/logs/` (`kill $(cat tmp/logs/sdk_demo.pid) $(cat tmp/logs/
 ports 8078 and 8012 are free. State lives in `services/sdk_example/out/` (gitignored); delete it to reset.
 `demos/sdk_demo/e2e/` holds `package.json`, `playwright.config.mjs` (one worker, base URL
 `http://localhost:8078`, no `webServer` block) and `lib.mjs`; run `npm install` once, then `npx playwright test`.
+
+# Web walk recipe: demos/roof_demo
+
+The roof demo is a Flutter web harness for `bond_roof_ui` against the `roof_measure` service. Run everything from
+the repo root. Written from the 2026-11-11 roof-module-v1 walk.
+
+## Start
+
+1. Service, backgrounded, pid saved: `ROOF_MEASURE_AUTH=off ROOF_MEASURE_HOST=127.0.0.1 ROOF_MEASURE_DEBUG=1
+   DATA_DIR=tmp/walk-data services/roof_measure/.venv/bin/uvicorn roof_measure.api:app --host 127.0.0.1 --port 8011`
+   (`tmp/logs/roof_measure.pid`). `curl -s localhost:8011/healthz` must return `{"status":"ok", ...}`. Auth off is
+   allowed only on a loopback host; `ROOF_MEASURE_DEBUG=1` exposes the fixture routes the demo's "(service)" chips use.
+   A real-address job needs the network (Census, Overpass, USGS 3DEP); the address comes from the gitignored
+   `local/spike-sites.json` and must never be written into a record.
+2. Demo, backgrounded, pid saved (`tmp/logs/roof_demo.pid`): from `demos/roof_demo`, `tool/sync_fixtures.sh` then
+   `flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8077 --no-web-experimental-hot-reload
+   --dart-define=ROOF_SERVICE=http://localhost:8011`. Same server rules as the SDK demo above (debug build,
+   no hot reload, restart after code changes). Wait until `http://localhost:8077/main.dart.js` answers.
+3. CORS: the service's default origin regex allows localhost, so :8077 → :8011 works without a flag.
+
+## Page setup
+
+- The demo does NOT call `ensureSemantics()`: after every full load click the placeholder,
+  `page.locator('flt-semantics-placeholder').dispatchEvent('click')`, before any locator.
+- No `flt-semantics-identifier` attributes exist in this demo. Locate by role and accessible name:
+  `getByRole('button', {name: 'Measure'})`, `getByRole('button', {name: /EN|ES/})` (segmented buttons),
+  `getByRole('checkbox', {name: 'roof_measurement_0.2_pass', exact: true})` (fixture chips are ChoiceChips and
+  expose role checkbox; a "(service)" variant appears only for a service fixture that is not bundled),
+  `getByRole('textbox')` (the address field), `getByText(...)` for inline status, totals rows and
+  warnings. Method segments are `getByRole('button', {name: /lidar_skeleton|lidar_agent|solar_agent|auto/})`.
+- Viewports: 1280x800 and 390x844. Below 600 px the report strip switches to the compact layout (800x1000 design
+  size, two-column legend); above it the wide layout. Nothing may overflow at 390.
+- Print and Save/Share PDF: Print calls `Printing.layoutPdf` (the browser print dialog is allowed by the no-popups
+  rule; headless Chromium never fires `beforeprint`, so assert the iframe the package inserts or SKIP); Save PDF
+  and Share PDF both download the file on web. Playwright: `page.waitForEvent('download')`. The PDF is vector:
+  about 12 KB for three Letter pages with the Roboto subset embedded.
+- Restarting the demo web-server while a page is open yields a one-off requirejs "Script error for
+  web_entrypoint.dart" page error; reload after `main.dart.js` answers again. Playwright's `isMobile`/`hasTouch`
+  emulation raises a Flutter "ViewInsets cannot be negative" assertion at load; use a plain 390x844 viewport.
+- The service is a separate process: restart it after service code changes, or lazy imports fail with ImportError.
+
+## Walk steps
+
+1. **Load.** Title "Roof measurement demo"; address field, method segments, Measure, EN/ES, "Load fixture" chips.
+2. **Pass envelope.** Click the `roof_measurement_0.2_pass` chip: diagram visible, totals table with the paired
+   variant rows (drip edge eave / eave+rake; ridge cap ridge / ridge+hip), the verdict line, the generated-at line.
+3. **Spanish.** Click `ES`: every label changes (e.g. "Aleros"), no overflow, chips still work. Click `EN` back.
+4. **390x844.** Repeat 2 at the phone viewport: compact layout, legible, no overflow, buttons reachable.
+5. **PDF.** Click Save PDF: a download named `*.pdf` whose first page is the length diagram (size > 20 KB).
+   Print: the dialog is the browser's; assert the call was made (a `beforeprint` listener) or SKIP headless.
+6. **Adjusted and fail.** Load `roof_measurement_0.2_adjusted` and `_fail`: the verification line shows the
+   verdict label and the first note. There are no "(service)" chips when every service fixture is also bundled
+   (the demo hides duplicates); `GET /fixtures` on :8011 lists the same ten names.
+7. **Service job.** Type an address from `local/spike-sites.json` (one that measured in the spike), method
+   `lidar_skeleton`, click Measure: the inline status goes queued → running → done within 90 s and the report
+   renders; or an inline `code: message` error line on failure. No dialogs.
+8. **Wrong token.** Not walkable with auth off; SKIP (covered by `tests/test_auth.py`).
+9. **Error check** after every step: no `[role=dialog]`, no console error, no `pageerror`.
+
+## Cleanup
+
+`kill $(cat tmp/logs/roof_demo.pid) $(cat tmp/logs/roof_measure.pid)`; confirm :8077 and :8011 are free;
+`rm -rf tmp/walk-data tmp/handtest`.

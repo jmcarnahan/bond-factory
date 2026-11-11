@@ -5,20 +5,23 @@ import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 import 'package:bond_roof_ui/bond_roof_ui.dart';
 import 'package:bond_roof/bond_roof.dart';
 
+import 'labels_es.dart';
 import 'model_panel.dart';
 import 'service_client.dart';
 import 'tokens.dart';
 
 class _Loaded {
-  const _Loaded(this.label, this.json, this.model);
+  const _Loaded(this.label, this.measurement);
   final String label;
-  final Map<String, dynamic> json;
-  final RoofModel model;
+  final RoofMeasurement measurement;
 }
 
 /// The single screen: address, method, measure, fixtures, report.
 class DemoPage extends StatefulWidget {
-  const DemoPage({super.key});
+  const DemoPage({super.key, this.service});
+
+  /// The service client; tests pass one backed by a fake HTTP client.
+  final ServiceClient? service;
 
   @override
   State<DemoPage> createState() => _DemoPageState();
@@ -26,9 +29,11 @@ class DemoPage extends StatefulWidget {
 
 class _DemoPageState extends State<DemoPage> {
   final _address = TextEditingController(text: DemoTokens.defaultAddress);
-  final _service = ServiceClient();
-  MeasureMethod _method = MeasureMethod.lidar;
+  late final ServiceClient _service = widget.service ?? ServiceClient();
+  MeasureMethod _method = MeasureMethod.auto;
   bool _busy = false;
+  bool _spanish = false;
+  String? _status;
   String? _error;
   _Loaded? _loaded;
   List<String> _bundled = const [];
@@ -75,20 +80,39 @@ class _DemoPageState extends State<DemoPage> {
     });
     try {
       final json = await job();
-      final model = RoofModel.fromJson(json);
+      // Envelopes (0.2) and bare models (0.1) both load.
+      final measurement = RoofMeasurement.parseAny(json);
       if (!mounted) return;
-      setState(() => _loaded = _Loaded(label, json, model));
+      setState(() => _loaded = _Loaded(label, measurement));
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '$e');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _status = null;
+        });
+      }
     }
   }
 
   Future<void> _measure() {
-    _selected = null;
-    return _run(_method.label, () => _service.measureJson(_address.text.trim(), _method));
+    // A new measurement starts from a clean page: no stale report under an error.
+    setState(() {
+      _selected = null;
+      _loaded = null;
+    });
+    return _run(
+      _method.label,
+      () => _service.measure(
+        _address.text.trim(),
+        _method,
+        onStatus: (s) {
+          if (mounted) setState(() => _status = s);
+        },
+      ),
+    );
   }
 
   Future<void> _loadBundled(String name) {
@@ -144,6 +168,15 @@ class _DemoPageState extends State<DemoPage> {
                     onPressed: _busy ? null : _measure,
                     child: const Text('Measure'),
                   ),
+                  SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('EN')),
+                      ButtonSegment(value: true, label: Text('ES')),
+                    ],
+                    selected: {_spanish},
+                    onSelectionChanged: (s) => setState(() => _spanish = s.first),
+                  ),
                 ],
               ),
               const SizedBox(height: DemoTokens.gap),
@@ -173,6 +206,11 @@ class _DemoPageState extends State<DemoPage> {
               const SizedBox(height: DemoTokens.gap),
               if (_busy)
                 const LinearProgressIndicator(minHeight: DemoTokens.progressHeight),
+              if (_status != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: DemoTokens.gap / 2),
+                  child: Text(_status!, style: theme.textTheme.bodyMedium),
+                ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: DemoTokens.gap / 2),
@@ -185,9 +223,12 @@ class _DemoPageState extends State<DemoPage> {
                 const SizedBox(height: DemoTokens.gapLarge),
                 Text('Report: ${loaded.label}', style: theme.textTheme.titleLarge),
                 const SizedBox(height: DemoTokens.gap),
-                ModelPanel(loaded.json),
+                ModelPanel(loaded.measurement.model.toJson(), extraNotes: loaded.measurement.warnings),
                 const SizedBox(height: DemoTokens.gap),
-                RoofReportStrip(loaded.model),
+                RoofReportStrip(
+                  measurement: loaded.measurement,
+                  labels: _spanish ? RoofLabels.fromMap(roofLabelsEs) : const RoofLabels(),
+                ),
               ] else if (!_busy)
                 Padding(
                   padding: const EdgeInsets.only(top: DemoTokens.gapLarge),

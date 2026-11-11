@@ -42,11 +42,13 @@ Consumers pin a full 40-char commit SHA in `git:` refs (per-package tags cannot 
 
 ## Components
 
+Apps consume these modules as described in `docs/sdk/README.md`.
+
 | Component | Kind | Status |
 |---|---|---|
-| `packages/bond_roof` | pure Dart: roof model JSON, totals, diagram scenes, SVG and PDF export | POC |
-| `packages/bond_roof_ui` | Flutter: widgets that draw a scene, print and share | POC |
-| `services/roof_measure` | Python: address -> footprint + LiDAR (+ Solar) -> roof model JSON | POC |
+| `packages/bond_roof` | pure Dart: roof model JSON, totals, diagram scenes, SVG and PDF export | 0.2.0 |
+| `packages/bond_roof_ui` | Flutter: widgets that draw a scene, print and share | 0.2.0 |
+| `services/roof_measure` | Python: address -> footprint + LiDAR (+ Solar) -> roof model JSON | 0.2.0 |
 | `demos/roof_demo` | Flutter: type an address, see the three diagrams, print | POC |
 
 ## House rules
@@ -54,3 +56,7 @@ Consumers pin a full 40-char commit SHA in `git:` refs (per-package tags cannot 
 Same as avalon-crm: no popups, dialogs or modal sheets of any kind (`tool/no_popups_gate.sh`);
 no code generation (no build_runner, freezed, json_serializable); hand-written `fromJson`;
 `flutter_lints` plus the six extra rules in `analysis_options.yaml`; tests per package.
+
+## Licensing
+
+The repository is licensed under GPL-3.0-or-later (see `LICENSE` and `NOTICE`). The roof service links compas_cgal, which pulls in a GPL component of CGAL, so one licence covers the whole repo for now. The Roboto font in `packages/bond_roof_ui/assets/fonts/` keeps its own Apache-2.0 licence. This choice may change later, and nothing here is a claim that it is legally sufficient for any particular use. Pinning the Dart packages by git brings GPL-3.0-or-later into the consuming app, so each app's licensing must account for it.

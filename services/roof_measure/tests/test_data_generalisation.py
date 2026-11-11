@@ -70,8 +70,8 @@ def test_eight_square_metre_shed_is_86_to_110_sqft():
 def test_sparse_cloud_raises_with_project_year_and_density():
     fp = box(X0, Y0, X0 + 15, Y0 + 10)
     with pytest.raises(LidarTooSparse, match=r"synthetic \(2024\).*points/m2") as e:
-        segment_blocks(gable(5, 5.0), fp, Frame.from_footprint_m(fp, 32611))
-    assert e.value.density < 8
+        segment_blocks(gable(5, 2.0), fp, Frame.from_footprint_m(fp, 32611))
+    assert e.value.density < 4
 
 
 def test_blocks_error_when_too_few_points_or_nothing_survives():
@@ -159,7 +159,7 @@ def test_thin_newest_project_falls_back_to_older_and_says_so(monkeypatch):
     fp = box(0, 0, 10, 10)
     monkeypatch.setattr(lidar, "select_project", lambda lat, lng: _projects())
     monkeypatch.setattr(lidar, "fetch_points",
-                        lambda p, *a: _cloud(300 if p.name.startswith("new") else 1500, fp, p.name))
+                        lambda p, *a: _cloud(100 if p.name.startswith("new") else 1500, fp, p.name))
     pc = lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
     assert pc.meta["project"] == "old_2016" and pc.meta["fallback_used"] is True
     assert "new_2023" in pc.meta["skipped"][0]
@@ -171,8 +171,8 @@ def test_every_project_thin_raises_too_sparse_naming_the_best(monkeypatch):
     fp = box(0, 0, 10, 10)
     monkeypatch.setattr(lidar, "select_project", lambda lat, lng: _projects())
     monkeypatch.setattr(lidar, "fetch_points",
-                        lambda p, *a: _cloud(300 if p.name.startswith("new") else 600, fp, p.name))
-    with pytest.raises(LidarTooSparse, match=r"old_2016 \(2016\) gives 6\.0 points/m2"):
+                        lambda p, *a: _cloud(100 if p.name.startswith("new") else 300, fp, p.name))
+    with pytest.raises(LidarTooSparse, match=r"old_2016 \(2016\) gives 3\.0 points/m2"):
         lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
 
 

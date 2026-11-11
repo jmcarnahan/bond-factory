@@ -2,6 +2,5 @@
 # Grandfathered baselines only: split the file when next touched, then drop its entry.
 services/roof_measure/roof_measure/classify.py
 # Over the 450 hard cap at the time the gate landed (2026-11-08); roof POC code.
-packages/bond_roof/lib/src/model.dart
 services/roof_measure/roof_measure/blocks.py
 services/roof_measure/roof_measure/model.py

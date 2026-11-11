@@ -6,8 +6,9 @@ end to end. Not shipped.
 What it does:
 
 - Address field, a segmented control for the method (LiDAR, LiDAR + agent, Solar + agent)
-  and a Measure button that POSTs `{"address", "method"}` to the Python service
-  (`services/roof_measure`, FastAPI on port 8011) and renders the returned roof model.
+  and a Measure button that POSTs `{"address", "method", "verify"}` to `/v1/measurements` on the Python service
+  (`services/roof_measure`, port 8011), polls the job every 2 s and renders the returned 0.2 envelope.
+  An EN/ES switch shows the label-override seam with a sample Spanish map.
 - Fixture chips that load bundled copies of `fixtures/*.json` (roof-model schema only), so
   the app works with no service running. Chips for fixtures the live service offers are
   added when it is reachable.
@@ -28,8 +29,8 @@ make demo-ios      # flutter run on the booted iOS simulator
 Both targets first run `tool/sync_fixtures.sh` (also `make sync-fixtures`), which copies the
 roof-model fixtures into `assets/fixtures/`. Re-run it whenever `fixtures/` changes.
 
-The service URL defaults to `http://localhost:8011`; override at build or run time with
-`--dart-define=ROOF_SERVICE=http://host:port`. Start the service with `make serve` in
+The service URL defaults to `http://127.0.0.1:8011`; override at build or run time with
+`--dart-define=ROOF_SERVICE=http://host:port`. The bearer token is `--dart-define=ROOF_TOKEN=...` (local development only; a real app keeps the token on its backend). Start the service with `make serve` in
 `services/roof_measure`.
 
 ## Status (POC)

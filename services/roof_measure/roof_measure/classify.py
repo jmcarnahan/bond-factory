@@ -767,7 +767,7 @@ def _merge_flats(pieces: list[tuple[Polygon, list[str], float, float]], step: fl
                  res: Classification) -> list[tuple[Polygon, list[str], float, float]]:
     """Greedy merge of touching flat pieces whose levels differ by < ``step`` ft.
 
-    Only merges that stay one simple polygon (no holes, one part): report keeps non-simple
+    Only merges that stay one simple polygon (no holes, one part): the reference report keeps non-simple
     combinations separate and draws the shared line as an eave.
     """
     pieces = list(pieces)

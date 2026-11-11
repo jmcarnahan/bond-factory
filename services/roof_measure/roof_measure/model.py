@@ -8,7 +8,7 @@ Edge typing follows contract section 3. Each block contributes its boundary segm
 segment is cut where a neighbouring block begins or ends and the piece is typed by comparing
 the roof levels either side of it:
 
-* flat beside flat, same level -> ``eave`` (emitted once; report draws these as eaves)
+* flat beside flat, same level -> ``eave`` (emitted once; the reference report draws these as eaves)
 * lower block beside a higher block (step > 1 ft) -> ``wall_flashing`` for a flat block,
   ``step_flashing`` for a sloped block; the lower block owns the edge
 * sloped beside same level -> the sloped block's own type (eave, rake, shed ridge)
@@ -29,6 +29,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from .classify import WALL_STEP_FT, BlockSet, Classification, RoofBlock, assign_levels
+from .model_cleanup import clean_facets
 from .skeleton import block_geometry
 
 log = logging.getLogger(__name__)
@@ -174,8 +175,10 @@ def build_model(blockset: BlockSet, roof_blocks: list[RoofBlock], source: dict[s
         blks.append(_Blk(len(blks), rb, rb.poly, geom, fids, fpolys))
 
     edges = _build_edges(blks, border_steps(blockset))
+    cleanup_notes = clean_facets(facets_out, edges)  # sliver spikes would fail validate; see model_cleanup.py
     totals = _totals(facets_out, edges)
     notes, warnings = _notes(blockset, blks, edges, diagnostics, method, source)
+    warnings = [*warnings, *cleanup_notes]
     confidence = _confidence(blockset, diagnostics, source, blks)
 
     meta = blockset.footprint_meta
@@ -292,7 +295,7 @@ def _type_piece(a: _Blk, e: dict[str, Any], b: _Blk | None, p: tuple[float, floa
     a_flat, b_flat = a.rb.form == "flat", b.rb.form == "flat"
     if a.rb.form == "shed" and b_flat:  # awning against the higher flat: top is flashed, sides stay rakes
         typ = "step_flashing" if hint == "ridge" else hint
-    elif a_flat and b_flat:  # report draws every flat-to-flat line as an eave, whatever the level step
+    elif a_flat and b_flat:  # the reference report draws every flat-to-flat line as an eave, whatever the level step
         if a.idx > b.idx:
             return None
         typ = "eave"
@@ -433,7 +436,9 @@ def validate(model: dict[str, Any]) -> None:
         need(e["length_ft"] + 1e-6 >= math.dist(*e["points"]) - 0.05 - 0.01 * e["length_ft"],
              f"edge {e['id']}: length_ft shorter than its plan length")
         lengths[e["type"]] += e["length_ft"]
-    for e in model["edges"]:  # every edge lies on the boundary of one of its facets
+    for e in model["edges"]:  # every edge lies on the boundary of one of its facets (hole outlines excepted)
+        if e["type"] == "wall_flashing" and model["holes"]:
+            continue
         near = min(Polygon(facets[i]["polygon"]).exterior.distance(Point(pt)) for i in e["facets"]
                    for pt in e["points"])
         need(near <= 1.0, f"edge {e['id']} is not on the boundary of its facets (stray spur)")

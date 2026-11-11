@@ -1,59 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:bond_roof/bond_roof.dart';
 import 'package:bond_roof/src/layout.dart';
 import 'package:test/test.dart';
 
+import 'scene_checks.dart';
 import 'support.dart';
-
-/// Rough extent check for a text primitive: the rotated box around its anchor.
-Obb _textBox(TextPrim t) {
-  final w = textWidth(t.text, t.size, bold: t.bold), h = t.size * 0.9;
-  final off = switch (t.anchor) {
-    TextAnchor.start => w / 2,
-    TextAnchor.middle => 0.0,
-    TextAnchor.end => -w / 2,
-  };
-  final a = t.angleDeg * math.pi / 180;
-  return Obb(t.at.x + off * math.cos(a), t.at.y + off * math.sin(a), w / 2, h / 2, a);
-}
-
-void _expectFits(Scene s) {
-  const eps = 0.51;
-  bool inside(Pt p) => p.x >= -eps && p.y >= -eps && p.x <= s.width + eps && p.y <= s.height + eps;
-  for (final p in s.prims) {
-    switch (p) {
-      case LinePrim():
-        expect(inside(p.a) && inside(p.b), isTrue, reason: 'line $p.a $p.b');
-      case PolyPrim():
-        for (final q in p.pts) {
-          expect(inside(q), isTrue, reason: 'poly point $q');
-        }
-      case TextPrim():
-        for (final c in _textBox(p).corners) {
-          expect(inside(c), isTrue, reason: 'text "${p.text}" corner $c in ${s.width}x${s.height}');
-        }
-    }
-  }
-}
-
-void _expectWellFormedSvg(String svg) {
-  expect(svg.startsWith('<svg'), isTrue);
-  expect(svg.trimRight().endsWith('</svg>'), isTrue);
-  expect('<'.allMatches(svg).length, '>'.allMatches(svg).length);
-  expect('<text'.allMatches(svg).length, '</text>'.allMatches(svg).length);
-  expect('<title>'.allMatches(svg).length, '</title>'.allMatches(svg).length);
-  expect('<svg'.allMatches(svg).length, 1);
-  expect(RegExp(r'NaN|Infinity').hasMatch(svg), isFalse);
-  // Every opening tag is either self-closed or closed explicitly.
-  final open = RegExp(r'<([a-z]+)[^>]*?(/?)>').allMatches(svg);
-  var depth = 0;
-  for (final m in open) {
-    if (m.group(2) == '/') continue;
-    depth++;
-  }
-  expect(depth, '</'.allMatches(svg).length);
-}
 
 void main() {
   final fixtures = loadFixtures();
@@ -97,18 +47,56 @@ void main() {
           expect(s.hiddenLabels + s.placedLabels, labellable);
           expect(s.hiddenLabels, lessThanOrEqualTo((labellable * 0.3).floor()),
               reason: '${s.hiddenLabels} of $labellable hidden');
-          _expectFits(s);
-          _expectWellFormedSvg(sceneToSvg(s));
+          expectFits(s);
+          expectWellFormedSvg(sceneToSvg(s));
         });
 
         test('area diagram ${size.$1.toInt()}x${size.$2.toInt()}', () {
           final s = AreaDiagram.build(m, width: size.$1, height: size.$2);
           expect(s.hiddenLabels + s.placedLabels, m.facets.length);
           expect(s.hiddenLabels, lessThanOrEqualTo((m.facets.length * 0.3).floor()));
-          _expectFits(s);
-          _expectWellFormedSvg(sceneToSvg(s));
+          expectFits(s);
+          expectWellFormedSvg(sceneToSvg(s));
         });
       }
+
+      test('compact layout: 400 x 500, two columns, nothing renders under 12 px at a 358 px card', () {
+        const compact = ReportLayout.compact;
+        final len = LengthDiagram.build(m, layout: compact);
+        final area = AreaDiagram.build(m, layout: compact);
+        final sum = SummaryBlock.build(m, layout: compact);
+        expect((len.width, len.height), (400.0, 500.0));
+        expect((area.width, area.height), (400.0, 500.0));
+        expect(sum.width, 400.0);
+        const cardScale = 358 / 400;
+        for (final s in [len, area, sum]) {
+          expectFits(s);
+          expectWellFormedSvg(sceneToSvg(s));
+          for (final t in s.prims.whereType<TextPrim>()) {
+            expect(t.size * cardScale, greaterThanOrEqualTo(12), reason: '"${t.text}" ${t.size} in ${s.title}');
+          }
+        }
+        // Legend swatches: two columns compact, three wide.
+        double legendCols(Scene s) => {
+              for (final p in s.prims)
+                if (p is LinePrim && p.a.y < 120 && p.b.x - p.a.x > 10 && (p.b.x - p.a.x) < 60) p.a.x.round()
+            }.length.toDouble();
+        expect(legendCols(len), 2);
+        expect(legendCols(LengthDiagram.build(m)), 3);
+        // Eave, ridge and hip rows and their totals are always present.
+        final texts = len.prims.whereType<TextPrim>().map((t) => t.text).toList();
+        for (final t in [EdgeType.eave, EdgeType.ridge, EdgeType.hip]) {
+          expect(texts, contains(feetInches(m.totals.lengthsFt[t]!)), reason: t.json);
+        }
+        expect(texts, containsAll(['Eaves', 'Ridges', 'Hips']));
+        final areaTexts = area.prims.whereType<TextPrim>().map((t) => t.text).toList();
+        expect(areaTexts, contains('${sqft(m.totals.totalAreaSqft)} sq ft'));
+        expect(sceneToSvg(sum), contains(sqft(m.totals.totalAreaSqft)));
+        // Hidden-label bookkeeping still adds up (compact hides more on a narrower plan).
+        final labellable = m.edges.where((e) => !isHoleOutlineEdge(m, e)).length;
+        expect(len.hiddenLabels + len.placedLabels, labellable);
+        expect(area.hiddenLabels + area.placedLabels, m.facets.length);
+      });
 
       test('every edge type used is drawn in its palette colour', () {
         final s = LengthDiagram.build(m);
@@ -133,7 +121,7 @@ void main() {
         for (final l in labels) {
           expect(l.angleDeg, greaterThan(-90));
           expect(l.angleDeg, lessThanOrEqualTo(90));
-          final b = _textBox(l);
+          final b = textBox(l);
           for (final o in boxes) {
             expect(b.overlaps(o), isFalse, reason: 'label ${l.text} overlaps another label');
           }
@@ -147,15 +135,16 @@ void main() {
       test('summary block builds and grows with content', () {
         final s = SummaryBlock.build(m);
         expect(s.height, greaterThan(200));
-        _expectFits(s);
-        _expectWellFormedSvg(sceneToSvg(s));
+        expectFits(s);
+        expectWellFormedSvg(sceneToSvg(s));
         expect(sceneToSvg(s), contains(sqft(m.totals.totalAreaSqft)));
       });
     });
   }
 
-  test('site1_truth: hole-outline edges carry no label, legend totals unchanged', () {
-    final m = RoofModel.fromJson(fixtures.firstWhere((f) => f.name == 'site1_truth').json);
+  test('synthetic_flat_curbs: hole-outline edges carry no label, legend totals unchanged', () {
+    final m = RoofModel.fromJson(fixtures.firstWhere((f) => f.name == 'synthetic_flat_curbs').json);
+    expect(m.holes.length, 17);
     final holeEdges = m.edges.where((e) => isHoleOutlineEdge(m, e)).toList();
     expect(holeEdges.length, greaterThanOrEqualTo(17 * 4 - 8));
     final s = LengthDiagram.build(m);
