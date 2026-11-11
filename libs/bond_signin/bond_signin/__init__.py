@@ -5,11 +5,13 @@ from .finish import CookiePolicy, clear_session_cookies, finish_session
 from .order import sign_in, sign_in_with_first
 from .origin import require_origin
 from .policy import ScopePolicy, ScopeSet, UnknownScopeSet, connect_scopes, normalize_email, wanted_sets
+from .profile import IdentityProfile, ProfileHookError, profile_of
 from .protocols import (
     HandoffStore,
     IdentityFlow,
     IssuedSession,
     OidcIdentity,
+    ProfileDirectory,
     SessionIssuer,
     SessionSpec,
     SignInResult,
@@ -29,9 +31,12 @@ __all__ = [
     "CookiePolicy",
     "HandoffStore",
     "IdentityFlow",
+    "IdentityProfile",
     "IdentityTaken",
     "IssuedSession",
     "OidcIdentity",
+    "ProfileDirectory",
+    "ProfileHookError",
     "ScopePolicy",
     "ScopeSet",
     "SessionIssuer",
@@ -51,6 +56,7 @@ __all__ = [
     "http_error",
     "make_signin_router",
     "normalize_email",
+    "profile_of",
     "refusal_code",
     "require_origin",
     "sign_in",

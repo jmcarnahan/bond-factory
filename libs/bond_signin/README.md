@@ -27,6 +27,8 @@ class Directory:  # structurally a bond_signin.UserDirectory; `user` is your row
     def session_spec(self, s, user): return SessionSpec(sub=user.id, name=user.name, capabilities=list(user.capabilities))
     def public(self, s, user): return user.public()  # the `user` JSON of every answer, same as /auth/me
     def record_sign_in(self, s, user, *, provider, ip, first): user.last_sign_in_at = utcnow()
+    def apply_profile(self, s, user, profile, *, provider, first):  # OPTIONAL: fill an e-mail-only invitee's name
+        if not (user.name or "").strip(): user.name = profile.name
     def record_refusal(self, s, reason, *, email, user, provider, ip): s.add(AuditRow(reason=reason, email=email))
     def mark_sessions_invalid(self, s, user, at): user.sessions_valid_after = at.replace(tzinfo=None)
     def provider_alive(self, s, user, provider): return None  # identity-only apps; else probe the stored connection
@@ -41,6 +43,23 @@ router = make_signin_router(
 ```
 `session_scope()` (no arguments) must commit on exit and roll back on an exception. Refusals and refresh reuse are caught
 inside it so the audit row and the family revoke are committed.
+
+### Display name (optional `apply_profile`)
+An invitee added by e-mail only has no name. Implement `apply_profile(session, user, profile, *, provider, first)` on
+your directory (it is not part of `UserDirectory`, so a directory without it is unaffected) and the identity provider's
+display name arrives at sign-in. It runs on every successful sign-in, inside the sign-in transaction and before the
+first access token is issued, so the first `name` claim and the first `user` JSON carry it, web and native. It is
+called only with a usable name: whitespace collapsed, control characters removed, at most 256 characters; with no
+usable name it is not called. Google and Microsoft both supply it (the id_token `name` with the `profile` scope, else
+the userinfo or Graph `displayName`). The app decides the policy: fill only when empty is the common choice, so an
+admin-set name is never overwritten; `first` is true when this sign-in bound the identity. The library writes nothing.
+An exception from the hook propagates as `ProfileHookError` (500, transaction rolled back) and is never a refusal:
+store or skip, do not refuse; a refusal raised inside the hook becomes a 500, not a refusal.
+
+Rules for the method: the keyword-only signature must match exactly (a mismatch raises `ProfileHookError` on every
+sign-in that carries a name); it must be synchronous (an `async def` is refused with `ProfileHookError`); omit it to opt
+out. On web the callback answers a redirect, so the first `user` JSON is `/auth/me` right after it. The name is free
+text the person typed at the identity provider: escape it on display and never treat it as a verified identity.
 
 ## Routes
 | Route (under `prefix`, default `/auth`; return page at `/app/return`) | Body or query | Answer | Errors |
@@ -93,7 +112,8 @@ and `/app/return/*`.
 ## Refusal order (`order.sign_in`)
 `tenant_mismatch` (upstream, in the flow) then `email_not_verified`, `not_invited`, `check_allowed`
 (`company_suspended`, `provider_not_allowed`), `deactivated`, `identity_mismatch`, `session_revoked`, link. Every
-refusal calls `record_refusal` and nothing is stored. Then: store connection, issue session, `record_sign_in`.
+refusal calls `record_refusal` and nothing else is stored; on success: link (first sign-in), `apply_profile` (optional),
+store connection, issue session, `record_sign_in`.
 
 ## Other helpers
 - `ScopePolicy`, `wanted_sets(policy, caps, provider, granted)` for `GET /connections`, `connect_scopes(policy,

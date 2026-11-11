@@ -3,7 +3,7 @@ Role: direct Google/Microsoft sign-in. Protocol seams, scope policy, fixed check
 
 ## Key files
 - `protocols.py` structural Protocols the app and the sibling libs satisfy (IdentityFlow, HandoffStore, SessionIssuer, UserDirectory)
-- `order.py` the fixed refusal order; `policy.py` ScopePolicy and `normalize_email`
+- `order.py` the fixed refusal order and the optional `apply_profile` call; `profile.py` `IdentityProfile` and display-name cleaning; `policy.py` ScopePolicy and `normalize_email`
 - `routes_web.py`, `routes_native.py`, `routes_session.py`, `routes_providers.py` router parts (`router.py` is the factory); `_callback.py` shared callback core
 - `finish.py` `finish_session`/`CookiePolicy`; `origin.py` Origin rule; `settings.py`; `errors.py` code table; `return_page.py`
 - The AASA and assetlinks router lives in bond_service_kit (`well_known.py`), not here.
