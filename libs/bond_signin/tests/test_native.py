@@ -179,3 +179,11 @@ def test_native_return_is_rechecked_at_callback(h):
     resp = callback(h, state)
     assert resp.status_code == 400 and "location" not in resp.headers
     assert h.flow.completed == [] and h.handoffs.issued == []
+
+
+def test_native_redeem_carries_the_provider_name_for_an_empty_invitee(h):
+    code = query(callback(h, state_of(native_start(h)), code="dora"))["code"]
+    assert h.directory.profile_calls == [("u-dora", "Dora Example", True, "google")]
+    body = redeem(h, code).json()
+    assert h.sessions.issued[-1]["spec"].name == "Dora Example"
+    assert body["user"]["name"] == "Dora Example"

@@ -41,8 +41,8 @@ def make_settings(**kw) -> SignInSettings:
     return SignInSettings(**{**base, **kw})
 
 
-def build(**kw) -> Harness:
-    h = Harness(db=FakeDb(), directory=FakeDirectory(), flow=FakeFlow(), handoffs=FakeHandoffs(),
+def build(directory=None, **kw) -> Harness:
+    h = Harness(db=FakeDb(), directory=directory or FakeDirectory(), flow=FakeFlow(), handoffs=FakeHandoffs(),
                 sessions=FakeSessions(), limits=[], current=None, legacy_calls=[])
     h.settings = kw.pop("settings", None) or make_settings()
 

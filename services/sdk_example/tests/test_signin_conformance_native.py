@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
+from bond_auth_py import decode_claims
 from signin_conformance_support import (  # noqa: F401
     GOOGLE,
     NATIVE_RETURN,
@@ -78,3 +79,14 @@ def test_native_attacker_state_replayed_with_another_device_is_unusable(stack, c
     stolen = client.post("/auth/signin/redeem", json={"code": code, "device_secret": secret_b})
     assert stolen.status_code == 401 and code_of(stolen) == "invalid_handoff"
     assert secret_a != secret_b
+
+
+def test_redeem_carries_the_filled_name(stack, client):
+    stack.add_user("u-dora", "dora.example@example.com", name="")
+    secret, cb = native_sign_in(client, email="dora.example@example.com")
+    code = parse_qs(urlsplit(cb.headers["location"]).query)["code"][0]
+    got = client.post("/auth/signin/redeem", json={"code": code, "device_secret": secret})
+    assert got.status_code == 200, got.text
+    body = got.json()
+    assert decode_claims(body["token"], stack.auth).name == "dora.example"
+    assert body["user"]["name"] == "dora.example"

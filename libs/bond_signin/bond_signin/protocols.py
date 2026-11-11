@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
+from .profile import IdentityProfile
+
 
 @dataclass(frozen=True)
 class SessionSpec:
@@ -165,3 +167,15 @@ class UserDirectory(Protocol):
 
     def provider_alive(self, session: Any, user: UserRef, provider: str) -> bool | None:
         """False: the IdP account is gone. None: unknown (identity-only apps)."""
+
+
+@runtime_checkable
+class ProfileDirectory(UserDirectory, Protocol):
+    """A ``UserDirectory`` that also takes the identity provider's display name (the hook is optional)."""
+
+    def apply_profile(self, session: Any, user: UserRef, profile: IdentityProfile, *, provider: str,
+                      first: bool) -> None:
+        """OPTIONAL. Called on every successful sign-in, inside the sign-in transaction and before the first access
+        token is issued, only when the provider supplied a usable display name (trimmed, <= 256 chars). ``first`` is
+        true when this sign-in bound the identity. The app decides what to store (fill only when empty, or refresh);
+        the library writes nothing. Detected by attribute: a directory without this method is unaffected."""

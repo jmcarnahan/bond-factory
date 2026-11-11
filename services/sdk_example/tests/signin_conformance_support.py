@@ -113,6 +113,10 @@ class Directory:
     def public(self, s, user):
         return {"id": user.id, "email": user.email, "name": user.name, "capabilities": self.capabilities(s, user)}
 
+    def apply_profile(self, s, user, profile, *, provider, first):  # optional hook: fill only when empty
+        if not (user.name or "").strip():
+            user.name = profile.name
+
     def record_sign_in(self, s, user, *, provider, ip, first):
         user.last_sign_in_at = datetime.now().replace(tzinfo=None)
         self.sign_ins.append((user.id, provider, first))
@@ -175,9 +179,12 @@ class Stack:
         finally:
             session.close()
 
-    def add_user(self, user_id: str, email: str, *, active: bool = True, caps: tuple[str, ...] = ()) -> None:
+    def add_user(self, user_id: str, email: str, *, active: bool = True, caps: tuple[str, ...] = (),
+                 name: str | None = None) -> None:
+        """``name=None`` seeds the e-mail local part; an explicit ``""`` seeds an empty name."""
         with self.db() as s:
-            s.add(User(id=user_id, email=email, name=email.split("@")[0], is_active=active,
+            s.add(User(id=user_id, email=email, name=email.split("@")[0] if name is None else name,
+                       is_active=active,
                        capabilities=list(caps)))
 
 

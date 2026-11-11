@@ -69,6 +69,14 @@ class Directory:
         """The `user` object of every sign-in answer: the same dict as `GET /auth/me`."""
         return user.public()
 
+    def apply_profile(self, session: Session, user: User, profile, *, provider: str, first: bool) -> None:
+        """OPTIONAL hook (found by attribute; leave it out and sign-in works the same). Called on every successful
+        sign-in, inside the sign-in transaction and before the first access token, only with a usable name.
+        Fill only when empty: an invitee created by e-mail alone otherwise shows without a name until an admin
+        types one, and an admin-set name is never overwritten."""
+        if not (user.name or "").strip():
+            user.name = profile.name
+
     # --- bookkeeping ------------------------------------------------------------------------------------
     def record_sign_in(self, session: Session, user: User, *, provider: str, ip: str | None, first: bool) -> None:
         now = utcnow()

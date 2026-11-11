@@ -18,7 +18,7 @@ fake mode and logs one warning. Real mode needs `SDK_EXAMPLE_AUTH_SECRET`, and a
 | --- | --- | --- |
 | Error body, security headers, upload cap | `wiring.py` (installed by `routes/a0_wiring.py`) | bond_service_kit |
 | Session routes (`demo`, `/auth/me`), break-glass | `routes/auth.py`, `break_glass.py`, `session_answer.py`, `auth_dep.py`, `models/auth.py` | bond_auth_py |
-| Direct sign-in (Google, Microsoft), refresh sessions, native hand-off | `signin_wiring.py`, `directory.py`, `scope_policy.py`, `models/sessions.py`, `models/handoffs.py` | bond_signin, bond_oauth, bond_auth_py |
+| Direct sign-in (Google, Microsoft), refresh sessions, native hand-off | `signin_wiring.py`, `directory.py` (with the optional `apply_profile` hook, which fills an e-mail-only invitee's name at first sign-in), `scope_policy.py`, `models/sessions.py`, `models/handoffs.py` | bond_signin, bond_oauth, bond_auth_py |
 | Connections, role asks (`wanted`, `?set=`), fake consent page | `routes/connections.py`, `connect_helpers.py`, `fake_routes.py`, `oauth_wiring.py` | bond_oauth, bond_signin |
 | Documents, share links, `/d/<token>` | `routes/storage.py`, `models/grants.py` | bond_storage |
 | Job table and handler registry | `models/jobs.py`, `wiring.py` | bond_jobs |
@@ -37,7 +37,7 @@ provider for identity only (fake-microsoft: the full set, as a pre-consented ten
 calendar are asked AFTER sign-in: `GET /connections` returns `{connections, wanted}` and the app sends the person
 through `GET /connections/{p}/start?set=<id>`, bound to the account they signed in with.
 
-What an app replaces: `directory.py` (its users table), `scope_policy.py` (its roles and scopes), the settings
+What an app replaces: `directory.py` (its users table, with the optional `apply_profile` hook that fills an e-mail-only invitee's name at first sign-in), `scope_policy.py` (its roles and scopes), the settings
 names. Everything else is the same wiring. Environment:
 
 | Variable | Meaning |
@@ -66,7 +66,7 @@ Which sign-in files an app copies:
 | `signin_wiring.py`, `providers_wiring.py`, `routes/signin.py`, `session_answer.py`, `origin_rule.py`, `signin_prune.py` | copies as is (rename settings) |
 | `routes/connections.py`, `connect_helpers.py`, `routes/connect_native.py`, `models/connections.py`, `fake_expiry.py` | copies as is; DELETE all of them in an app without connections (identity-only sign-in), and set `SDK_EXAMPLE_CONNECTIONS=0` or drop the setting. `connect_native.py` also goes when there is no phone client |
 | `routes/auth.py`, `models/sessions.py`, `models/handoffs.py`, `alembic/versions/0003_signin.py` columns and tables | copies as is |
-| `directory.py`, `scope_policy.py`, `oauth_wiring.py` names | REPLACES with its own users table, roles and scopes |
+| `directory.py` (with the optional `apply_profile` hook, which fills an e-mail-only invitee's name at first sign-in), `scope_policy.py`, `oauth_wiring.py` names | REPLACES with its own users table, roles and scopes |
 | `break_glass.py` (and `allow_password`) | REPLACES, or deletes when there is no break-glass |
 | `fake_routes.py` | deletes (fake mode only) |
 
