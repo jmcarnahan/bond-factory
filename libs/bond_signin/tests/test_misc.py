@@ -118,12 +118,15 @@ def test_package_imports_no_sibling_lib():
 
 
 def test_fakes_satisfy_the_protocols():
-    from bond_signin import HandoffStore, IdentityFlow, SessionIssuer, UserDirectory
+    from bond_signin import HandoffStore, IdentityFlow, ProfileDirectory, SessionIssuer, UserDirectory
 
+    from .bare_directory import BareDirectory
     from .fakes import FakeDirectory, FakeFlow, FakeHandoffs, FakeSessions
 
     assert isinstance(FakeDirectory(), UserDirectory) and isinstance(FakeFlow(), IdentityFlow)
     assert isinstance(FakeHandoffs(), HandoffStore) and isinstance(FakeSessions(), SessionIssuer)
+    assert isinstance(FakeDirectory(), ProfileDirectory)
+    assert not isinstance(BareDirectory(), ProfileDirectory) and isinstance(BareDirectory(), UserDirectory)
 
 
 def test_the_directory_spec_is_passed_to_issue_unchanged(h):

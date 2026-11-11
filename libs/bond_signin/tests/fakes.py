@@ -58,7 +58,8 @@ class FakeDirectory:
     def __init__(self) -> None:
         self.by_id = {u.id: u for u in (User("u-alice", "alice@example.com", "Alice"),
                                         User("u-bob", "bob@example.com", "Bob"),
-                                        User("u-carol", "carol@example.com", "Carol", is_active=False))}
+                                        User("u-carol", "carol@example.com", "Carol", is_active=False),
+                                        User("u-dora", "dora@example.com", ""))}
         self.by_email = {u.email: u for u in self.by_id.values()}
         self.links: list[tuple[str, str, str]] = []
         self.signins: list[dict] = []
@@ -66,6 +67,7 @@ class FakeDirectory:
         self.invalidated: list[tuple[str, datetime]] = []
         self.invite_calls: list[list[str]] = []
         self.invite_subjects: list[str | None] = []
+        self.profile_calls: list[tuple[str, str, bool, str]] = []
 
     def find_by_identity(self, session, provider, subject):
         return next((u for u in self.by_id.values() if u.identity == (provider, subject)), None)
@@ -114,6 +116,11 @@ class FakeDirectory:
     def provider_alive(self, session, user, provider):
         return user.alive
 
+    def apply_profile(self, session, user, profile, *, provider, first):
+        self.profile_calls.append((user.id, profile.name, first, provider))
+        if not user.name:  # fill only when empty: an admin-set name is never overwritten
+            user.name = profile.name
+
 
 class FakeFlow:
     """``complete`` reads the identity from ``code`` (``alice`` -> alice@example.com) unless ``identities`` says."""
@@ -123,7 +130,7 @@ class FakeFlow:
         self.stored: list[dict] = []
         self.started: list[dict] = []
         self.completed: list[dict] = []
-        self.identities: dict[str, dict] = {}
+        self.identities: dict[str, dict] = {"dora": {"name": "Dora Example"}}
         self.fail_complete: str | None = None
         self.fail_start: str | None = None
         self.counter = itertools.count(1)

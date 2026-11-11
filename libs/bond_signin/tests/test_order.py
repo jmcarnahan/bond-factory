@@ -4,8 +4,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from bond_signin import SignInRefused, refusal_code, sign_in, sign_in_with_first
+from bond_signin import ProfileHookError, SignInRefused, refusal_code, sign_in, sign_in_with_first
 
+from .bare_directory import BareDirectory
 from .fakes import FakeDb, FakeDirectory, identity_ns
 
 DB = FakeDb()
@@ -144,3 +145,106 @@ def test_non_refusal_errors_are_not_recorded():
 def test_signin_refused_carries_code_and_message():
     exc = SignInRefused("deactivated")
     assert exc.code == "deactivated" and "deactivated" in exc.message
+
+
+# --- optional apply_profile hook -------------------------------------------------------------------------------
+
+def dora_signin(directory, **kw):
+    ident = identity_ns(**{"email": "dora@example.com", "subject": "g-dora", "name": "Dora Example", **kw})
+    return sign_in_with_first(DB, directory=directory, identity=ident, provider="google", ip=None)
+
+
+def test_hook_runs_on_first_sign_in_and_fills_an_empty_name():
+    d = FakeDirectory()
+    user, first = dora_signin(d)
+    assert (user.id, first) == ("u-dora", True)
+    assert d.profile_calls == [("u-dora", "Dora Example", True, "google")] and user.name == "Dora Example"
+
+
+def test_hook_runs_again_on_a_repeat_sign_in_with_first_false():
+    d = FakeDirectory()
+    dora_signin(d)
+    _, first = dora_signin(d)
+    assert first is False
+    assert d.profile_calls == [("u-dora", "Dora Example", True, "google"), ("u-dora", "Dora Example", False, "google")]
+
+
+def test_hook_does_not_overwrite_an_existing_name():
+    d = FakeDirectory()
+    user = run(d, name="Alice Renamed")
+    assert d.profile_calls == [("u-alice", "Alice Renamed", True, "google")] and user.name == "Alice"
+
+
+@pytest.mark.parametrize("name", [None, "", "   ", "\u200b", 42])
+def test_hook_is_not_called_without_a_usable_name(name):
+    d = FakeDirectory()
+    ident = identity_ns(email="dora@example.com", subject="g-dora", name=name)
+    user, _ = sign_in_with_first(DB, directory=d, identity=ident, provider="google", ip=None)
+    assert d.profile_calls == [] and user.name == ""
+
+
+def test_hook_is_passed_the_normalised_name():
+    d = FakeDirectory()
+    dora_signin(d, name="  Dora\n\tExample\u202e ")
+    assert d.profile_calls == [("u-dora", "Dora Example", True, "google")]
+
+
+def _set(uid, **attrs):
+    def setup(d):
+        for key, value in attrs.items():
+            setattr(d.by_id[uid], key, value)
+        return d
+    return setup
+
+
+@pytest.mark.parametrize("setup, kw, code", [
+    (_set("u-alice"), {"email_verified": False}, "email_not_verified"),
+    (_set("u-alice"), {"email": "stranger@example.com"}, "not_invited"),
+    (_set("u-alice", suspended=True), {}, "company_suspended"),
+    (_set("u-alice", blocked_provider="google"), {}, "provider_not_allowed"),
+    (_set("u-alice"), {"email": "carol@example.com"}, "deactivated"),
+    (_set("u-alice", identity=("google", "other")), {"subject": "g-2"}, "identity_mismatch"),
+    (_set("u-alice", taken_by_other=True), {}, "identity_mismatch"),
+    (_set("u-alice", identity=("google", "g-1"), sessions_valid_after=datetime(2999, 1, 1)), {"subject": "g-1"},
+     "session_revoked"),
+])
+def test_hook_never_runs_on_a_refusal(setup, kw, code):
+    d = setup(FakeDirectory())
+    assert reason(d, **kw) == code
+    assert d.profile_calls == [] and [r["reason"] for r in d.refusals] == [code]
+
+
+def test_an_async_hook_is_refused_loudly():
+    async def hook(*args, **kwargs):
+        return None
+
+    d = FakeDirectory()
+    d.apply_profile = hook
+    with pytest.raises(ProfileHookError, match="synchronous"):
+        dora_signin(d)
+    assert d.refusals == []
+
+
+def test_bare_directory_has_no_hook_and_gets_the_same_result():
+    bare = BareDirectory()
+    assert not hasattr(bare, "apply_profile")
+    plain = FakeDirectory()
+    b_user, b_first = dora_signin(bare)
+    p_user, p_first = dora_signin(plain)
+    assert (b_user.id, b_first) == (p_user.id, p_first) == ("u-dora", True)
+    assert b_user.name == ""  # nothing wrote the name
+
+
+def test_a_raising_hook_becomes_profile_hook_error_not_a_refusal():
+    class Boom(Exception):
+        code = "x"
+
+    def hook(*args, **kwargs):
+        raise Boom("db")
+
+    d = FakeDirectory()
+    d.apply_profile = hook
+    with pytest.raises(ProfileHookError) as info:
+        dora_signin(d)
+    assert isinstance(info.value.__cause__, Boom) and refusal_code(info.value) is None
+    assert d.refusals == []
