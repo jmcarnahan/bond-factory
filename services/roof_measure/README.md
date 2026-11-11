@@ -40,6 +40,10 @@ except MeasureError as e:          # e.code, e.message, e.retryable
     print(e.to_dict())
 ```
 
+As written this geocodes and downloads LiDAR, so it needs the network and a writable `cache_dir` (on a laptop use
+`tempfile.mkdtemp()`). For an offline try-out add `verify=False, blocks_path="<copy of fixtures/site1_blocks.json>"`
+(contract §3.10).
+
 `measure()` blocks for up to `deadline_s + 30` s: run it off the request thread, in a pool of one or two. Signature,
 errors, isolation and caching: [docs/contract-0.2.md section 3](../../docs/contract-0.2.md).
 

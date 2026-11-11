@@ -26,7 +26,7 @@ Requires Flutter 3.41 (Dart 3.11), Python 3.12 and [uv](https://docs.astral.sh/u
 Root make targets use `flutter` from your PATH; override with `make FLUTTER=/path/to/flutter ...`.
 
 ```
-make setup-service  # create the service virtualenv
+make setup-service  # create the service virtualenv (Python library use: docs/contract-0.2.md section 3)
 make test           # test-dart + test-flutter + test-service
 make analyze        # dart analyze / flutter analyze
 make gates          # no-popups gate

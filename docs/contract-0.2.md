@@ -573,7 +573,10 @@ skeleton links CGAL through compas_cgal.
 
 ### 3.1 Install
 
-Pin a full 40-character commit SHA. Tags are labels only.
+Pin a full 40-character commit SHA. Tags are labels only. The extras `service` and `render` are never pulled by
+default; a consumer that wants them asks for `roof-measure[service,render]`. The install was verified (spikes.md §4)
+with pip's `git+file` transport from a checkout; the https and archive forms below differ only in transport and are
+confirmed once the branch is on GitHub.
 
 ```
 pip install "roof-measure @ git+https://github.com/jmcarnahan/bond-factory.git@<full sha>#subdirectory=services/roof_measure"
@@ -713,25 +716,31 @@ Measured in `python:3.12.9-slim`, linux/amd64, with the method in
 
 | metric | value |
 |---|---|
-| install from git, seconds | TBD (phase 2) |
-| site-packages size, core install | TBD (phase 2) |
-| image size | TBD (phase 2) |
-| cold `import roof_measure.pipeline`, seconds | TBD (phase 2) |
-| `measure()` on the blocks fixture, `isolate=True`, seconds | TBD (phase 2) |
-| child peak RSS | TBD (phase 2) |
+| install from git, seconds | 69.0 s (second run 109.9 s; varies with network), plus 14.2 s for apt git |
+| site-packages size, core install | 366 MB, 37 packages |
+| image size | 843 MB for the committed spike container (base 189 MB + site-packages 366 MB + about 290 MB of apt git, pip cache and clone residue that a clean Dockerfile build would not keep); a clean core install is about 555 MB |
+| cold `import roof_measure.pipeline`, seconds | 1.8 s (second run 2.1 s); `import roof_measure` alone 0.1 s |
+| `measure()` on the blocks fixture, `isolate=True`, seconds | 11.0 s first call, 10.1 s and 10.2 s after (second run 9.3, 10.4, 7.4 s); `isolate=False` 6.1 s |
+| child peak RSS | 268.8 MB (second run 271.0 MB) |
 
-An earlier install on a Mac, with the `service` and `render` extras and before the extras were split out, was 51
+The container ran on an Apple-silicon Mac under linux/amd64 emulation (colima), which inflates CPU-bound times several-fold: the `import`, `measure()` and in-process seconds are upper bounds, not what a native amd64 host sees (the same fixture run takes 1.0 s isolated and 0.7 s in-process on the Mac natively). Sizes and the install/package facts are unaffected.
+
+An earlier install on a Mac (arm64 wheels, which bundle fewer native libraries than the manylinux ones), with the
+`service` and `render` extras and before the extras were split out, was 51
 packages and 235 MB of site-packages.
 
 ### 3.10 Offline testing
 
-`blocks_path` runs the pipeline from a saved blocks file, for example `fixtures/site1_blocks.json`, and
+`blocks_path` runs the pipeline from a saved blocks file, for example a copy of this repository's
+`fixtures/site1_blocks.json` (a consumer has no `fixtures/` directory: copy the file or point at the checkout), and
 `solar_fixture` is the matching hook for Solar data. Pass `verify=False` to skip the verifier. With these,
 `isolate=True` also works offline, so a test can exercise the child process without network or keys.
 
 ```python
+import tempfile
 from roof_measure import measure
-env = measure("100 Example Ave, Sampletown, CA 90000", cache_dir=tmp_path, verify=False,
+cache_dir = tempfile.mkdtemp()          # any writable directory
+env = measure("100 Example Ave, Sampletown, CA 90000", cache_dir=cache_dir, verify=False,
               blocks_path="fixtures/site1_blocks.json")
 ```
 

@@ -79,11 +79,33 @@ then `measure()` on the blocks fixture with `isolate=True` and `verify=False`.
 
 | metric | value |
 |---|---|
-| install seconds | TBD (phase 2) |
-| site-packages size | TBD (phase 2) |
-| image size | TBD (phase 2) |
-| cold `import roof_measure.pipeline`, seconds | TBD (phase 2) |
-| `measure()` seconds, blocks fixture, `isolate=True` | TBD (phase 2) |
-| child peak RSS | TBD (phase 2) |
+| install seconds | 69.0 s (second run 109.9 s; varies with network), plus 14.2 s for apt git |
+| site-packages size | 366 MB, 37 packages |
+| image size | 843 MB for the committed spike container (base 189 MB + site-packages 366 MB + about 290 MB of apt git, pip cache and clone residue that a clean Dockerfile build would not keep); a clean core install is about 555 MB |
+| cold `import roof_measure.pipeline`, seconds | 1.8 s (second run 2.1 s); `import roof_measure` alone 0.1 s |
+| `measure()` seconds, blocks fixture, `isolate=True` | 11.0 s first call, 10.1 s and 10.2 s after (second run 9.3, 10.4, 7.4 s); `isolate=False` 6.1 s |
+| child peak RSS | 268.8 MB (second run 271.0 MB) |
+
+The container ran on an Apple-silicon Mac under linux/amd64 emulation (colima), which inflates CPU-bound times several-fold: the `import`, `measure()` and in-process seconds are upper bounds, not what a native amd64 host sees (the same fixture run takes 1.0 s isolated and 0.7 s in-process on the Mac natively). Sizes and the install/package facts are unaffected.
 
 The compas_cgal wheel needs no libgomp1 (verified 2026-11-11 on bookworm), and there is no linux aarch64 wheel.
+
+Run on 2026-11-11 against base `python:3.12.9-slim` (Debian 12.10, digest
+`sha256:48a11b7ba705fd53bf15248d1f94d36c39549903c5d59edcfa2f3f84126e7b44`), twice; the tables show the first run and
+name the second where it differs.
+
+- **Transport.** pip's `git+file` form from a read-only bind mount of the checkout at 6abcc03, with
+  `#subdirectory=services/roof_measure`. It clones, builds with PEP 517 and installs like the https form. Only the
+  transport differs. The https form is checked after the branch is pushed. git needed `safe.directory` for the mount.
+- **git.** `apt-get install --no-install-recommends git` took 14.2 s (second run 22.6 s). libgomp1 was not
+  installed (`ldconfig` finds none) and `compas_cgal.straight_skeleton_2` imported.
+- **Extras absent.** `matplotlib` and `fastapi` fail to import after the core install.
+- **Packages.** 37 in the core install.
+- **Largest site-packages directories (MB).** scipy 109, numpy 43, anthropic 32, scipy.libs 30, numpy.libs 27,
+  pyproj 22, networkx 19, compas 15.
+- **Driver.** The installed package, not the source tree, ran `measure()` on the blocks fixture with
+  `method="lidar_skeleton"`, `verify=False`, three times with `isolate=True` and once with `isolate=False`. The
+  envelope contract was `bond.roof_model/0.2` and all four areas were equal. The import timings are two separate
+  processes, so both are cold with respect to the module cache.
+- **anthropic 1.x.** In a Mac venv with `anthropic==1.14.0`, the verifier, seam, errors and library tests passed
+  (104 passed).
