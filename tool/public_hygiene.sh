@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Public-hygiene gate. This repo is public. Scans tracked files under
 #   packages libs services demos fixtures tool make .github .githooks docs/sdk docs/decisions docs/contracts docs/test
+#   docs/research, docs/*.md (image and font files are skipped by extension)
 #   and the root files pubspec.yaml pyproject.toml Makefile (README.md and CLAUDE.md name the apps on purpose)
 # for e-mail addresses, API keys, private keys, cloud access keys, Firebase
-# hosting names and the brand denylist, and fails on fixtures over 100 KB.
+# hosting names, the brand denylist, US street addresses and latitude/longitude pairs,
+# and fails on fixtures over 100 KB.
 # Exempt: this script, docs/migration/**, local/**, and paths listed in
-# tool/allowlist_hygiene.txt.
+# tool/allowlist_hygiene.txt. Lines in that file starting with "text:" name a literal
+# that makes a hit harmless (the placeholder address).
 # Allowed e-mails: noreply@anthropic.com, *@example.com, *@example.org.
 #
 # Usage: bash tool/public_hygiene.sh [--worktree] [--help]
@@ -19,7 +22,7 @@ cd "$(dirname "$0")/.."
 WORKTREE=0
 case "${1:-}" in
   --help|-h)
-    sed -n "2,13p" "$0" | sed 's/^# \{0,1\}//'
+    sed -n "2,17p" "$0" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
   --worktree) WORKTREE=1 ;;
@@ -27,7 +30,7 @@ case "${1:-}" in
   *) echo "unknown argument: $1 (try --help)" >&2; exit 2 ;;
 esac
 
-ROOTS=(packages libs services demos fixtures tool make .github .githooks docs/sdk docs/decisions docs/contracts docs/test
+ROOTS=(packages libs services demos fixtures tool make .github .githooks docs/sdk docs/decisions docs/contracts docs/test docs/research docs/*.md
        pubspec.yaml pyproject.toml Makefile)
 
 list="$(mktemp)"
@@ -44,15 +47,20 @@ fi
 filtered="$(mktemp)"
 trap 'rm -f "$list" "$hits" "$filtered"' EXIT
 allow="$(mktemp)"
-trap 'rm -f "$list" "$hits" "$filtered" "$allow"' EXIT
+texts="$(mktemp)"
+trap 'rm -f "$list" "$hits" "$filtered" "$allow" "$texts"' EXIT
 if [[ -f tool/allowlist_hygiene.txt ]]; then
-  sed -E 's/#.*$//; s/^[[:space:]]+|[[:space:]]+$//g' tool/allowlist_hygiene.txt | grep . > "$allow" || true
+  sed -E 's/#.*$//; s/^[[:space:]]+|[[:space:]]+$//g' tool/allowlist_hygiene.txt | grep . | grep -v '^text:' > "$allow" || true
+  sed -E 's/^[[:space:]]+//' tool/allowlist_hygiene.txt | grep '^text:' | sed -E 's/^text:[[:space:]]*//; s/[[:space:]]+$//' > "$texts" || true
 fi
 while IFS= read -r f; do
   case "$f" in
     tool/public_hygiene.sh|docs/migration/*|local/*) continue ;;
   esac
   grep -qxF "$f" "$allow" && continue
+  case "$f" in
+    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.pdf|*.ttf|*.otf|*.woff|*.woff2|*.ico|*.zip|*.gz) continue ;;
+  esac
   [[ -f "$f" ]] && echo "$f"
 done < "$list" | sort -u > "$filtered"
 
@@ -117,9 +125,19 @@ done < "$fb_tmp"
 # Brand denylist: words (case-insensitive, start of word) and app identifiers.
 scan "brand name" '(avalon|sbel|pagatime|bondable)' -i
 scan "brand name" '(^|[^A-Za-z])paga' -i
+scan "brand name" '(^|[^A-Za-z])roofr([^A-Za-z]|$)' -i
 scan "Google OAuth client id" '[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com'
 scan "Firebase app id" '1:[0-9]+:(web|ios|android):[0-9a-f]+'
 scan "brand identifier" '(^|[^A-Za-z0-9_])(Av[A-Z][A-Za-z]+|Pt[A-Z][A-Za-z]+|Sbel[A-Z])'
+
+# US street addresses ("123 N Main St"); the placeholder is allowed via the text: entries.
+scan "street address" '\b[0-9]{3,5} +(N|S|E|W|North|South|East|West)?\.? *[A-Z][a-zA-Z]+ +(St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Ct|Court|Pl|Place)\b'
+
+# Coordinates: Southern-California-looking pairs in either order, and any lat/lng/lon
+# key carrying five or more decimals. Synthetic models use origin 0/0.
+scan "coordinate pair" '\b3[34]\.[0-9]{4,}[ ,]+-11[78]\.[0-9]{4,}\b'
+scan "coordinate pair" '-11[78]\.[0-9]{4,}[ ,]+3[34]\.[0-9]{4,}\b'
+scan "coordinate" '(lat|lng|lon)[a-z]*["'"'"' :=]+-?[0-9]{1,3}\.[0-9]{5,}' -i
 
 # Fixtures larger than 100 KB.
 big=0
@@ -134,6 +152,13 @@ while IFS= read -r f; do
       ;;
   esac
 done < "$filtered"
+
+# Drop hits that contain an allowed literal (text: entries).
+if [[ -s "$texts" && -s "$hits" ]]; then
+  kept="$(mktemp)"
+  grep -v -F -f "$texts" "$hits" > "$kept" || true
+  mv "$kept" "$hits"
+fi
 
 count="$(grep -c . "$hits" || true)"
 [[ "$count" -gt 0 ]] && sort -u "$hits"

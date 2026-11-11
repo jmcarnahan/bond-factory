@@ -1,7 +1,7 @@
 # Solar API + footprint + Claude agent: design (not run)
 
 Status: design only. The Anthropic API and the Solar API were not called. The Solar
-input used in the worked example is the SYNTHETIC fixture `data/solar_fixture_site1.json`.
+input used in the worked example is the SYNTHETIC fixture a synthetic hand-written fixture (no longer tracked).
 The output schema below is my proposal. I have not seen the Dart-side schema, so align it.
 
 ## 1. What the agent is for, and what it is not for
@@ -94,11 +94,11 @@ round or invent.
 ## 6. Honest limits
 
 1. Solar gives no edges. Whether a flat-looking low-pitch roof has a parapet, and how tall, is invisible to it.
-2. Solar pitch/azimuth is a fit per segment. On small hips it can merge or drop facets (the report triangles are 169 and 190 sqft, a Solar segmenter may return one or none).
+2. Solar pitch/azimuth is a fit per segment. On small hips it can merge or drop facets (the report's smaller hip faces are small enough that a Solar segmenter may return one or none).
 3. The skeleton assumes uniform pitch and that every non-gable footprint edge is an eave at the same height. Real roofs
    with mixed pitch, dormers, clipped hips, or overhangs break this. Jogs under about 2 ft in the footprint must be regularised first.
 4. The footprint is a wall outline (LARIAC 2008-era geometry on this record), not the roof drip line, so eaves and
-   hip lengths inherit the width error. On site 1 the fitted block is 27.4 ft wide against about 26 ft implied by the report numbers; that alone moves hips by 5 percent and the ridge by 2 ft.
+   hip lengths inherit the width error. On site 1 the fitted block is about 5 percent wider than the report implies; that alone moves hips by 5 percent.
 5. Gable versus hip is decided from azimuth count; a gable with a small hipped (jerkinhead) end has 4 azimuths and would be called a hip.
 6. Flat areas: the Solar table covers whatever Google segmented; the footprint covers the whole outline. The two disagree on site 1 (see FINDINGS), and the agent can only flag it.
 7. Terms: see FINDINGS section 6. The Solar API permitted use is energy systems. This is the dominant risk of the track, not the geometry.
@@ -128,33 +128,35 @@ Hard rules:
 8. Output only the JSON in the schema given. No prose.
 ```
 
-## 8. Worked example: site 1 (synthetic Solar input)
+## 8. Worked example: site 1 (synthetic Solar input; figures withheld)
 
-Input: footprint 46 vertices (6,901 sq ft); fixture with 11 segments: 4 sloped at 21.0 deg (areas 190, 289, 169, 300 sqft, azimuths 266.6, 176.6, 86.6, 356.6),
-3 sloped at 20.0 deg, azimuth 183, centred 4.0 ft outside the south edge (82, 87, 86 sqft), 4 flat segments (pitch 1.0-1.6 deg, total 4,205 sqft).
-The fixture's total is 5,408 sqft against report's 5,405. All of these values are derived from report's report, and the awning positions are invented.
+Input: a footprint (vertex count and area withheld, real site) and a hand-written fixture with 11 segments: 4 sloped
+segments at about 21 deg with azimuths 90 deg apart, 3 sloped segments at about 20 deg, azimuth 183, centred about 4 ft
+outside the south edge, and 4 flat segments (pitch 1.0-1.6 deg). The fixture's total is within 0.1% of the third-party
+report's total. All of these values were derived from the third-party report, and the awning positions are invented.
+The fixture is no longer tracked; `fixtures/synthetic_solar_response.json` replaces it.
 
 Reasoning the agent should produce:
-1. Four segments inside the footprint, pitch 21 deg, azimuths spaced exactly 90 deg apart, two long (300, 289) and two short (169, 190): a hip block. Mean pitch 21.0 deg, rise 4.61/12.
+1. Four segments inside the footprint, pitch about 21 deg, azimuths spaced exactly 90 deg apart, two long and two short: a hip block. Mean rise about 4.6/12.
 2. Three sloped segments outside the footprint, all azimuth 183: shed awnings on the south wall. Flag as separate blocks.
 3. Four flat segments: flat. Every outer footprint edge outside the hip block is a parapet.
-4. Block location: sloped-segment bboxes span x -0.2..35.3, y 28.8..58.1. The south wall is footprint edge 37 (the south-facing edge at y about 29-30). Cut along it, then cut perpendicular to the ridge axis.
-   `split_footprint` result must give a block plan area close to the 885 sqft of Solar ground area. The scan lands on 33.8 ft along the axis, 885.4 sqft.
+4. Block location: cut along the south-facing footprint edge, then perpendicular to the ridge axis. `split_footprint` must give a block plan area close to the Solar ground area of the hip segments (the scan matches it within 0.1%).
 5. Call `rect_fit`, then `hip_roof_edges(rect, 4.61)`. Call `measure` on the rest for the parapet.
 
-Tool results (actually run, `scripts/run_pipeline.py`): fitted block 27.4 x 33.2 ft; eaves 121.2, hips 80.3, ridge 5.8, valleys 0, pitched area 974.0 sqft;
-flat remainder 6,016 sqft; parapet (outer wall of the rest) 471.9 ft. Comparison with the report truth is in FINDINGS.md section 4.
+Tool results (actually run, `scripts/run_pipeline.py`): the fitted block, eaves, hips, ridge, pitched and flat areas and
+the parapet are withheld. The pitched area was about 10% under and the flat remainder about 40% over the fixture's flat
+total. Comparison with the report is in FINDINGS.md section 4.
 
 Expected JSON (abbreviated):
 
 ```json
 {"blocks": [
   {"id": "b1", "form": "hip", "pitch_rise_per_12": 4.61, "confidence": "high",
-   "evidence": ["4 sloped segments inside footprint", "azimuths 86.6/176.6/266.6/356.6 (90 deg spacing)", "plan area 885.4 vs Solar ground area 885.1"]},
+   "evidence": ["4 sloped segments inside footprint", "azimuths 86.6/176.6/266.6/356.6 (90 deg spacing)", "plan area matches Solar ground area"]},
   {"id": "b2", "form": "flat", "confidence": "medium", "evidence": ["4 segments pitch 1.0-1.6 deg"]},
   {"id": "b3-b5", "form": "shed", "confidence": "low", "evidence": ["3 sloped segments centred 4.0 ft outside footprint, azimuth 183"]}],
- "totals": {"eaves_ft": 121.2, "hips_ft": 80.3, "ridges_ft": 5.8, "valleys_ft": 0, "pitched_sqft": 974.0, "flat_sqft": 6016.0, "parapet_ft": 471.9},
- "warnings": ["Footprint flat area 6016 sqft exceeds Solar flat total 4205 sqft by 1811 sqft", "Awning edges not computed (outside footprint, shed form unsupported by skeleton)"]}
+ "totals": {"eaves_ft": "[withheld]", "hips_ft": "[withheld]", "ridges_ft": "[withheld]", "valleys_ft": 0, "pitched_sqft": "[withheld]", "flat_sqft": "[withheld]", "parapet_ft": "[withheld]"},
+ "warnings": ["Footprint flat area exceeds the Solar flat total by about 40 percent", "Awning edges not computed (outside footprint, shed form unsupported by skeleton)"]}
 ```
 
 ## 9. Cost and risk summary

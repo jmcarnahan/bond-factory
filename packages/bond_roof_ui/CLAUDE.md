@@ -7,11 +7,12 @@ Contract: docs/contracts/roof_model.md
 ## Key files
 - lib/bond_roof_ui.dart — barrel
 - lib/src/scene_painter.dart — paints a Scene on a canvas, scaled to fit
-- lib/src/report_strip.dart — three diagrams stacked, inline Print and Save PDF, status line
+- lib/src/report_strip.dart — model|measurement, labels, compact under 600 px; Print / Save / Share, inline status
+- lib/src/totals_table.dart — RoofTotalsTable (variants, verification, generated)
 - lib/src/report.dart — report pages as scenes; print and PDF share/download
-- lib/src/tokens.dart — layout and colour tokens for these widgets
+- lib/src/tokens.dart — layout and colour tokens (strings live in RoofLabels)
 - assets/fonts/Roboto-Regular.ttf — PDF font (license beside it)
-- test/roof_diagram_view_test.dart
+- test/roof_diagram_view_test.dart, report_strip_test.dart
 
 ## Commands
 - One test: `make test T=test/roof_diagram_view_test.dart`

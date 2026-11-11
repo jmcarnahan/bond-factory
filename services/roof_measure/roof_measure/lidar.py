@@ -20,6 +20,7 @@ from pathlib import Path
 import laspy
 import lazrs
 import numpy as np
+import requests
 from pyproj import Transformer
 from shapely import contains_xy
 from shapely.geometry import Point, Polygon, shape
@@ -39,6 +40,10 @@ class LidarError(RuntimeError):
     """No LiDAR covers the address."""
 
 
+class LidarUnavailable(LidarError):
+    """The LiDAR source could not be reached (outage, rate limit): retryable, not 'no coverage here'."""
+
+
 class LidarTooSparse(LidarError):
     """LiDAR exists but is too thin on the roof to segment (message names project, year, density)."""
 
@@ -49,7 +54,7 @@ class LidarTooSparse(LidarError):
                          f"at least {needed:.0f} are needed.")
 
 
-MIN_ROOF_DENSITY = 8.0  # points per m2 inside the footprint below which segmentation is unreliable
+MIN_ROOF_DENSITY = 4.0  # points per m2 inside the footprint below which the job fails (plan D17); below 8 warns
 
 
 @dataclass
@@ -204,7 +209,7 @@ def select_project(lat: float, lng: float) -> list[LidarProject]:
             if lp.year is None:
                 lp.year = sample_year(lp.ept_url, lp.ept)
         except (*cache.NET_ERRORS, LidarError) as e:  # keep the project listed; fetch_points will fail loudly
-            log.warning("could not read %s: %s", lp.ept_url, e)
+            log.warning("could not read an EPT project: %s", cache.describe_error(e))
     out.sort(key=lambda lp: (-(lp.year or 0), -lp.density))  # again: sampled years may have changed ranks
     return out
 
@@ -346,17 +351,21 @@ def fetch_best_points(lat: float, lng: float, half_size_m: float, epsg_out: int,
     try:
         projects = select_project(lat, lng)
     except cache.NET_ERRORS as e:
-        raise LidarError(f"Could not list USGS 3DEP projects ({e}).") from e
+        # only request/HTTP failures are outages; a body that does not parse is bad data (permanent)
+        kind = LidarUnavailable if isinstance(e, requests.RequestException) else LidarError
+        raise kind(f"Could not list USGS 3DEP projects ({cache.describe_error(e)}).") from e
     if not projects:
         raise LidarError("No USGS 3DEP LiDAR project covers this address.")
     reasons: list[str] = []
+    net_failures = 0
     thin: tuple[LidarProject, float] | None = None
     for i, p in enumerate(projects):
         try:
             pc = fetch_points(p, lat, lng, half_size_m, epsg_out)
         except (*cache.NET_ERRORS, LidarError) as e:
-            reasons.append(f"{p.name}: {e}")
-            log.warning("project %s failed: %s", p.name, e)
+            net_failures += isinstance(e, requests.RequestException)
+            reasons.append(f"{p.name}: {cache.describe_error(e) if isinstance(e, cache.NET_ERRORS) else e}")
+            log.warning("project %s failed: %s", p.name, cache.describe_error(e))
             continue
         if footprint_m is not None:
             dens = footprint_density(pc, footprint_m)
@@ -373,7 +382,8 @@ def fetch_best_points(lat: float, lng: float, half_size_m: float, epsg_out: int,
         return pc
     if thin is not None:
         raise LidarTooSparse(thin[0].name, thin[0].year, thin[1], MIN_ROOF_DENSITY)
-    raise LidarError("No 3DEP project returned usable points near this address: " + "; ".join(reasons))
+    detail = "No 3DEP project returned usable points near this address: " + "; ".join(reasons)
+    raise (LidarUnavailable if net_failures == len(projects) else LidarError)(detail)
 
 
 def fetch_for_footprint(footprint_m: Polygon, epsg: int, *, margin_m: float = 15.0) -> PointCloud:

@@ -2,5 +2,12 @@
 # Only dated history that must name the source apps. New entries need a reason.
 # Roof POC summary: records which app repo held the credentials it discusses.
 docs/decisions/2026-11-07-roof-poc-summary.md
+# Dart diagram research (now scanned): records how the source app repos are laid out.
+docs/research/2026-11-07-roof-poc/dart-diagrams/FINDINGS.md
 # Guard test that carries the denylist itself.
 packages/bond_ui/test/source_guards_test.dart
+# Literals that make a hit harmless (text: entries; matched anywhere on the hit line).
+# Placeholder addresses on Example Ave (fixtures, docs, examples).
+text: Example Ave
+# Synthetic Google Solar response placed near lat/lng 0/0 (segment boxes need more than four decimals).
+fixtures/synthetic_solar_response.json

@@ -1,7 +1,8 @@
 [project]
 name = "roof-measure"
-version = "0.1.0"
-description = "Address -> roof model JSON (footprint + USGS 3DEP LiDAR, optionally Google Solar + a Claude agent). POC."
+version = "0.2.0"
+description = "Address -> roof measurement (footprint + USGS 3DEP LiDAR, optional Google Solar, LLM verifier) behind an async job API."
+license = "GPL-3.0-or-later"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "numpy>=2.0",
@@ -18,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "ruff>=0.6", "httpx>=0.27"]
+dev = ["pytest>=8.3", "ruff>=0.6", "httpx>=0.27"]  # httpx: fastapi TestClient
 
 [project.scripts]
 roof-measure = "roof_measure.cli:main"

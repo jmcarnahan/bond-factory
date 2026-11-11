@@ -1,59 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:bond_roof/bond_roof.dart';
 import 'package:bond_roof/src/layout.dart';
 import 'package:test/test.dart';
 
+import 'scene_checks.dart';
 import 'support.dart';
-
-/// Rough extent check for a text primitive: the rotated box around its anchor.
-Obb _textBox(TextPrim t) {
-  final w = textWidth(t.text, t.size, bold: t.bold), h = t.size * 0.9;
-  final off = switch (t.anchor) {
-    TextAnchor.start => w / 2,
-    TextAnchor.middle => 0.0,
-    TextAnchor.end => -w / 2,
-  };
-  final a = t.angleDeg * math.pi / 180;
-  return Obb(t.at.x + off * math.cos(a), t.at.y + off * math.sin(a), w / 2, h / 2, a);
-}
-
-void _expectFits(Scene s) {
-  const eps = 0.51;
-  bool inside(Pt p) => p.x >= -eps && p.y >= -eps && p.x <= s.width + eps && p.y <= s.height + eps;
-  for (final p in s.prims) {
-    switch (p) {
-      case LinePrim():
-        expect(inside(p.a) && inside(p.b), isTrue, reason: 'line $p.a $p.b');
-      case PolyPrim():
-        for (final q in p.pts) {
-          expect(inside(q), isTrue, reason: 'poly point $q');
-        }
-      case TextPrim():
-        for (final c in _textBox(p).corners) {
-          expect(inside(c), isTrue, reason: 'text "${p.text}" corner $c in ${s.width}x${s.height}');
-        }
-    }
-  }
-}
-
-void _expectWellFormedSvg(String svg) {
-  expect(svg.startsWith('<svg'), isTrue);
-  expect(svg.trimRight().endsWith('</svg>'), isTrue);
-  expect('<'.allMatches(svg).length, '>'.allMatches(svg).length);
-  expect('<text'.allMatches(svg).length, '</text>'.allMatches(svg).length);
-  expect('<title>'.allMatches(svg).length, '</title>'.allMatches(svg).length);
-  expect('<svg'.allMatches(svg).length, 1);
-  expect(RegExp(r'NaN|Infinity').hasMatch(svg), isFalse);
-  // Every opening tag is either self-closed or closed explicitly.
-  final open = RegExp(r'<([a-z]+)[^>]*?(/?)>').allMatches(svg);
-  var depth = 0;
-  for (final m in open) {
-    if (m.group(2) == '/') continue;
-    depth++;
-  }
-  expect(depth, '</'.allMatches(svg).length);
-}
 
 void main() {
   final fixtures = loadFixtures();
@@ -97,18 +47,48 @@ void main() {
           expect(s.hiddenLabels + s.placedLabels, labellable);
           expect(s.hiddenLabels, lessThanOrEqualTo((labellable * 0.3).floor()),
               reason: '${s.hiddenLabels} of $labellable hidden');
-          _expectFits(s);
-          _expectWellFormedSvg(sceneToSvg(s));
+          expectFits(s);
+          expectWellFormedSvg(sceneToSvg(s));
         });
 
         test('area diagram ${size.$1.toInt()}x${size.$2.toInt()}', () {
           final s = AreaDiagram.build(m, width: size.$1, height: size.$2);
           expect(s.hiddenLabels + s.placedLabels, m.facets.length);
           expect(s.hiddenLabels, lessThanOrEqualTo((m.facets.length * 0.3).floor()));
-          _expectFits(s);
-          _expectWellFormedSvg(sceneToSvg(s));
+          expectFits(s);
+          expectWellFormedSvg(sceneToSvg(s));
         });
       }
+
+      test('compact layout: 800 wide, two columns, no text under 14, fits, well formed', () {
+        const compact = ReportLayout.compact;
+        final len = LengthDiagram.build(m, layout: compact);
+        final area = AreaDiagram.build(m, layout: compact);
+        final sum = SummaryBlock.build(m, layout: compact);
+        expect((len.width, len.height), (800.0, 1000.0));
+        expect((area.width, area.height), (800.0, 1000.0));
+        expect(sum.width, 800.0);
+        for (final s in [len, area, sum]) {
+          expectFits(s);
+          expectWellFormedSvg(sceneToSvg(s));
+          for (final t in s.prims.whereType<TextPrim>()) {
+            expect(t.size, greaterThanOrEqualTo(14), reason: '"${t.text}" in ${s.title}');
+          }
+        }
+        // Legend swatches: two columns compact, three wide.
+        double legendCols(Scene s) => {
+              for (final p in s.prims)
+                if (p is LinePrim && p.a.y < 230 && p.b.x - p.a.x > 20 && (p.b.x - p.a.x) < 60) p.a.x.round()
+            }.length.toDouble();
+        expect(legendCols(len), 2);
+        expect(legendCols(LengthDiagram.build(m)), 3);
+        // Compact hides more because the plan is narrower, but never more than half.
+        final labellable = m.edges.where((e) => !isHoleOutlineEdge(m, e)).length;
+        expect(len.hiddenLabels + len.placedLabels, labellable);
+        expect(len.hiddenLabels, lessThanOrEqualTo((labellable / 2).ceil()));
+        expect(area.hiddenLabels + area.placedLabels, m.facets.length);
+        expect(area.hiddenLabels, lessThanOrEqualTo((m.facets.length / 2).ceil()));
+      });
 
       test('every edge type used is drawn in its palette colour', () {
         final s = LengthDiagram.build(m);
@@ -133,7 +113,7 @@ void main() {
         for (final l in labels) {
           expect(l.angleDeg, greaterThan(-90));
           expect(l.angleDeg, lessThanOrEqualTo(90));
-          final b = _textBox(l);
+          final b = textBox(l);
           for (final o in boxes) {
             expect(b.overlaps(o), isFalse, reason: 'label ${l.text} overlaps another label');
           }
@@ -147,15 +127,16 @@ void main() {
       test('summary block builds and grows with content', () {
         final s = SummaryBlock.build(m);
         expect(s.height, greaterThan(200));
-        _expectFits(s);
-        _expectWellFormedSvg(sceneToSvg(s));
+        expectFits(s);
+        expectWellFormedSvg(sceneToSvg(s));
         expect(sceneToSvg(s), contains(sqft(m.totals.totalAreaSqft)));
       });
     });
   }
 
-  test('site1_truth: hole-outline edges carry no label, legend totals unchanged', () {
-    final m = RoofModel.fromJson(fixtures.firstWhere((f) => f.name == 'site1_truth').json);
+  test('synthetic_flat_curbs: hole-outline edges carry no label, legend totals unchanged', () {
+    final m = RoofModel.fromJson(fixtures.firstWhere((f) => f.name == 'synthetic_flat_curbs').json);
+    expect(m.holes.length, 17);
     final holeEdges = m.edges.where((e) => isHoleOutlineEdge(m, e)).toList();
     expect(holeEdges.length, greaterThanOrEqualTo(17 * 4 - 8));
     final s = LengthDiagram.build(m);

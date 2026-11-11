@@ -1,25 +1,14 @@
 import 'dart:math' as math;
 
 import 'format.dart';
+import 'labels.dart';
 import 'layout.dart';
 import 'metrics.dart';
 import 'model.dart';
 import 'polylabel.dart';
+import 'report_layout.dart';
 import 'scene.dart';
 import 'style.dart';
-
-const _legendNames = <EdgeType, String>{
-  EdgeType.eave: 'Eaves',
-  EdgeType.rake: 'Rakes',
-  EdgeType.ridge: 'Ridges',
-  EdgeType.hip: 'Hips',
-  EdgeType.valley: 'Valleys',
-  EdgeType.stepFlashing: 'Step flashing',
-  EdgeType.wallFlashing: 'Wall flashing',
-  EdgeType.parapet: 'Parapet walls',
-  EdgeType.transition: 'Transitions',
-  EdgeType.unspecified: 'Unspecified',
-};
 
 /// True when both endpoints of [e] lie on the outline of one of the model's holes (within
 /// 0.05 ft). Such edges are drawn and counted in the totals but never labelled.
@@ -34,40 +23,48 @@ bool isHoleOutlineEdge(RoofModel m, RoofEdge e) {
 }
 
 /// Plan view with every edge coloured by type, a whole-foot label on each edge that has room,
-/// a three-column legend of totals at the top, a compass rose and the rounding footer.
+/// a legend of totals at the top (three columns wide, two compact), a compass rose and the
+/// rounding footer. All text comes from [labels]; [layout] picks the page geometry (the
+/// default size is the layout's design size).
 class LengthDiagram {
   const LengthDiagram._();
 
   static Scene build(
     RoofModel m, {
-    double width = 1600,
-    double height = 1000,
+    double? width,
+    double? height,
     DiagramStyle style = DiagramStyle.report,
+    RoofLabels labels = const RoofLabels(),
+    ReportLayout layout = ReportLayout.wide,
   }) {
-    final k = sceneScale(width, height);
+    width ??= layout.designWidth;
+    height ??= layout.designHeight;
+    final k = layoutScale(layout, width, height);
     final prims = <Prim>[];
 
-    // Header: address, then the legend in three columns (4 + 3 + 3 rows).
+    // Header: address, then the legend in columns (wide 4 + 3 + 3 rows, compact 5 + 5).
+    final title = m.address.display.isEmpty ? labels.lengthTitle : m.address.display;
     prims
       ..add(TextPrim(
         at: (x: 48 * k, y: 40 * k),
-        text: m.address.display.isEmpty ? 'Roof length diagram' : m.address.display,
-        size: 25 * k,
+        text: title,
+        size: fitSize(title, width - 96 * k, 25 * k, 16 * k, bold: true),
         color: style.textColor,
         anchor: TextAnchor.start,
         bold: true,
       ))
       ..add(TextPrim(
         at: (x: 48 * k, y: 66 * k),
-        text: 'Length diagram',
+        text: labels.lengthCaption,
         size: 14 * k,
         color: 0xFF757575,
         anchor: TextAnchor.start,
       ));
-    final colW = (width - 96 * k) / 3;
-    const perCol = [4, 3, 3];
+    final cols = layout.legendColumns;
+    final colW = (width - 96 * k) / cols;
+    final perCol = layout.legendRows;
     var idx = 0;
-    for (var c = 0; c < 3; c++) {
+    for (var c = 0; c < cols; c++) {
       for (var r = 0; r < perCol[c]; r++) {
         final t = EdgeType.values[idx++];
         final x0 = 48 * k + c * colW, y = (104 + r * 28) * k;
@@ -81,14 +78,14 @@ class LengthDiagram {
           ))
           ..add(TextPrim(
             at: (x: x0 + 46 * k, y: y),
-            text: _legendNames[t]!,
+            text: labels.edgeName(t),
             size: 16 * k,
             color: style.textColor,
             anchor: TextAnchor.start,
           ))
           ..add(TextPrim(
             at: (x: x0 + colW - 36 * k, y: y),
-            text: feetInches(m.totals.lengthsFt[t] ?? 0),
+            text: feetInches(m.totals.lengthsFt[t] ?? 0, labels: labels),
             size: 16 * k,
             color: style.textColor,
             anchor: TextAnchor.end,
@@ -98,7 +95,8 @@ class LengthDiagram {
     }
 
     // Plan.
-    final area = (l: 56 * k, t: 214 * k, r: width - 56 * k, b: height - 96 * k);
+    final legendBottom = 104 + (perCol.reduce(math.max) - 1) * 28 + 26;
+    final area = (l: 56 * k, t: legendBottom * k, r: width - 56 * k, b: height - 96 * k);
     final fit = PlanFit(m, left: area.l + 12 * k, top: area.t + 18 * k, right: area.r - 12 * k, bottom: area.b - 12 * k);
     for (final f in m.facets) {
       prims.add(PolyPrim(
@@ -128,17 +126,17 @@ class LengthDiagram {
     }
 
     // Labels, longest edge first.
-    final size = math.max(10.0, style.fontSize * k);
+    final size = layout == ReportLayout.wide ? math.max(layout.minLabelSize, style.fontSize * k) : layout.minLabelSize;
     final placer = LabelPlacer(edges: segs, area: (l: 8 * k, t: area.t, r: width - 8 * k, b: area.b + 8 * k));
     final centroid = fit.map(roofCentroid(m));
     final order = [for (var i = 0; i < m.edges.length; i++) i]
       ..sort((a, b) => segs[b].length.compareTo(segs[a].length));
-    final labels = <TextPrim>[];
+    final edgeLabels = <TextPrim>[];
     var hidden = 0;
     final onHole = [for (final e in m.edges) isHoleOutlineEdge(m, e)];
     for (final i in order) {
-      // Opening outlines are drawn dashed but, as in report, carry no length label. They are
-      // neither placed nor counted as hidden.
+      // Opening outlines are drawn dashed but carry no length label. They are neither placed
+      // nor counted as hidden.
       if (onHole[i]) continue;
       final text = wholeFeet(m.edges[i].lengthFt);
       Obb? box;
@@ -150,7 +148,7 @@ class LengthDiagram {
         hidden++;
         continue;
       }
-      labels.add(TextPrim(
+      edgeLabels.add(TextPrim(
         at: (x: box.cx, y: box.cy),
         text: text,
         angleDeg: box.angle * 180 / math.pi,
@@ -159,10 +157,10 @@ class LengthDiagram {
         bold: true,
       ));
     }
-    prims.addAll(labels);
+    prims.addAll(edgeLabels);
 
-    addCompass(prims, (x: width - 76 * k, y: height - 54 * k), 28 * k, style, k);
-    addFooter(prims, footerLength, width, height, style, k);
+    addCompass(prims, (x: width - 76 * k, y: height - 54 * k), 28 * k, style, k, north: labels.compassNorth);
+    addFooter(prims, labels.footerLength, width, height, style, k, size: layout.textSize(13, k));
 
     return Scene(
       width: width,
@@ -170,8 +168,8 @@ class LengthDiagram {
       background: style.background,
       prims: prims,
       hiddenLabels: hidden,
-      placedLabels: labels.length,
-      title: 'Length diagram',
+      placedLabels: edgeLabels.length,
+      title: labels.lengthCaption,
     );
   }
 }

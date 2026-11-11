@@ -4,9 +4,12 @@ import 'tokens.dart';
 
 /// Inline, in-flow expander with the totals table and the warnings.
 class ModelPanel extends StatelessWidget {
-  const ModelPanel(this.json, {super.key});
+  const ModelPanel(this.json, {super.key, this.extraNotes = const []});
 
   final Map<String, dynamic> json;
+
+  /// Envelope warnings, listed after the model's own.
+  final List<String> extraNotes;
 
   static String _fmt(Object? v) {
     if (v is num) return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
@@ -49,8 +52,8 @@ class ModelPanel extends StatelessWidget {
           ),
           const SizedBox(height: DemoTokens.gap),
           Text('Warnings', style: theme.textTheme.titleSmall),
-          if (warnings.isEmpty && notes.isEmpty) const Text('None'),
-          for (final w in [...warnings, ...notes]) Text('- $w'),
+          if (warnings.isEmpty && notes.isEmpty && extraNotes.isEmpty) const Text('None'),
+          for (final w in [...warnings, ...notes, ...extraNotes]) Text('- $w'),
         ],
       ),
     );

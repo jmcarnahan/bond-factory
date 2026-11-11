@@ -1,7 +1,9 @@
 # docs index
 
 - contracts/roof_model.md — the `bond.roof_model/0.1` wire contract shared by bond_roof and roof_measure
+- contract-0.2.md — the `bond.roof_model/0.2` job API and envelope (`result.model` is the 0.1 roof model)
 - decisions/2026-11-07-roof-poc-summary.md — what the roof POC proved and what was decided
+- decisions/2026-11-10-roof-module-v1.md — roof module v1 decisions D1 to D18, GPL-3 licence, hygiene gate, history rewrite runbook
 - contracts/error_body.md — the shared error body, status codes and Retry-After rules (bond_api, bond_service_kit)
 - contracts/auth.md — auth routes, user shape, session JWT, revocation, error codes, providers payload
 - contracts/signin.md — direct sign-in routes, cookies, device-bound hand-offs, refusal codes, security model
@@ -18,8 +20,8 @@
   - footprints/FINDINGS.md — building footprint sources
   - lidar-3dep/FINDINGS.md — USGS 3DEP LiDAR access and fit
   - roof-algos/FINDINGS.md — plane and level algorithms
-  - ground-truth/ — reference reports and checks (no FINDINGS.md)
   - solar-agent-track/agent_design.md — Solar + agent design
+- research/2026-11-10-roof-module-v1/spikes.md — v1 spike results (national hit rate, image size, verifier cost)
 - ../fixtures/README.md — contract fixtures
 
 ## Rules

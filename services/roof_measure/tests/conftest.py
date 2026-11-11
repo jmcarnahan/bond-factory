@@ -39,10 +39,9 @@ def site1_blocks_path() -> Path:
 
 @pytest.fixture(scope="session")
 def solar_fixture_path() -> Path:
-    for p in (FIXTURES / "solar_site1_fixture.json", DATA / "solar_fixture_site1_synthetic.json"):
-        if p.is_file():
-            return p
-    raise AssertionError("no Solar fixture found")
+    path = FIXTURES / "synthetic_solar_response.json"
+    assert path.is_file(), "run `make fixtures` first"
+    return path
 
 
 @pytest.fixture(scope="session")

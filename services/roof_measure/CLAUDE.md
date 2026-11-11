@@ -1,33 +1,25 @@
 # roof_measure
 
-Role: address -> footprint + LiDAR (+ Solar, optional Claude agent) -> roof model JSON `bond.roof_model/0.1`.
-Python 3.12, FastAPI on :8011. Contract: docs/contracts/roof_model.md. Reads ../../fixtures.
+Role: private async job API. Address -> footprint chain + LiDAR (+ Solar, + LLM verifier) -> envelope
+`bond.roof_model/0.2` (model `bond.roof_model/0.1`). Python 3.12, FastAPI, port $PORT (8011). The one deployed
+module: Dockerfile (context = repo root), railway.toml. Contract: docs/contract-0.2.md, docs/contracts/roof_model.md.
 
-## Key files (pipeline order, in roof_measure/)
-- geocode.py — address to lat/lng (Census geocoder)
-- footprint.py — building footprint
-- lidar.py — USGS 3DEP point cloud over HTTPS (EPT)
-- solar.py — Google Solar API evidence rows (optional)
-- frame.py — coordinate frame shared by every stage
-- blocks.py — height-continuous roof blocks from LiDAR + footprint
-- classify.py — blocks to form, polygon, pitch (859 lines: split when next touched)
-- skeleton.py — straight-skeleton geometry for hip, gable, shed
-- agent.py — optional Claude agent choosing the roof form per part
-- model.py — blocks to the contract JSON
-- render.py — debug PNG of a model; synth.py — synthetic fixtures (not pipeline)
-- cli.py — CLI + pipeline entry; api.py — HTTP API for the demo; cache.py — fetch cache
+## Key files (roof_measure/)
+- api.py routes only; service.py cache-or-queue; jobs.py disk job store + worker pool; runner.py job body
+- auth.py bearer + start-up refusal; errors.py code_for(exc); settings.py env; keys.py/normalize.py cache keys
+- pipeline.py run_pipeline (deadline, lat_lng, on_stage, verify, auto); cli.py CLI; envelope.py 0.2 result
+- footprint.py chain; footprint_{county,osm,solar,hull}.py links; footprint_types.py Footprint
+- verify*.py verifier (own seam); deadline.py shared time budget; version.py PIPELINE_VERSION
+- geocode, lidar, blocks, classify (859 lines), skeleton, agent, model, render, solar, cache: the pipeline
+- synth*.py fixture generators (not pipeline); `make fixtures` rewrites ../../fixtures
 
-## Commands (from this dir)
-- Once: `make setup`
-- All tests: `make test`
-- One file: `.venv/bin/pytest tests/test_model_classify.py` (Makefile has no T=)
-- Lint: `make lint`; serve: `make serve`; run: `make measure ADDR="..."`
+## Commands (this dir)
+- `make setup` once; `make test`; one file `.venv/bin/pytest tests/test_x.py`; `make lint`; `make fixtures`; `make serve`
 
 ## Rules
-- Real site config is `local/sites.json` (copy `tests/sites.example.json`); property data is in `local/test-data/`.
-- Tests that need them skip when absent (a fresh clone still passes).
-- Network tests are marked `network`; they run only with `ROOF_MEASURE_NETWORK=1`.
-- Never read `local/test-data/*.pts`. Never read uv.lock.
-- cache/ and out/ are gitignored; do not commit them.
-- The uv workspace root holds uv.lock; add deps in pyproject.toml, then lock at the root.
-- `anthropic` is needed only for the agent track.
+- New code in new modules; split over-cap files (classify, blocks, model, agent, lidar, skeleton) when touched.
+- Docker binds `::` (IPv6-only): local `docker run -p` needs ROOF_MEASURE_HOST=0.0.0.0. Env: contract Appendix A.
+- Deadlines: cache.fetch_bytes reads the ambient cache.deadline_scope (runner, pipeline); watchdog = deadline + 30 s.
+- Never log token or address at INFO; never read tests/data/**, local/test-data/*.pts, uv.lock. Real sites: local/sites.json only; tests needing them skip; network tests need ROOF_MEASURE_NETWORK=1.
+- cache/, out/, data/ are gitignored.
+- Known limits: small or oddly segmented roofs can fail at blocks (measurement_failed); `lidar_agent` is the manual retry.
