@@ -1,0 +1,18 @@
+bond-factory
+Copyright (C) bond-factory contributors
+
+This repository is licensed under the GNU General Public License, version 3 or
+(at your option) any later version (GPL-3.0-or-later). The full text is in LICENSE.
+
+Why GPL: the roof measurement service (services/roof_measure) links compas_cgal,
+which wraps the CGAL Straight_skeleton_2 package. That CGAL component is GPL per
+the CGAL documentation. compas_cgal itself declares LGPL-3 in its package
+metadata. The whole repository carries one licence for now rather than a
+per-module split. This may change later; it is not legal advice.
+
+The roof service is deployed as a hosted service. It is not distributed to
+end users as a binary or a package.
+
+The Roboto font in packages/bond_roof_ui/assets/fonts/ carries its own
+Apache-2.0 licence, which ships next to the font files and is not changed by
+this notice.

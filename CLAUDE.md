@@ -1,6 +1,6 @@
 # bond-factory
 
-Shared SDK monorepo for the bond app family (avalon-crm, sbel-crm, paga-time): small Dart/Flutter packages, Python libs and services. Nothing here ships; demos are harnesses.
+Shared SDK monorepo for the bond app family (avalon-crm, sbel-crm, paga-time): small Dart/Flutter packages, Python libs and services. Nothing here ships except services/roof_measure, the one deployed service (private Docker image); demos are harnesses.
 
 ## Layout
 - packages/  — Dart/Flutter packages (`bond_<x>` core, `bond_<x>_ui` widgets). Conventions + commands: packages/<pkg>/CLAUDE.md

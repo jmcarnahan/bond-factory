@@ -24,6 +24,7 @@ from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
 from .classify import BlockSet, RoofBlock, complete_tiling, polygons_of, ridge_azimuth, ring_of
+from .deadline import Deadline
 from .skeleton import block_geometry, hip_roof_edges, measure, rect_fit, signed_area, split_footprint
 
 log = logging.getLogger(__name__)
@@ -333,13 +334,14 @@ def _block_dict(b: Any) -> dict[str, Any]:
 
 def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, *, kind: str = "solar",
               client: Any | None = None, model: str = MODEL, max_rounds: int = MAX_ROUNDS,
-              imagery: dict[str, Any] | None = None) -> AgentResult:
+              imagery: dict[str, Any] | None = None, deadline: Deadline | None = None) -> AgentResult:
     """Run the tool-use loop and return completed blocks.
 
     ``kind`` is ``solar`` (``evidence`` = rows from ``solar.segments_to_evidence``) or
     ``lidar`` (the block set's own blocks). ``client`` is an Anthropic client (default: built
     from ``ANTHROPIC_API_KEY``); tests pass a scripted fake. Raises :class:`AgentError` when the
-    loop ends without an accepted ``finalize``.
+    loop ends without an accepted ``finalize``. With a ``deadline`` the client gets a 30 s per-call timeout and no
+    SDK retries, and each round checks the time left.
     """
     if kind == "solar":
         if not evidence:
@@ -351,7 +353,7 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
         seg_polys = {b.id: b.poly for b in blockset.blocks}
     ws = Workspace(blockset.footprint_ft, rows, seg_polys)
     if client is None:
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(timeout=30.0, max_retries=0) if deadline else anthropic.Anthropic()
 
     fp_poly = blockset.footprint
     m = measure(blockset.footprint_ft)
@@ -371,9 +373,13 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
     api_calls = 0
     for rnd in range(1, max_rounds + 1):
         api_calls += 1
+        extra: dict[str, Any] = {}
+        if deadline is not None:
+            deadline.check("agent")
+            extra["timeout"] = deadline.timeout(30.0)
         try:
             resp = client.messages.create(model=model, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT, tools=TOOLS,
-                                          messages=messages)
+                                          messages=messages, **extra)
         except anthropic.APIError as exc:  # message is the API's own text; never the request (which holds no key)
             raise AgentError(f"Anthropic API error: {getattr(exc, 'message', type(exc).__name__)}") from None
         u = getattr(resp, "usage", None)

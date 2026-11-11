@@ -6,7 +6,7 @@ placement once, so the agent never converts coordinates itself.
 
 The Solar API is DISABLED on our Google project at the time of writing, so the live path is
 coded and fails with :class:`SolarUnavailable` (clear message plus the enable URL); the
-service is exercised with the synthetic fixture in ``fixtures/solar_site1_fixture.json``.
+service is exercised with the synthetic fixture in ``fixtures/synthetic_solar_response.json``.
 Never log the API key: request errors are rewritten before they leave this module.
 """
 
@@ -61,7 +61,10 @@ def fetch_building_insights(lat: float, lng: float, api_key: str, timeout: float
                                f"Enable it at {ENABLE_URL} and retry.")
     if not r.ok:
         raise SolarUnavailable(f"Solar API returned HTTP {r.status_code}.")
-    return r.json()
+    try:
+        return r.json()
+    except ValueError:
+        raise SolarUnavailable("Solar API returned a body that is not JSON.") from None
 
 
 def load_fixture(path: str | Path) -> dict[str, Any]:

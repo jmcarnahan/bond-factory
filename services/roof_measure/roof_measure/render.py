@@ -11,10 +11,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Polygon as MplPolygon
 
@@ -37,7 +35,9 @@ def ft_in(v: float) -> str:
 
 def render_png(model: dict[str, Any], path: str | Path) -> Path:
     """Write the debug PNG for ``model`` and return its path."""
-    fig, ax = plt.subplots(figsize=(15, 8), dpi=110)
+    fig = Figure(figsize=(15, 8), dpi=110)  # no pyplot: no global state shared between worker threads, nothing to leak
+    FigureCanvasAgg(fig)
+    ax = fig.add_subplot()
     xs = [p[0] for f in model["facets"] for p in f["polygon"]]
     ys = [p[1] for f in model["facets"] for p in f["polygon"]]
     span = max(max(xs) - min(xs), max(ys) - min(ys), 1.0)
@@ -79,5 +79,4 @@ def render_png(model: dict[str, Any], path: str | Path) -> Path:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
-    plt.close(fig)
     return out

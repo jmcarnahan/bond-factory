@@ -33,7 +33,7 @@ class DiagramStyle {
         dashedTypes = dashedTypes ?? _defaultDashed;
 
   /// The contract palette.
-  static const DiagramStyle roofr = DiagramStyle();
+  static const DiagramStyle report = DiagramStyle();
 
   final Map<EdgeType, int> edgeColors;
   final Set<EdgeType> dashedTypes;

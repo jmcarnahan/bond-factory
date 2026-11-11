@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copies every ../../fixtures/*.json whose schema is bond.roof_model/0.1 into
+# Copies every ../../fixtures/*.json whose schema or contract is bond.roof_model/0.x (0.1 models and 0.2 envelopes) into
 # assets/fixtures/ so the demo works with no service running. Run from anywhere
 # (or `make sync-fixtures` at the repo root). Stale copies are removed first.
 set -euo pipefail
@@ -11,7 +11,7 @@ rm -f "$dst"/*.json
 n=0
 for f in "$src"/*.json; do
   [[ -e "$f" ]] || continue
-  if grep -q '"bond.roof_model/0.1"' "$f"; then
+  if grep -q '"bond.roof_model/0\.' "$f"; then
     cp "$f" "$dst/"
     n=$((n + 1))
   fi

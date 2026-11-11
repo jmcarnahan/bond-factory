@@ -107,6 +107,10 @@ def test_geocode_live(site1):
 ADDR = geocode.Address(PLACEHOLDER["line1"], PLACEHOLDER["city"], PLACEHOLDER["state"], PLACEHOLDER["zip"])
 
 
+def _no_hull(*a, **k):
+    raise footprint.FootprintError("no LiDAR in this test")
+
+
 def _county_routes(net):
     net.routes["LACounty_Parcel"] = _load("parcels_site1_60m.geojson")
     net.routes["Countywide_Building_Outlines"] = _load("buildings_parcel_site1.geojson")
@@ -238,11 +242,10 @@ def test_arcgis_error_is_not_cached_or_read_as_empty(fake_net, site1):
     assert footprint.fetch_footprint(*_pt(site1), _addr(site1)).id == site1["footprint_id"]
 
 
-def test_overpass_timeout_remark_is_not_cached(fake_net):
+def test_overpass_timeout_remark_is_not_cached(fake_net, monkeypatch):
+    monkeypatch.setattr(footprint, "fetch_hull", _no_hull)
     fake_net.routes["LACounty_Parcel"] = json.dumps({"features": []}).encode()
     fake_net.routes["overpass-api.de"] = json.dumps({"elements": [], "remark": "runtime error: timed out"}).encode()
-    fake_net.routes["overpass.kumi"] = json.dumps({"elements": [], "remark": "runtime error: timed out"}).encode()
-    fake_net.routes["overpass.private"] = json.dumps({"elements": [], "remark": "timed out"}).encode()
     with pytest.raises(footprint.FootprintError):
         footprint.fetch_footprint(33.0, -118.0, ADDR)
     assert not any(b"remark" in f.read_bytes() for f in cache.cache_dir().glob("*.bin"))
@@ -270,7 +273,8 @@ def test_cache_key_covers_params_expiry_and_temp_files(fake_net):
     assert not list(cache.cache_dir().glob("*.tmp"))  # no stray temp files
 
 
-def test_footprint_error_when_nothing_found(fake_net):
+def test_footprint_error_when_nothing_found(fake_net, monkeypatch):
+    monkeypatch.setattr(footprint, "fetch_hull", _no_hull)
     fake_net.routes["LACounty_Parcel"] = json.dumps({"features": []}).encode()
     fake_net.routes["overpass"] = json.dumps({"elements": []}).encode()
     with pytest.raises(footprint.FootprintError, match="No building footprint"):
@@ -283,13 +287,12 @@ def test_footprint_live(site1):
     assert fp.id == site1["footprint_id"]
 
 
-def test_matched_parcel_without_building_raises_instead_of_osm(fake_net, site1):
+def test_matched_parcel_without_building_falls_through_to_osm(fake_net, site1):
     fake_net.routes["LACounty_Parcel"] = _load("parcels_site1_60m.geojson")
     fake_net.routes["Countywide_Building_Outlines"] = json.dumps({"type": "FeatureCollection", "features": []}).encode()
-    fake_net.routes["overpass"] = _load("overpass_site1.json")  # must NOT be consulted
-    with pytest.raises(footprint.FootprintError, match="parcel matched but has no building outline"):
-        footprint.fetch_footprint(*_pt(site1), _addr(site1))
-    assert not any("overpass" in u for u in fake_net.calls)
+    fake_net.routes["overpass"] = _load("overpass_site1.json")
+    fp = footprint.fetch_footprint(*_pt(site1), _addr(site1))
+    assert fp.source == "osm" and fp.warning_codes[0] == "parcel_without_building"
 
 
 def test_county_layer_unreachable_falls_back_to_osm_with_warning(fake_net, site1, monkeypatch):

@@ -1,71 +1,82 @@
 import 'dart:math' as math;
 
 import 'format.dart';
+import 'labels.dart';
 import 'layout.dart';
 import 'metrics.dart';
 import 'model.dart';
 import 'polylabel.dart';
+import 'report_layout.dart';
 import 'scene.dart';
 import 'style.dart';
 
 /// Plan view with facet outlines and a two-line label per facet (pitch, then area), dashed
-/// holes, and the eight totals in a block at the top.
+/// holes, and the eight totals in a block at the top (four columns wide, two compact). All
+/// text comes from [labels]; [layout] picks the page geometry.
 class AreaDiagram {
   const AreaDiagram._();
 
   static Scene build(
     RoofModel m, {
-    double width = 1600,
-    double height = 1000,
-    DiagramStyle style = DiagramStyle.roofr,
+    double? width,
+    double? height,
+    DiagramStyle style = DiagramStyle.report,
+    RoofLabels labels = const RoofLabels(),
+    ReportLayout layout = ReportLayout.wide,
   }) {
-    final k = sceneScale(width, height);
+    width ??= layout.designWidth;
+    height ??= layout.designHeight;
+    final k = layoutScale(layout, width, height);
     final prims = <Prim>[];
     final t = m.totals;
 
+    final title = m.address.display.isEmpty ? labels.areaTitle : m.address.display;
     prims
       ..add(TextPrim(
         at: (x: 48 * k, y: 40 * k),
-        text: m.address.display.isEmpty ? 'Roof area diagram' : m.address.display,
-        size: 25 * k,
+        text: title,
+        size: fitSize(title, width - 96 * k, 25 * k, 16 * k, bold: true),
         color: style.textColor,
         anchor: TextAnchor.start,
         bold: true,
       ))
       ..add(TextPrim(
         at: (x: 48 * k, y: 66 * k),
-        text: 'Area diagram',
+        text: labels.areaCaption,
         size: 14 * k,
         color: 0xFF757575,
         anchor: TextAnchor.start,
       ));
-    String sq(double v) => '${sqft(v)} sq ft';
-    final cells = <(String, String)>[
-      ('Total area', sq(t.totalAreaSqft)),
-      ('Total pitched area', sq(t.pitchedAreaSqft)),
-      ('Total flat area', sq(t.flatAreaSqft)),
-      ('Predominant pitch', pitchLabel(t.predominantPitchRise)),
-      ('Predominant pitch area', sq(t.predominantPitchAreaSqft)),
-      ('Two-story area', 'n/a'),
-      ('Two-layer area', 'n/a'),
-      ('Unspecified pitch area', 'n/a'),
+    String sq(double v) => '${sqft(v)} ${labels.unitSqft}';
+    // A null value is "not available" (drawn grey); the cell is chosen by the null, not by text.
+    final cells = <(String, String?)>[
+      (labels.totalArea, sq(t.totalAreaSqft)),
+      (labels.totalPitchedArea, sq(t.pitchedAreaSqft)),
+      (labels.totalFlatArea, sq(t.flatAreaSqft)),
+      (labels.predominantPitch, pitchLabel(t.predominantPitchRise, labels: labels)),
+      (labels.predominantPitchArea, sq(t.predominantPitchAreaSqft)),
+      (labels.twoStoryArea, null),
+      (labels.twoLayerArea, null),
+      (labels.unspecifiedPitchArea, null),
     ];
-    final colW = (width - 96 * k) / 4;
+    final cols = layout.figureColumns;
+    final colW = (width - 96 * k) / cols;
+    final rows = ReportLayout.rowsFor(cells.length, cols);
     for (final (i, c) in cells.indexed) {
-      final x0 = 48 * k + (i % 4) * colW, y0 = (96 + (i ~/ 4) * 58) * k;
+      final x0 = 48 * k + (i % cols) * colW, y0 = (96 + (i ~/ cols) * 58) * k;
       prims
-        ..add(TextPrim(at: (x: x0, y: y0), text: c.$1, size: 13 * k, color: 0xFF757575, anchor: TextAnchor.start))
+        ..add(TextPrim(at: (x: x0, y: y0), text: c.$1, size: layout.textSize(13, k), color: 0xFF757575, anchor: TextAnchor.start))
         ..add(TextPrim(
           at: (x: x0, y: y0 + 24 * k),
-          text: c.$2,
+          text: c.$2 ?? labels.notAvailable,
           size: 22 * k,
-          color: c.$2 == 'n/a' ? 0xFF9E9E9E : style.textColor,
+          color: c.$2 == null ? 0xFF9E9E9E : style.textColor,
           anchor: TextAnchor.start,
           bold: true,
         ));
     }
 
-    final area = (l: 56 * k, t: 214 * k, r: width - 56 * k, b: height - 96 * k);
+    final area = (l: 56 * k, t: (98 + rows * 58) * k, r: width - 56 * k, b: height - 96 * k);
     final fit = PlanFit(m, left: area.l + 12 * k, top: area.t + 18 * k, right: area.r - 12 * k, bottom: area.b - 12 * k);
     final polys = [for (final f in m.facets) fit.mapAll(f.polygon)];
     final holes = [for (final h in m.holes) fit.mapAll(h.polygon)];
@@ -88,13 +99,13 @@ class AreaDiagram {
 
     // Facet labels at the pole of inaccessibility; shrink the text until the label box fits
     // inside the facet, hide it if it never does.
-    final maxSize = math.max(10.0, style.fontSize * 1.2 * k);
-    final minSize = 8.5 * k;
+    final maxSize = math.max(layout.minLabelSize, style.fontSize * 1.2 * k);
+    final minSize = layout == ReportLayout.wide ? 8.5 * k : layout.minLabelSize;
     var hidden = 0, placed = 0;
     final labelPrims = <Prim>[];
     for (final (i, f) in m.facets.indexed) {
       final pole = polylabel([polys[i]], precision: 0.5 * k);
-      final line1 = pitchLabel(f.kind == FacetKind.flat ? 0 : f.pitchRise);
+      final line1 = pitchLabel(f.kind == FacetKind.flat ? 0 : f.pitchRise, labels: labels);
       final line2 = sqft(f.areaSqft);
       double? chosen;
       var at = pole.point;
@@ -140,8 +151,8 @@ class AreaDiagram {
     }
     prims.addAll(labelPrims);
 
-    addCompass(prims, (x: width - 76 * k, y: height - 54 * k), 28 * k, style, k);
-    addFooter(prims, footerArea, width, height, style, k);
+    addCompass(prims, (x: width - 76 * k, y: height - 54 * k), 28 * k, style, k, north: labels.compassNorth);
+    addFooter(prims, labels.footerArea, width, height, style, k, size: layout.textSize(13, k));
 
     return Scene(
       width: width,
@@ -150,7 +161,7 @@ class AreaDiagram {
       prims: prims,
       hiddenLabels: hidden,
       placedLabels: placed,
-      title: 'Area diagram',
+      title: labels.areaCaption,
     );
   }
 

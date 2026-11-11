@@ -73,3 +73,6 @@ Thumbs.db
 .claude/settings.local.json
 .claude/worktrees/
 CLAUDE.local.md
+
+# roof_measure job store (default DATA_DIR)
+services/*/data/

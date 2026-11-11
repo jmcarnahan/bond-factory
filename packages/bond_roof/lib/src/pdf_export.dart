@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
+import 'labels.dart';
 import 'scene.dart';
 
 /// Page width in PDF points for a landscape letter sheet; taller scenes use the same width.
@@ -11,14 +12,15 @@ const _pageWidthPt = 792.0;
 
 /// Draws each scene onto its own PDF page, scaled to 792 pt wide. Pass [fontTtf] (a TrueType
 /// font file) for text outside Latin-1; without it the built-in Helvetica is used and other
-/// characters become "?".
+/// characters become "?". The document title is [title], or `labels.pdfTitle` when omitted.
 Future<Uint8List> scenesToPdf(
   List<Scene> pages, {
   Uint8List? fontTtf,
-  String title = 'Roof measurement report',
+  String? title,
+  RoofLabels labels = const RoofLabels(),
 }) async {
   if (pages.isEmpty) throw ArgumentError.value(pages, 'pages', 'at least one scene is required');
-  final doc = pw.Document(title: title, creator: 'bond_roof');
+  final doc = pw.Document(title: title ?? labels.pdfTitle, creator: 'bond_roof');
   final pw.Font regular, bold;
   if (fontTtf != null) {
     regular = pw.Font.ttf(ByteData.sublistView(fontTtf));

@@ -1,119 +1,207 @@
-"""HTTP API for the Flutter demo: ``POST /measure`` and the fixture endpoints.
+"""HTTP routing for the roof measurement service (contract: docs/contract-0.2.md).
 
-Run with ``make serve`` (port 8011). Results are cached on disk under ``out/`` keyed by
-address and method, so a repeated request for the same building is instant and costs no
-agent calls. CORS is open for localhost origins only (the web demo runs on another port).
+Routes only: validation here, work in ``service.py`` and ``runner.py``. Run with
+``uvicorn roof_measure.api:app --host :: --port $PORT``. The app is built on first access, so a missing
+``ROOF_MEASURE_TOKEN`` stops the process at start-up instead of serving unauthenticated.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
+import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .cli import METHODS, PipelineError, run_pipeline
+from . import auth
+from .errors import error_body
+from .jobs import QueueFull
+from .service import RunFn, Service
+from .settings import Settings
+from .version import PIPELINE_VERSION
 
-log = logging.getLogger(__name__)
-
-SERVICE_DIR = Path(__file__).resolve().parents[1]
-OUT_DIR = SERVICE_DIR / "out"
-FIXTURES_DIR = SERVICE_DIR.parents[1] / "fixtures"
-
-app = FastAPI(title="roof-measure", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-                   allow_methods=["*"], allow_headers=["*"])
+LOG_FORMAT = "%(asctime)s level=%(levelname)s logger=%(name)s %(message)s"
+log = logging.getLogger("roof_measure.api")
+Method = Literal["auto", "lidar_skeleton", "lidar_agent", "solar_agent"]
+DEBUG_FIELDS = ("blocks_fixture", "solar_fixture", "fixture")
+MAX_BODY_BYTES = 8192  # a request is about 300 bytes; checked after reading
+MAX_CONTENT_LENGTH = 65536  # refused from the header, before the body is read
 
 
 class MeasureRequest(BaseModel):
-    address: str = Field(max_length=200)
-    method: str = "lidar_skeleton"
-    blocks_fixture: str | None = None  # NAME of a blocks JSON in fixtures/ (skips the data stages)
-    solar_fixture: str | None = None  # NAME of a Solar insights JSON in fixtures/
-    no_agent: bool = False
-    fixture: str | None = None  # method "fixture": which fixture to return (default site1_lidar)
+    model_config = ConfigDict(extra="forbid", strict=True)  # "34", true, "yes", 1 are not coordinates or flags
+    address: str = Field(min_length=1, max_length=200)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+    method: Method | Literal["fixture"] = "auto"
+    verify: bool = True
+    force: bool = False
+    blocks_fixture: str | None = None  # debug only: NAME of a blocks JSON in fixtures/
+    solar_fixture: str | None = None  # debug only: NAME of a Solar insights JSON in fixtures/
+    fixture: str | None = None  # debug only, method "fixture": NAME of the fixture to return
+
+    @field_validator("address")
+    @classmethod
+    def _address_not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("address must not be blank")
+        return v
+
+    @field_validator("blocks_fixture", "solar_fixture", "fixture")
+    @classmethod
+    def _bare_name(cls, v: str | None) -> str | None:
+        """Accept ``site1_blocks`` as well as ``site1_blocks.json`` (the safe-name check runs on the result)."""
+        return v if v is None or v.endswith(".json") else v + ".json"
+
+    @model_validator(mode="after")
+    def _both_or_neither(self) -> MeasureRequest:
+        if (self.lat is None) != (self.lng is None):
+            raise ValueError("lat and lng must be given together")
+        return self
 
 
-def _fixture_names() -> list[str]:
-    return sorted(p.stem for p in FIXTURES_DIR.glob("*.json"))
+def _err(status: int, code: str, message: str | None = None, headers: dict[str, str] | None = None) -> JSONResponse:
+    return JSONResponse(error_body(code, message), status_code=status, headers=headers)
 
 
-def _fixture_path(name: str | None) -> Path | None:
-    """Resolve a fixture NAME strictly under FIXTURES_DIR; 400 for anything else."""
+def _invalid(errors: list[Any]) -> JSONResponse:
+    """422 naming the first bad field and rule, never echoing the input."""
+    first = errors[0] if errors else {}
+    where = ".".join(str(p) for p in first.get("loc", ()) if p != "body")
+    return _err(422, "invalid_request", f"Invalid request: {where or 'body'}: {first.get('type', 'invalid')}.")
+
+
+def fixture_path(settings: Settings, name: str | None) -> Path | None:
+    """Resolve a fixture NAME strictly under the fixtures dir; None for no name; ValueError otherwise."""
     if name is None:
         return None
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", name) or not name.endswith(".json") or ".." in name:
-        raise HTTPException(400, "fixture names look like 'site1_blocks.json'")
-    path = FIXTURES_DIR / name
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+\.json", name) or ".." in name:
+        raise ValueError("fixture names look like 'site1_blocks.json'")
+    path = settings.fixtures_dir / name
     if not path.is_file():
-        raise HTTPException(400, f"no fixture {name!r} in fixtures/")
+        raise ValueError(f"no fixture {name!r}")
     return path
 
 
-def _safe_name(name: str) -> str:
-    if not re.fullmatch(r"[A-Za-z0-9_\-]+", name):
-        raise HTTPException(400, "bad fixture name")
-    return name
+def create_app(settings: Settings | None = None, *, token: str | None = None, run: RunFn | None = None,
+               env: dict[str, str] | None = None) -> FastAPI:
+    """Build the app. ``token`` None means: derive from the environment (``auth.require_token``)."""
+    settings = settings or Settings.from_env(env)
+    enforce = auth.require_token(env) if token is None else token
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)  # no-op when the host already configured logging
+    service = Service(settings, run)
+    log.info("roof-measure %s starting: bind_host=%s auth=%s debug=%s", PIPELINE_VERSION,
+             (env or os.environ).get("ROOF_MEASURE_HOST", "::"), "on" if enforce else "off", settings.debug)
+    docs = {} if settings.debug else {"docs_url": None, "redoc_url": None, "openapi_url": None}  # schema lists debug fields
+    app = FastAPI(title="roof-measure", version=PIPELINE_VERSION, **docs)
+    app.state.service = service
+    auth.install(app, enforce)
+    app.add_middleware(CORSMiddleware, allow_origin_regex=settings.cors_regex, allow_methods=["*"],
+                       allow_headers=["*"])
 
+    @app.exception_handler(RequestValidationError)
+    async def _bad_request(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        return _invalid(list(exc.errors()))
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+    @app.exception_handler(StarletteHTTPException)
+    async def _http(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        if exc.status_code == 404:
+            return _err(404, "unknown_job", "No such resource.")
+        return _err(exc.status_code, "invalid_request", "The request cannot be served.")
 
+    @app.exception_handler(Exception)
+    async def _unexpected(_request: Request, exc: Exception) -> JSONResponse:
+        log.error("unhandled %s in a request handler", type(exc).__name__)
+        log.debug("unhandled detail", exc_info=exc)
+        return _err(500, "measurement_failed", "The service hit an unexpected error.")
 
-@app.get("/fixtures")
-def list_fixtures() -> list[dict[str, Any]]:
-    """Roof-model fixtures (schema bond.roof_model/0.1) in the repository's ``fixtures/`` directory.
+    @app.get("/healthz")
+    def healthz() -> dict[str, str]:
+        return {"status": "ok", "pipeline_version": PIPELINE_VERSION}
 
-    Service inputs that live beside them (blocks files, Solar responses) are not listed, so a
-    client can render every entry.
-    """
-    out = []
-    for p in sorted(FIXTURES_DIR.glob("*.json")):
+    @app.post("/v1/measurements", status_code=202)
+    async def create_measurement(request: Request) -> JSONResponse:
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > MAX_CONTENT_LENGTH:
+            return _err(422, "invalid_request", "Request body too large.")
+        raw = await request.body()
+        if len(raw) > MAX_BODY_BYTES:
+            return _err(422, "invalid_request", "Request body too large.")
         try:
-            if json.loads(p.read_text()).get("schema") != "bond.roof_model/0.1":
+            req = MeasureRequest.model_validate_json(raw)
+        except ValidationError as exc:
+            return _invalid(list(exc.errors()))
+        body = req.model_dump()
+        if not settings.debug and (req.method == "fixture" or any(body[k] for k in DEBUG_FIELDS)):
+            return _err(422, "invalid_request", "Fixture inputs are available only with ROOF_MEASURE_DEBUG=1.")
+        try:
+            for k in ("blocks_fixture", "solar_fixture", "fixture"):
+                fixture_path(settings, body[k])
+        except ValueError as exc:
+            return _err(422, "invalid_request", str(exc))
+        try:
+            job = service.submit(body)
+        except QueueFull:
+            return _err(429, "queue_full", headers={"Retry-After": "30"})
+        return JSONResponse({"id": job["id"], "status": job["status"]}, status_code=202)
+
+    @app.get("/v1/measurements/{job_id}")
+    def get_measurement(job_id: str) -> JSONResponse:
+        view = service.view(job_id)
+        if view is None:
+            return _err(404, "unknown_job")
+        return JSONResponse(view)
+
+    if settings.debug:
+        _debug_routes(app, settings)
+    return app
+
+
+def _debug_routes(app: FastAPI, settings: Settings) -> None:
+    def is_roof(doc: Any) -> bool:
+        return isinstance(doc, dict) and (str(doc.get("schema", "")).startswith("bond.roof_model/0.")
+                                          or str(doc.get("contract", "")).startswith("bond.roof_model/0."))
+
+    @app.get("/fixtures")
+    def list_fixtures() -> list[dict[str, Any]]:
+        out = []
+        for p in sorted(settings.fixtures_dir.glob("*.json")):
+            try:
+                doc = json.loads(p.read_text())
+            except ValueError:
                 continue
-        except (ValueError, AttributeError):
-            continue
-        out.append({"name": p.stem, "file": p.name, "bytes": p.stat().st_size})
-    return out
+            if is_roof(doc):
+                out.append({"name": p.stem, "file": p.name, "bytes": p.stat().st_size,
+                            "kind": "envelope" if "contract" in doc else "model"})
+        return out
+
+    @app.get("/fixtures/{name}")
+    def get_fixture(name: str) -> Any:
+        if not re.fullmatch(r"[A-Za-z0-9_\-.]+", name) or ".." in name:
+            return _err(404, "unknown_job", "No such fixture.")
+        path = settings.fixtures_dir / f"{name}.json"
+        if not path.is_file():
+            return _err(404, "unknown_job", "No such fixture.")
+        return json.loads(path.read_text())
 
 
-@app.get("/fixtures/{name}")
-def get_fixture(name: str) -> Any:
-    path = FIXTURES_DIR / f"{_safe_name(name)}.json"
-    if not path.is_file():
-        raise HTTPException(404, f"no fixture {name!r}; have {_fixture_names()}")
-    return json.loads(path.read_text())
+_app: FastAPI | None = None
 
 
-@app.post("/measure")
-def measure(req: MeasureRequest) -> Any:
-    """Roof model JSON for an address (cached). ``method: "fixture"`` returns a saved fixture."""
-    if req.method == "fixture":
-        return get_fixture(req.fixture or "site1_lidar")
-    if req.method not in METHODS:
-        raise HTTPException(400, f"method must be one of {METHODS + ('fixture',)}")
-    blocks_path = _fixture_path(req.blocks_fixture)
-    solar_path = _fixture_path(req.solar_fixture)
-    key = hashlib.sha256(json.dumps([req.address.strip().lower(), req.method, req.blocks_fixture,
-                                     req.solar_fixture, req.no_agent]).encode()).hexdigest()[:16]
-    cache = OUT_DIR / f"api_{key}.json"
-    if cache.is_file():
-        return json.loads(cache.read_text())
-    try:
-        res = run_pipeline(req.address, OUT_DIR, req.method, blocks_path=blocks_path,
-                           solar_fixture=solar_path, no_agent=req.no_agent)
-    except PipelineError as exc:
-        raise HTTPException(422, str(exc)) from exc
-    except Exception as exc:  # data-layer errors carry human messages (GeocodeError, FootprintError, ...)
-        log.exception("measure failed")
-        raise HTTPException(502, "The measurement failed upstream; see the service log.") from exc
-    cache.write_text(json.dumps(res.model))
-    return res.model
+def __getattr__(name: str) -> FastAPI:
+    """``roof_measure.api:app`` for uvicorn: built from the environment on first access."""
+    global _app
+    if name != "app":
+        raise AttributeError(name)
+    if _app is None:
+        _app = create_app()
+    return _app

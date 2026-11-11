@@ -13,11 +13,11 @@ by the lead only.
   The service works in the UTM zone of the footprint (EPSG:32611 for Los Angeles) and
   converts by `ft = m / 0.3048` after translating the origin.
 - `edges[].points` are plan coordinates; `edges[].length_ft` is the true (slope) length for
-  edges on a sloped facet and equals the plan length on flat facets, as Roofr prints it.
+  edges on a sloped facet and equals the plan length on flat facets, as a printed measurement report shows it.
 - `origin` carries the WGS84 lat/lng of that `[0, 0]` point so a consumer can place the
   model on a map later. `north_deg` is always `0` in this version (plan is true-north up).
 - Pitch is `pitch_rise`: the rise in inches over a 12 inch run (`4.0` means 4/12). Flat is
-  `pitch_rise <= 0.5` (Roofr prints 0/12). Tilt degrees = `atan(pitch_rise / 12)`.
+  `pitch_rise <= 0.5` (a printed report shows 0/12). Tilt degrees = `atan(pitch_rise / 12)`.
 - Aspect `aspect_deg` is the compass direction the facet faces (0 = N, 90 = E, 180 = S,
   270 = W), the downslope direction. Flat facets have `aspect_deg: null`.
 - Slope factor `sf = sqrt(1 + (pitch_rise / 12)^2)`; `area_sqft = plan_area_sqft * sf`.
@@ -35,9 +35,9 @@ by the lead only.
   "units": "ft",
   "source": {
     "method": "lidar_skeleton",
-    "footprint": {"provider": "lacounty_lariac_2020", "id": "SITE1-BLDG", "area_sqft": 6901.0},
+    "footprint": {"provider": "lacounty_lariac_2020", "id": "EXAMPLE-BLDG", "area_sqft": 910.0},
     "lidar": {"project": "CA_LosAngeles_1_B23", "acquired": "2023-10-03/2023-12-08",
-              "points_on_roof": 12049, "density_per_m2": 19.0},
+              "points_on_roof": 5000, "density_per_m2": 15.0},
     "solar": null
   },
   "blocks": [
@@ -57,16 +57,15 @@ by the lead only.
     {"id": "h1", "kind": "skylight", "polygon": [[10, 40], [13, 40], [13, 43], [10, 43]], "area_sqft": 9.0}
   ],
   "totals": {
-    "total_area_sqft": 5405.0, "pitched_area_sqft": 1200.0, "flat_area_sqft": 4205.0,
-    "predominant_pitch_rise": 0.0, "predominant_pitch_area_sqft": 4205.0,
-    "squares": 54.05,
-    "lengths_ft": {"eave": 209.7, "rake": 32.0, "ridge": 7.8, "hip": 76.2, "valley": 0.0,
-                   "step_flashing": 50.0, "wall_flashing": 344.4, "parapet": 423.8,
+    "total_area_sqft": 959.22, "pitched_area_sqft": 959.22, "flat_area_sqft": 0.0,
+    "predominant_pitch_rise": 4.0, "predominant_pitch_area_sqft": 959.22,
+    "squares": 9.59,
+    "lengths_ft": {"eave": 122.0, "rake": 0.0, "ridge": 9.0, "hip": 75.55, "valley": 0.0,
+                   "step_flashing": 0.0, "wall_flashing": 0.0, "parapet": 0.0,
                    "transition": 0.0, "unspecified": 0.0}
   },
   "confidence": {"overall": "medium",
-                 "notes": ["Parapet assigned by rule: flat roof edge on the outline.",
-                           "Awnings on the south edge detected but under-sized; verify on site."]},
+                 "notes": ["Pitch fitted from LiDAR returns; verify on site."]},
   "warnings": ["Tree canopy overhangs the south edge."],
   "debug": {"png": "site1_debug.png"}
 }
@@ -86,8 +85,8 @@ Rules:
 - `predominant_pitch_rise` is the half-pitch bucket (0, 0.5, 1.0, ...; flat counts as 0) whose
   facets have the largest summed `area_sqft`; ties go to the lower pitch.
 - Holes are subtracted from `plan_area_sqft` and `area_sqft` of the facet that contains them
-  (Roofr: "Deleted facets (skylights, chimneys) are excluded from the calculations").
-- Numbers are unrounded doubles. Rounding is the renderer's job (Roofr prints whole feet
+  (commercial reports exclude deleted facets such as skylights and chimneys from the calculations).
+- Numbers are unrounded doubles. Rounding is the renderer's job (commercial reports print whole feet
   on the diagram, `ft in` in the legend, whole sq ft for areas).
 - `source.method` is `lidar_skeleton | lidar_agent | solar_agent | manual | fixture`.
 - `source.lidar.fitted_area_sqft`, when present, is the plan area of blocks fitted to LiDAR
@@ -102,7 +101,7 @@ Per block, given its polygon, form and pitch:
 
 - **flat**: every block polygon edge on the footprint outline is `parapet`; an edge shared
   with another block at a higher roof level (step > 1.0 ft) is `wall_flashing` for the lower
-  block; an edge shared with another flat block at the same level is `eave` (Roofr draws
+  block; an edge shared with another flat block at the same level is `eave` (commercial reports draw
   those internal flat-to-flat lines as eaves); an edge shared with a sloped block is the
   sloped block's eave (do not double count).
 - **hip / gable** (straight skeleton of the block polygon at uniform pitch): block polygon
@@ -112,7 +111,7 @@ Per block, given its polygon, form and pitch:
   block's polygon edge meets a higher wall of another block it is `step_flashing` instead
   of eave.
 - **shed**: one facet; the high edge is `ridge`, the low edge `eave`, the two sides `rake`.
-- Hole outlines are `wall_flashing` when the hole is a chimney or curb (Roofr draws them
+- Hole outlines are `wall_flashing` when the hole is a chimney or curb (commercial reports draw them
   dashed blue); skylight outlines are drawn but carry no edge type (not in totals).
 - `transition` is reserved (pitch change within a block); the POC never emits it.
 
@@ -139,13 +138,17 @@ parapet `#FB8C00`, transition `#D81B60`, unspecified `#26A69A`. Facet fill: flat
 
 ## 5. Fixtures (the contract tests)
 
-`fixtures/site1_truth.json`: the Roofr report for the sample building, hand-digitised
-(from the research `ground-truth` agent), in THIS schema with `source.method: "manual"`.
 `fixtures/site1_lidar.json`: what the service produced. `fixtures/synthetic_hip.json`,
-`fixtures/synthetic_gable.json`, `fixtures/synthetic_flat_parapet.json`: closed-form cases
+`fixtures/synthetic_gable.json`, `fixtures/synthetic_flat_parapet.json`, `fixtures/synthetic_flat_curbs.json`, `fixtures/synthetic_hip_zigzag.json`: closed-form cases
 with known totals. `fixtures/site1_blocks.json` (schema `bond.roof_blocks/0.1`) and
-`fixtures/solar_site1_fixture.json` (a synthetic Solar response) are inputs to the service,
+`fixtures/synthetic_solar_response.json` (a synthetic Solar response) are inputs to the service,
 not roof models; consumers filter on the `schema` string. Dart `bond_roof` tests load every
 roof-model fixture and check: schema parses,
 totals recompute from facets and edges within 0.5 sq ft / 0.05 ft, every edge type in the
 palette, diagrams render without throwing and hide no more than 30% of labels.
+
+## 6. 0.2 envelope
+
+The service answers with a `result` whose `contract` is `bond.roof_model/0.2`; `result.model` is a roof model in the
+schema above (0.1, unchanged). The 0.2 envelope adds the job state, the verifier verdict, `warnings[]` with parallel `warning_codes[]` and
+the error object. See `docs/contract-0.2.md`. Every rule in this document still applies to `result.model`.

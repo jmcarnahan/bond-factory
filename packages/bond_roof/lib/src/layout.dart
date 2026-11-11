@@ -189,6 +189,12 @@ Pt roofCentroid(RoofModel m) {
   return (x: (b.min.x + b.max.x) / 2, y: (b.min.y + b.max.y) / 2);
 }
 
+/// Shrinks [size] (never below [minSize]) until [text] fits in [maxWidth].
+double fitSize(String text, double maxWidth, double size, double minSize, {bool bold = false}) {
+  final w = textWidth(text, size, bold: bold);
+  return w <= maxWidth ? size : math.max(minSize, size * maxWidth / w);
+}
+
 /// Greedy word wrap using Helvetica metrics.
 List<String> wrapText(String text, double maxWidth, double size, {bool bold = false}) {
   final lines = <String>[];
@@ -209,13 +215,8 @@ List<String> wrapText(String text, double maxWidth, double size, {bool bold = fa
 /// Scale factor for a scene relative to the 1600 x 1000 design size.
 double sceneScale(double width, double height) => math.max(0.4, math.min(width / 1600, height / 1000));
 
-const footerLength = 'Measurements in diagram are rounded for display. '
-    'Some edge lengths may be hidden to avoid overcrowding.';
-const footerArea = 'Areas in diagram are rounded to the nearest square foot for display. '
-    'Pitch is rounded to the nearest half.';
-
 /// Adds a compass rose centred at [c] with radius [r] (north up).
-void addCompass(List<Prim> out, Pt c, double r, DiagramStyle style, double k) {
+void addCompass(List<Prim> out, Pt c, double r, DiagramStyle style, double k, {String north = 'N'}) {
   final n = (x: c.x, y: c.y - r);
   final s = (x: c.x, y: c.y + r);
   final w = r * 0.28;
@@ -234,7 +235,7 @@ void addCompass(List<Prim> out, Pt c, double r, DiagramStyle style, double k) {
     ))
     ..add(TextPrim(
       at: (x: c.x, y: c.y - r - 13 * k),
-      text: 'N',
+      text: north,
       size: 16 * k,
       color: style.textColor,
       bold: true,
@@ -242,8 +243,9 @@ void addCompass(List<Prim> out, Pt c, double r, DiagramStyle style, double k) {
 }
 
 /// Adds the footer line, left aligned, at the bottom of the scene.
-void addFooter(List<Prim> out, String text, double width, double height, DiagramStyle style, double k) {
-  final size = 13 * k;
+void addFooter(List<Prim> out, String text, double width, double height, DiagramStyle style, double k,
+    {double? size}) {
+  size ??= 13 * k;
   final lines = wrapText(text, width - 48 * k - 150 * k, size);
   for (final (i, l) in lines.indexed) {
     out.add(TextPrim(

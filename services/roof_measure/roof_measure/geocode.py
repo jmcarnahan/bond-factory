@@ -59,5 +59,5 @@ def geocode(address: str) -> Geocoded:
     try:
         payload = cache.fetch_json(CENSUS_URL, params=params, max_age_s=30 * cache.DAY, timeout=30)
     except cache.NET_ERRORS as e:  # network or HTTP failure
-        raise GeocodeError(f"The Census geocoder could not be reached ({e}).") from e
+        raise GeocodeError(f"The Census geocoder could not be reached ({cache.describe_error(e)}).") from e
     return parse_census(payload, address)
