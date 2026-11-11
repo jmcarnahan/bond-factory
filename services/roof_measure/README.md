@@ -1,9 +1,9 @@
 # roof_measure
 
-Private Python service: address -> footprint + USGS 3DEP LiDAR (+ Google Solar, + an LLM verifier) -> a roof
-measurement envelope `bond.roof_model/0.2` (`bond.roof_model/0.1` model inside), behind an async job API.
-Apps call it over HTTP only; the straight skeleton uses CGAL through compas_cgal (GPL), so the code is not
-linked into any app. API and envelope: [docs/contract-0.2.md](../../docs/contract-0.2.md).
+Python library and private service: address -> footprint + USGS 3DEP LiDAR (+ Google Solar, + an LLM verifier) -> a
+roof measurement envelope `bond.roof_model/0.2` (`bond.roof_model/0.1` model inside). Apps either call
+`roof_measure.measure()` in-process or call the service over its async job API. The straight skeleton uses CGAL
+through compas_cgal (GPL), so the library is GPL-3.0-or-later as well. API and envelope: [docs/contract-0.2.md](../../docs/contract-0.2.md).
 
 ## Run locally
 
@@ -25,9 +25,28 @@ ASCII characters) the process prints one line and exits with status 1. The start
 which is what the image passes to uvicorn; uvicorn's own line shows the address it bound. Debug fixture routes and request fields exist only with
 `ROOF_MEASURE_DEBUG=1`. Environment variables: [contract Appendix A](../../docs/contract-0.2.md).
 
+## Use as a library
+
+For development here, `make setup` installs `.[dev,service,render]`. A consumer installs only the core (no
+fastapi, uvicorn or matplotlib); pin a full SHA, see [contract §3.1](../../docs/contract-0.2.md).
+
+```python
+from roof_measure import measure, MeasureError
+
+try:
+    envelope = measure("100 Example Ave, Sampletown, CA 90000", cache_dir="/var/cache/roof",
+                       anthropic_api_key=None, on_stage=print)
+except MeasureError as e:          # e.code, e.message, e.retryable
+    print(e.to_dict())
+```
+
+`measure()` blocks for up to `deadline_s + 30` s: run it off the request thread, in a pool of one or two. Signature,
+errors, isolation and caching: [docs/contract-0.2.md section 3](../../docs/contract-0.2.md).
+
 ## Docker and Railway
 
-Build context is the repository root (uv workspace lock, shared fixtures):
+Build context is the repository root (uv workspace lock, shared fixtures). The image installs the `service` and
+`render` extras on top of the core dependencies:
 
 ```
 docker buildx build --platform linux/amd64 -f services/roof_measure/Dockerfile -t roof-measure .

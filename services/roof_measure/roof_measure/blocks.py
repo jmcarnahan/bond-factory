@@ -24,7 +24,6 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import matplotlib
 import numpy as np
 import shapely
 from scipy import ndimage
@@ -36,9 +35,6 @@ from shapely.ops import unary_union
 
 from .frame import FT_PER_M, M_PER_FT, Frame
 from .lidar import MIN_ROOF_DENSITY, LidarTooSparse, PointCloud, acquired_range
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -152,6 +148,11 @@ class BlockSet:
 
     def save_debug_png(self, path: str | Path) -> None:
         """Points by z, block polygons labelled with id/area/kind/pitch, borders in red/orange."""
+        import matplotlib  # lazy: the `render` extra
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         fw, fh = _bbox_size_ft(self.footprint_m)
         fig, ax = plt.subplots(figsize=(14, min(10.0, max(4.0, 14 * fh / max(fw, 1.0) + 2.0))))

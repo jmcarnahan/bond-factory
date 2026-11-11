@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Licence: MIT (LICENSE file added). It was GPL-3.0-or-later with the rest of the repository;
+  no code changes.
+
 ## 0.2.0 (2026-11-11)
 - Added `RoofMeasurement` (0.2 envelope: model, `RoofEnvelopeTotals`, `RoofVerification`, `RoofVerdict`,
   confidence score, warnings, `warningCodes`, `extra`) with `fromJson`, `toJson`, `fromModel` and

@@ -8,7 +8,7 @@ ADDR ?= 100 Example Ave, Sampletown, CA 90000
 .PHONY: setup test lint measure serve fixtures
 setup:  # always the module venv, never the root fallback
 	uv venv .venv --python 3.12 --seed >/dev/null || python3 -m venv .venv
-	uv pip install --python .venv/bin/python -e ".[dev]" || .venv/bin/pip install -e ".[dev]"
+	uv pip install --python .venv/bin/python -e ".[dev,service,render]" || .venv/bin/pip install -e ".[dev,service,render]"
 
 test:
 	$(PY) -m pytest -q

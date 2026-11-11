@@ -8,7 +8,7 @@ from typing import Any
 
 from .version import CONTRACT, PIPELINE_VERSION
 
-WARNING_CODES = ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "parcel_without_building",
+WARNING_CODES = ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
                  "other_buildings_on_parcel", "low_point_density", "method_fallback", "verifier_unverified",
                  "verifier_adjusted", "verifier_failed", "verifier_timeout", "solar_segments_only",
                  "flat_roof_assumed", "other")

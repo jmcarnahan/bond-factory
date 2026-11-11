@@ -8,6 +8,7 @@ adapters (see `docs/decisions/2026-11-08-shared-modules-policy.md`).
 
 Toolchain: this branch and CI use Flutter 3.47.8 / Dart 3.13.7; the packages' floor is Flutter 3.41 and Dart ^3.11.
 Apps still on Flutter 3.47.2 should bump when they adopt a module.
+The two roof packages, `bond_roof` and `bond_roof_ui`, are MIT licensed; the other modules are GPL-3.0-or-later.
 
 ```yaml
 dependencies:
@@ -60,6 +61,14 @@ pubspec_overrides.yaml
 python = ">=3.12,<3.14"   # bond_storage requires it; "^3.12" fails `poetry lock`
 bond_storage = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "<sha>", subdirectory = "libs/bond_storage" }
 ```
+
+The roof pipeline is importable the same way:
+
+```toml
+roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "<sha>", subdirectory = "services/roof_measure" }
+```
+
+- roof-measure is GPL-3.0-or-later (CGAL through compas_cgal); the Dart packages bond_roof and bond_roof_ui are MIT. See docs/contract-0.2.md §3 for the library API.
 
 - The python image stage needs git: `apt-get update && apt-get install -y --no-install-recommends git`.
 - Alternative: every CI run builds one wheel per lib; tagged runs (`v*`) attach them to the GitHub Release.

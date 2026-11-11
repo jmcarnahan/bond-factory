@@ -70,3 +70,20 @@ Measured 2026-11-11 with `tools/spike_verifier.py --fixtures` against the live A
 
 About $0.013 and 4–6 s per roof: the $0.05 and 30 s targets hold with a 4× cost margin and 6× time margin. The
 zigzag eave (seven segments) was merged into one 35.0 ft line and the verdict came back `adjusted` as designed.
+
+## 4. Library install in python:3.12.9-slim (linux/amd64)
+
+Method: `python:3.12.9-slim` built with `--platform linux/amd64`; `apt-get install git`; no libgomp1;
+`pip install "roof-measure @ git+https://github.com/jmcarnahan/bond-factory.git@<phase-1 sha>#subdirectory=services/roof_measure"`;
+then `measure()` on the blocks fixture with `isolate=True` and `verify=False`.
+
+| metric | value |
+|---|---|
+| install seconds | TBD (phase 2) |
+| site-packages size | TBD (phase 2) |
+| image size | TBD (phase 2) |
+| cold `import roof_measure.pipeline`, seconds | TBD (phase 2) |
+| `measure()` seconds, blocks fixture, `isolate=True` | TBD (phase 2) |
+| child peak RSS | TBD (phase 2) |
+
+The compas_cgal wheel needs no libgomp1 (verified 2026-11-11 on bookworm), and there is no linux aarch64 wheel.

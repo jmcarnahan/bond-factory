@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import cache
+from . import cache, config
 from .classify import BlockSet, Classification, RoofBlock, classify_blocks
 from .deadline import Deadline
 from .envelope import build_envelope, cap_verification, totals_from_model
@@ -30,7 +29,7 @@ from .pipeline_stages import (  # noqa: F401
     _stage_footprint,
     parse_address,
 )
-from .render import render_png, slug
+from .text import slug
 
 log = logging.getLogger("roof_measure.pipeline")
 
@@ -54,6 +53,13 @@ class PipelineResult:
 
 def _noop(_stage: str) -> None:
     return None
+
+
+def render_png(model: dict[str, Any], path: str | Path) -> Path:
+    """The debug picture; imported on use because it needs the ``render`` extra (matplotlib)."""
+    from . import render as render_mod
+
+    return render_mod.render_png(model, path)
 
 
 def _no_verification(model: dict[str, Any], note: str) -> dict[str, Any]:
@@ -83,7 +89,7 @@ def run_pipeline(address: str, out_dir: str | Path, method: str = "lidar_skeleto
                  no_agent: bool = False, max_rounds: int = 12, merge_flats: bool = False,
                  client: Any | None = None, deadline: Deadline | None = None,
                  lat_lng: tuple[float, float] | None = None, on_stage: Callable[[str], None] | None = None,
-                 verify: bool = True) -> PipelineResult:
+                 verify: bool = True, render: bool = True) -> PipelineResult:
     """Run the whole pipeline for one address; writes ``<slug>_{blocks,model}.json`` and ``.png`` into ``out_dir``.
 
     ``method="auto"`` is D12: ``lidar_skeleton``, falling back to ``solar_agent`` when LiDAR is missing or too
@@ -92,12 +98,12 @@ def run_pipeline(address: str, out_dir: str | Path, method: str = "lidar_skeleto
     if method == "auto":
         return _run_auto(address, out_dir, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
                          max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline,
-                         lat_lng=lat_lng, on_stage=on_stage, verify=verify)
+                         lat_lng=lat_lng, on_stage=on_stage, verify=verify, render=render)
     if method not in METHODS:
         raise PipelineError(f"method must be one of {METHODS + ('auto',)}")
     return _run(address, out_dir, method, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
                 max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline, lat_lng=lat_lng,
-                on_stage=on_stage or _noop, verify=verify, fallback_from=None)
+                on_stage=on_stage or _noop, verify=verify, render=render, fallback_from=None)
 
 
 def _run_auto(address: str, out_dir: str | Path, *, on_stage: Callable[[str], None] | None, **kw: Any) -> PipelineResult:
@@ -105,8 +111,7 @@ def _run_auto(address: str, out_dir: str | Path, *, on_stage: Callable[[str], No
     try:
         return _run(address, out_dir, "lidar_skeleton", on_stage=stage, fallback_from=None, **kw)
     except Exception as exc:
-        has_keys = bool(os.environ.get("ANTHROPIC_API_KEY") or kw.get("client")) and any(
-            os.environ.get(n) for n in SOLAR_KEY_ENV)
+        has_keys = bool(config.anthropic_key() or kw.get("client")) and bool(config.solar_key())
         if type(exc).__name__ not in FALLBACK_ERRORS or not has_keys:
             raise
         log.info("auto: LiDAR failed (%s); falling back to solar_agent", type(exc).__name__)
@@ -127,7 +132,7 @@ def _run(address: str, out_dir: str | Path, method: str, **kw: Any) -> PipelineR
 def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: str | Path | None,
          solar_fixture: str | Path | None, no_agent: bool, max_rounds: int, merge_flats: bool, client: Any | None,
          deadline: Deadline | None, lat_lng: tuple[float, float] | None, on_stage: Callable[[str], None],
-         verify: bool, fallback_from: str | None) -> PipelineResult:
+         verify: bool, fallback_from: str | None, render: bool = True) -> PipelineResult:
     from . import agent as agent_mod
     from . import solar
 
@@ -207,14 +212,21 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
              "png": out / f"{tag}_model.png"}
     base.extra.pop("_geo", None)
     base.save(paths["blocks"])
-    model["debug"]["png"] = paths["png"].name
+    if render:
+        model["debug"]["png"] = paths["png"].name
+    else:
+        paths.pop("png")
     write_model(model, paths["model"])
-    try:
-        render_png(model, paths["png"])
-    except Exception as exc:  # the debug picture never fails a finished measurement
-        log.warning("render failed: %s", type(exc).__name__, exc_info=True)
-        paths.pop("png", None)
-        extra_warnings.append(("other", "The debug picture could not be rendered."))
+    if render:
+        try:
+            render_png(model, paths["png"])
+        except ImportError:  # the `render` extra (matplotlib) is not installed: skip the picture, no warning
+            log.info("render skipped: matplotlib is not installed")
+            paths.pop("png", None)
+        except Exception as exc:  # the debug picture never fails a finished measurement
+            log.warning("render failed: %s", type(exc).__name__, exc_info=True)
+            paths.pop("png", None)
+            extra_warnings.append(("other", "The debug picture could not be rendered."))
     if verify:  # empty list when only the deterministic merge ran
         paths["verifier_transcript"] = out / "verifier_transcript.json"
         paths["verifier_transcript"].write_text(json.dumps(verifier_transcript, indent=1, default=str))
@@ -238,14 +250,14 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
 def _run_agent(agent_mod: Any, base: BlockSet, evidence: list[dict[str, Any]] | None, kind: str,
                client: Any | None, max_rounds: int, imagery: dict[str, Any] | None,
                deadline: Deadline | None = None) -> Any:
-    if client is None and not os.environ.get("ANTHROPIC_API_KEY"):
-        raise PipelineError("The agent needs ANTHROPIC_API_KEY in the environment. Pass --no-agent for the "
-                            "deterministic path.")
+    if client is None and not config.anthropic_key():
+        raise PipelineError("The agent method needs an Anthropic API key (the anthropic_api_key argument or "
+                            "ANTHROPIC_API_KEY).")
     try:
         return agent_mod.run_agent(base, evidence, kind=kind, client=client, max_rounds=max_rounds, imagery=imagery,
                                   deadline=deadline)
     except agent_mod.AgentError as exc:
-        raise PipelineError(f"The agent failed: {exc}. Re-run with --no-agent for the deterministic path.") from exc
+        raise PipelineError(f"The agent failed: {exc}.") from exc
 
 
 def _transcript(res: Any) -> dict[str, Any]:

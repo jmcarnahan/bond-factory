@@ -92,3 +92,8 @@ whose `schema` or `contract` matches; other files are skipped. A generated fixtu
   vertices and edge crossings near the box are checked, not a chord spanning the whole box.
 - `pitchLabel` of a non-finite rise prints "Flat".
 - Predominant pitch is a half-pitch bucket (flat is 0); ties go to the lower pitch.
+
+## License
+
+MIT, see `LICENSE` in this directory (Copyright (c) 2026 John Carnahan). The rest of the bond-factory
+repository is GPL-3.0-or-later; this package does not depend on any of it. Third-party notices: `lib/src/polylabel.dart` is a port of Mapbox polylabel under the ISC licence (notice in the file header).

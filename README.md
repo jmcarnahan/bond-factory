@@ -48,7 +48,7 @@ Apps consume these modules as described in `docs/sdk/README.md`.
 |---|---|---|
 | `packages/bond_roof` | pure Dart: roof model JSON, totals, diagram scenes, SVG and PDF export | 0.2.0 |
 | `packages/bond_roof_ui` | Flutter: widgets that draw a scene, print and share | 0.2.0 |
-| `services/roof_measure` | Python: address -> footprint + LiDAR (+ Solar) -> roof model JSON | 0.2.0 |
+| `services/roof_measure` | Python: address -> footprint + LiDAR (+ Solar) -> roof model JSON; also importable as a library | 0.2.0 |
 | `demos/roof_demo` | Flutter: type an address, see the three diagrams, print | POC |
 
 ## House rules
@@ -59,4 +59,4 @@ no code generation (no build_runner, freezed, json_serializable); hand-written `
 
 ## Licensing
 
-The repository is licensed under GPL-3.0-or-later (see `LICENSE` and `NOTICE`). The roof service links compas_cgal, which pulls in a GPL component of CGAL, so one licence covers the whole repo for now. The Roboto font in `packages/bond_roof_ui/assets/fonts/` keeps its own Apache-2.0 licence. This choice may change later, and nothing here is a claim that it is legally sufficient for any particular use. Pinning the Dart packages by git brings GPL-3.0-or-later into the consuming app, so each app's licensing must account for it.
+The repository and the roof pipeline (`services/roof_measure`, because it links compas_cgal and a GPL component of CGAL) are licensed under GPL-3.0-or-later (see `LICENSE` and `NOTICE`). `packages/bond_roof` and `packages/bond_roof_ui` are MIT (their own `LICENSE` files). The Roboto font in `packages/bond_roof_ui/assets/fonts/` keeps its own Apache-2.0 licence. Pinning `bond_roof` or `bond_roof_ui` by git brings MIT code into an app. Importing `roof_measure` as a Python library brings GPL-3.0-or-later code into that backend. Nothing here is a claim that it is legally sufficient for any particular use.

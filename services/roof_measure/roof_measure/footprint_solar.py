@@ -8,13 +8,12 @@ source ``solar``, caps the confidence at 0.5 and never lets the verdict be ``pas
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from shapely.geometry import MultiPoint, Polygon
 from shapely.geometry.polygon import orient
 
-from . import solar
+from . import config, solar
 from .deadline import Deadline
 from .errors import is_transient
 from .footprint_types import Footprint, FootprintUnavailable, area_sqft
@@ -25,7 +24,8 @@ SOLAR_NOTE = ("Footprint estimated from Google Solar roof segments (convex hull 
 
 
 def solar_key(env: dict[str, str] | None = None) -> str | None:
-    env = os.environ if env is None else env
+    if env is None:
+        return config.solar_key()
     for name in ("GOOGLE_SOLAR_API_KEY",):
         if env.get(name):
             return env[name]

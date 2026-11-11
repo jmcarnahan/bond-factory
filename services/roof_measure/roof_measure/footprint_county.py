@@ -101,7 +101,7 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
     except cache.NET_ERRORS as e:
         # An unreachable layer is NOT "outside the county": say so on whatever footprint replaces it.
         log.info("LA County parcel query failed: %s", cache.describe_error(e))
-        return None, [("other", "LA County layer unreachable; footprint from OpenStreetMap.")], "LA County layer unreachable"
+        return None, [("source_unreachable", "LA County layer unreachable; footprint from OpenStreetMap.")], "LA County layer unreachable"
     parcels = [f for f in parcels if f.get("geometry")]
     if not parcels:
         return None, [], None  # genuinely outside the county layer
@@ -121,7 +121,7 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
         log.info("LA County building query failed: %s", cache.describe_error(e))
         text = (f"The LA County building layer could not be queried ({cache.describe_error(e)}); "
                 "footprint taken from another source.")
-        return None, [*warnings, ("other", text)], "LA County building layer unreachable"
+        return None, [*warnings, ("source_unreachable", text)], "LA County building layer unreachable"
     c = parcel_poly.centroid
     epsg = utm_epsg_for(c.x, c.y)
     parcel_m = project_geometry(parcel_poly, 4326, epsg)

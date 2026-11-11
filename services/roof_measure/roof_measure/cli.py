@@ -19,7 +19,7 @@ import requests
 
 from .model import ModelError
 from .pipeline import PipelineError, PipelineResult, run_pipeline  # noqa: F401  (re-exported)
-from .render import ft_in
+from .text import ft_in
 
 log = logging.getLogger(__name__)
 
