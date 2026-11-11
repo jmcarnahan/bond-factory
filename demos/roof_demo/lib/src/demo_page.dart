@@ -18,7 +18,10 @@ class _Loaded {
 
 /// The single screen: address, method, measure, fixtures, report.
 class DemoPage extends StatefulWidget {
-  const DemoPage({super.key});
+  const DemoPage({super.key, this.service});
+
+  /// The service client; tests pass one backed by a fake HTTP client.
+  final ServiceClient? service;
 
   @override
   State<DemoPage> createState() => _DemoPageState();
@@ -26,7 +29,7 @@ class DemoPage extends StatefulWidget {
 
 class _DemoPageState extends State<DemoPage> {
   final _address = TextEditingController(text: DemoTokens.defaultAddress);
-  final _service = ServiceClient();
+  late final ServiceClient _service = widget.service ?? ServiceClient();
   MeasureMethod _method = MeasureMethod.auto;
   bool _busy = false;
   bool _spanish = false;
@@ -95,7 +98,11 @@ class _DemoPageState extends State<DemoPage> {
   }
 
   Future<void> _measure() {
-    _selected = null;
+    // A new measurement starts from a clean page: no stale report under an error.
+    setState(() {
+      _selected = null;
+      _loaded = null;
+    });
     return _run(
       _method.label,
       () => _service.measure(

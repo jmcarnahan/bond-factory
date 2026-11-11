@@ -16,7 +16,8 @@ from shapely.geometry.polygon import orient
 
 from . import solar
 from .deadline import Deadline
-from .footprint_types import Footprint, area_sqft
+from .errors import is_transient
+from .footprint_types import Footprint, FootprintUnavailable, area_sqft
 
 log = logging.getLogger(__name__)
 SOLAR_NOTE = ("Footprint estimated from Google Solar roof segments (convex hull of segment boxes); "
@@ -60,11 +61,13 @@ def footprint_from_insights(insights: dict[str, Any]) -> Footprint | None:
 
 
 def fetch_solar(lat: float, lng: float, key: str, deadline: Deadline | None = None) -> Footprint | None:
-    """None when Solar has no building here (or is disabled); the chain then tries the next link."""
+    """None when Solar has no building here (or is disabled); FootprintUnavailable on an outage."""
     timeout = deadline.timeout(20.0) if deadline else 20.0
     try:
         insights = solar.fetch_building_insights(lat, lng, key, timeout=timeout)
     except solar.SolarUnavailable as exc:
         log.info("Solar footprint unavailable: %s", type(exc).__name__)
+        if is_transient(exc):  # 429, 5xx, connection: an outage, not "Solar has no building here"
+            raise FootprintUnavailable("Google Solar could not be reached") from None
         return None
     return footprint_from_insights(insights)

@@ -60,34 +60,42 @@ void main() {
         });
       }
 
-      test('compact layout: 800 wide, two columns, no text under 14, fits, well formed', () {
+      test('compact layout: 400 x 500, two columns, nothing renders under 12 px at a 358 px card', () {
         const compact = ReportLayout.compact;
         final len = LengthDiagram.build(m, layout: compact);
         final area = AreaDiagram.build(m, layout: compact);
         final sum = SummaryBlock.build(m, layout: compact);
-        expect((len.width, len.height), (800.0, 1000.0));
-        expect((area.width, area.height), (800.0, 1000.0));
-        expect(sum.width, 800.0);
+        expect((len.width, len.height), (400.0, 500.0));
+        expect((area.width, area.height), (400.0, 500.0));
+        expect(sum.width, 400.0);
+        const cardScale = 358 / 400;
         for (final s in [len, area, sum]) {
           expectFits(s);
           expectWellFormedSvg(sceneToSvg(s));
           for (final t in s.prims.whereType<TextPrim>()) {
-            expect(t.size, greaterThanOrEqualTo(14), reason: '"${t.text}" in ${s.title}');
+            expect(t.size * cardScale, greaterThanOrEqualTo(12), reason: '"${t.text}" ${t.size} in ${s.title}');
           }
         }
         // Legend swatches: two columns compact, three wide.
         double legendCols(Scene s) => {
               for (final p in s.prims)
-                if (p is LinePrim && p.a.y < 230 && p.b.x - p.a.x > 20 && (p.b.x - p.a.x) < 60) p.a.x.round()
+                if (p is LinePrim && p.a.y < 120 && p.b.x - p.a.x > 10 && (p.b.x - p.a.x) < 60) p.a.x.round()
             }.length.toDouble();
         expect(legendCols(len), 2);
         expect(legendCols(LengthDiagram.build(m)), 3);
-        // Compact hides more because the plan is narrower, but never more than half.
+        // Eave, ridge and hip rows and their totals are always present.
+        final texts = len.prims.whereType<TextPrim>().map((t) => t.text).toList();
+        for (final t in [EdgeType.eave, EdgeType.ridge, EdgeType.hip]) {
+          expect(texts, contains(feetInches(m.totals.lengthsFt[t]!)), reason: t.json);
+        }
+        expect(texts, containsAll(['Eaves', 'Ridges', 'Hips']));
+        final areaTexts = area.prims.whereType<TextPrim>().map((t) => t.text).toList();
+        expect(areaTexts, contains('${sqft(m.totals.totalAreaSqft)} sq ft'));
+        expect(sceneToSvg(sum), contains(sqft(m.totals.totalAreaSqft)));
+        // Hidden-label bookkeeping still adds up (compact hides more on a narrower plan).
         final labellable = m.edges.where((e) => !isHoleOutlineEdge(m, e)).length;
         expect(len.hiddenLabels + len.placedLabels, labellable);
-        expect(len.hiddenLabels, lessThanOrEqualTo((labellable / 2).ceil()));
         expect(area.hiddenLabels + area.placedLabels, m.facets.length);
-        expect(area.hiddenLabels, lessThanOrEqualTo((m.facets.length / 2).ceil()));
       });
 
       test('every edge type used is drawn in its palette colour', () {

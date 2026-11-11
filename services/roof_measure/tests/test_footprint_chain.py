@@ -37,36 +37,6 @@ def osm_way(i, dlat=2 * D, dlng=2 * D, tags=None):
             "geometry": [{"lat": y, "lon": x} for x, y in pts]}
 
 
-class Net:
-    """Routes cache.fetch_json by URL fragment; a value can be a dict, an exception, or a callable."""
-
-    def __init__(self):
-        self.routes, self.calls = {}, []
-
-    def __call__(self, url, **kw):
-        self.calls.append((url, kw))
-        for frag, val in self.routes.items():
-            if frag in url:
-                if callable(val):
-                    return val(url, kw)
-                if isinstance(val, Exception):
-                    raise val
-                return val
-        raise AssertionError(f"unexpected request {url}")
-
-    def urls(self):
-        return [u for u, _ in self.calls]
-
-
-@pytest.fixture
-def net(monkeypatch):
-    n = Net()
-    monkeypatch.setattr(cache, "fetch_json", n)
-    monkeypatch.delenv("GOOGLE_SOLAR_API_KEY", raising=False)
-    monkeypatch.setattr(footprint, "fetch_hull", lambda *a, **k: (_ for _ in ()).throw(FootprintError("no lidar")))
-    return n
-
-
 def county_ok(net, buildings=None, parcels=None):
     net.routes["LACounty_Parcel"] = {"features": parcels if parcels is not None else [parcel()]}
     net.routes["Countywide_Building_Outlines"] = {"features": buildings if buildings is not None else [building()]}
@@ -309,7 +279,7 @@ def test_osm_outage_is_a_skipped_link_the_hull_still_runs(net, monkeypatch):
 def test_a_used_up_stage_cap_does_not_stop_the_chain(net, monkeypatch):
     net.routes["LACounty_Parcel"] = {"features": []}
     for u in footprint_osm.OVERPASS_URLS:
-        net.routes[u] = {"elements": []}
+        net.routes[u] = lambda url, kw: time.sleep(0.3) or {"elements": []}  # slower than the zero stage cap: no race
     monkeypatch.setenv("GOOGLE_SOLAR_API_KEY", "k")
     monkeypatch.setattr(footprint, "FOOTPRINT_STAGE_S", 0.0)
     called = []
@@ -320,8 +290,9 @@ def test_a_used_up_stage_cap_does_not_stop_the_chain(net, monkeypatch):
         raise FootprintError("no smooth roof")
 
     monkeypatch.setattr(footprint, "fetch_hull", hull)
-    with pytest.raises(FootprintError, match="No building footprint"):
+    with pytest.raises(FootprintError, match="could not be reached") as e:  # OSM timed out: an outage, not a miss
         footprint.fetch_footprint(LAT, LNG, ADDR, deadline=Deadline.after(100))
+    assert isinstance(e.value, footprint.FootprintUnavailable)
     assert called == ["hull"]  # solar skipped (stage spent), hull still attempted
 
 

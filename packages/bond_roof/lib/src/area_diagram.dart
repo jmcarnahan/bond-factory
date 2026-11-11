@@ -27,23 +27,24 @@ class AreaDiagram {
     width ??= layout.designWidth;
     height ??= layout.designHeight;
     final k = layoutScale(layout, width, height);
+    final sp = LayoutSpec(layout, k);
     final prims = <Prim>[];
     final t = m.totals;
 
     final title = m.address.display.isEmpty ? labels.areaTitle : m.address.display;
     prims
       ..add(TextPrim(
-        at: (x: 48 * k, y: 40 * k),
+        at: (x: sp.margin, y: sp.titleY),
         text: title,
-        size: fitSize(title, width - 96 * k, 25 * k, 16 * k, bold: true),
+        size: fitSize(title, width - 2 * sp.margin, sp.titleSize, sp.titleMin, bold: true),
         color: style.textColor,
         anchor: TextAnchor.start,
         bold: true,
       ))
       ..add(TextPrim(
-        at: (x: 48 * k, y: 66 * k),
+        at: (x: sp.margin, y: sp.captionY),
         text: labels.areaCaption,
-        size: 14 * k,
+        size: sp.captionSize,
         color: 0xFF757575,
         anchor: TextAnchor.start,
       ));
@@ -60,24 +61,33 @@ class AreaDiagram {
       (labels.unspecifiedPitchArea, null),
     ];
     final cols = layout.figureColumns;
-    final colW = (width - 96 * k) / cols;
+    final colW = (width - 2 * sp.margin) / cols;
     final rows = ReportLayout.rowsFor(cells.length, cols);
     for (final (i, c) in cells.indexed) {
-      final x0 = 48 * k + (i % cols) * colW, y0 = (96 + (i ~/ cols) * 58) * k;
+      final x0 = sp.margin + (i % cols) * colW, y0 = sp.areaHeaderTop + (i ~/ cols) * sp.areaRowPitch;
+      final capText = layout == ReportLayout.wide ? c.$1 : ellipsize(c.$1, colW - 6, sp.areaCaptionSize);
       prims
-        ..add(TextPrim(at: (x: x0, y: y0), text: c.$1, size: layout.textSize(13, k), color: 0xFF757575, anchor: TextAnchor.start))
+        ..add(TextPrim(at: (x: x0, y: y0), text: capText, size: sp.areaCaptionSize, color: 0xFF757575, anchor: TextAnchor.start))
         ..add(TextPrim(
-          at: (x: x0, y: y0 + 24 * k),
+          at: (x: x0, y: y0 + sp.areaValueDy),
           text: c.$2 ?? labels.notAvailable,
-          size: 22 * k,
+          size: sp.areaValueSize,
           color: c.$2 == null ? 0xFF9E9E9E : style.textColor,
           anchor: TextAnchor.start,
           bold: true,
         ));
     }
 
-    final area = (l: 56 * k, t: (98 + rows * 58) * k, r: width - 56 * k, b: height - 96 * k);
-    final fit = PlanFit(m, left: area.l + 12 * k, top: area.t + 18 * k, right: area.r - 12 * k, bottom: area.b - 12 * k);
+    final footer = footerLines(labels.footerArea, width, sp);
+    final bottomReserve = layout == ReportLayout.wide ? sp.planBottomMin : math.max(sp.planBottomMin, footerHeight(footer, sp));
+    final area = (
+      l: sp.planSide,
+      t: sp.areaHeaderTop + sp.areaPlanPad + rows * sp.areaRowPitch,
+      r: width - sp.planSide,
+      b: height - bottomReserve,
+    );
+    final fit = PlanFit(m,
+        left: area.l + sp.planInsetX, top: area.t + sp.planInsetTop, right: area.r - sp.planInsetX, bottom: area.b - sp.planInsetBottom);
     final polys = [for (final f in m.facets) fit.mapAll(f.polygon)];
     final holes = [for (final h in m.holes) fit.mapAll(h.polygon)];
     for (final (i, f) in m.facets.indexed) {
@@ -99,7 +109,7 @@ class AreaDiagram {
 
     // Facet labels at the pole of inaccessibility; shrink the text until the label box fits
     // inside the facet, hide it if it never does.
-    final maxSize = math.max(layout.minLabelSize, style.fontSize * 1.2 * k);
+    final maxSize = layout == ReportLayout.wide ? math.max(layout.minLabelSize, style.fontSize * 1.2 * k) : 16.0;
     final minSize = layout == ReportLayout.wide ? 8.5 * k : layout.minLabelSize;
     var hidden = 0, placed = 0;
     final labelPrims = <Prim>[];
@@ -151,8 +161,8 @@ class AreaDiagram {
     }
     prims.addAll(labelPrims);
 
-    addCompass(prims, (x: width - 76 * k, y: height - 54 * k), 28 * k, style, k, north: labels.compassNorth);
-    addFooter(prims, labels.footerArea, width, height, style, k, size: layout.textSize(13, k));
+    addCompass(prims, (x: width - sp.compassInsetX, y: height - sp.compassInsetY), sp, style, north: labels.compassNorth);
+    addFooter(prims, footer, height, style, sp);
 
     return Scene(
       width: width,

@@ -40,53 +40,59 @@ class LengthDiagram {
     width ??= layout.designWidth;
     height ??= layout.designHeight;
     final k = layoutScale(layout, width, height);
+    final sp = LayoutSpec(layout, k);
     final prims = <Prim>[];
 
     // Header: address, then the legend in columns (wide 4 + 3 + 3 rows, compact 5 + 5).
     final title = m.address.display.isEmpty ? labels.lengthTitle : m.address.display;
     prims
       ..add(TextPrim(
-        at: (x: 48 * k, y: 40 * k),
+        at: (x: sp.margin, y: sp.titleY),
         text: title,
-        size: fitSize(title, width - 96 * k, 25 * k, 16 * k, bold: true),
+        size: fitSize(title, width - 2 * sp.margin, sp.titleSize, sp.titleMin, bold: true),
         color: style.textColor,
         anchor: TextAnchor.start,
         bold: true,
       ))
       ..add(TextPrim(
-        at: (x: 48 * k, y: 66 * k),
+        at: (x: sp.margin, y: sp.captionY),
         text: labels.lengthCaption,
-        size: 14 * k,
+        size: sp.captionSize,
         color: 0xFF757575,
         anchor: TextAnchor.start,
       ));
     final cols = layout.legendColumns;
-    final colW = (width - 96 * k) / cols;
+    final colW = (width - 2 * sp.margin) / cols;
     final perCol = layout.legendRows;
     var idx = 0;
     for (var c = 0; c < cols; c++) {
       for (var r = 0; r < perCol[c]; r++) {
         final t = EdgeType.values[idx++];
-        final x0 = 48 * k + c * colW, y = (104 + r * 28) * k;
+        final x0 = sp.margin + c * colW, y = sp.legendTop + r * sp.legendPitch;
+        final value = feetInches(m.totals.lengthsFt[t] ?? 0, labels: labels);
+        final valueX = x0 + colW - sp.legendValueInset;
+        final nameX = x0 + sp.legendTextX;
         prims
           ..add(LinePrim(
             a: (x: x0, y: y),
-            b: (x: x0 + 34 * k, y: y),
+            b: (x: x0 + sp.swatchLen, y: y),
             color: style.colorOf(t),
             width: style.strokeWidth * k,
             dashed: style.dashedTypes.contains(t),
           ))
           ..add(TextPrim(
-            at: (x: x0 + 46 * k, y: y),
-            text: labels.edgeName(t),
-            size: 16 * k,
+            at: (x: nameX, y: y),
+            text: layout == ReportLayout.wide
+                ? labels.edgeName(t)
+                : ellipsize(labels.edgeName(t), valueX - textWidth(value, sp.legendSize, bold: true) - 6 - nameX, sp.legendSize),
+            size: sp.legendSize,
             color: style.textColor,
             anchor: TextAnchor.start,
           ))
           ..add(TextPrim(
-            at: (x: x0 + colW - 36 * k, y: y),
-            text: feetInches(m.totals.lengthsFt[t] ?? 0, labels: labels),
-            size: 16 * k,
+            at: (x: valueX, y: y),
+            text: value,
+            size: sp.legendSize,
             color: style.textColor,
             anchor: TextAnchor.end,
             bold: true,
@@ -95,9 +101,12 @@ class LengthDiagram {
     }
 
     // Plan.
-    final legendBottom = 104 + (perCol.reduce(math.max) - 1) * 28 + 26;
-    final area = (l: 56 * k, t: legendBottom * k, r: width - 56 * k, b: height - 96 * k);
-    final fit = PlanFit(m, left: area.l + 12 * k, top: area.t + 18 * k, right: area.r - 12 * k, bottom: area.b - 12 * k);
+    final footer = footerLines(labels.footerLength, width, sp);
+    final legendBottom = sp.legendTop + (perCol.reduce(math.max) - 1) * sp.legendPitch + sp.legendPlanPad;
+    final bottomReserve = layout == ReportLayout.wide ? sp.planBottomMin : math.max(sp.planBottomMin, footerHeight(footer, sp));
+    final area = (l: sp.planSide, t: legendBottom, r: width - sp.planSide, b: height - bottomReserve);
+    final fit = PlanFit(m,
+        left: area.l + sp.planInsetX, top: area.t + sp.planInsetTop, right: area.r - sp.planInsetX, bottom: area.b - sp.planInsetBottom);
     for (final f in m.facets) {
       prims.add(PolyPrim(
         pts: fit.mapAll(f.polygon),
@@ -127,7 +136,8 @@ class LengthDiagram {
 
     // Labels, longest edge first.
     final size = layout == ReportLayout.wide ? math.max(layout.minLabelSize, style.fontSize * k) : layout.minLabelSize;
-    final placer = LabelPlacer(edges: segs, area: (l: 8 * k, t: area.t, r: width - 8 * k, b: area.b + 8 * k));
+    final placer = LabelPlacer(
+        edges: segs, area: (l: sp.labelAreaSide, t: area.t, r: width - sp.labelAreaSide, b: area.b + sp.labelAreaSide));
     final centroid = fit.map(roofCentroid(m));
     final order = [for (var i = 0; i < m.edges.length; i++) i]
       ..sort((a, b) => segs[b].length.compareTo(segs[a].length));
@@ -159,8 +169,8 @@ class LengthDiagram {
     }
     prims.addAll(edgeLabels);
 
-    addCompass(prims, (x: width - 76 * k, y: height - 54 * k), 28 * k, style, k, north: labels.compassNorth);
-    addFooter(prims, labels.footerLength, width, height, style, k, size: layout.textSize(13, k));
+    addCompass(prims, (x: width - sp.compassInsetX, y: height - sp.compassInsetY), sp, style, north: labels.compassNorth);
+    addFooter(prims, footer, height, style, sp);
 
     return Scene(
       width: width,

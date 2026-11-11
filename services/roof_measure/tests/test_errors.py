@@ -7,9 +7,9 @@ from roof_measure import cache
 from roof_measure.blocks import BlocksError
 from roof_measure.deadline import DeadlineExceeded
 from roof_measure.errors import JOB_CODES, REQUEST_CODES, code_for, error_body, error_object, retryable_for
-from roof_measure.footprint_types import AmbiguousBuilding, FootprintError
-from roof_measure.geocode import GeocodeError
-from roof_measure.lidar import LidarError, LidarTooSparse
+from roof_measure.footprint_types import AmbiguousBuilding, FootprintError, FootprintUnavailable
+from roof_measure.geocode import GeocodeError, GeocodeUnavailable
+from roof_measure.lidar import LidarError, LidarTooSparse, LidarUnavailable
 from roof_measure.model import ModelError
 from roof_measure.pipeline import PipelineError
 from roof_measure.solar import SolarUnavailable
@@ -17,12 +17,15 @@ from roof_measure.solar import SolarUnavailable
 
 @pytest.mark.parametrize("exc,code", [
     (GeocodeError("The Census geocoder found no match for 'x'."), "address_not_found"),
-    (GeocodeError("The Census geocoder could not be reached (boom)."), "upstream_unavailable"),
+    (GeocodeUnavailable("The Census geocoder could not be reached (boom)."), "upstream_unavailable"),
+    (GeocodeError("The Census geocoder could not be reached (a user typed this)."), "address_not_found"),
+    (GeocodeError("no match for 100 Example Ave, timed out Connection"), "address_not_found"),
     (FootprintError("No building footprint found near x."), "no_footprint"),
-    (FootprintError("OpenStreetMap (Overpass) could not be reached, so no fallback."), "upstream_unavailable"),
+    (FootprintUnavailable("OpenStreetMap (Overpass) could not be reached, so no fallback."), "upstream_unavailable"),
+    (FootprintError("No building footprint found near 100 Example Ave, Timed Out Connection"), "no_footprint"),
     (AmbiguousBuilding("two buildings"), "ambiguous_building"),
     (LidarError("No USGS 3DEP LiDAR project covers this address."), "no_lidar_coverage"),
-    (LidarError("Could not list USGS 3DEP projects (timed out)."), "upstream_unavailable"),
+    (LidarUnavailable("Could not list USGS 3DEP projects (timed out)."), "upstream_unavailable"),
     (LidarTooSparse("P", 2020, 3.0, 8.0), "lidar_too_sparse"),
     (BlocksError("No roof block survived"), "measurement_failed"),
     (ModelError("bad"), "measurement_failed"),

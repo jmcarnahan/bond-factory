@@ -40,6 +40,14 @@ class LidarError(RuntimeError):
     """No LiDAR covers the address."""
 
 
+def is_outage(exc: BaseException) -> bool:
+    """A request failure that may pass: connection trouble and HTTP 5xx/429. An HTTP 4xx (a missing tile) is permanent."""
+    if not isinstance(exc, requests.RequestException):
+        return False
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    return not (status is not None and 400 <= status < 500 and status != 429)
+
+
 class LidarUnavailable(LidarError):
     """The LiDAR source could not be reached (outage, rate limit): retryable, not 'no coverage here'."""
 
@@ -352,7 +360,7 @@ def fetch_best_points(lat: float, lng: float, half_size_m: float, epsg_out: int,
         projects = select_project(lat, lng)
     except cache.NET_ERRORS as e:
         # only request/HTTP failures are outages; a body that does not parse is bad data (permanent)
-        kind = LidarUnavailable if isinstance(e, requests.RequestException) else LidarError
+        kind = LidarUnavailable if is_outage(e) else LidarError
         raise kind(f"Could not list USGS 3DEP projects ({cache.describe_error(e)}).") from e
     if not projects:
         raise LidarError("No USGS 3DEP LiDAR project covers this address.")
@@ -363,7 +371,7 @@ def fetch_best_points(lat: float, lng: float, half_size_m: float, epsg_out: int,
         try:
             pc = fetch_points(p, lat, lng, half_size_m, epsg_out)
         except (*cache.NET_ERRORS, LidarError) as e:
-            net_failures += isinstance(e, requests.RequestException)
+            net_failures += is_outage(e)
             reasons.append(f"{p.name}: {cache.describe_error(e) if isinstance(e, cache.NET_ERRORS) else e}")
             log.warning("project %s failed: %s", p.name, cache.describe_error(e))
             continue

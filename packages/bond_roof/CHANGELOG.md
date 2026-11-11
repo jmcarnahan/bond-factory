@@ -10,7 +10,7 @@
   `keys`, `fill`. `fromMap` and `copyWith` accept `Map<String, String?>`; null, empty and whitespace-only values keep the English default. `LengthDiagram`, `AreaDiagram`, `SummaryBlock`, `scenesToPdf`, `feetInches` and
   `pitchLabel` take `labels`. The "n/a" cells are chosen by a null value, not by text.
 - Added `ReportLayout { wide, compact }`; the three builders take `layout` and default their size to
-  the layout's design size (compact: 800 x 1000, two-column legend and figures, text at least 14 px).
+  the layout's design size (compact: 400 x 500, two-column legend and figures, text at least 14 px).
   `width` and `height` of the builders are now nullable.
 - Tolerant parser: unknown edge type, facet kind, block form and `lengths_ft` key no longer throw; they map
   to `unspecified`, by pitch, `flat` and `RoofTotals.extraLengths`, and are listed in `RoofModel.parseNotes`.

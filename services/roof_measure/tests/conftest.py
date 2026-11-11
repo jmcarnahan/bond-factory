@@ -5,6 +5,9 @@ from pathlib import Path
 import pytest
 from sites import load_site, local_data_path
 
+from roof_measure import cache, footprint
+from roof_measure.footprint_types import FootprintError
+
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = ROOT / "fixtures"
 DATA = Path(__file__).resolve().parent / "data"
@@ -50,3 +53,35 @@ def handmade_blocks_path() -> Path:
     path = DATA / "site1_blocks_handmade.json"
     assert path.is_file()
     return path
+
+
+class Net:
+    """Routes cache.fetch_json by URL fragment; a value can be a dict, an exception, or a callable."""
+
+    def __init__(self):
+        self.routes, self.calls = {}, []
+
+    def __call__(self, url, **kw):
+        self.calls.append((url, kw))
+        for frag, val in self.routes.items():
+            if frag in url:
+                if callable(val):
+                    return val(url, kw)
+                if isinstance(val, Exception):
+                    raise val
+                return val
+        raise AssertionError(f"unexpected request {url}")
+
+    def urls(self):
+        return [u for u, _ in self.calls]
+
+
+@pytest.fixture
+def net(monkeypatch):
+    n = Net()
+    monkeypatch.setattr(cache, "fetch_json", n)
+    monkeypatch.delenv("GOOGLE_SOLAR_API_KEY", raising=False)
+    monkeypatch.setattr(footprint, "fetch_hull", lambda *a, **k: (_ for _ in ()).throw(FootprintError("no lidar")))
+    return n
+
+

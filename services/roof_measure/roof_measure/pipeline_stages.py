@@ -40,7 +40,7 @@ def _locate(address: str, lat_lng: tuple[float, float] | None) -> tuple[float, f
 
 def _footprint_info(fp: Any) -> dict[str, Any]:
     return {"source": fp.source, "warnings": list(fp.warnings), "codes": list(fp.warning_codes),
-            "other_buildings": len(fp.other_buildings)}
+            "other_buildings": len(fp.other_buildings), "transient": fp.transient}
 
 
 def _address_dict(parts: Any, formatted: str) -> dict[str, str]:

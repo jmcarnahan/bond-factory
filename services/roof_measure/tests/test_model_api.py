@@ -76,7 +76,7 @@ def stub_pipeline(monkeypatch, calls):
 
     def fake(address, out_dir, method, **kw):
         calls.append({"address": address, "out_dir": out_dir, "method": method, **kw})
-        return NS(envelope=env, footprint_source="osm")
+        return NS(envelope=env, footprint_source="osm", transient=False)
 
     monkeypatch.setattr(pipeline, "run_pipeline", fake)
     return env

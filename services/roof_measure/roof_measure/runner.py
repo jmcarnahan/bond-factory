@@ -62,6 +62,7 @@ def _run_measurement(req: dict[str, Any], out_dir: Path, deadline: Deadline, on_
         _store(results, request_key(req), req, None, env)
         return env
     lat_lng = (req["lat"], req["lng"]) if req.get("lat") is not None else None
+    lat_lng_given = lat_lng is not None  # a pin must not become the alias of a plain address (S3)
     key = request_key(req)
     if key is None:  # address only: the key is the geocoder's matched address (plan D4)
         on_stage("geocode")
@@ -71,7 +72,8 @@ def _run_measurement(req: dict[str, Any], out_dir: Path, deadline: Deadline, on_
     if not req.get("force"):
         hit = results.get(key)
         if hit is not None:
-            results.alias_put(alias_key(req), key)
+            if not lat_lng_given:
+                results.alias_put(alias_key(req), key)
             log.info("job=%s stage=cache_hit cache_hit=true ms=%d", job_id, int((time.monotonic() - started) * 1000))
             return hit
     else:
@@ -84,7 +86,10 @@ def _run_measurement(req: dict[str, Any], out_dir: Path, deadline: Deadline, on_
     finally:
         if req.get("force"):
             cache.force_refresh(False)
-    _store(results, key, req, alias_key(req), res.envelope)
+    if res.transient:
+        log.info("job=%s result not cached: a data source was unreachable", job_id)
+    else:
+        _store(results, key, req, None if lat_lng_given else alias_key(req), res.envelope)
     log.info("job=%s stage=done footprint_source=%s cache_hit=false ms=%d", job_id, res.footprint_source,
              int((time.monotonic() - started) * 1000))
     return res.envelope

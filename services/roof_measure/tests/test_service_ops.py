@@ -89,7 +89,7 @@ def test_force_refreshes_the_fetch_cache_for_that_job_only(tmp_path, monkeypatch
 
     def fake_pipeline(address, out_dir, method, **kw):
         cache.fetch_bytes("https://example.test/tile")
-        return NS(envelope=ENVELOPE, footprint_source="osm")
+        return NS(envelope=ENVELOPE, footprint_source="osm", transient=False)
 
     monkeypatch.setattr(pipeline, "run_pipeline", fake_pipeline)
     c = api.create_app(Settings(data_dir=tmp_path), token=TOKEN)

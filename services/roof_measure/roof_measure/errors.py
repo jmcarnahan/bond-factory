@@ -39,12 +39,11 @@ def error_body(code: str, message: str | None = None) -> dict[str, Any]:
 
 
 _BY_NAME = {
-    "FootprintUnavailable": "upstream_unavailable", "LidarUnavailable": "upstream_unavailable",
+    "FootprintUnavailable": "upstream_unavailable", "GeocodeUnavailable": "upstream_unavailable", "LidarUnavailable": "upstream_unavailable",
     "FootprintError": "no_footprint", "AmbiguousBuilding": "ambiguous_building", "LidarTooSparse": "lidar_too_sparse",
     "LidarError": "no_lidar_coverage", "GeocodeError": "address_not_found", "BadResponse": "upstream_unavailable",
     "DeadlineExceeded": "timeout", "TimeoutError": "timeout",
 }
-_NETWORK_MARKERS = ("could not be reached", "unreachable", "timed out", "connection")
 # transient errors from the SDKs (matched by class name over the cause chain) and from our own wrappers (by text)
 _TRANSIENT_CLASSES = frozenset({
     "RateLimitError", "APIConnectionError", "APITimeoutError", "InternalServerError", "OverloadedError",
@@ -54,7 +53,7 @@ _TRANSIENT_TEXT = ("http 429", "http 500", "http 502", "http 503", "http 504", "
                    "rate limit", "overloaded", "connection error", "timed out")
 
 
-def _transient(exc: BaseException) -> bool:
+def is_transient(exc: BaseException) -> bool:
     """True for upstream blips: SDK/httpx/requests network and 429/5xx errors, also behind a wrapper's cause."""
     seen: set[int] = set()
     e: BaseException | None = exc
@@ -73,21 +72,18 @@ def code_for(exc: BaseException) -> str:
     """Map an exception raised by the pipeline to one of the job failure codes (class names: no imports)."""
     import requests
 
-    if isinstance(exc, requests.RequestException) or _transient(exc):
+    if isinstance(exc, requests.RequestException) or is_transient(exc):
         return "upstream_unavailable"
     for cls in type(exc).__mro__:
         code = _BY_NAME.get(cls.__name__)
         if code:
-            if code in ("address_not_found", "no_footprint", "no_lidar_coverage") and any(
-                    m in str(exc).lower() for m in _NETWORK_MARKERS):
-                return "upstream_unavailable"
             return code
     return "measurement_failed"  # PipelineError, BlocksError, ModelError, AgentError, SolarUnavailable, the rest
 
 
 HUMAN_MESSAGE_CLASSES = frozenset({
     "GeocodeError", "FootprintError", "AmbiguousBuilding", "LidarError", "LidarTooSparse", "BlocksError", "ModelError",
-    "PipelineError", "SolarUnavailable", "DeadlineExceeded", "FootprintUnavailable", "LidarUnavailable"})
+    "PipelineError", "SolarUnavailable", "DeadlineExceeded", "FootprintUnavailable", "LidarUnavailable", "GeocodeUnavailable"})
 
 
 def error_from(exc: BaseException) -> dict[str, Any]:
