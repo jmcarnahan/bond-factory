@@ -9,7 +9,7 @@ Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`; the serv
 
 | File | What it is | Owner |
 |---|---|---|
-| `roof_measurement_0.2_{pass,adjusted,unverified,fail}.json` | Example 0.2 envelopes (`contract` is `bond.roof_model/0.2`), one per verification verdict. `result` is the envelope and `result.model` is the 0.1 roof model; see `docs/contract-0.2.md`. Asserted by the service and by `bond_roof` (Dart). | service |
+| `roof_measurement_0.2_{pass,adjusted,unverified,fail}.json` | Example 0.2 envelopes, one per verification verdict. Each file IS the envelope (the `result` of the job GET response, `contract` is `bond.roof_model/0.2`) and its `model` is the 0.1 roof model; see `docs/contract-0.2.md`. The Appendix C list there covers only these roof envelopes; the bare models (`site1_*`, `synthetic_*`) remain separate. Asserted by the service and by `bond_roof` (Dart). | service |
 | `synthetic_flat_curbs.json` | Closed-form flat block with a parapet, 17 chimney curbs (`wall_flashing` outlines) and one `step_flashing` edge. Keeps the chimney-hole tests. | service (`synth.py`) |
 | `synthetic_hip_zigzag.json` | Closed-form hip whose south eave is split into 7 segments (five short ones under 2 ft between two 13 ft ends), nearly collinear. The verifier's `adjusted` input. | service (`synth.py`) |
 | `synthetic_solar_response.json` | SYNTHETIC Google Solar `buildingInsights` response built by `synth.py`. Not a Google response. | service (`synth.py`) |

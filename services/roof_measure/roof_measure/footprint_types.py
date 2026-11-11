@@ -38,6 +38,7 @@ class Footprint:
     warnings: list[str] = field(default_factory=list)
     warning_codes: list[str] = field(default_factory=list)  # parallel to warnings (closed list, see envelope)
     source: str = "lariac"  # one of SOURCES: which link of the chain produced it
+    transient: bool = False  # a link was unreachable: do not cache this result (an outage must not outlive itself)
 
     def warn(self, code: str, text: str) -> None:
         self.warnings.append(text)

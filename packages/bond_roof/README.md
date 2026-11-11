@@ -13,9 +13,9 @@ hand-written. No network access.
 |---|---|---|
 | `bond_roof.dart` | `RoofModel.fromJson` / `toJson` | Parse and write the contract JSON. Throws `FormatException` starting with the JSON path (`edges[3].polygon: ...`) for structural errors. An unknown edge type, facet kind, block form or `lengths_ft` key is mapped (`unspecified`, by pitch, `flat`, `extraLengths`) and recorded in `RoofModel.parseNotes`. Unknown top-level keys (`origin`, `generated_at`, `debug`) survive a round trip in `extra`. |
 | | `RoofMeasurement.parseAny(json)` | Reads a 0.2 envelope (model, 14 totals, verification, confidence, warnings and `warning_codes`) or wraps a bare 0.1 model as an unverified measurement. Unknown top-level keys survive in `extra`. |
-| | `RoofTotalsVariants.of(totals)` | Drip edge (eave / eave + rake) and ridge cap (ridge / ridge + hip) from the ten length totals. |
+| | `RoofTotalsVariants.of(totals)` | Takes the model's `RoofTotals` (`measurement.model.totals`) and returns drip edge (eave / eave + rake) and ridge cap (ridge / ridge + hip) from the ten length totals. `RoofEnvelopeTotals` carries the same four values as fields (`dripEdgeEaveFt`, `dripEdgeEaveRakeFt`, `ridgeCapRidgeFt`, `ridgeCapRidgeHipFt`) and a `.variants` getter. |
 | | `RoofLabels` | Every user-visible string with English defaults; `RoofLabels.fromMap(map)` overrides by `RoofLabels.keys`, `{name}` placeholders in templates. |
-| | `ReportLayout` | `wide` (1600 x 1000, 3-column legend) or `compact` (800 x 1000, 2 columns, text never under 14 px) for the three builders. |
+| | `ReportLayout` | `wide` (1600 x 1000, 3-column legend) or `compact` (400 x 500, 2 columns, text sized for a phone card) for the three builders. |
 | | `RoofModel.recomputeTotals()` | Totals from facets and edges, same rules as the contract. |
 | | `RoofModel.bounds` | Bounding box of all geometry, feet. |
 | | `feetInches`, `wholeFeet`, `sqft`, `pitchLabel` | Number formats: `209ft 8in`, `35`, `2,121`, `Flat` / `4/12` / `4.5/12`. |
@@ -46,6 +46,18 @@ Text is measured with Helvetica advance widths (`lib/src/metrics.dart`), so SVG,
 placer agree. Text outside Latin-1 needs a TrueType font for the PDF:
 `scenesToPdf(scenes, fontTtf: bytes)`; without one it prints `?`.
 
+## Example
+
+```dart
+final m = RoofMeasurement.parseAny(jsonDecode(body) as Map<String, dynamic>);
+final v = RoofTotalsVariants.of(m.model.totals); // same numbers as m.totals.variants
+print('${v.dripEdgeEaveFt} / ${v.dripEdgeEaveRakeFt} ft drip edge');
+final scenes = [
+  LengthDiagram.build(m.model, layout: ReportLayout.compact),
+  AreaDiagram.build(m.model, labels: RoofLabels.fromMap(strings)),
+];
+```
+
 ## Render
 
 ```
@@ -74,8 +86,8 @@ whose `schema` or `contract` matches; other files are skipped. A generated fixtu
 ## Known limits
 
 - At small wide-layout scene sizes (about 800 px wide and below) the legend columns can come close
-  to each other; use `ReportLayout.compact` for phone width. Compact hides more labels (text is
-  never under 14 px on a narrower plan), at most half.
+  to each other; use `ReportLayout.compact` for phone width. Compact hides more labels (the plan is a
+  quarter the size and labels are 14 px), so only the legend and totals are guaranteed.
 - A facet label can have a hole outline cross the box between the sampled points; only hole
   vertices and edge crossings near the box are checked, not a chord spanning the whole box.
 - `pitchLabel` of a non-finite rise prints "Flat".

@@ -14,7 +14,7 @@ and real-site details from the tree and adds a licence. Dated and append-only; l
 - D4 The cache key is the geocoder output (or rounded coordinates), plus method, verify, pipeline version and key presence.
 - D5 Auth fails closed (constant-time bearer compare, refuse to start without a token); debug surfaces only with `ROOF_MEASURE_DEBUG=1`.
 - D6 Degraded footprint sources (Solar hull, LiDAR hull) never reach `pass`; confidence is capped at 0.5.
-- D7 `RoofModel` is untouched; `RoofMeasurement.fromJson` and `parseAny` read the envelope; totals variants are computed in Dart.
+- D7 `RoofModel` keeps its API; the parser became tolerant (unknown edge, facet, form and `lengths_ft` values map with `parseNotes`) and `model.dart` was split into model, model_parts and totals; `RoofMeasurement.fromJson` and `parseAny` read the envelope; totals variants are computed in Dart.
 - D8 Labels are a `RoofLabels` object with English defaults, built from a plain map; no l10n system in the packages.
 - D9 Hygiene scope: third-party report data, real-site strings and the brand name leave tracked files; the gate learns addresses and coordinates.
 - D10 The whole repo is GPL-3.0-or-later (see below).

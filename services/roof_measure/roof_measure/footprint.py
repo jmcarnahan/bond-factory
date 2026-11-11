@@ -56,21 +56,28 @@ def fetch_footprint(lat: float, lng: float, address: Address, *, deadline: Deadl
                     use_solar: bool = True, use_hull: bool = True) -> Footprint:
     """First building found by the chain; ``FootprintError`` (or ``AmbiguousBuilding``) when none has one."""
     stage = Deadline.after(min(FOOTPRINT_STAGE_S, deadline.remaining())) if deadline else Deadline.after(FOOTPRINT_STAGE_S)
-    fp, notes = fetch_county(lat, lng, address)
+    fp, notes, unreachable = fetch_county(lat, lng, address)  # unreachable: first link that could not be reached
     if fp is not None:
         return fp
-    unreachable: str | None = None  # the first link that could not be reached; it decides the final error code
     hull_reason = ""
+
+    def down(text: str, what: str) -> None:
+        nonlocal unreachable, notes
+        unreachable = unreachable or text
+        notes = [*notes, ("other", f"{what} could not be reached; footprint taken from another source.")]
+
     try:
         fp = _with_notes(fetch_osm(lat, lng, address, stage), notes)
     except FootprintError as exc:
-        unreachable = str(exc)
         log.info("OSM link failed: %s", type(exc).__name__)
-        notes = [*notes, ("other", "OpenStreetMap could not be reached; footprint taken from another source.")]
+        down(str(exc), "OpenStreetMap")
     # An unreachable or empty link is a skip, never the end of the chain: the stage cap bounds OSM and Solar only,
     # and the LiDAR hull still gets the job's own remaining time.
     if fp is None and use_solar and (key := solar_key()) and not stage.expired():
-        fp = _with_notes(fetch_solar(lat, lng, key, stage), notes)
+        try:
+            fp = _with_notes(fetch_solar(lat, lng, key, stage), notes)
+        except FootprintUnavailable as exc:
+            down(str(exc), "Google Solar")
     if fp is None and use_hull:
         if deadline:
             deadline.check("footprint")
@@ -81,12 +88,13 @@ def fetch_footprint(lat: float, lng: float, address: Address, *, deadline: Deadl
         except FootprintError as exc:
             log.info("LiDAR hull link failed: %s", type(exc).__name__)
             hull_reason = str(exc)
-            if isinstance(exc, FootprintUnavailable) and unreachable is None:
-                unreachable = str(exc)
+            if isinstance(exc, FootprintUnavailable):
+                unreachable = unreachable or str(exc)
     if fp is None:
         if unreachable:  # every link failed and at least one was unreachable: retryable
             detail = f" LiDAR hull: {hull_reason}" if hull_reason else ""
             raise FootprintUnavailable((unreachable + detail)[:300])
         raise FootprintError(f"No building footprint found near {address.line1}, {address.city}. "
                              "LA County, OpenStreetMap and the LiDAR have nothing within 60 m.")
+    fp.transient = unreachable is not None  # the answer came from a fallback because something was down
     return fp

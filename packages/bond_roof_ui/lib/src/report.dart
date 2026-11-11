@@ -13,7 +13,7 @@ abstract final class RoofReport {
   static const double pageHeight = RoofUiTokens.pageHeightPx;
 
   /// Length, area and summary scenes. [ReportLayout.wide] is sized for US Letter landscape at
-  /// 150 dpi; [ReportLayout.compact] uses the 800 x 1000 phone-width design size.
+  /// 150 dpi; [ReportLayout.compact] uses the 400 x 500 phone-width design size.
   static List<Scene> pages(
     RoofModel m, {
     DiagramStyle? style,

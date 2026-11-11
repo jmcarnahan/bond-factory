@@ -234,8 +234,7 @@ def test_arcgis_error_is_not_cached_or_read_as_empty(fake_net, site1):
     fake_net.routes["overpass"] = json.dumps({"elements": []}).encode()
     with pytest.raises(footprint.FootprintError):
         footprint.fetch_footprint(*_pt(site1), _addr(site1))
-    assert not any(cache.cache_dir().glob("*.bin")) or all(
-        b"boom" not in f.read_bytes() for f in cache.cache_dir().glob("*.bin"))
+    assert all(b"boom" not in f.read_bytes() for f in cache.cache_dir().glob("*.bin"))  # nothing, or nothing poisoned
     # service recovers: the next call must succeed, not replay the cached error
     fake_net.routes["LACounty_Parcel"] = _load("parcels_site1_60m.geojson")
     fake_net.routes["Countywide_Building_Outlines"] = _load("buildings_parcel_site1.geojson")

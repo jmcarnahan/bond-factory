@@ -65,10 +65,10 @@ void main() {
       });
     }
 
-    testWidgets('width under 600 builds compact (800 x 1000) scenes, wider builds wide scenes', (tester) async {
+    testWidgets('width under 600 builds compact (400 x 500) scenes, wider builds wide scenes', (tester) async {
       final m = _envelope('pass').model;
       await _pump(tester, 390, RoofReportStrip(model: m));
-      expect(_scenes(tester).take(2).map((s) => (s.width, s.height)), everyElement((800.0, 1000.0)));
+      expect(_scenes(tester).take(2).map((s) => (s.width, s.height)), everyElement((400.0, 500.0)));
       await _pump(tester, 1280, RoofReportStrip(model: m));
       expect(_scenes(tester).take(2).map((s) => (s.width, s.height)), everyElement((RoofReport.pageWidth, RoofReport.pageHeight)));
     });
@@ -183,7 +183,7 @@ void main() {
       expect(wide.length, 3);
       expect(compact.length, 3);
       expect((wide[0].width, wide[0].height), (RoofReport.pageWidth, RoofReport.pageHeight));
-      expect((compact[0].width, compact[0].height), (800.0, 1000.0));
+      expect((compact[0].width, compact[0].height), (400.0, 500.0));
       expect(wide[2].title, 'Summary');
     });
 

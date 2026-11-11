@@ -68,12 +68,14 @@ def test_auth_off_needs_a_loopback_host():
         assert auth.require_token({"ROOF_MEASURE_AUTH": "off", "ROOF_MEASURE_HOST": host}) is None
 
 
-def test_module_app_refuses_to_build_without_a_token(monkeypatch):
+def test_module_app_refuses_to_build_without_a_token(monkeypatch, capsys):
     for name in ("ROOF_MEASURE_TOKEN", "ROOF_MEASURE_AUTH"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(api, "_app", None)
-    with pytest.raises(auth.AuthConfigError):
+    with pytest.raises(SystemExit) as e:  # one stderr line and exit 1, no traceback
         api.__getattr__("app")
+    assert e.value.code == 1
+    assert "ROOF_MEASURE_TOKEN" in capsys.readouterr().err
 
 
 def test_auth_off_serves_without_a_token(tmp_path):

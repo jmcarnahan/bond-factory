@@ -49,6 +49,7 @@ class PipelineResult:
     verification: dict[str, Any] = field(default_factory=dict)
     envelope: dict[str, Any] = field(default_factory=dict)
     density_pts_m2: float | None = None
+    transient: bool = False  # produced by an outage fall-through: the caller must not cache it
 
 
 def _noop(_stage: str) -> None:
@@ -230,7 +231,8 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
              envelope["verification"]["verdict"], int((time.monotonic() - started) * 1000))
     return PipelineResult(model=model, blockset=base, paths=paths, agent_transcript=transcript, method_used=method,
                           footprint_source=fpinfo["source"], verification=envelope["verification"],
-                          envelope=envelope, density_pts_m2=density)
+                          envelope=envelope, density_pts_m2=density,
+                          transient=bool(fpinfo.get("transient")))
 
 
 def _run_agent(agent_mod: Any, base: BlockSet, evidence: list[dict[str, Any]] | None, kind: str,

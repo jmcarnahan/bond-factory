@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'metrics.dart';
 import 'model.dart';
+import 'report_layout.dart';
 import 'scene.dart';
 import 'style.dart';
 
@@ -215,8 +216,19 @@ List<String> wrapText(String text, double maxWidth, double size, {bool bold = fa
 /// Scale factor for a scene relative to the 1600 x 1000 design size.
 double sceneScale(double width, double height) => math.max(0.4, math.min(width / 1600, height / 1000));
 
-/// Adds a compass rose centred at [c] with radius [r] (north up).
-void addCompass(List<Prim> out, Pt c, double r, DiagramStyle style, double k, {String north = 'N'}) {
+/// Shortens [text] with an ellipsis until it fits in [maxWidth].
+String ellipsize(String text, double maxWidth, double size, {bool bold = false}) {
+  if (textWidth(text, size, bold: bold) <= maxWidth) return text;
+  var t = text;
+  while (t.length > 1 && textWidth('$t\u2026', size, bold: bold) > maxWidth) {
+    t = t.substring(0, t.length - 1);
+  }
+  return '${t.trimRight()}\u2026';
+}
+
+/// Adds a compass rose centred at [c] with the spec's radius (north up).
+void addCompass(List<Prim> out, Pt c, LayoutSpec spec, DiagramStyle style, {String north = 'N'}) {
+  final r = spec.compassRadius, k = spec.k;
   final n = (x: c.x, y: c.y - r);
   final s = (x: c.x, y: c.y + r);
   final w = r * 0.28;
@@ -234,22 +246,28 @@ void addCompass(List<Prim> out, Pt c, double r, DiagramStyle style, double k, {S
       width: 1.2 * k,
     ))
     ..add(TextPrim(
-      at: (x: c.x, y: c.y - r - 13 * k),
+      at: (x: c.x, y: c.y - r - spec.northDy),
       text: north,
-      size: 16 * k,
+      size: spec.northSize,
       color: style.textColor,
       bold: true,
     ));
 }
 
-/// Adds the footer line, left aligned, at the bottom of the scene.
-void addFooter(List<Prim> out, String text, double width, double height, DiagramStyle style, double k,
-    {double? size}) {
-  size ??= 13 * k;
-  final lines = wrapText(text, width - 48 * k - 150 * k, size);
+/// The wrapped footer lines for [text] in a scene [width] wide.
+List<String> footerLines(String text, double width, LayoutSpec spec) =>
+    wrapText(text, width - spec.margin - spec.footerRight, spec.footerSize);
+
+/// Vertical room the footer needs above the scene bottom.
+double footerHeight(List<String> lines, LayoutSpec spec) =>
+    spec.footerBottom + lines.length * spec.footerSize * 1.4 + 6 * spec.k;
+
+/// Adds the footer, left aligned, at the bottom of the scene.
+void addFooter(List<Prim> out, List<String> lines, double height, DiagramStyle style, LayoutSpec spec) {
+  final size = spec.footerSize;
   for (final (i, l) in lines.indexed) {
     out.add(TextPrim(
-      at: (x: 48 * k, y: height - 26 * k - (lines.length - 1 - i) * size * 1.4),
+      at: (x: spec.margin, y: height - spec.footerBottom - (lines.length - 1 - i) * size * 1.4),
       text: l,
       size: size,
       color: 0xFF616161,

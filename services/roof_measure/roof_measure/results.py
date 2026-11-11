@@ -40,9 +40,9 @@ class ResultCache:
         """Delete result and alias files not touched for ``days`` days; returns how many."""
         cutoff = (time.time() if now is None else now) - days * 86400
         n = 0
-        for f in self.root.glob("*.json"):
+        for f in [*self.root.glob("*.json"), *self.root.glob("*.tmp")]:
             try:
-                if f.stat().st_mtime < cutoff:
+                if f.stat().st_mtime < (time.time() - 3600 if f.suffix == ".tmp" else cutoff):
                     f.unlink()
                     n += 1
             except OSError:

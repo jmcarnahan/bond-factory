@@ -84,15 +84,15 @@ def _arcgis_check(obj: dict) -> None:
         raise cache.BadResponse(f"ArcGIS error: {str(obj['error'])[:200]}")
 
 
-def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | None, list[Note]]:
-    """(footprint or None, notes for the footprint that replaces it).
+def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | None, list[Note], str | None]:
+    """(footprint or None, notes for the footprint that replaces it, outage text or None).
 
     A matched parcel with no building outline is no longer fatal: it returns None plus a
     ``parcel_without_building`` note and the chain tries OpenStreetMap; a failing layer query does the same with
     a note. This link never raises for an outage.
     """
     if not (LA_BBOX[0] <= lat <= LA_BBOX[1] and LA_BBOX[2] <= lng <= LA_BBOX[3]):
-        return None, []
+        return None, [], None
     pq = {"f": "geojson", "geometry": f"{lng},{lat}", "geometryType": "esriGeometryPoint", "inSR": 4326,
           "spatialRel": "esriSpatialRelIntersects", "distance": 60, "units": "esriSRUnit_Meter",
           "outFields": "*", "outSR": 4326, "returnGeometry": "true"}
@@ -101,10 +101,10 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
     except cache.NET_ERRORS as e:
         # An unreachable layer is NOT "outside the county": say so on whatever footprint replaces it.
         log.info("LA County parcel query failed: %s", cache.describe_error(e))
-        return None, [("other", "LA County layer unreachable; footprint from OpenStreetMap.")]
+        return None, [("other", "LA County layer unreachable; footprint from OpenStreetMap.")], "LA County layer unreachable"
     parcels = [f for f in parcels if f.get("geometry")]
     if not parcels:
-        return None, []  # genuinely outside the county layer
+        return None, [], None  # genuinely outside the county layer
     parcel, match = pick_parcel(parcels, lat, lng, address)
     warnings: list[Note] = []
     if match != "exact":
@@ -121,7 +121,7 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
         log.info("LA County building query failed: %s", cache.describe_error(e))
         text = (f"The LA County building layer could not be queried ({cache.describe_error(e)}); "
                 "footprint taken from another source.")
-        return None, [*warnings, ("other", text)]
+        return None, [*warnings, ("other", text)], "LA County building layer unreachable"
     c = parcel_poly.centroid
     epsg = utm_epsg_for(c.x, c.y)
     parcel_m = project_geometry(parcel_poly, 4326, epsg)
@@ -142,7 +142,7 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
             text = ("The parcel matched but has no building outline in the county layer "
                     f"(parcel {parcel['properties'].get('AIN')}); footprint taken from another source.")
             warnings.append(("parcel_without_building", text))
-        return None, warnings
+        return None, warnings, None
     ok.sort(key=lambda t: t[0], reverse=True)
     _, _, main_f, main = ok[0]
     props = main_f["properties"]
@@ -157,5 +157,5 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
         other_buildings=[t[3] for t in ok[1:]], match=match, source="lariac")
     for code, text in warnings:
         fp.warn(code, text)
-    return fp, []
+    return fp, [], None
 

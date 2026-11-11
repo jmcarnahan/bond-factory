@@ -116,10 +116,15 @@ void main() {
             expect(scenes[0].hiddenLabels, lessThanOrEqualTo((labellable * 0.3).floor()));
             expect(scenes[1].hiddenLabels, lessThanOrEqualTo((m.facets.length * 0.3).floor()));
           }
-          // Text items against the wide English scene: at most 30% of them are gone.
+          // Text items against the wide English scene: at most 30% of them are gone (wide only; the
+          // compact plan is a quarter the size, so it hides more labels by design).
           final wideEn = LengthDiagram.build(m);
-          expect(_texts(scenes[0]), greaterThanOrEqualTo((_texts(wideEn) * 0.7).ceil()),
-              reason: '${_texts(scenes[0])} vs wide English ${_texts(wideEn)}');
+          if (layout == ReportLayout.wide) {
+            expect(_texts(scenes[0]), greaterThanOrEqualTo((_texts(wideEn) * 0.7).ceil()),
+                reason: '${_texts(scenes[0])} vs wide English ${_texts(wideEn)}');
+          } else {
+            expect(_texts(scenes[0]), _texts(enLen), reason: 'same text count as English compact, modulo ellipsis');
+          }
           final svg = sceneToSvg(scenes[0]);
           expect(svg, contains('Aleros'));
           expect(svg, contains(feetInches(m.totals.lengthsFt[EdgeType.eave]!, labels: es)));

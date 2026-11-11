@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any, Literal
 
@@ -65,7 +66,7 @@ class MeasureRequest(BaseModel):
     @model_validator(mode="after")
     def _both_or_neither(self) -> MeasureRequest:
         if (self.lat is None) != (self.lng is None):
-            raise ValueError("lat and lng must be given together")
+            raise ValueError("lat requires lng and lng requires lat")
         return self
 
 
@@ -77,7 +78,17 @@ def _invalid(errors: list[Any]) -> JSONResponse:
     """422 naming the first bad field and rule, never echoing the input."""
     first = errors[0] if errors else {}
     where = ".".join(str(p) for p in first.get("loc", ()) if p != "body")
-    return _err(422, "invalid_request", f"Invalid request: {where or 'body'}: {first.get('type', 'invalid')}.")
+    kind = str(first.get("type", "invalid"))
+    if kind == "value_error":  # our own validators: their text names the fields ("lat and lng must be given together")
+        reason = str(first.get("msg", "")).removeprefix("Value error, ")
+        return _err(422, "invalid_request", f"Invalid request: {reason}." if not where else
+                    f"Invalid request: {where}: {reason}.")
+    hint = {"missing": "is required", "extra_forbidden": "is not a known field", "float_type": "must be a number",
+            "bool_type": "must be true or false", "string_type": "must be a string",
+            "greater_than_equal": "is below the allowed range", "less_than_equal": "is above the allowed range",
+            "string_too_long": "is too long", "string_too_short": "must not be empty",
+            "json_invalid": "is not valid JSON"}.get(kind, f"is invalid ({kind})")
+    return _err(422, "invalid_request", f"Invalid request: {where or 'body'} {hint}.")
 
 
 def fixture_path(settings: Settings, name: str | None) -> Path | None:
@@ -125,8 +136,10 @@ def create_app(settings: Settings | None = None, *, token: str | None = None, ru
         return _err(500, "measurement_failed", "The service hit an unexpected error.")
 
     @app.get("/healthz")
-    def healthz() -> dict[str, str]:
-        return {"status": "ok", "pipeline_version": PIPELINE_VERSION}
+    def healthz() -> dict[str, Any]:
+        """No disk, no network. ``abandoned_workers`` counts workers held by jobs the watchdog gave up on."""
+        return {"status": "ok", "pipeline_version": PIPELINE_VERSION,
+                "abandoned_workers": service.runner.abandoned_workers}
 
     @app.post("/v1/measurements", status_code=202)
     async def create_measurement(request: Request) -> JSONResponse:
@@ -203,5 +216,9 @@ def __getattr__(name: str) -> FastAPI:
     if name != "app":
         raise AttributeError(name)
     if _app is None:
-        _app = create_app()
+        try:
+            _app = create_app()
+        except auth.AuthConfigError as exc:  # one line and exit 1, not a traceback, when started misconfigured
+            print(f"roof-measure: {exc}", file=sys.stderr)
+            raise SystemExit(1) from None
     return _app

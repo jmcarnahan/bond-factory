@@ -36,15 +36,27 @@ def _near(p: Any, q: Any, tol: float) -> bool:
 def _dedupe(pts: list[Pt]) -> tuple[list[Pt], dict[Pt, Pt]]:
     """Merge consecutive vertices closer than DUP_FT (wrapping); returns the ring and dropped -> kept."""
     out: list[Pt] = []
-    moved: dict[Pt, Pt] = {}
+    moved: dict[Pt, Pt] = {}  # resolved below so no entry points at a vertex that was itself dropped
     for p in pts:
         if out and _near(out[-1], p, DUP_FT):
-            moved[p] = out[-1]
+            if out[-1] != p:  # an exact repeat needs no snapping (and a self-map would never resolve)
+                moved[p] = out[-1]
         else:
             out.append(p)
     while len(out) > 1 and _near(out[0], out[-1], DUP_FT):
-        moved[out[-1]] = out[0]
+        if out[-1] != out[0]:
+            moved[out[-1]] = out[0]
         out.pop()
+    for k, v in list(moved.items()):
+        for _ in range(len(pts)):  # bounded: a cycle could otherwise spin a worker forever
+            nxt = moved.get(v)
+            if nxt is None or nxt == v:
+                break
+            v = nxt
+        if v == k:
+            del moved[k]
+        else:
+            moved[k] = v
     return out, moved
 
 
@@ -69,16 +81,18 @@ def clean_facets(facets: list[dict[str, Any]], edges: list[dict[str, Any]]) -> l
         ring, moved = _dedupe(ring)
         if moved:
             _snap_edges(edges, moved)
-        changed = bool(moved)
+        changed = bool(moved) or len(ring) != len(f["polygon"])
+        if len(ring) < 3:  # collapsed to a point or a line: leave it for validate to reject with a message
+            continue
+        original_area = Polygon(ring).area  # losses are measured against this, so removals cannot compound past 0.5%
         while len(ring) > 3:
-            area = Polygon(ring).area
             angles = [(interior_angle(ring[i - 1], ring[i], ring[(i + 1) % len(ring)]), i) for i in range(len(ring))]
             angle, i = min(angles)
             if angle >= SPIKE_DEG:
                 break
             trial = ring[:i] + ring[i + 1:]
             poly = Polygon(trial)
-            if not poly.is_valid or area <= 0 or (area - poly.area) / area >= MAX_AREA_LOSS:
+            if not poly.is_valid or original_area <= 0 or (original_area - poly.area) / original_area >= MAX_AREA_LOSS:
                 break
             _drop_tip(edges, f["id"], ring[i])
             notes.append(f"facet {f['id']}: sliver vertex removed")

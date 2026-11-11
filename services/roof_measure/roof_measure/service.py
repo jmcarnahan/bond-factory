@@ -31,17 +31,22 @@ class Service:
         self._inflight: dict[str, list[str]] = {}  # request key -> [leader job id, follower ids...]
         kw = {} if watchdog_grace_s is None else {"watchdog_grace_s": watchdog_grace_s}
         self.runner = JobRunner(self.store, settings.workers, settings.queue_max, settings.job_timeout_s, run,
-                                settings.retention_days, on_done=self._resolve_followers, **kw)
+                                settings.retention_days, on_done=self._resolve_followers,
+                                extra_purge=self._purge_caches, **kw)
         self.store.purge(settings.retention_days)
-        self.results.purge(settings.retention_days)
+        self._purge_caches()
+        n = self.store.mark_interrupted_on_boot()
+        if n:
+            log.warning("marked %d interrupted job(s) failed on boot", n)
+
+    def _purge_caches(self) -> None:
+        """Cached results (retention days) and fetch-cache bodies (30 days): at boot and hourly after a job."""
+        self.results.purge(self.settings.retention_days)
         try:
             from . import cache
             cache.purge_old(30.0)
         except OSError:
             log.warning("fetch cache purge failed")
-        n = self.store.mark_interrupted_on_boot()
-        if n:
-            log.warning("marked %d interrupted job(s) failed on boot", n)
 
     def cached(self, req: dict[str, Any]) -> dict[str, Any] | None:
         """A finished envelope for this request without running anything, or None."""

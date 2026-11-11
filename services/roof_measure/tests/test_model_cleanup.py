@@ -102,3 +102,39 @@ def test_build_model_runs_the_cleanup_and_reports_its_notes(monkeypatch):
     bs, rbs = synthetic_hip()
     m = model_mod.build_model(bs, rbs, {"method": "fixture"})
     assert "facet f1: sliver vertex removed" in m["warnings"]
+
+
+def test_dedupe_terminates_on_exact_duplicates_first_equals_last_and_chains():
+    from roof_measure.model_cleanup import _dedupe
+
+    ring, moved = _dedupe([(0, 0), (10, 0), (10, 0), (10, 10)])
+    assert ring == [(0, 0), (10, 0), (10, 10)] and moved == {}
+    ring, moved = _dedupe([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)])  # first == last
+    assert ring == [(0, 0), (10, 0), (10, 10), (0, 10)] and moved == {}
+    ring, moved = _dedupe([(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0), (0.0, 0.02), (0.0, 0.04)])  # a -> b -> c
+    assert ring == [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+    assert moved == {(0.0, 0.02): (0.0, 0.0), (0.0, 0.04): (0.0, 0.0)}
+    ring, moved = _dedupe([(1, 1), (1, 1), (1, 1)])
+    assert ring == [(1, 1)] and moved == {}
+
+
+def test_clean_facets_removes_exact_duplicate_vertices_and_build_model_finishes_fast(monkeypatch):
+    import time
+
+    from roof_measure.synth import synthetic_hip
+
+    f = {"id": "f1", "polygon": [[0, 0], [10, 0], [10, 0], [10, 10], [0, 10], [0, 0]], "pitch_rise": 0.0,
+         "plan_area_sqft": 100.0, "area_sqft": 100.0}
+    start = time.monotonic()
+    clean_facets([f], [])
+    assert time.monotonic() - start < 1.0 and f["polygon"] == [[0, 0], [10, 0], [10, 10], [0, 10]]
+    bs, rbs = synthetic_hip()
+    bs.footprint_ft = [bs.footprint_ft[0], bs.footprint_ft[0], *bs.footprint_ft[1:]]  # a duplicated footprint vertex
+    rbs[0].polygon = [rbs[0].polygon[0], rbs[0].polygon[0], *rbs[0].polygon[1:]]
+    start = time.monotonic()
+    try:
+        m = model_mod.build_model(bs, rbs, {"method": "fixture"})
+    except ModelError:
+        m = None  # rejecting a degenerate ring is acceptable; hanging is not
+    assert time.monotonic() - start < 1.0
+    assert m is None or m["totals"]["total_area_sqft"] == pytest.approx(959.2, abs=1.0)

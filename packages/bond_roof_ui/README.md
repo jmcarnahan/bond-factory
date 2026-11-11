@@ -11,7 +11,7 @@ printable three-page report (length diagram, area diagram, summary). Pure drawin
   scene is built.
 - `RoofReportStrip({model | measurement, labels, filename, showActions, showTotals, onStatus})`:
   Print, Save PDF and Share PDF buttons with inline status, the totals table, then the length
-  diagram, area diagram and summary. Under 600 px wide it builds the compact (800 x 1000)
+  diagram, area diagram and summary. Under 600 px wide it builds the compact (400 x 500)
   scenes. Scenes are cached per model, labels and layout. No dialogs, snackbars or tooltips.
 - `RoofTotalsTable(measurement, {labels})`: inline text rows for the totals, both drip edge and
   both ridge cap variants, the verification verdict with its first note, and the generated time.
@@ -29,23 +29,33 @@ on every platform.
 
 ## Use from an app
 
+A consumer must depend on BOTH `bond_roof` and `bond_roof_ui`: the UI barrel does not re-export
+`RoofModel`, `RoofMeasurement` or `RoofLabels`, so import those from `package:bond_roof/bond_roof.dart`.
+
 Inside this workspace, depend by path (the root `pubspec.yaml` resolves it):
 
 ```yaml
 dependencies:
+  bond_roof:
+    path: ../../packages/bond_roof
   bond_roof_ui:
     path: ../../packages/bond_roof_ui
 ```
 
-From another repository, pin a commit:
+From another repository, pin the full 40-character commit SHA (tags are labels only):
 
 ```yaml
 dependencies:
+  bond_roof:
+    git:
+      url: https://github.com/jmcarnahan/bond-factory.git
+      ref: <full 40-char sha>
+      path: packages/bond_roof
   bond_roof_ui:
     git:
-      url: <bond-factory git url>
+      url: https://github.com/jmcarnahan/bond-factory.git
+      ref: <full 40-char sha>
       path: packages/bond_roof_ui
-      ref: <commit sha>
 ```
 
 ## Develop

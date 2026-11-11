@@ -61,11 +61,12 @@ class SummaryBlock {
     ReportLayout layout = ReportLayout.wide,
   }) {
     width ??= layout.designWidth;
-    final k = layoutScale(layout, width, 1000 * width / layout.designWidth);
+    final k = layoutScale(layout, width, layout.designHeight * width / layout.designWidth);
+    final sp = LayoutSpec(layout, k);
     final prims = <Prim>[];
-    final left = 48 * k;
+    final left = sp.margin;
     final textW = width - 2 * left;
-    var y = 44 * k;
+    var y = sp.sumTop;
 
     void text(String s, double size, {bool bold = false, int? color, double x = 0, double? gapAfter}) {
       prims.add(TextPrim(
@@ -92,9 +93,9 @@ class SummaryBlock {
       }
     }
 
-    text(labels.summaryCaption, 14 * k, color: 0xFF757575, gapAfter: 30 * k);
+    text(labels.summaryCaption, sp.captionSize, color: 0xFF757575, gapAfter: sp.sumCaptionGap);
     final address = m.address.display.isEmpty ? labels.addressMissing : m.address.display;
-    text(address, fitSize(address, textW, 28 * k, 18 * k, bold: true), bold: true, gapAfter: 40 * k);
+    text(address, fitSize(address, textW, sp.sumTitleSize, sp.titleMin, bold: true), bold: true, gapAfter: sp.sumTitleGap);
 
     // Key figures in columns.
     final t = m.totals;
@@ -114,34 +115,45 @@ class SummaryBlock {
     ];
     final cols = layout.figureColumns;
     final colW = textW / cols;
+    final compact = layout == ReportLayout.compact;
     for (var row = 0; row < ReportLayout.rowsFor(figs.length, cols); row++) {
       for (var c = 0; c < cols; c++) {
         final (cap, val) = figs[row * cols + c];
         final x = left + c * colW;
         prims
-          ..add(TextPrim(at: (x: x, y: y), text: cap, size: layout.textSize(13, k), color: 0xFF757575, anchor: TextAnchor.start))
           ..add(TextPrim(
-              at: (x: x, y: y + 24 * k), text: val, size: 20 * k, color: style.textColor, anchor: TextAnchor.start, bold: true));
+              at: (x: x, y: y),
+              text: compact ? ellipsize(cap, colW - 6, sp.figCaptionSize) : cap,
+              size: sp.figCaptionSize,
+              color: 0xFF757575,
+              anchor: TextAnchor.start))
+          ..add(TextPrim(
+              at: (x: x, y: y + sp.figValueDy),
+              text: compact ? ellipsize(val, colW - 6, sp.figValueSize, bold: true) : val,
+              size: sp.figValueSize,
+              color: style.textColor,
+              anchor: TextAnchor.start,
+              bold: true));
       }
-      y += 66 * k;
+      y += sp.figRowPitch;
     }
-    y += 6 * k;
+    y += sp.sectionGap / 2;
 
-    text(labels.sourceHeading, 17 * k, bold: true, gapAfter: 26 * k);
+    text(labels.sourceHeading, sp.headingSize, bold: true, gapAfter: sp.headingGap);
     for (final l in sourceLines(m, labels)) {
-      paragraph(l, 15 * k, indent: 12 * k);
+      paragraph(l, sp.paraSize, indent: sp.paraIndent);
     }
-    y += 12 * k;
+    y += sp.sectionGap;
 
     void bullets(String title, List<String> items, {int bullet = 0xFF757575}) {
       if (items.isEmpty) return;
-      text(title, 17 * k, bold: true, gapAfter: 26 * k);
+      text(title, sp.headingSize, bold: true, gapAfter: sp.headingGap);
       for (final n in items) {
         prims.add(TextPrim(
-            at: (x: left + 12 * k, y: y), text: '-', size: 15 * k, color: bullet, anchor: TextAnchor.start, bold: true));
-        paragraph(n, 15 * k, indent: 30 * k);
+            at: (x: left + sp.paraIndent, y: y), text: '-', size: sp.paraSize, color: bullet, anchor: TextAnchor.start, bold: true));
+        paragraph(n, sp.paraSize, indent: sp.bulletIndent);
       }
-      y += 12 * k;
+      y += sp.sectionGap;
     }
 
     bullets(labels.confidenceNotesHeading, m.confidence.notes);
@@ -158,7 +170,7 @@ class SummaryBlock {
 
     return Scene(
       width: width,
-      height: math.max(y + 24 * k, 240 * k),
+      height: math.max(y + sp.sumBottom, sp.sumMinHeight),
       background: style.background,
       prims: prims,
       title: labels.summaryPageTitle,

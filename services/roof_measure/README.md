@@ -9,7 +9,11 @@ linked into any app. API and envelope: [docs/contract-0.2.md](../../docs/contrac
 
 ```
 make setup
-ROOF_MEASURE_AUTH=off ROOF_MEASURE_HOST=127.0.0.1 ROOF_MEASURE_DEBUG=1 make serve   # same defaults as plain `make serve`
+make serve                      # auth off, loopback only, debug routes on, port 8011
+PORT=8031 make serve            # another port
+# with auth on, as in production (token of 32+ characters, no debug routes):
+ROOF_MEASURE_TOKEN=$(openssl rand -hex 16) ROOF_MEASURE_HOST=127.0.0.1 PORT=8031 \
+  .venv/bin/uvicorn roof_measure.api:app --host 127.0.0.1 --port 8031
 curl -s localhost:8011/healthz
 curl -s -X POST localhost:8011/v1/measurements -H 'content-type: application/json' \
   -d '{"address": "100 Example Ave, Sampletown, CA 90000", "method": "fixture"}'      # debug fixture job, no network
@@ -17,7 +21,8 @@ curl -s localhost:8011/v1/measurements/<id>
 ```
 
 Auth is on unless `ROOF_MEASURE_AUTH=off` AND the bind host is loopback. Without `ROOF_MEASURE_TOKEN` (32+
-characters) the process refuses to start. Debug fixture routes and request fields exist only with
+ASCII characters) the process prints one line and exits with status 1. The start-up log shows `ROOF_MEASURE_HOST`,
+which is what the image passes to uvicorn; uvicorn's own line shows the address it bound. Debug fixture routes and request fields exist only with
 `ROOF_MEASURE_DEBUG=1`. Environment variables: [contract Appendix A](../../docs/contract-0.2.md).
 
 ## Docker and Railway
@@ -39,8 +44,9 @@ replica, a volume mounted at `/data`, `ROOF_MEASURE_TOKEN`, and optionally `ANTH
 methods) and `GOOGLE_SOLAR_API_KEY` (Solar footprint link). `railway.toml` sets the `/healthz` health check. `RAILWAY_RUN_UID=0` is
 required on the service: the volume mounts root-owned, so the container must run as root to create `/data/jobs`
 (without it the service logs the fix and stops at boot). Size the volume for about 5 GB: results are a few KB
-each, finished job directories (PNG, blocks, transcripts) go after 14 days, and the fetch cache (LiDAR tiles, several
-MB per building) is purged after 30 days.
+each, and after 14 days finished job directories (PNG, blocks, transcripts) and cached results are deleted. The
+fetch cache (LiDAR tiles, several MB per building) is purged after 30 days. All of these purges run at boot and at
+most hourly after a job; job directories are also purged after each job.
 
 ## Pipeline
 

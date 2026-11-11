@@ -73,6 +73,15 @@ re-geocode: the geocoder answer is cached for 30 days.
 Every HTTP call in a job is bound to the job deadline and the footprint stage has its own cap. As a backstop a
 watchdog marks a job `timeout` 30 seconds after its deadline even if its thread is stuck.
 
+### 1.3 Debug mode
+
+Only with `ROOF_MEASURE_DEBUG=1`, never in production. The request accepts `method: "fixture"` with `fixture`
+(a saved envelope or model, by file name with or without `.json`), `blocks_fixture` (skip the data stages and use a
+saved blocks file) and `solar_fixture` (a saved Solar response for `solar_agent`); `GET /fixtures` and
+`GET /fixtures/{name}` list and return the files in the fixtures directory. Outside debug mode these fields are
+a 422 and the routes and the OpenAPI schema do not exist. Fixture jobs are not cached across fixtures: the fixture
+names are part of the cache key.
+
 ## 2. Envelope `bond.roof_model/0.2`
 
 The `result` of a done job. Parsers ignore unknown keys and tolerate missing optional ones.
@@ -93,8 +102,9 @@ The `result` of a done job. Parsers ignore unknown keys and tolerate missing opt
 
 - `pass`: nothing moved.
 - `adjusted`: the verifier merged runs of tiny, nearly collinear segments and recomputed; some total moved by more
-  than 0.05 ft or 0.5 sq ft, none by more than the fail limits.
-- `fail`: total area moved by more than 5 percent, or any single edge-type total moved by more than 10 percent.
+  than 0.05 ft or 0.5 sq ft, or the predominant pitch or the facet count changed, and none moved past the fail limits.
+- `fail`: total area moved by more than 5 percent, or any single edge-type total whose original length was over 10 ft
+  moved by more than 10 percent.
 - `unverified`: no verifier key, an API error, a timeout, or no final answer. The deterministic merge still ran and
   `model` is final. A verifier problem never fails the job. With `verify: false` neither the verifier nor the
   deterministic merge runs: `model` is the raw pipeline model and `verification.notes` says it was not requested.
@@ -557,7 +567,7 @@ placeholder address. Copy it as an app's mock fixture.
 
 | Var | Required | Default | Meaning |
 |---|---|---|---|
-| `PORT` | yes (Railway sets it) | 8011 | listen port |
+| `PORT` | no (Railway sets it) | 8011 | listen port |
 | `ROOF_MEASURE_TOKEN` | yes | none | bearer token, at least 32 characters; the process refuses to start without it |
 | `ROOF_MEASURE_AUTH` | no | `on` | `off` only with a loopback `ROOF_MEASURE_HOST` (local dev) |
 | `ROOF_MEASURE_HOST` | no | `::` | bind host; `::` is IPv6-only under uvicorn (right for Railway), so local Docker needs `0.0.0.0` |

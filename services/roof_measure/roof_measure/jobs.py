@@ -114,6 +114,12 @@ class JobStore:
         """Delete finished job dirs whose ``job.json`` is older than ``days`` days; returns how many."""
         cutoff = (time.time() if now is None else now) - days * 86400
         removed = 0
+        for tmp in self.root.glob("*/*.tmp"):  # a crash between write and replace leaves these behind
+            try:
+                if tmp.stat().st_mtime < (time.time() if now is None else now) - 3600:
+                    tmp.unlink()
+            except OSError:
+                continue
         for d in sorted(self.root.iterdir()):
             job = self.get(d.name) if d.is_dir() else None
             if job is None or job["status"] in ACTIVE:
@@ -136,6 +142,7 @@ class JobStore:
 # run(job, out_dir, deadline, on_stage) -> envelope dict; raises on failure
 RunFn = Callable[[dict[str, Any], Path, Deadline, Callable[[str], None]], dict[str, Any]]
 WATCHDOG_GRACE_S = 30.0
+EXTRA_PURGE_EVERY_S = 3600.0
 
 
 class JobRunner:
@@ -145,10 +152,11 @@ class JobRunner:
 
     def __init__(self, store: JobStore, workers: int, queue_max: int, timeout_s: float, run: RunFn,
                  retention_days: float = 14.0, on_done: Callable[[str], None] | None = None,
-                 watchdog_grace_s: float = WATCHDOG_GRACE_S):
+                 watchdog_grace_s: float = WATCHDOG_GRACE_S, extra_purge: Callable[[], None] | None = None):
         self.store, self.queue_max, self.timeout_s, self.run = store, queue_max, timeout_s, run
         self.retention_days, self.on_done, self.grace_s = retention_days, on_done, watchdog_grace_s
         self.workers = max(1, workers)
+        self.extra_purge, self._last_extra_purge = extra_purge, time.monotonic()  # results + fetch cache, hourly
         self._pool = ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="roof-job")
         self._queued = 0
         self._running = 0
@@ -164,9 +172,17 @@ class JobRunner:
         ``queue_max`` is the number of jobs that may wait; 0 means no waiting: a job is admitted only when a
         worker is free."""
         with self._lock:
+            if len(self._abandoned) >= self.workers:
+                raise QueueFull  # every worker is stuck on an abandoned job: nothing would ever run
             if self._queued >= self.queue_max and self._queued + self._running >= self.workers:
                 raise QueueFull
             self._queued += 1
+
+    @property
+    def abandoned_workers(self) -> int:
+        """Workers still held by a job the watchdog gave up on (their threads cannot be killed)."""
+        with self._lock:
+            return len(self._abandoned)
 
     def release(self) -> None:
         with self._lock:
@@ -194,6 +210,13 @@ class JobRunner:
             with self._lock:
                 late = [j for j, at in self._active.items() if now > at and j not in self._abandoned]
                 self._abandoned.update(late)
+            with self._lock:
+                all_stuck = len(self._abandoned) >= self.workers
+            if all_stuck:  # queued jobs would wait forever: fail them now (retryable)
+                for j in self.store.list_incomplete():
+                    if j["status"] == "queued":
+                        self.store.update(j["id"], status="failed", stage=None, error=error_object("timeout"))
+                        self._finish(j["id"])
             for job_id in late:
                 log.warning("job watchdog: id=%s did not finish %gs after its deadline; marking timeout", job_id,
                             self.grace_s)
@@ -221,6 +244,9 @@ class JobRunner:
             self._active[job_id] = time.monotonic() + self.timeout_s + self.grace_s
         started = time.monotonic()
         try:
+            current = self.store.get(job_id)
+            if current is None or current["status"] != "queued":
+                return  # failed while it waited (all workers were stuck): nothing to run
             job = self.store.update(job_id, status="running", stage="start")
             deadline = Deadline.after(self.timeout_s)
             result = self.run(job, self.store.job_dir(job_id), deadline,
@@ -252,13 +278,17 @@ class JobRunner:
             self._purge()
 
     def _stage(self, job_id: str, stage: str) -> None:
-        if job_id not in self._abandoned:
-            self.store.update(job_id, stage=stage)
+        with self._lock:  # never write a stage onto a job the watchdog already failed
+            if job_id not in self._abandoned:
+                self.store.update(job_id, stage=stage)
 
     def _purge(self) -> None:
         try:
             n = self.store.purge(self.retention_days)
             if n:
                 log.info("purged %d job dir(s) older than %g days", n, self.retention_days)
+            if self.extra_purge and time.monotonic() - self._last_extra_purge >= EXTRA_PURGE_EVERY_S:
+                self._last_extra_purge = time.monotonic()
+                self.extra_purge()
         except OSError:
             log.exception("retention purge failed")
