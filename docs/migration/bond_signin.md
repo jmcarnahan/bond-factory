@@ -13,7 +13,7 @@ The app writes ONLY a `UserDirectory`, a `ScopePolicy`, settings and a mount. Or
 
 | File | A | S | P |
 |---|---|---|---|
-| `auth/directory.py` | ~90: identity lookup, invite by `lower(email)` not removed, capabilities from `user_capabilities`, bookkeeping | ~110: role to capabilities, admin e-mail list promotes inside `find_invite`, invite is UPN or `mail` | ~80: invite lookup, `company_suspended`, `company_id` extra claim, audit |
+| `auth/directory.py` | ~90: identity lookup, invite by `lower(email)` not removed, capabilities from `user_capabilities`, bookkeeping, `apply_profile` fill-only-when-empty | ~110: role to capabilities, admin e-mail list promotes inside `find_invite`, invite is UPN or `mail`, `apply_profile` fill-only-when-empty | ~80: invite lookup, `company_suspended`, `company_id` extra claim, audit, `apply_profile` fill-only-when-empty |
 | Settings and policy | ~70 | ~60 | ~40 |
 | Models and revisions | `identity_provider`, `identity_subject` (unique pair, nullable); `SessionsMixin`, `HandoffsMixin`; two revisions | same plus `sessions_valid_after` (S has none) and the connections table; three revisions | same minus connections; one revision |
 | Router and deps | keeps `/me`, `PATCH /me`, `/demo`, `/providers`, `/firebase` (break-glass); mounts the SDK router | same; first moves to the SDK auth contract | same |
@@ -21,7 +21,8 @@ The app writes ONLY a `UserDirectory`, a `ScopePolicy`, settings and a mount. Or
 
 `UserDirectory` methods (the app writes all): `find_by_identity`, `find_by_id`, `find_invite(session, emails,
 provider)`, `link_identity` (raises `IdentityTaken`), `check_allowed`, `capabilities`, `session_spec`, `public`,
-`mark_sessions_invalid`, `provider_alive`, `record_sign_in`, `record_refusal`. Signatures: `libs/bond_signin/README.md`.
+`mark_sessions_invalid`, `provider_alive`, `record_sign_in`, `record_refusal`; optional `apply_profile(session, user,
+profile, *, provider, first)` (receives the IdP display name; fill an empty name). Signatures: `libs/bond_signin/README.md`.
 
 ## 2. ScopePolicy
 
@@ -87,6 +88,8 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
 - **Existing Firebase users.** `identity_provider`/`identity_subject` start null. The first Google or Microsoft sign-in
   links once by a VERIFIED e-mail match in `find_invite` (P: the Firebase `identities` list already holds the Google
   subject). A second subject for the same row is `identity_mismatch`.
+- **Display name.** Implement `apply_profile` (optional) so an e-mail-only invitee gets the IdP's name at first sign-in;
+  see `libs/bond_signin/README.md`.
 - **Connections.** One-off copy of the old connection rows into `oauth_connections` (A `user_mail_connections`, S
   `oauth_tokens`; steps in `bond_oauth.md`), so nobody reconnects. Rows that fail to decrypt are listed.
 - **Stays in the app.** FCM push and its Firebase init (A, P; S has no `firebase_messaging` and removes Firebase from both clients with direct sign-in), users, invites, admin, audit, role mapping, the A shared office mailbox

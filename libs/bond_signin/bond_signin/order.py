@@ -2,17 +2,20 @@
 
 ``tenant_mismatch`` is raised upstream by the identity flow. Here: ``email_not_verified`` -> ``not_invited`` ->
 ``check_allowed`` -> ``deactivated`` -> ``identity_mismatch`` -> ``session_revoked`` -> link. On ANY refusal
-``record_refusal`` runs and the exception is re-raised. Nothing is stored here: the caller stores after this returns.
+``record_refusal`` runs and the exception is re-raised. Nothing is stored on a refusal; on success ``link_identity``
+(first sign-in) and the optional ``apply_profile`` hook write before the caller issues the session.
 """
 
 from __future__ import annotations
 
+import inspect
 import time
 from datetime import UTC, datetime
 from typing import Any
 
 from .errors import SignInRefused, refusal_code
 from .policy import normalize_email
+from .profile import ProfileHookError, profile_of
 from .protocols import OidcIdentity, UserDirectory, UserRef
 
 SKEW_SECONDS = 5.0
@@ -90,4 +93,14 @@ def _run(session: Any, directory: UserDirectory, identity: OidcIdentity, provide
             if refusal_code(exc) is not None:
                 exc.user = user  # type: ignore[attr-defined]
             raise
+    hook = getattr(directory, "apply_profile", None)
+    if callable(hook):
+        if inspect.iscoroutinefunction(hook):  # a coroutine nobody awaits would silently store nothing
+            raise ProfileHookError("apply_profile must be synchronous")
+        profile = profile_of(identity)
+        if profile is not None:
+            try:
+                hook(session, user, profile, provider=provider, first=invited)
+            except Exception as exc:  # wrapped: a coded error (e.g. a DB error) must never read as a refusal
+                raise ProfileHookError("apply_profile failed") from exc
     return user, invited

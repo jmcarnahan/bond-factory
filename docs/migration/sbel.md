@@ -170,3 +170,16 @@ There is no break-glass: a rollback is the previous image (Firebase accounts wer
 Client side: after a rollback web users sign in again (the old image never reads the new cookie); phone users reinstall the
 previous TestFlight build. The new phone build must not reach external testers before the server cutover, and the old build
 stops at cutover (no compatibility window): the two releases are done back to back.
+
+## 12. Display name (apply_profile)
+
+Invitees created by e-mail only have `users.name` NULL and show as a dash until someone types a name. bond_signin
+(from the next pin) calls the optional `apply_profile(session, user, profile, *, provider, first)` on every successful
+sign-in, inside the sign-in transaction and before the first access token, with `profile.name` already trimmed,
+non-empty and at most 256 characters (Microsoft: id_token `name`, else Graph `displayName`). Implement it in
+`sbelcrm/auth/signin/directory.py` as fill-only-when-empty:
+`if not (user.name or '').strip(): user.name = profile.name`. An admin-set name is never overwritten; nothing else
+changes. Move all four pins (bond_signin, bond_oauth, bond_auth_py, bond_service_kit) to the new SHA together; between
+de681b4 and it, only docs, this hook in bond_signin, and the sdk_example reference (not a pin) moved; bond_oauth,
+bond_auth_py and bond_service_kit code is unchanged. The name is free text the person typed at the identity provider:
+escape it on display like any user text.

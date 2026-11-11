@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
+from bond_auth_py import decode_claims
 from bond_oauth.fake import FAKE_TENANT, mock_code
 from fastapi.testclient import TestClient
 from signin_conformance_support import (  # noqa: F401
@@ -252,3 +253,21 @@ def test_mounted_under_a_prefix_end_to_end(tmp_path):
     assert c.cookies.get(REFRESH) not in (None, old)  # the rotated cookie came back on the prefixed path
     out = c.post(f"{prefix}/logout", json={}, headers=ORIGIN)
     assert out.status_code == 200 and c.cookies.get(REFRESH) is None and c.cookies.get(ACCESS) is None
+
+
+# 2b. the display name at first sign-in -----------------------------------------------------------------------
+
+
+def test_first_sign_in_fills_an_empty_name(stack, client):
+    stack.add_user("u-dora", "dora.example@example.com", name="")
+    done = web_sign_in(client, GOOGLE, "dora.example@example.com")
+    assert done.status_code == 302 and done.headers["location"] == f"{REDIRECT}?signin=ok"
+    assert decode_claims(client.cookies.get(ACCESS), stack.auth).name == "dora.example"  # the first token
+    assert client.get("/auth/me").json()["name"] == "dora.example"
+
+
+def test_sign_in_keeps_an_existing_name(stack, client):
+    stack.add_user("u-kept", "kept.example@example.com", name="Kept Name")
+    web_sign_in(client, GOOGLE, "kept.example@example.com")
+    assert decode_claims(client.cookies.get(ACCESS), stack.auth).name == "Kept Name"
+    assert client.get("/auth/me").json()["name"] == "Kept Name"
