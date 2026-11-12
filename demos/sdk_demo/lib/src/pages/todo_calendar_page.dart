@@ -12,7 +12,7 @@ import 'page_scaffold.dart';
 /// A month of TODOs: `BondMonthGrid` with a `BondDueMarker` per day and the `BondDueLane` of the
 /// selected day. Events sent from the Capture page show under the lane; one in the past reads
 /// "Missed" and never "overdue". Ids are `sdk.calendar.<element>`: `grid`, `marker-<yyyy-mm-dd>`,
-/// `row-<id>`, `complete-<id>`, `event-<n>`, `error`.
+/// `row-<id>`, `complete-<id>`, `event-<n>`, `clock-state`, `error`.
 class TodoCalendarPage extends StatefulWidget {
   const TodoCalendarPage({super.key, this.services});
 
@@ -30,6 +30,9 @@ class _TodoCalendarPageState extends State<TodoCalendarPage> {
   late DateTime _selected = _dayOf(_s.now());
   late DateTime _month = DateTime(_selected.year, _selected.month);
   List<Task> _tasks = const [];
+
+  /// True once the person picked a day or a month: the clock then no longer moves the selection.
+  bool _picked = false;
   String? _error;
 
   static DateTime _dayOf(DateTime instant) {
@@ -52,7 +55,12 @@ class _TodoCalendarPageState extends State<TodoCalendarPage> {
 
   void _clockMoved() {
     if (!mounted) return;
-    setState(() {});
+    setState(() {
+      if (!_picked) {
+        _selected = _dayOf(_s.now());
+        _month = DateTime(_selected.year, _selected.month);
+      }
+    });
     unawaited(_load());
   }
 
@@ -150,14 +158,31 @@ class _TodoCalendarPageState extends State<TodoCalendarPage> {
         children: [
           if (_error != null)
             labelledText('$_id.error', _error!, TextStyle(color: BondTokens.of(context).danger.press)),
+          labelledText(
+            '$_id.clock-state',
+            _s.fakeNow.value == null
+                ? 'Clock: real time (today ${dueDateString(today)})'
+                : 'Clock: ${_s.fakeNow.value!.toIso8601String()} (today ${dueDateString(today)})',
+            BondText.of(context).caption.copyWith(color: BondTokens.of(context).muted),
+          ),
+          BondSpace.h8,
           BondMonthGrid(
             visibleMonth: _month,
             selected: _selected,
             today: today,
             semanticsId: '$_id.grid',
-            onPrevious: () => setState(() => _month = DateTime(_month.year, _month.month - 1)),
-            onNext: () => setState(() => _month = DateTime(_month.year, _month.month + 1)),
-            onSelect: (d) => setState(() => _selected = d),
+            onPrevious: () => setState(() {
+              _picked = true;
+              _month = DateTime(_month.year, _month.month - 1);
+            }),
+            onNext: () => setState(() {
+              _picked = true;
+              _month = DateTime(_month.year, _month.month + 1);
+            }),
+            onSelect: (d) => setState(() {
+              _picked = true;
+              _selected = d;
+            }),
             isSelectable: (_) => true,
             dayBuilder: (context, day) => _marker(context, day, now),
             daySemantics: (day) {

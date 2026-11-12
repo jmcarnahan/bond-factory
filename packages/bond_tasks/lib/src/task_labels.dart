@@ -83,6 +83,7 @@ class TaskLabels {
     this.anytime = 'Any time',
     this.dueMarker = 'due',
     this.overdueMarker = 'overdue',
+    this.moreLinks = '+{n}',
   });
 
   final String title;
@@ -166,6 +167,10 @@ class TaskLabels {
   final String anytime;
   final String dueMarker;
   final String overdueMarker;
+  final String moreLinks;
+
+  /// "+2": how many links a row does not show.
+  String moreLinksText(int n) => moreLinks.replaceAll('{n}', '$n');
 
   /// Spoken name of a month cell marker: "3 due" or "2 overdue".
   String markerText(int count, {required bool overdue}) => '$count ${overdue ? overdueMarker : dueMarker}';

@@ -98,10 +98,8 @@ class DemoSession {
     return _signingIn ??= _establish().whenComplete(() => _signingIn = null);
   }
 
-  /// The one place `_session` changes. When the person (user id) changes, the stop hooks run for the
-  /// one who left and the start hooks for the one who arrived, so the alerts always follow the
-  /// session: a server-ended session, a switch of user and a reset all stop them. Hooks are not awaited
-  /// (a hook must never fail a sign-in); `TodoAlerts` serialises them.
+  /// The one place `_session` changes. When the user id changes, the stop hooks run for the one who left
+  /// and the start hooks for the one who arrived (not awaited; `TodoAlerts` serialises them).
   static void _setSession(AuthSession? s) {
     _session = s;
     final uid = s?.userId;

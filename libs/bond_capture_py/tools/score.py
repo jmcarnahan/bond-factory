@@ -100,7 +100,9 @@ def match(exp_items, pred):
         j = None
         kw = e.get("kw")
         if kw:
-            j = next((i for i, p in enumerate(pred) if i not in used and kw in str(p.get("title", "")).lower()), None)
+            hits = [i for i, p in enumerate(pred) if i not in used and kw in str(p.get("title", "")).lower()]
+            # prefer the keyword hit whose kind fits the label, else the first hit
+            j = next((i for i in hits if kind_ok(e["kind"], pred[i].get("kind"))), hits[0] if hits else None)
         if j is None:
             j = next((i for i in range(len(pred)) if i not in used), None)
         if j is not None:

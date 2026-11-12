@@ -294,6 +294,31 @@ void main() {
     await expectNoOverlays(t);
   });
 
+  testWidgets('an invalid time box disables Save and nothing stale is saved; a valid one re-enables', (t) async {
+    final got = <TaskDraft>[];
+    await pumpAt(
+      t,
+      BondTaskForm(
+        today: kToday,
+        onSubmit: got.add,
+        initial: const Task(id: 'x', title: 'T', dueDate: '2026-03-12', dueTime: '09:00'),
+      ),
+    );
+    final hour = find.byType(TextField).at(2);
+    bool saveOff() => t.widget<BondButton>(find.widgetWithText(BondButton, 'Save task')).onPressed == null;
+    await t.ensureVisible(hour);
+    await t.enterText(hour, '91');
+    await t.pump();
+    expect(saveOff(), isTrue);
+    await t.tap(find.text('Save task'), warnIfMissed: false);
+    expect(got, isEmpty);
+    await t.enterText(hour, '12');
+    await t.pump();
+    expect(saveOff(), isFalse);
+    await t.tap(find.text('Save task'));
+    expect(got.single.dueTime, '00:00', reason: '12 typed over 9 AM is 12 AM; the stale 09:00 is not saved');
+  });
+
   testWidgets('semantics ids follow the prefix', (t) async {
     final handle = t.ensureSemantics();
     await pumpAt(t, BondTaskForm(today: kToday, onSubmit: (_) {}, assignees: _people, semanticsPrefix: 'sdk.tasks'));

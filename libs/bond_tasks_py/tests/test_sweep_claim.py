@@ -173,3 +173,31 @@ def test_compose_is_not_called_for_notices_already_claimed(sq_factory):
         add_task(session, "late", owner="u9", due_time="09:30", due_at=datetime(2026, 3, 12, 16, 30))
         sweep(session, datetime(2026, 3, 12, 16, 32), compose=compose)
         assert calls[5:] == ["late"]  # only the new notice
+
+
+def test_a_conflicting_outbox_row_does_not_break_the_claim(sq_factory):
+    from bond_tasks_py.stages import deadline_token, notice_id
+
+    with sq_factory() as session:
+        task = add_task(session, due_time="09:30", due_at=datetime(2026, 3, 12, 16, 30))
+        nid = notice_id("t1", "user-1", "due", 0, deadline_token(task))
+        session.execute(Outbox.__table__.insert().values(ledger_id=nid, channel="chat", attempts=0,
+                                                         created_at=datetime(2026, 3, 12)))
+        result = sweep(session, datetime(2026, 3, 12, 16, 30), transactional=[FakeInbox()], channels=["chat"],
+                       outbox_model=Outbox)
+        assert (result.claimed, result.errors) == (1, 0)
+
+
+def test_a_row_another_worker_won_is_not_written_again(sq_factory, monkeypatch):
+    from bond_tasks_py import sweep as sweep_module
+
+    first, second = FakeInbox(), FakeInbox()
+    with sq_factory() as session:
+        add_task(session, due_time="09:30", due_at=datetime(2026, 3, 12, 16, 30))
+        sweep(session, datetime(2026, 3, 12, 16, 30), transactional=[first], channels=["chat"], outbox_model=Outbox)
+        # the existence check misses it (another worker committed in between): the insert is the arbiter
+        monkeypatch.setattr(sweep_module, "existing_ids", lambda *a, **k: set())
+        result = sweep(session, datetime(2026, 3, 12, 16, 31), transactional=[second], channels=["chat"],
+                       outbox_model=Outbox)
+        assert (result.claimed, result.queued) == (0, 0) and second.written == []
+        assert session.scalar(select(func.count()).select_from(Outbox)) == 1

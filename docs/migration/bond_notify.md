@@ -16,6 +16,8 @@ rows to `Notice` and swaps the REST calls for `NoticesApi`.
 - One feed. REST or sync, same controller:
 
 ```dart
+import 'package:http/http.dart' as http; // a test passes MockClient from package:http/testing.dart
+final apiClient = ApiClient(baseUrl: Uri.parse('https://api.example.com'), http: http.Client(), tokens: tokenSource);
 final api = NoticesApi(apiClient);                         // prefix '/notices'
 final controller = NoticeController(PollingNoticeFeed(api)); // polls every 30 seconds while someone listens
 await controller.start();

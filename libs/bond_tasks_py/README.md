@@ -6,6 +6,7 @@ mirrors behind a Protocol, never the source of truth. Imports only SQLAlchemy, p
 the queue, the calendar and every notice channel arrive through Protocols the app wires.
 
 ## What it owns
+Host models, every service call's signature and the route list: `docs/migration/bond_tasks_py_host.md`.
 The lib ships no migration: write your own revision and assert each `*_COLUMNS` (name -> nullable) in a test.
 
 | Mixin (table) | Columns constant |
@@ -26,7 +27,7 @@ Service functions take a session, flush and never commit. Datetimes are naive UT
 - `AfterWrite` `(session, task)`: runs after the flush in create and update; `make_link_hook(Index)` is one.
 - `TransactionalNotifier.write(session, notices)`: the inbox; runs inside the claim, a raise cancels the batch.
 - `Notifier.send(session, notice) -> "ok" | "retryable" | "unregistered" | "failed"`: push, chat, email; after commit.
-- `Recipients.for_stage(session, task, stage)`: who gets a stage; the default is `default_recipients`.
+- `Recipients.for_stage(session, task, stage)`: who gets a stage. `default_recipients`: `close` and `due` go to the responsible user (assignee, else owner); `past` goes to that user and the owner (once if the same).
 - `Compose` `(task, stage, seq, prefs) -> (title, body)`: wording; the default is `default_compose`.
 - `sync_routes(on_deleted=)`: `(ctx, session, task_id, owner_user_id)` after each delete; `after_delete` still gets the mirror pointer.
 - `CalendarMirror`, `MirrorProviders`: calendar provider, per-user lookup.

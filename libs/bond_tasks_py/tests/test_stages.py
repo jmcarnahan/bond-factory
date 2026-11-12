@@ -204,3 +204,11 @@ def test_lead_of_exactly_the_cap_and_one_more():
     assert due - at[10079] == timedelta(minutes=10079)
     assert due - at[10080] == timedelta(minutes=10080)
     assert at[10081] == at[10080]
+
+
+@pytest.mark.parametrize("due_minute, has_past0", [(45, False), (44, True)])
+def test_past_zero_when_the_first_morning_is_exactly_fifteen_minutes_after_due(due_minute, has_past0):
+    prefs = UserPrefs(time_zone="UTC", start_of_day=time(0, 0), end_of_day=time(17, 0))
+    task = _task(datetime(2026, 3, 12, 23, due_minute), remind=-2)
+    stages = stage_times(task, prefs, "UTC", datetime(2026, 3, 12))
+    assert (("past", 0) in [(s.stage, s.seq) for s in stages]) is has_past0

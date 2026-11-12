@@ -73,6 +73,9 @@ class _BondTaskFormState extends State<BondTaskForm> {
   List<TaskLink> _links = const [];
   bool _tried = false;
 
+  /// False while the time boxes hold something that is not a time; Save waits.
+  bool _timeValid = true;
+
   /// A date or time the server sent that this form cannot read: kept as it
   /// came and sent back unchanged unless the person picks or clears one.
   String? _badDate;
@@ -169,7 +172,11 @@ class _BondTaskFormState extends State<BondTaskForm> {
             _time = const BondTime(hour24: 9, minute: 0);
           }),
           onTime: (v) => setState(() => _time = v),
-          onRemoveTime: () => setState(() => _time = null),
+          onRemoveTime: () => setState(() {
+            _time = null;
+            _timeValid = true;
+          }),
+          onTimeValid: (v) => setState(() => _timeValid = v),
           idOf: _id,
         ),
         if (widget.assignees.isNotEmpty) ...[
@@ -223,7 +230,7 @@ class _BondTaskFormState extends State<BondTaskForm> {
         BondSpace.h16,
         Row(
           children: [
-            BondButton(label: l.save, loading: widget.busy, onPressed: widget.busy ? null : _save, semanticsId: _id('save')),
+            BondButton(label: l.save, loading: widget.busy, onPressed: widget.busy || !_timeValid ? null : _save, semanticsId: _id('save')),
             if (widget.onCancel != null) ...[
               BondSpace.w8,
               BondButton(

@@ -76,4 +76,31 @@ void main() {
     expect(find.text('Database is down'), findsWidgets);
     await leave(t);
   });
+
+  testWidgets('a fresh user with no stored zone gets the device zone once, and the page shows it', (t) async {
+    final r = TodoRig();
+    r.on.json('GET', '/tasks/settings', settingsJson(zone: '')..['time_zone'] = null);
+    r.on.json('GET', '/tasks/settings', settingsJson(zone: 'America/Los_Angeles'));
+    r.on.json('PUT', '/tasks/settings', settingsJson(zone: 'America/Los_Angeles'));
+    await pumpPage(t, TodoSettingsPage(services: r.services));
+    expect(r.all('PUT', '/tasks/settings'), hasLength(1));
+    expect(r.only('PUT', '/tasks/settings').json, {'time_zone': 'America/Los_Angeles'});
+    expect(find.text('Zone: America/Los_Angeles'), findsOneWidget);
+    await leave(t);
+  });
+
+  testWidgets('a second user with no stored zone gets their own report after sign-out', (t) async {
+    final r = TodoRig();
+    r.on.json('GET', '/tasks/settings', settingsJson(zone: '')..['time_zone'] = null);
+    r.on.json('PUT', '/tasks/settings', settingsJson(zone: 'America/Los_Angeles'));
+    await r.services.reportZone();
+    expect(r.all('PUT', '/tasks/settings'), hasLength(1));
+    await r.services.reportZone();
+    expect(r.all('PUT', '/tasks/settings'), hasLength(1), reason: 'same user, same zone: nothing to send');
+
+    // Sign-out, then another person in the same page session; the server holds no zone for them.
+    r.services.useUser('demo-user-2');
+    await r.services.reportZone();
+    expect(r.all('PUT', '/tasks/settings'), hasLength(2), reason: 'the new user is not compared with the old one');
+  });
 }

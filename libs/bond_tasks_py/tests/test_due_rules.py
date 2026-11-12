@@ -1,6 +1,6 @@
 """One test per rule of docs/decisions/2026-11-11-due-instant.md, through the service and the due helpers."""
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 import pytest
 from conftest import NOW, Task
@@ -63,6 +63,21 @@ def test_rule3_a_consistent_client_due_at_is_accepted_and_an_inconsistent_one_ig
     assert compute_due_at(DAY, "09:30", client_due_at=ok, **named) == ok
     # never an error for a value of another kind (aware, far off)
     assert compute_due_at(DAY, "09:30", client_due_at=datetime(1900, 1, 1), **kw) == datetime(2026, 3, 12, 9, 30)
+
+
+def test_client_hint_bounds_are_inclusive_and_quarter_hour_exact():
+    kw = {"writer_zone": None, "responsible_prefs": UserPrefs(), "app_tz": "UTC"}
+    wall = datetime(2026, 3, 12, 9, 30)  # the computed instant, since the app zone is UTC
+
+    def got(shift):
+        return compute_due_at(DAY, "09:30", client_due_at=wall + shift, **kw)
+
+    assert got(-timedelta(hours=14)) == wall - timedelta(hours=14)  # the extreme legal offsets are accepted
+    assert got(timedelta(hours=12)) == wall + timedelta(hours=12)
+    assert got(-timedelta(hours=14, minutes=15)) == wall  # 15 minutes beyond each is ignored
+    assert got(timedelta(hours=12, minutes=15)) == wall
+    assert got(-timedelta(minutes=5)) == wall  # not a quarter hour
+    assert got(-timedelta(minutes=45)) == wall - timedelta(minutes=45)
 
 
 def test_rule3_through_create_a_device_hint_without_a_zone_is_used_when_plausible(session):

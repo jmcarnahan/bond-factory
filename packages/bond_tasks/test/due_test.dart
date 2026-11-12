@@ -75,6 +75,14 @@ void main() {
   });
 
   group('inQuietHours', () {
+    test('work day across midnight: the end minute is not quiet', () {
+      const p = TaskPrefs(startOfDay: '22:00', endOfDay: '06:00');
+      expect(inQuietHours(p, DateTime(2026, 3, 12, 6, 0)), isFalse);
+      expect(inQuietHours(p, DateTime(2026, 3, 12, 6, 1)), isTrue);
+      expect(inQuietHours(p, DateTime(2026, 3, 12, 21, 59)), isTrue);
+      expect(inQuietHours(p, DateTime(2026, 3, 12, 22, 0)), isFalse);
+    });
+
     const p = TaskPrefs();
     test('strictly after end and strictly before start', () {
       expect(inQuietHours(p, DateTime(2026, 3, 12, 17, 0)), isFalse);

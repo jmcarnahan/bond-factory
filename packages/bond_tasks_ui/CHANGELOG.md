@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+- `BondTaskFormDue.onTimeValid` (internal); `BondTaskForm` disables Save while the time box holds an invalid time.
+- `BondTaskRow` shows up to 3 link chips and "+N"; `onLinkTap` on the row, `BondTaskList`, `BondTodayList`.
 - `BondTaskSettingsForm.zoneOptions` (`List<String>?`): choose the zone inline; capture cards carry `<prefix>.review-item-<n>`.
 Removed
 - Uses of `Task.remindAt` / `remindedAt`. Changed: a new task in `BondTaskForm` starts at "use my default" (-3).

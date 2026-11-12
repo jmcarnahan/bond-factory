@@ -206,6 +206,26 @@ void main() {
   });
 
   group('past seq 0', () {
+    Task dueAtLocal(int h, int m) => Task(
+          id: 'edge',
+          title: 'edge',
+          dueDate: '2026-03-12',
+          dueTime: '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}',
+          dueAt: DateTime(2026, 3, 12, h, m).toUtc(),
+          ownerUserId: 'user-1',
+          remindMinutesBefore: kRemindNone,
+        );
+    // The first morning (seq 1) is startOfDay on the day AFTER the due local date, so with startOfDay
+    // 00:00 the boundary is due 23:45 (+ 15 min = exactly 00:00 next day).
+    List<String> kinds(Task t) => [
+          for (final s in stageTimes(t, const TaskPrefs(startOfDay: '00:00'), DateTime.utc(2026, 3, 12))) '${s.stage}/${s.seq}',
+        ];
+
+    test('past 0 is listed only when it comes strictly before the first morning', skip: _skip, () {
+      expect(kinds(dueAtLocal(23, 45)), ['due/0', 'past/1', 'past/2', 'past/3', 'past/4', 'past/5']);
+      expect(kinds(dueAtLocal(23, 44)), ['due/0', 'past/0', 'past/1', 'past/2', 'past/3', 'past/4', 'past/5']);
+    });
+
     test('is left out when dueAt + 15 minutes is not before the next morning', skip: _skip, () {
       // Due 23:55 local with a work day starting at 00:00: seq 0 would start at 00:10, after seq 1 (00:00).
       final due = DateTime(2026, 3, 12, 23, 55).toUtc();

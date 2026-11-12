@@ -34,7 +34,7 @@ Per-app notes live beside the module notes (`sbel.md`).
 | `bond_sync`, `bond_sync_powersync`, `bond_sync_py` | `bond_sync.md`, `bond_sync_powersync.md`, `bond_sync_py.md` | S first, then A |
 | `bond_oauth` | `bond_oauth.md` | A, S |
 | `bond_calendar` | `bond_calendar.md` | S (Microsoft Graph), A (Google read); P adopts nothing |
-| `bond_tasks_py` | `bond_tasks_py.md` | S, A |
+| `bond_tasks_py` | `bond_tasks_py.md`, `bond_tasks_py_host.md` (models, routes, service calls) | S, A |
 | `bond_tasks`, `bond_tasks_ui` | `bond_tasks.md`, `bond_tasks_ui.md` | S web, S phone, A |
 | `bond_connections`, `bond_connections_ui` | `bond_connections.md` | A, S |
 | `bond_notify_py` | `bond_notify_py.md` | after `bond_tasks_py`: S, then A |

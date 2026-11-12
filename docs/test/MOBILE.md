@@ -5,6 +5,12 @@ permission prompt and its three buttons. Everything else is walked in the browse
 harness (never shipped). The example API is `services/sdk_example` in fake mode. Run everything from the repo root.
 Phones are iOS only: there is no Android lane.
 
+## Status
+
+On 2026-11-11 the demo was built for the simulator (`flutter build ios --simulator --debug`), installed and launched on an iPhone 17
+simulator, and rendered its home page. Steps 1 to 9 below (permission, notification, buttons, tap) have NOT been run, because no
+tool could tap the simulator. They need a hand test. The first build runs `pod install` and writes `ios/Podfile.lock`.
+
 ## What this lane can and cannot prove
 
 | Can | Cannot |

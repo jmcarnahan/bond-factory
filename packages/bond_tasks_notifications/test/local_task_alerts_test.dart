@@ -441,6 +441,135 @@ void main() {
     });
   });
 
+  group('hardening', () {
+    Notice arriving(String id) => Notice(id: id, title: 'T', body: 'B', taskId: 'a', stage: 'due');
+
+    test('perTask caps one task even when the budget is not reached', () async {
+      table['a'] = [for (var s = 0; s < 6; s++) _st('past', s, Duration(days: s + 1))];
+      final alerts = make(perTask: 2);
+      await alerts.start();
+      repo.push([_task('a')]);
+      await settle();
+      expect(plugin.scheduled.map((r) => r.atUtc).toList()..sort(),
+          [_now.add(const Duration(days: 1)), _now.add(const Duration(days: 2))]);
+      await alerts.dispose();
+    });
+
+    test('defaults: budget 60, perTask 3', () {
+      final alerts = LocalTaskAlerts(repo, plugin, userId: 'me');
+      expect(alerts.budget, 60);
+      expect(alerts.perTask, 3);
+    });
+
+    test('a done task gets no alerts even if the schedule lists stages', () async {
+      table['a'] = [_st('due', 0, const Duration(hours: 1))];
+      final alerts = make();
+      await alerts.start();
+      repo.push([const Task(id: 'a', title: 'x', ownerUserId: 'me', dueDate: '2026-03-12', status: TaskStatus.done)]);
+      await settle();
+      expect(plugin.scheduled, isEmpty);
+      await alerts.dispose();
+    });
+
+    test('a stage exactly 2 s ahead is not scheduled, 2 s + 1 ms is', () async {
+      table['a'] = [
+        _st('close', 0, const Duration(seconds: 2)),
+        _st('due', 0, const Duration(seconds: 2, milliseconds: 1)),
+      ];
+      final alerts = make();
+      await alerts.start();
+      repo.push([_task('a')]);
+      await settle();
+      expect(plugin.scheduled.map((r) => r.atUtc), [_now.add(const Duration(seconds: 2, milliseconds: 1))]);
+      await alerts.dispose();
+    });
+
+    test('a copy scheduled for exactly now counts as fired', () async {
+      table['a'] = [_st('due', 0, const Duration(hours: 1))];
+      final alerts = make();
+      await alerts.start();
+      repo.push([_task('a')]);
+      await settle();
+      final r = plugin.scheduled.single;
+      clockNow = r.atUtc;
+      await alerts.onNoticeArrived(arriving(r.noticeId));
+      expect(plugin.shown, isEmpty);
+      expect(plugin.cancelled, isEmpty);
+      await alerts.dispose();
+    });
+
+    test('an arrived notice that is shown is not shown twice (only the posted set stops it)', () async {
+      final p = _NeverActive();
+      final alerts = LocalTaskAlerts(repo, p, userId: 'me', clock: TaskClock(() => _now));
+      await alerts.start();
+      await alerts.onNoticeArrived(arriving('n1'));
+      await alerts.onNoticeArrived(arriving('n1'));
+      expect(p.shown, hasLength(1));
+      await alerts.dispose();
+    });
+
+    test('cancelAll forgets what was shown: a new session shows it again', () async {
+      final p = _NeverActive();
+      final alerts = LocalTaskAlerts(repo, p, userId: 'me', clock: TaskClock(() => _now));
+      await alerts.start();
+      await alerts.onNoticeArrived(arriving('n1'));
+      await alerts.cancelAll();
+      await alerts.start();
+      await alerts.onNoticeArrived(arriving('n1'));
+      expect(p.shown, hasLength(2));
+      await alerts.dispose();
+    });
+
+    test('a stage that had fired can fire again after it is rescheduled', () async {
+      table['a'] = [_st('due', 0, const Duration(hours: 1))];
+      final alerts = make();
+      await alerts.start();
+      repo.push([_task('a')]);
+      await settle();
+      final r = plugin.scheduled.single;
+      plugin.scheduled.clear(); // it fired
+      clockNow = _now.add(const Duration(hours: 2));
+      table['a'] = [_st('due', 0, const Duration(hours: 5))]; // the deadline moved later
+      repo.push([_task('a')]);
+      await settle();
+      expect(plugin.scheduled.single.id, r.id);
+      await alerts.onNoticeArrived(arriving(r.noticeId));
+      expect(plugin.shown, hasLength(1), reason: 'the new copy is still ahead, so the notice is shown');
+      await alerts.dispose();
+    });
+
+    test('start() twice subscribes once', () async {
+      table['a'] = [_st('due', 0, const Duration(hours: 1))];
+      final r = _CountingRepo();
+      final p = _CountingPending();
+      final alerts = LocalTaskAlerts(r, p, userId: 'me', clock: TaskClock(() => _now), stages: (t, pr, n) => table[t.id]!);
+      await alerts.start();
+      await alerts.start();
+      expect(r.watchCalls, 1);
+      final before = p.pendingCalls;
+      r.push([_task('a')]);
+      await settle();
+      expect(p.pendingCalls - before, 1, reason: 'one sync pass for one push');
+      await alerts.dispose();
+    });
+
+    test('equal times are cut by id, so the budget choice is deterministic', () async {
+      final task = _task('x');
+      int idOf(String t) => fnv1a31(noticeId(t, 'me', 'due', 0, deadlineToken(task)));
+      final ids = {'p': idOf('p'), 'q': idOf('q')};
+      final higher = ids['p']! > ids['q']! ? 'p' : 'q';
+      final lower = higher == 'p' ? 'q' : 'p';
+      table['p'] = [_st('due', 0, const Duration(hours: 1))];
+      table['q'] = [_st('due', 0, const Duration(hours: 1))];
+      final alerts = make(budget: 1);
+      await alerts.start();
+      repo.push([_task(higher), _task(lower)]); // the higher id comes first in the input
+      await settle();
+      expect(plugin.scheduled.single.taskId, lower);
+      await alerts.dispose();
+    });
+  });
+
   group('lifecycle', () {
     test('cancelAll clears the list and stops listening until start() again', () async {
       table['a'] = [_st('due', 0, const Duration(hours: 1))];
@@ -638,5 +767,28 @@ class _FlakyPending extends FakeAlertPlugin {
   Future<List<PendingAlert>> pending() async {
     if (fail) throw StateError('pending failed');
     return super.pending();
+  }
+}
+
+class _NeverActive extends FakeAlertPlugin {
+  @override
+  Future<List<int>> active() async => [];
+}
+
+class _CountingPending extends FakeAlertPlugin {
+  int pendingCalls = 0;
+  @override
+  Future<List<PendingAlert>> pending() {
+    pendingCalls++;
+    return super.pending();
+  }
+}
+
+class _CountingRepo extends FakeRepo {
+  int watchCalls = 0;
+  @override
+  Stream<List<Task>> watchOpen() {
+    watchCalls++;
+    return super.watchOpen();
   }
 }

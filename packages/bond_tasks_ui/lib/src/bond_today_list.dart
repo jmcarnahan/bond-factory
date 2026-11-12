@@ -22,6 +22,7 @@ class BondTodayList extends StatelessWidget {
     this.onComplete,
     this.labels = const TaskLabels(),
     this.semanticsPrefix,
+    this.onLinkTap,
   });
 
   final TaskToday today;
@@ -33,6 +34,9 @@ class BondTodayList extends StatelessWidget {
   final ValueChanged<Task>? onComplete;
   final TaskLabels labels;
   final String? semanticsPrefix;
+
+  /// Called when a link chip on a row is tapped.
+  final ValueChanged<TaskLink>? onLinkTap;
 
   String? _id(String part, [String? id]) =>
       semanticsPrefix == null ? null : '$semanticsPrefix.$part${id == null ? '' : '-$id'}';
@@ -108,6 +112,7 @@ class BondTodayList extends StatelessWidget {
           child: BondTaskRow(
             task: k,
             now: now,
+            onLinkTap: onLinkTap,
             labels: labels,
             semanticsId: _id('row', k.id),
             completeSemanticsId: _id('complete', k.id),

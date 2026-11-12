@@ -19,7 +19,7 @@ class CaptureLabels {
     this.degraded = 'Could not read this fully. Please check each item.',
     this.modelUnavailable = 'Smart capture is unavailable. Your text is kept as one task.',
     this.invalidOutput = 'The result could not be read. Your text is kept as one task.',
-    this.captureDenied = 'Too many requests. Try again in a minute.',
+    this.captureDenied = 'Too many notes in a short time. Try again in a minute.',
     this.noItems = 'Nothing found in that text.',
     this.linkTo = 'Link to',
     this.chooseMatch = 'Choose a match',

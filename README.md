@@ -5,19 +5,14 @@ plus the small services some of them need.
 
 ## Layout
 
-- `packages/bond_roof` pure Dart: roof model JSON, totals, diagram scenes, SVG and PDF export.
-- `packages/bond_roof_ui` Flutter: widgets that draw a scene, print and share.
-  Both packages live in one pub workspace (root `pubspec.yaml`).
-- `demos/` demo apps that exercise the packages end to end. Not shipped.
-- `services/` services that back a package when the work cannot run on the device
-  (today: `services/roof_measure`, Python, turns an address into a roof model). One uv workspace
-  (root `pyproject.toml`, `uv.lock`).
-- `fixtures/` JSON fixtures shared by the service tests and the Dart contract tests.
-- `docs/contracts/` wire contracts (start with `docs/contracts/roof_model.md`).
-- `docs/decisions/` decision records (start with `docs/decisions/2026-11-07-roof-poc-summary.md`).
-- `docs/research/` per-topic research notes and evidence behind the decisions.
+- `packages/` Dart and Flutter packages (`bond_<x>` pure Dart core, `bond_<x>_ui` widgets, adapters per backend). One pub workspace (root `pubspec.yaml`).
+- `libs/` Python libraries the services import (SQLAlchemy mixins, Protocol seams, no migrations). One uv workspace (root `pyproject.toml`, `uv.lock`).
+- `services/` Python services: `roof_measure` (the one deployed service) and `sdk_example` (a reference app, never shipped).
+- `demos/` Flutter harnesses that exercise the packages end to end. Not shipped.
+- `fixtures/` JSON fixtures shared by the Python and Dart tests.
+- `docs/` `contracts/` (wire contracts), `decisions/`, `migration/` (one note per module), `sdk/`, `test/` (walk recipes), `research/`. Index: `docs/README.md`.
 - `make/` make fragments included by the root `Makefile`. Run `make help`.
-- `tool/` the no-popups gate, its allowlist and `changed_modules.sh`.
+- `tool/` the repo gates and scripts (`no_popups_gate.sh`, `changed_modules.sh`, ...).
 - `local/` gitignored scratch space.
 
 ## Quick start
@@ -27,9 +22,9 @@ Root make targets use `flutter` from your PATH; override with `make FLUTTER=/pat
 
 ```
 make setup-service  # create the service virtualenv (Python library use: docs/contract-0.2.md section 3)
-make test           # test-dart + test-flutter + test-service
+make test           # test-dart + test-flutter + test-service + test-libs + test-example
 make analyze        # dart analyze / flutter analyze
-make gates          # no-popups gate
+make gates          # popups, ui tokens, boundaries, line cap, public hygiene
 make demo-web       # run the demo in Chrome
 make build-web      # release web build in demos/roof_demo/build/web
 make changed        # modules affected by changes vs main (BASE=<ref> to change)
@@ -42,14 +37,35 @@ Consumers pin a full 40-char commit SHA in `git:` refs (per-package tags cannot 
 
 ## Components
 
-Apps consume these modules as described in `docs/sdk/README.md`.
+How an app consumes them: `docs/sdk/README.md`. The daily TODO checklist (due times, three-stage notices, inbox, push,
+capture, phone alerts) is adopted in the order of `docs/migration/todo-checklist.md`. One migration note per module is in `docs/migration/`.
 
-| Component | Kind | Status |
+| Component | Kind | Role |
 |---|---|---|
-| `packages/bond_roof` | pure Dart: roof model JSON, totals, diagram scenes, SVG and PDF export | 0.2.0 |
-| `packages/bond_roof_ui` | Flutter: widgets that draw a scene, print and share | 0.2.0 |
-| `services/roof_measure` | Python: address -> footprint + LiDAR (+ Solar) -> roof model JSON; also importable as a library | 0.2.0 |
-| `demos/roof_demo` | Flutter: type an address, see the three diagrams, print | POC |
+| `packages/bond_json` | pure Dart | null-safe JSON readers and UTC timestamp helpers |
+| `packages/bond_api` | pure Dart | HTTP `ApiClient`, typed errors, error-body parser, SSE |
+| `packages/bond_auth` | pure Dart | auth contracts: token stores, session, capability policy, gateways |
+| `packages/bond_auth_firebase` | Flutter | Firebase adapter for `bond_auth` |
+| `packages/bond_signin`, `bond_signin_ui` | pure Dart, Flutter | direct sign-in client; sign-in screen and system-browser port |
+| `packages/bond_connections`, `bond_connections_ui` | pure Dart, Flutter | OAuth connection status; card, list and return banner |
+| `packages/bond_sync`, `bond_sync_powersync` | pure Dart, Flutter | backend-agnostic sync core; PowerSync connector, store and opener |
+| `packages/bond_ui` | Flutter | design tokens, theme, labels and widgets |
+| `packages/bond_test_support` | Flutter | shared widget-test helpers |
+| `packages/bond_tasks`, `bond_tasks_ui` | pure Dart, Flutter | task model, REST client, controller, stage helpers; task widgets |
+| `packages/bond_notify`, `bond_notify_ui` | pure Dart, Flutter | inbox notices, feed and controller; inbox widgets |
+| `packages/bond_push` | Flutter | Apple push token, device registration and taps (iOS only) |
+| `packages/bond_tasks_notifications` | Flutter | local task alerts, action handler and the alerts coordinator |
+| `packages/bond_tasks_powersync`, `bond_notify_powersync` | Flutter | task repository and notice feed over the synced store |
+| `packages/bond_roof`, `bond_roof_ui` | pure Dart, Flutter | roof model, totals, diagrams, SVG and PDF export; widgets that draw and print them |
+| `libs/bond_service_kit` | Python | FastAPI and SQLAlchemy plumbing: errors, middleware, rate limit, clock, health |
+| `libs/bond_auth_py`, `bond_signin`, `bond_oauth` | Python | token verification and sessions; direct sign-in; OAuth flows and encrypted token storage |
+| `libs/bond_jobs`, `bond_storage`, `bond_sync_py` | Python | job queue and worker; S3-compatible storage; server side of device sync |
+| `libs/bond_calendar` | Python | Microsoft Graph and Google calendar providers behind one protocol |
+| `libs/bond_tasks_py` | Python | tasks table, due instants, notice stages, sweep, outbox, calendar mirror |
+| `libs/bond_notify_py`, `bond_push_py`, `bond_capture_py` | Python | stored inbox; Apple push delivery; natural-language capture |
+| `services/roof_measure` | Python | address -> footprint + LiDAR (+ Solar) -> roof model JSON; also importable as a library (GPL-3.0-or-later) |
+| `services/sdk_example` | Python | reference FastAPI app wiring every bond Python lib; never shipped |
+| `demos/roof_demo`, `demos/sdk_demo` | Flutter | roof demo; web and iOS harness for every SDK package. Not shipped |
 
 ## House rules
 

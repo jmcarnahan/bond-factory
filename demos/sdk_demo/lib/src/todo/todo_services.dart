@@ -49,10 +49,14 @@ class TodoServices {
 
   /// Signs in before the first call; null in tests that need no session.
   final Future<Object?> Function()? ensureSignedIn;
-  final String? _userId;
+  String? _userId;
 
   /// The signed-in person (read when used: the session may start after the services).
   String get userId => _userId ?? DemoSession.session?.userId ?? DemoSession.defaultUserId;
+
+  /// Pins the signed-in person (tests that change user inside one page session).
+  @visibleForTesting
+  void useUser(String id) => _userId = id;
 
   /// Fake mode shows the clock strip (the example service only).
   final bool fakeMode;
@@ -80,8 +84,29 @@ class TodoServices {
   /// The one "now" of the pages: the fake instant when set, else the device clock.
   DateTime now() => fakeNow.value ?? _deviceNow();
 
+  /// Signs in, then tells the server the device zone when it has none or another one
+  /// ([ZoneReporter]: a settings read, and one PUT only on a change).
   Future<void> signIn() async {
     await ensureSignedIn?.call();
+    await reportZone();
+  }
+
+  /// One reporter per person: its "seeded / sent" memory must never be compared across users.
+  final Map<String, ZoneReporter> _zoneReporters = {};
+  Future<void>? _reporting;
+  String? _reportingFor;
+
+  /// One report at a time per person; never throws (the reporter swallows its own failures).
+  Future<void> reportZone() {
+    final user = userId;
+    if (_reporting != null && _reportingFor == user) return _reporting!;
+    final reporter = _zoneReporters.putIfAbsent(user, () => ZoneReporter(_ZoneNow(this), settings));
+    _reportingFor = user;
+    final f = reporter.reportIfChanged();
+    _reporting = f.whenComplete(() {
+      if (_reportingFor == user) _reporting = null;
+    });
+    return _reporting!;
   }
 
   /// Pins the server's clock to [instant] (`PUT /fake/clock`), runs the due jobs as of it
@@ -166,3 +191,13 @@ class TodoServices {
 
 /// The words an inline error line shows for [e].
 String todoErrorText(Object e) => e is ApiException ? e.message : e.toString();
+
+/// The zone the pages use: the device's, or the one the person chose on the settings page.
+class _ZoneNow implements TimeZoneSource {
+  const _ZoneNow(this.services);
+
+  final TodoServices services;
+
+  @override
+  Future<String?> currentZone() async => services.zone;
+}

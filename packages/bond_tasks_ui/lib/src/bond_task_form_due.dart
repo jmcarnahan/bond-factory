@@ -21,6 +21,7 @@ class BondTaskFormDue extends StatelessWidget {
     required this.onRemoveTime,
     required this.idOf,
     this.canAddTime = true,
+    this.onTimeValid,
   });
 
   final TaskLabels labels;
@@ -41,6 +42,9 @@ class BondTaskFormDue extends StatelessWidget {
 
   /// False while there is no date: a task with no date has no time.
   final bool canAddTime;
+
+  /// Told when the time boxes become invalid (false) or valid again (true).
+  final ValueChanged<bool>? onTimeValid;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +81,7 @@ class BondTaskFormDue extends StatelessWidget {
             ),
           )
         else if (time != null) ...[
-          BondTimeField(label: l.dueTime, value: time!, onChanged: onTime, semanticsId: idOf('due-time')),
+          BondTimeField(label: l.dueTime, value: time!, onChanged: onTime, onValidChanged: onTimeValid, semanticsId: idOf('due-time')),
           Align(
             alignment: Alignment.centerLeft,
             child: BondButton(

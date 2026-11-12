@@ -8,6 +8,8 @@
 - `BondSearchPicker<T>`: removable picked chips, a search field and an inline result list with busy, empty and error lines; a stale answer is dropped.
 - `BondPersonTile`: a person as a list row (avatar, name, subtitle, trailing).
 - `BondLabels`: `searching`, `searchFailed`, `remove`.
+- `BondTimeField` selects a box's text on focus, so typing replaces it.
+- `BondTextField` with a `semanticsId` exposes its error message as its own node `<id>-error`.
 
 Tokens, theme, labels, semantics helper and the primitive widgets, lifted from the two near-identical app UI packages.
 

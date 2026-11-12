@@ -50,3 +50,15 @@ await repo.create(const TaskDraft(title: 'Send the estimate', dueDate: '2026-03-
 - Notice ids match the Python side (`fixtures/tasks/notice_ids.json`).
 - Tests: `make test` (it runs in `America/Los_Angeles`, the zone of the stage fixtures).
 - A banner is for `TaskStage.close`, `due` and `past` only; `upcoming` and `none` show nothing.
+
+## Signatures
+```dart
+const prefs = TaskPrefs(startOfDay: '08:00', endOfDay: '17:00', leadMinutes: 60, maxPast: 5); // named, 'HH:MM' strings
+stageTimes(task, prefs, nowUtc);                 // List<StageTime>; stageTimesFor(..., userId: id) for one recipient
+noticeId(taskId, userId, 'close', 0, deadlineToken(task)); // stage is a String: 'close' | 'due' | 'past'
+```
+`StageTime(stage, seq, at, last, sendAt)`. `TaskToday(overdue, today, undated, doneToday, counts)` holds four `List<Task>`.
+`TimeZoneSource` has `Future<String?> currentZone()`. `TaskController.load()` returns a `Future<void>`; `dispose()` returns void.
+`ApiClient(baseUrl: Uri.parse(...), http: client)` builds the client; a test passes `MockClient` from `package:http/testing.dart`.
+The stage functions use the DEVICE zone and the server the user's stored zone: before `ZoneReporter`'s report lands, local alert
+ids can differ from server ids and a duplicate alert is possible.

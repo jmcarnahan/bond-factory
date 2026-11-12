@@ -1,6 +1,7 @@
 """The sweep on SQLite: the life of a task minute by minute, exactly-once, since, permissions, failure isolation."""
 from datetime import date, datetime, timedelta
 
+import pytest
 from conftest import Ledger, Outbox, Task
 from sqlalchemy import func, select
 from support_sweep import FakeInbox, MapPrefs, load_cases, parse_z
@@ -249,3 +250,56 @@ def test_notice_recipients_is_owner_and_assignee_without_blanks():
     assert notice_recipients(SimpleNamespace(owner_user_id="u1", assigned_user_id=None)) == {"u1"}
     assert notice_recipients(SimpleNamespace(owner_user_id="u1", assigned_user_id="u2")) == {"u1", "u2"}
     assert notice_recipients(SimpleNamespace(owner_user_id="u1", assigned_user_id="u1")) == {"u1"}
+
+
+def test_done_is_withheld_when_permissions_refuse_completion(sq_factory):
+    class NoComplete:
+        def can_edit(self, task, user_id):
+            return True
+
+        def can_own(self, task, user_id):
+            return True
+
+        def can_complete(self, task, user_id):
+            return False
+
+    inbox = FakeInbox()
+    with sq_factory() as session:
+        add_task(session, due_time="09:30", due_at=datetime(2026, 3, 12, 16, 30))
+        sweep(session, datetime(2026, 3, 12, 16, 30), transactional=[inbox], permissions=NoComplete())
+        assert inbox.written[0].actions == ("snooze", "cancel")
+
+
+@pytest.mark.parametrize("since, skipped", [(datetime(2026, 3, 12, 16, 30), 0), (datetime(2026, 3, 12, 16, 31), 1)])
+def test_a_stage_starting_exactly_at_since_is_claimed(sq_factory, since, skipped):
+    with sq_factory() as session:
+        add_task(session, due_time="09:30", due_at=datetime(2026, 3, 12, 16, 30))
+        result = sweep(session, datetime(2026, 3, 12, 16, 30), since=since, transactional=[FakeInbox()])
+        assert (result.claimed, result.skipped) == (1 - skipped, skipped)
+
+
+def test_a_recipients_seam_that_drops_a_user_is_obeyed(sq_factory):
+    class OwnerOnly:
+        def for_stage(self, session, task, stage):
+            return [task.owner_user_id]
+
+    inbox = FakeInbox()
+    with sq_factory() as session:
+        add_task(session, owner="boss", assigned="worker", due_time="09:30", due_at=datetime(2026, 3, 12, 16, 30))
+        sweep(session, datetime(2026, 3, 13, 15, 0), transactional=[inbox], recipients=OwnerOnly())
+        assert [n.user_id for n in inbox.written] == ["boss"]
+
+
+def test_an_owner_still_gets_the_past_notice_when_the_assignee_has_no_current_stage(sq_factory):
+    from datetime import time
+
+    assignee = UserPrefs(time_zone="UTC", start_of_day=time(0, 0), end_of_day=time(23, 0))
+    owner = UserPrefs(time_zone="America/Los_Angeles", start_of_day=time(20, 0), end_of_day=time(19, 0))
+    prefs = MapPrefs({"asg": assignee, "boss": owner})
+    inbox = FakeInbox()
+    with sq_factory() as session:
+        add_task(session, owner="boss", assigned="asg", due_time="09:30", due_at=datetime(2026, 3, 12, 16, 30))
+        # the assignee is past their series (seq 2 > max_past 1), the owner's late morning is still seq 1
+        result = sweep(session, datetime(2026, 3, 14, 16, 0), prefs=prefs, transactional=[inbox], max_past=1)
+        assert result.claimed == 1
+        assert [(n.user_id, n.stage, n.seq) for n in inbox.written] == [("boss", "past", 1)]

@@ -29,8 +29,8 @@ revision and assert each `*_COLUMNS` constant in a test (`schema_contract` from 
 | `NoticeLedgerMixin`, `NoticeOutboxMixin` | `task_notice_ledger`, `task_notice_outbox` |
 | `NoticesMixin`, `PushDevicesMixin` (sibling libs) | `notices`, `push_devices` |
 
-Routes: copy `routes/tasks.py` (list, summary, today, CRUD, lifecycle, settings) and the notice and device routes from
-`bond_notify_py.md` and `bond_push_py.md`. `now` is required in `task_item`, `list_tasks` and `summary` (no `today`). Pass the link index model to `delete`.
+Routes: copy `routes/tasks.py` and `routes/task_today.py`. `bond_tasks_py_host.md` lists every route, its service call, the
+signatures and the models block. Notice and device routes: `bond_notify_py.md`, `bond_push_py.md`. `now` is required in `task_item`, `list_tasks` and `summary` (no `today`). Pass the link index model to `delete`.
 Wire `after_write=make_link_hook(LinkIndex)`. `sync_routes(on_deleted=)` is called `(ctx, session, task_id, owner_user_id)`: dismiss notices there.
 
 ## 3. The reminder is removed
@@ -49,27 +49,27 @@ later is needed (`RETURNING`). PostgreSQL needs nothing.
 
 ## 5. Running the sweep
 From a `bond_jobs` tick, as the `before` hook, throttled with `before_every`:
-
 ```python
-def sweep(session, now):  # tick(..., before=sweep, before_every=60)
-    sweep_due(session, task_model=Task, ledger_model=Ledger, outbox_model=Outbox, now=now,
-              prefs=StoredPreferences(Settings), tz="UTC", transactional=[InboxNotifier(Notice)], channels=["push"])
+# models are in bond_tasks_py_host.md; push = PushNotifier(PushDevice, ApnsSender(key_pem, key_id, team_id))
+KW = dict(task_model=Task, ledger_model=TaskNoticeLedger, outbox_model=TaskNoticeOutbox)
+def sweep(session, now):  # bond_jobs.tick(..., before=sweep, before_every=60); tick commits after the hook
+    sweep_due(session, now=now, prefs=StoredPreferences(TaskUserSettings), tz="UTC",
+              transactional=[InboxNotifier(Notice)], channels=["push"], **KW)
 ```
 
-`tick` commits after the hook. Run `deliver_pending` as a job (it needs a `commit` callable). Or a plain script, every minute:
+Run `deliver_pending` as a job (it needs a `commit` callable). Or a plain script, every minute:
 
 ```python
-with Session(engine) as s:
-    sweep_due(s, ...same arguments..., since=activation_time)
+with Session(engine) as s:   # engine = sqlite_savepoint_setup(create_engine(url)) on SQLite
+    sweep(s, now)            # pass since=activation_time on the first run
     s.commit()
-    deliver_pending(s, ledger_model=Ledger, outbox_model=Outbox, task_model=Task, notifiers={"push": push},
-                    now=now, commit=s.commit)
-    prune_ledger(s, task_model=Task, ledger_model=Ledger, outbox_model=Outbox, now=now)  # daily, then prune_notices
+    deliver_pending(s, ledger_model=TaskNoticeLedger, outbox_model=TaskNoticeOutbox, task_model=Task,
+                    notifiers={"push": push}, now=now, commit=s.commit)
+    prune_ledger(s, now=now, **KW)  # daily, then bond_notify_py.prune_notices(s, Notice, now)
     s.commit()
 ```
 
-Pass `since=` on first activation so old stage times are recorded as skipped, not sent. List `"push"` in `channels`
-only when a real sender is configured.
+Pass `since=` on first activation (old stage times are then skipped). List `"push"` only when a real sender is configured.
 
 ## 6. A chat-tool Notifier in 15 lines
 
@@ -90,9 +90,9 @@ class ChatNotifier:
 
 ## 7. Call-site changes and checks
 
-- On done, cancel and delete call `dismiss_for_source`. When `due_date`, `due_time` or the assignee changes call
-  `dismiss_stale`. `apply_notice_action` is the one handler (done or cancel on a closed task does nothing). After a reassign use `notice_recipients(task)` and `dismiss_for_source(..., user_ids=)`.
-- Settings: `update_settings(..., on_recomputed=)` returns `(prefs, warnings)`; in the hook call `dismiss_stale`. Pass `time_zone` with client writes.
+- On done, cancel and delete call `dismiss_for_source`, and when `due_date`, `due_time` or the assignee changes call
+  `dismiss_stale` (both are in `bond_notify_py`, not this lib). `apply_notice_action` is the one handler (done or cancel on a closed task does nothing). After a reassign use `notice_recipients(task)` and `bond_notify_py.dismiss_for_source(..., user_ids=)`.
+- Settings: `update_settings(..., on_recomputed=)` returns `(prefs, warnings)`; in the hook call `bond_notify_py.dismiss_stale`. Pass `time_zone` with client writes.
 - Order: revision, backfill, wire the sweep, swap the router. Assert every `*_COLUMNS`, round-trip
   `fixtures/tasks/task.json` through `task_item`, run `make -C libs/bond_tasks_py test`.
 - Test: a fake clock sweep over close, due and past with an `InboxNotifier`, and one `sweep_due` twice (second claims 0).

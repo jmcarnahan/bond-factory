@@ -18,12 +18,12 @@ Phones are iOS only.
 
 1. **Tables and the sweep** (`bond_tasks_py.md`). One revision: the new `tasks` columns (`priority`, `due_at`), drop
    `remind_at` and `reminded_at`, and add `task_user_settings`, `task_link_index`, `task_notice_ledger`,
-   `task_notice_outbox`. Mount the task routes with `now` and the viewer zone. On SQLite call `sqlite_savepoint_setup`.
+   `task_notice_outbox`. Mount the task routes (list, summary, today, CRUD, lifecycle, settings): `bond_tasks_py_host.md` gives each route and its service call, and the reference host is `services/sdk_example/sdk_example/routes/tasks.py` and `task_today.py`. Pass `now` and the viewer zone. On SQLite call `sqlite_savepoint_setup`.
    Run `sweep_due` with `since=` set to the activation time. Backfill with `backfill_due_at` or let the sweep repair rows.
    Check: a task due in two minutes yields a ledger row at the right stage, and a second sweep claims nothing.
 2. **Inbox** (`bond_notify_py.md`). Add the `notices` table beside `tasks`, list `InboxNotifier(Notice)` in
-   `transactional=`, mount `GET /notices`, read, dismiss, read-all and `act`. Call `dismiss_for_source` on done, cancel and
-   delete. Run `prune_notices` daily. Check: each stage writes one notice, and done puts the rest away.
+   `transactional=`, mount `GET /notices`, read, dismiss, read-all and `act`. Call `bond_notify_py.dismiss_for_source` on done, cancel and
+   delete (it lives in `bond_notify_py`, as does `dismiss_stale`). Run `prune_notices` daily. Check: each stage writes one notice, and done puts the rest away.
 3. **Push** (`bond_push_py.md`). Add `push_devices`, the device routes (REST or sync) and `PushNotifier` with an
    `ApnsSender`, and list the `"push"` channel only when the key is configured. Run `deliver_pending` after each sweep.
    Check with `MockSender` first. A real delivery needs an Apple key and a device.
@@ -51,6 +51,7 @@ Phones are iOS only.
 - One id on every path: `notice_id`, computed the same in Python and Dart (`fixtures/tasks/notice_ids.json`). Delivery is at
   least once, so every channel must be idempotent on it.
 - The three actions (Done, Snooze, Cancel) go through one handler on the inbox row, the banner and the phone button.
+- The Dart stage functions use the device zone and Python the user's stored zone. Before `ZoneReporter`'s report lands, local alert ids can differ from server ids and a duplicate alert is possible.
 - Do not run two alert paths. With push on, tell the coordinator the three stages are handled elsewhere.
 - No popups, dialogs or sheets. The widgets expand inline.
 - Pin every module at the same commit: the one listed in `docs/sdk/sdk-pins.md`.

@@ -24,8 +24,13 @@ Per recipient R with settings P and zone Z (R's stored zone if it is a known nam
 - Each tick claims only the current stage and seq, never earlier ones. A missed day makes seq jump. Two sweeps in a
   day make one row. `since` marks stage times before it as ledger status `skipped` (not sent) so a first run does not flood.
 - Only open tasks with a non-null `due_at` have stages. A timed task whose `due_at` is null has no stages.
-- Recipients (`default_recipients`): `close` and `due` go to the responsible user (assignee, else owner). `past`
-  goes to the responsible user and the owner, once if they are the same person. An app may pass its own `Recipients`.
+- Recipients (`default_recipients(task, stage)`). The responsible user is the assignee, else the owner. An app may pass its own `Recipients`.
+
+| Stage | Gets the notice |
+|---|---|
+| `close` | the responsible user |
+| `due` | the responsible user |
+| `past` | the responsible user and the owner (once if they are the same person) |
 
 ## Quiet hours
 
@@ -47,7 +52,8 @@ notice_id      = sha256("task_id|user_id|stage|seq|token") first 32 hex characte
 local_id       = FNV-1a 32-bit over the UTF-8 bytes of notice_id, masked to 31 bits
 ```
 
-Python and Dart both compute these; `fixtures/tasks/notice_ids.json` pins them. The `notice_id` is the ledger id, the
+Python and Dart both compute these from the same task row; `fixtures/tasks/notice_ids.json` pins them (a list of `{task_id, user_id, stage, seq, token, notice_id, local_id}`).
+The Dart stage functions use the DEVICE zone and Python the user's stored zone. Before `ZoneReporter`'s report lands, local alert ids can differ from server ids and a duplicate alert is possible. The `notice_id` is the ledger id, the
 `notices` primary key, the Apple collapse id and (through `local_id`) the local notification id. Moving the deadline
 changes the token, so a postponed task notices again. A zone change does not change a date-only token.
 

@@ -41,7 +41,7 @@ Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`; the serv
 | `push/device_register.json` | Device registration body. Loaded by the `bond_push_py` tests. | hand-written |
 | `capture/model_output.json`, `schema.json` | Example model output and the JSON schema it must satisfy. | hand-written |
 | `capture/expected_candidates.json` | The candidates `model_output.json` must produce. | hand-written |
-| `capture/phrases.jsonl` | Labelled phrase set (60 phrases) with the expected parse. | hand-written |
+| `capture/phrases.jsonl` | Labelled phrase set (60 phrases) with the expected parse. Phrase 52 accepts 3 or 4 items: the model reads "...tell Marcus I am out Wednesday" as three tasks plus an all-day "Out of office" event in every run of the 2026-11-11 measurement (`docs/research/2026-11-11-capture-prompt/README.md`); both readings are acceptable. | hand-written |
 
 Contract for the sync files: `docs/contracts/sync_upload.md`.
 

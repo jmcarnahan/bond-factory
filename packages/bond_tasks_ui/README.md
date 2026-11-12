@@ -16,7 +16,7 @@ in, no API calls, no clock reads. Import `package:bond_tasks_ui/bond_tasks_ui.da
 
 ## Widgets
 - `BondTaskList(tasks, today, now?, onTap, onComplete, rowExtra)`: sections Overdue, Today, Upcoming, No date, Done.
-- `BondTaskRow(task, now?, onTap, onComplete)`: one task: complete button, title, due text, priority chip.
+- `BondTaskRow(task, now?, onTap, onComplete)`: one task: complete button, title, due text, priority chip, up to 3 link chips (`<rowId>-link-<n>`, "+N" for more; `onLinkTap`). `BondTaskList` and `BondTodayList` take `onLinkTap` too.
 - `BondTodayList(today: TaskToday, now, onTap, onComplete)`: the day view; Overdue, Today, No date, Done today
   with counts; each task in exactly one section, decided by `now`.
 - `BondDueLane(tasks, day, now, onTap, onComplete)`: one calendar day for a day view; timed tasks with local time.
@@ -24,7 +24,7 @@ in, no API calls, no clock reads. Import `package:bond_tasks_ui/bond_tasks_ui.da
 - `BondStageBanner(task, stage, last, actions, onAction)`: inline banner for close, due and past stages with
   Done, Snooze and Cancel task; nothing for `none` and `upcoming`.
 - `BondTaskForm(today, onSubmit, initial, assignees, onSearchLinks)`: title, notes, date, time, assignee,
-  priority, links, checklist, reminder (including "Use my default"), calendar mirror.
+  priority, links, checklist, reminder (including "Use my default"), calendar mirror. Save is off while the time box is invalid.
 - `BondTaskQuickAdd`, `BondChecklist`, `BondTaskChecklistEditor`, `BondCheckRow`: one-line add and checklists.
 - `BondTaskSummaryCard`, `BondTaskDeleteControl`: counts and an inline two-step delete.
 - `BondPriorityChip(priority)`, `BondLinkChip(link, onTap, onRemove)`, `BondLinkPickerRow(links, onSearch, onChanged)`.

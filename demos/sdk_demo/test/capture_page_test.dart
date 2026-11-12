@@ -1,3 +1,4 @@
+import 'package:bond_tasks/bond_tasks.dart';
 import 'package:bond_test_support/bond_test_support.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -163,6 +164,23 @@ void main() {
     await leave(t);
   });
 
+  testWidgets('a refused second parse clears the old review and uses the capture_denied wording', (t) async {
+    final r = rig({'items': [taskItem('Call Ann')], 'degraded': false, 'reason': null});
+    r.on.json('POST', '/tasks/parse', {
+      'detail': {'code': 'capture_denied', 'message': 'server words'},
+    }, status: 429);
+    await parseIt(t, r);
+    expect(byId('sdk.capture.review-item-0-title'), findsWidgets);
+
+    await t.tap(byId('sdk.capture.parse').first);
+    await settle(t);
+    expect(byId('sdk.capture.review-item-0-title'), findsNothing, reason: 'the old review is gone');
+    expect(t.widget<Text>(find.descendant(of: byId('sdk.capture.error'), matching: find.byType(Text))).data,
+        const CaptureLabels().captureDenied);
+    expect(find.text('server words'), findsNothing);
+    await leave(t);
+  });
+
   testWidgets('a refused parse (429) is worded inline', (t) async {
     final r = TodoRig()..baseline();
     r.on.json('POST', '/tasks/parse', {
@@ -170,7 +188,7 @@ void main() {
     }, status: 429);
     await parseIt(t, r);
     expect(byId('sdk.capture.error'), findsWidgets);
-    expect(find.textContaining('Too many requests'), findsWidgets);
+    expect(find.textContaining('Too many notes'), findsWidgets);
     await leave(t);
   });
 }

@@ -70,4 +70,20 @@ void main() {
     expect(event.toLowerCase(), isNot(contains('overdue')));
     await leave(t);
   });
+
+  testWidgets('the selected day and the lane follow the server\'s pinned clock', (t) async {
+    final r = rig();
+    r.on.json('GET', '/fake/clock', {'now': '2026-03-20T16:00:00Z'});
+    await pumpPage(t, TodoCalendarPage(services: r.services));
+    final state = (find.byWidgetPredicate((w) => w is Semantics && w.properties.identifier == 'sdk.calendar.clock-state')
+            .evaluate()
+            .first
+            .widget as Semantics)
+        .properties
+        .label!;
+    expect(state, contains('2026-03-20'));
+    expect(byId('sdk.calendar.row-t3'), findsWidgets, reason: 'the lane shows the pinned day without a tap');
+    expect(byId('sdk.calendar.row-t1'), findsNothing);
+    await leave(t);
+  });
 }

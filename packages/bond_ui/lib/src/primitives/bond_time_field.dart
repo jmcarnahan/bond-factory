@@ -94,6 +94,16 @@ class _BondTimeFieldState extends State<BondTimeField> {
     super.initState();
     _hourFocus.addListener(() => _blur(_hourFocus));
     _minuteFocus.addListener(() => _blur(_minuteFocus));
+    _hourFocus.addListener(() => _selectAll(_hourFocus, _hour));
+    _minuteFocus.addListener(() => _selectAll(_minuteFocus, _minute));
+  }
+
+  /// Focus selects the box's text, so typing replaces it instead of growing it.
+  void _selectAll(FocusNode node, TextEditingController c) {
+    if (!node.hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && node.hasFocus) c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
+    });
   }
 
   /// A box that loses focus while invalid goes back to the last valid value.

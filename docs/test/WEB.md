@@ -181,22 +181,21 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
 `sdk.calendar`, `sdk.todo` (the settings page), `sdk.inbox`. A plain tap on a phone notification opens `/today` and shows
 `sdk.today.opened` (dismiss with `sdk.today.opened-dismiss`).
 
-1. **Today, by hand.** `/today`: fill `sdk.today.form-title`, pick priority high (`sdk.today.form-priority`, the high option under `sdk.today.form-priority`), add a contact link with `sdk.today.form-links` (type a name, pick a result inline),
+1. **Today, by hand.** `/today`: fill `sdk.today.form-title`, pick priority high (the high option under `sdk.today.form-priority`), add a contact link with `sdk.today.form-links` (type a name, pick a result inline),
    a due date today, `sdk.today.form-save`. The task appears in `sdk.today.section-today` (row `sdk.today.row-<id>`) with the
-   high-priority chip and the link chip.
+   high-priority chip and the link chip (`sdk.today.row-<id>-link-<n>`).
 2. **Capture.** `/capture`: type "Call Sam tomorrow, send the estimate by Friday, and lunch with Dana at noon" in
-   `sdk.capture.text`, click `sdk.capture.parse`. The pretend model answers its fixed fixture: two task drafts and one
-   event draft show in the review. Flip one between task and event (`sdk.capture.review-item-<n>-kind-task` / `-kind-event`), accept
-   (`sdk.capture.review-accept`; `-discard` drops the review, the draft notice is `sdk.capture.review-notice` and a discarded count `sdk.capture.review-dropped`; the answer line is `sdk.capture.result`). Two tasks exist on `/today` and `sdk.capture.events-sent` reads "Events sent: 1".
+   `sdk.capture.text`, click `sdk.capture.parse`. The pretend model answers its fixed fixture whatever is typed: the drafts are "Call Sam", "Send the appraisal to Dana" and "Day off" (two tasks and one event). Flip one between task and event (`sdk.capture.review-item-<n>-kind-task` / `-kind-event`), accept
+   (`sdk.capture.review-accept`; `-discard` drops the review, the draft notice is `sdk.capture.review-notice` and a discarded count `sdk.capture.review-dropped`; the answer line is `sdk.capture.result`). The two accepted tasks are due tomorrow and Friday, so they are NOT on `/today`: find them on `/tasks` and on `/calendar` on their days. `sdk.capture.events-sent` reads "Events sent: 1".
    Nothing is created by parsing alone.
 3. **Capture, model off.** Click `sdk.capture.model-off` (it calls `PUT /fake/capture {"down": true}`), parse again: one draft with the low-confidence mark and a degraded note, never an error. Switch it back.
-   `PUT /fake/capture/limit {"limit": 0}` then parse: the inline error reads the `capture_denied` text (429).
-4. **Calendar.** `/calendar`: the month cell of today has a marker (`sdk.calendar.marker-<YYYY-MM-DD>`) with the count; the
+   `PUT /fake/capture/limit {"limit": 0}` then parse: the inline error reads the capture label "Too many notes in a short time. Try again in a minute." (429 `capture_denied`; the text is `CaptureLabels.captureDenied` in the source). Starting a new parse clears the old review.
+4. **Calendar.** `/calendar`: the month cell of a day with TODOs has the id `sdk.calendar.grid-<YYYY-MM-DD>` and a label like "12, 2 due" or "12, 2 overdue"; the
    due lane of the selected day lists the day's TODOs with their local times. An accepted event shows as
-   `sdk.calendar.event-<n>`. A past event reads "Missed", never "Overdue".
+   `sdk.calendar.event-<n>`. A past event reads "Missed", never "Overdue". The calendar follows the fake clock: `sdk.calendar.clock-state` reads "Clock: real time (today yyyy-mm-dd)" or "Clock: <iso> (today yyyy-mm-dd)", and today and the first selected day follow it unless you already picked a day. Set the clock on `/today` or `/inbox`, then open `/calendar` and check the state line.
 5. **Settings.** `/todo-settings`: change the end of the work day to 18:00 (`sdk.todo.settings-end`; also `settings-start`, `settings-lead`, `settings-quiet`), save
-   (`sdk.todo.settings-save`). A date-only TODO's due time on `/today` moves to 18:00 local. Change the zone
-   (`sdk.todo.settings-zone`, pick a result such as `sdk.todo.settings-zone-picked-0`, then `sdk.todo.settings-save`; the current zone reads in `sdk.todo.zone-state`): the due time follows. Tick the clock across a stage after the change:
+   (`sdk.todo.settings-save`). A date-only TODO's due time is not shown on its `/today` row: check that it moved to 18:00 local through `GET /tasks` (`due_at`) or the calendar lane. Change the zone
+   (`sdk.todo.settings-zone`, pick a result `sdk.todo.settings-zone-result-<n>` (the chip `sdk.todo.settings-zone-picked-0` then shows the chosen zone), then `sdk.todo.settings-save`; the current zone reads in `sdk.todo.zone-state`, and shows the device zone before any change, because the device reports its zone on sign-in): the date-only due time follows (see `GET /tasks`). A timed TODO keeps its instant. Tick the clock across a stage after the change:
    no duplicate notice (the ledger key holds, `GET /notices` shows one row per stage).
 6. **Stages in the app.** Create a timed TODO due at a minute you choose, with "Use my default" reminder (60 minutes).
    On `/today` set `clock-now` to 30 minutes before the due time and Tick: the stage banner
@@ -208,7 +207,7 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
 8. **Complete.** Click `sdk.today.complete-<id>` on the TODO: no further notice on the next Ticks, its unread notices are put
    away (the badge drops), and `sdk.today.undo` reopens the task.
 9. **Two paths, one stage.** Tick the same instant twice (or open the task from two tabs): the inbox still has one notice per
-   stage and `GET /fake/push/sent` holds one message per stage with the same `collapse_id`.
+   stage and the web demo has no registered device, so `GET /fake/push/sent` is empty on web; the one-message-per-stage push half is covered by the example's tests.
 11. **No dialogs.** At 1280x800 and 390x844, on all five pages: zero `[role=dialog],[role=alertdialog]`, no console error, no
     `pageerror`, `sdk.errors` absent.
 12. **Three actions, two places.** On a notice row (`sdk.inbox.list.row-<id>-done`, `-snooze`, `-cancel`) and on the stage
@@ -216,14 +215,14 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
     or banner away and the next stage still arrives, Cancel cancels the task. An assignee who does not own the task sees no
     Cancel on either (sign in as the assignee, or assign the TODO to another seeded user).
 13. **Overdue moves.** A TODO due at a time today moves from Today to Overdue when the clock passes the time: in the list
-    (`sdk.today.section-overdue`), in the count in its header, and in the calendar lane and marker together. The word
+    (`sdk.today.section-overdue`), in the count in its header, and in the calendar lane and grid label together (read `sdk.calendar.clock-state` first; pick the day if you had already chosen another). The word
     "overdue" appears on no event.
 14. **Past-due series.** Tick the clock day by day from the due time: one notice each morning at the start of the work day
     (08:00 local), the last one marked "Last reminder", none after it (5 mornings by default). The task still shows as overdue.
 15. **Quiet hours in words.** On `/todo-settings` the quiet hours sentence names the hours (after the end of the work day
     until its start). Move the end of the work day: a date-only TODO's notice arrives at the new time, and a TODO timed for
     the evening still alerts in the evening.
-16. **Error check** after every step.
+16. **Error check** after every step. One console 401 from `POST /auth/refresh` on the first signed-out page load is expected: the demo tries the refresh cookie before it falls back to the demo sign-in. Every other console error fails the check.
 
 ## Cleanup
 

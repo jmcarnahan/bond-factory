@@ -63,13 +63,15 @@ class _CapturePageState extends State<CapturePage> {
       _busy = true;
       _error = null;
       _result = null;
+      _parsed = null; // an old review must not stay under a new outcome
     });
     try {
       await _s.signIn();
       final r = await _s.tasks.parse(text, timeZone: _s.zone);
       if (mounted) setState(() => _parsed = r);
     } catch (e) {
-      if (mounted) setState(() => _error = todoErrorText(e));
+      final denied = e is ServerError && (e.code == 'capture_denied' || e.statusCode == 429);
+      if (mounted) setState(() => _error = denied ? const CaptureLabels().captureDenied : todoErrorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

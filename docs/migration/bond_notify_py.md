@@ -33,7 +33,7 @@ mark_all_read(session, Notice, user_id, now)                                 # P
 
 - `POST /notices/{id}/act` is the app's own. Load the notice, check it is the user's, call
   `apply_notice_action(session, task=task, action=action, actor_user_id=user_id, now=now)` from `bond_tasks_py`,
-  mark the notice read, and on done or cancel call `dismiss_for_source(session, Notice, task.id, now)`. Answer
+  mark the notice read, and on done or cancel call `dismiss_for_source(session, Notice, task.id, now)`. Snooze changes nothing on the server and only marks the notice read. Answer
   `{notice, task}`. A cancel by someone who may not is the tasks lib's 403 `not_task_owner`.
 - `dismiss_for_source(session, Notice, task_id, now, user_ids=...)` limits the clean-up to those users (after a reassign, the ones who left).
 - In the task routes: call `dismiss_for_source` on done, cancel and delete, and
@@ -45,8 +45,8 @@ mark_all_read(session, Notice, user_id, now)                                 # P
 
 ## 3. Smallest working example
 
-A task due at 15:30, a sweep at 15:00 and 15:35, two notices. Run on SQLite (3.35 or later), engine prepared with
-`sqlite_savepoint_setup`:
+A task due at 15:30, a sweep at 15:00 and 15:35, two notices. Run on SQLite (3.35 or later), an in-memory `create_engine("sqlite://")` prepared with
+`sqlite_savepoint_setup(engine)` (models: `bond_tasks_py_host.md`):
 
 ```python
 sweep_due(s, task_model=Task, ledger_model=Ledger, outbox_model=Outbox, now=at,

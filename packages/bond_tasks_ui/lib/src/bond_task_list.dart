@@ -25,6 +25,7 @@ class BondTaskList extends StatelessWidget {
     this.rowExtra,
     this.labels = const TaskLabels(),
     this.semanticsPrefix,
+    this.onLinkTap,
     this.now,
   });
 
@@ -42,6 +43,9 @@ class BondTaskList extends StatelessWidget {
   final Widget Function(BuildContext context, Task task)? rowExtra;
   final TaskLabels labels;
   final String? semanticsPrefix;
+
+  /// Called when a link chip on a row is tapped.
+  final ValueChanged<TaskLink>? onLinkTap;
 
   String? _id(String part, String id) => semanticsPrefix == null ? null : '$semanticsPrefix.$part-$id';
 
@@ -87,6 +91,7 @@ class BondTaskList extends StatelessWidget {
               BondTaskRow(
                 task: k,
                 now: now,
+                onLinkTap: onLinkTap,
                 labels: labels,
                 semanticsId: _id('row', k.id),
                 completeSemanticsId: _id('complete', k.id),

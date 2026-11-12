@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+- `TaskLabels.moreLinks` / `moreLinksText(n)`; `CaptureLabels.captureDenied` now reads "Too many notes in a short time. Try again in a minute."
 Removed
 - `Task.remindAt` and `Task.remindedAt` (and the `remind_at`, `reminded_at` wire keys); the queued reminder is gone.
 - Changed: `TaskDraft.remindMinutesBefore` defaults to -3 (`kRemindUseDefault`).

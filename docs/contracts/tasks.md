@@ -78,7 +78,7 @@ the notice stages read this value (`notices.md`).
 | `lead_minutes` | integer 0 to 10080 | 60 | |
 
 A PUT changes only the fields it sends. Answer: the four fields plus `warnings`. Changing `end_of_day` or
-`time_zone` recomputes `due_at` of the user's open date-only tasks in the same transaction. `update_settings(..., on_recomputed=)`
+`time_zone` recomputes `due_at` of the user's open date-only tasks only, in the same transaction. A timed task keeps its instant: its `due_time` is the wall time in the zone it was written in. `update_settings(..., on_recomputed=)`
 calls `on_recomputed(task, old_due_at)` once per task whose `due_at` really changed: the host calls `dismiss_stale` there. Warnings never block:
 
 | Warning | When |
