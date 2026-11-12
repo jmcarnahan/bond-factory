@@ -92,6 +92,9 @@ None. Add the git dependency; keep the Figtree font in the UI package. Delete th
 - `BondStartupFailed` is a whole `MaterialApp`. `Semantics(identifier)` is untested in a browser until the walk.
 - S: its radii (6, 10, 16) become 8, 12, 16 by default; set `BondTokens(shape: BondShape(r8: 6, r12: 10, r16: 16))` to keep them; `ui/components/overlays/sbel_snackbar.dart` has no bond equivalent.
 
+- `BondPressable.borderRadius`, `BondPhoto.radius` and `BondDashedBorder.radius` are now nullable. Null means the shape token
+  (`r8`, `r12`, `r12`), the same value as before. Code that reads those fields must handle null.
+
 ## 7. Added for the task widgets
 - `BondMonthGrid` is exported with `dayBuilder` (a widget under each day number, hidden from screen readers), `daySemantics`
   (added to a cell's spoken label) and `firstWeekday` (default Sunday).

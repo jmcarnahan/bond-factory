@@ -2,7 +2,7 @@
 
 Task table, due instant, per-user settings, link index, three-stage notice ledger and sweep, calendar mirror
 (`libs/bond_tasks_py`). The wire is `docs/contracts/tasks.md` and `docs/contracts/notices.md`. Wired in
-`services/sdk_example` (`tasks_wiring.py`, `routes/tasks.py`, `routes/jobs.py`). Legend: `docs/migration/README.md`.
+`services/sdk_example` (`tasks_wiring.py`, `routes/task_routers.py`, `routes/jobs.py`). Legend: `docs/migration/README.md`.
 Dart side: `bond_tasks.md`. Adoption order: `todo-checklist.md`.
 
 ## 1. What it replaces
@@ -29,7 +29,7 @@ revision and assert each `*_COLUMNS` constant in a test (`schema_contract` from 
 | `NoticeLedgerMixin`, `NoticeOutboxMixin` | `task_notice_ledger`, `task_notice_outbox` |
 | `NoticesMixin`, `PushDevicesMixin` (sibling libs) | `notices`, `push_devices` |
 
-Routes: copy `routes/tasks.py` and `routes/task_today.py`. `bond_tasks_py_host.md` lists every route, its service call, the
+Routes: mount `make_tasks_router` and `make_notices_router`; `services/sdk_example/sdk_example/routes/task_routers.py` shows the wiring. `bond_tasks_py_host.md` lists every route, its service call, the
 signatures and the models block. Notice and device routes: `bond_notify_py.md`, `bond_push_py.md`. `now` is required in `task_item`, `list_tasks` and `summary` (no `today`). Pass the link index model to `delete`.
 Wire `after_write=make_link_hook(LinkIndex)`. `sync_routes(on_deleted=)` is called `(ctx, session, task_id, owner_user_id)`: dismiss notices there.
 
@@ -106,9 +106,13 @@ class ChatNotifier:
 
 ## 6b. Mount the routes instead of copying them
 
-`pip install bond_tasks_py[http]`, then (module `bond_tasks_py.routes`; the package never imports fastapi):
+Install with the `http` extra (the lib is not on a package index; the git form is in `docs/sdk/README.md`, "Python"):
+Poetry `bond_tasks_py = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "<sha>", subdirectory = "libs/bond_tasks_py", extras = ["http"] }`,
+pip `pip install "bond_tasks_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_tasks_py"`.
+Then (module `bond_tasks_py.routes`; the package never imports fastapi):
 
 ```python
+from bond_service_kit import make_session_factory, session_scope   # or your own equivalent
 from bond_tasks_py.routes import make_tasks_router
 app.include_router(make_tasks_router(
     task_model=Task, settings_model=TaskUserSettings, link_index_model=TaskLinkIndex,
@@ -118,6 +122,8 @@ app.include_router(make_tasks_router(
     prepare=owner_edits_closed, names=lambda s, ids: ..., labels=contacts.labels, user_exists=lambda s, uid: ...,
     after_write=lambda s, task, now, before: ..., after_commit=queue_mirror))
 ```
+
+`session_scope` must return a context manager that commits on exit and rolls back on an error; `bond_service_kit.session_scope(factory)` does, and `make_session_factory(url)` returns `(engine, sessionmaker)` for `app.state.session_factory`.
 
 Include it AFTER the app's own static `/tasks/<name>` routes (such as `/tasks/export`): routes match in registration order, and `/{id}` would swallow them with 404 `task_not_found` if the factory came first. `scope=all` and other people's tasks
 are refused with 403 `forbidden` unless `read_all_dep(request)` is given. `error_map(TaskError) -> (status, body)` keeps

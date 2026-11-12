@@ -120,5 +120,6 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
 
 - Old: `import 'package:bond_signin_ui/bond_signin_ui.dart';`
 - New: `import 'package:bond_auth_secure_storage/bond_auth_secure_storage.dart';`
-- Pubspec: a phone app adds `bond_auth_secure_storage`. A web app adds nothing and uses `NoRefreshTokenStore` or a
-  cookie session.
+- `bond_signin_ui` no longer exports `SecureRefreshTokenStore`, so an old import of it fails to compile.
+- Pubspec: a phone app adds `bond_auth_secure_storage`. A web app adds nothing and uses `NoRefreshTokenStore`
+  (`import 'package:bond_auth/bond_auth.dart';`) or a cookie session.

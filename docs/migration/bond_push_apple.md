@@ -23,5 +23,7 @@ The pub.dev `push` plugin behind the `bond_push` seams (`packages/bond_push_appl
 
 ## 3. What to test
 
-`make -C packages/bond_push_apple test` and `analyze`. The proof that the plugin is gone from the other packages:
-`bond_tasks_notifications` and `bond_notify_powersync` have no `push` in their dependency closure.
+`make -C packages/bond_push_apple test` and `analyze`. Checked once by hand on 2026-11-12 in a scratch
+consumer: `bond_tasks_notifications` and `bond_notify_powersync` have no `push` in their dependency closure. No CI job
+repeats that check. `tool/boundary_gate.sh` does track the rule that only this package depends on the `push` plugin. To
+check your own app, run `flutter pub get`, then `flutter pub deps` and look for `push`.

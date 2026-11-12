@@ -39,7 +39,7 @@ def _before(session, now):  # was inside tick()
         LOGGER.warning("demo clock anchor refresh failed", exc_info=True)
     schedule_jobs(session, now)
 
-def tick(now=None, engine=None):
+def tick(now=None, engine=None):  # session_factory: see the note below
     return _tick(engine or get_engine(), session_scope, registry, AppClock(now), before=_before)
 
 registry.on_dead("crew_day_notice")(lambda job: _tell_office_not_sent(job, utcnow_naive()))  # was in run_due
@@ -49,6 +49,10 @@ def start_inline(): return _start(tick, name="avalon-worker")
 def main(argv=None) -> int:  # keep the startup lines (schema check, demo_clock.prime, pool size), then:
     return _main(argv, step=tick)
 ```
+
+`session_factory` (here the app's `session_scope`) is a callable with no arguments that returns a context manager yielding a
+SQLAlchemy `Session`. The lib uses it as `with session_factory() as session:` and calls `session.commit()` itself after the
+handler, so a plain `sessionmaker` works. The factory does not need to commit.
 
 The model (`db/models.py`); the table already matches. P keeps its foreign key on a `JobsMixin` subclass:
 

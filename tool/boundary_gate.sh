@@ -8,6 +8,8 @@
 #  (iv)  no libs/bond_*/pyproject.toml lists a bond_ package as a dependency.
 #  (iii) no packages/*/pubspec.yaml names intl, flutter_localizations,
 #        flutter_riverpod or go_router (demos may).
+#  (v)   only packages/bond_push_apple may depend on the `push` plugin, and only
+#        packages/bond_auth_secure_storage on `flutter_secure_storage` (demos may).
 #
 # Usage: bash tool/boundary_gate.sh [--help]
 # Exit: 0 clean, 1 violation, 2 nothing scanned.
@@ -18,7 +20,7 @@ cd "$(dirname "$0")/.."
 
 case "${1:-}" in
   --help|-h)
-    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
   "") ;;
@@ -87,6 +89,16 @@ for f in packages/*/pubspec.yaml; do
   pubspecs=$((pubspecs + 1))
   grep -nE '^[[:space:]]+(intl|flutter_localizations|flutter_riverpod|go_router):' "$f" 2>/dev/null \
     | sed -E "s|^([0-9]+):(.*)\$|${f}:\1: forbidden dependency in a shared package:\2|" >> "$hits" || true
+  # (v) plugin dependencies stay in the one package that owns them
+  dir="$(basename "$(dirname "$f")")"
+  if [[ "$dir" != "bond_push_apple" ]]; then
+    grep -nE '^[[:space:]]+push:' "$f" 2>/dev/null \
+      | sed -E "s|^([0-9]+):(.*)\$|${f}:\1: only bond_push_apple may depend on the push plugin:\2|" >> "$hits" || true
+  fi
+  if [[ "$dir" != "bond_auth_secure_storage" ]]; then
+    grep -nE '^[[:space:]]+flutter_secure_storage:' "$f" 2>/dev/null \
+      | sed -E "s|^([0-9]+):(.*)\$|${f}:\1: only bond_auth_secure_storage may depend on flutter_secure_storage:\2|" >> "$hits" || true
+  fi
 done
 
 if [[ $((core + libs + pubspecs)) -eq 0 ]]; then

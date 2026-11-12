@@ -50,7 +50,8 @@ checks ownership first and marks the notice read.
 
 ## Routes
 
-`pip install bond_notify_py[http]`, then `from bond_notify_py.routes import make_notices_router` (the package never
+Install with the `http` extra (git form in `docs/sdk/README.md`, "Python": add `extras = ["http"]` to the Poetry line, or pip
+`pip install "bond_notify_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_notify_py"`), then `from bond_notify_py.routes import make_notices_router` (the package never
 imports it). It serves list, read, dismiss and read-all; with `on_act(session, notice, action, user_id, now)` it also
 serves `act`, which checks ownership first. A result key `notice` never replaces the notice. A coded exception (str `code`, str `message`, int `status`) escaping a route is answered as `status` with `{"detail": {"code", "message"}}`; `error_map(exc) -> (status, body) | None` replaces that rule. `session_scope()` is a context manager factory that commits on exit.
 

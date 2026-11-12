@@ -7,7 +7,7 @@ S3-compatible object storage, recipient download links and image helpers. Depend
 
 | Piece | What it is |
 | --- | --- |
-| `StorageService` | ABC: `upload`, `download`, `get_url`, `delete`; concrete `list_keys`, `supports_presigned`, `upload_bytes`, `download_bytes` (missing -> `FileNotFoundError`), `exists` |
+| `StorageService` | ABC: `upload`, `download`, `get_url`, `delete`; concrete `list_keys`, `supports_presigned`, `upload_bytes(content: bytes, key: str, *, content_type: str | None = None) -> str` (content first), `download_bytes` (missing -> `FileNotFoundError`), `exists` |
 | `LocalStorageService(base_dir)` | disk backend, traversal guard, URLs are `/uploads/<key>`, `list_keys` implemented |
 | `S3StorageService(bucket, region=, endpoint_url=, addressing_style=)` | boto3 s3v4, presigned `get_object` with disposition and type, paginated `list_keys`, clients cached by (region, endpoint, style) |
 | `StorageSettings.from_env(bucket_env=, prefix=)`, `build_storage` | settings from the environment, backend factory |

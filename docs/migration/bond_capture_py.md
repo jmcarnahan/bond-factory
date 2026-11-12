@@ -86,6 +86,8 @@ result = parse_capture(text, ..., rich=True, resolver_kinds=("contact", "propert
   "title": "Site meeting", "start_date": "2026-11-12", "start_time": "14:00", "end_time": "15:30", ...,
   "location": "Example Plaza office", "notes": "Bring the permit drawings", "duration_minutes": 90,
   "attendees": ["Dana", "Lee"]}`.
+- The `expected_*_rich.json` fixtures assume a resolver that returns no candidates. Your own resolver adds candidates, so compare
+  against them only with such a resolver.
 - Without `rich` the wire is byte for byte what it was (a test compares it with the fixture). Clients that ignore unknown
   keys can read both. A Dart client reads the rich keys through `packages/bond_tasks` (`task_candidates.dart`).
 - To write an attendee's display name to a calendar, pass `Person(name, email)` in the draft (`docs/migration/bond_calendar.md`).

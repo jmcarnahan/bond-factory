@@ -1,8 +1,8 @@
 # Hosting bond_tasks_py: models, routes and service calls
 
 The code an app writes around `libs/bond_tasks_py`. The reference host is `services/sdk_example/sdk_example/`, mainly
-`routes/tasks.py` (CRUD and lifecycle), `routes/task_today.py` (day view and settings), `routes/notices.py`, `routes/push.py`
-and `task_support.py`. The note for the library is `bond_tasks_py.md`, the wire is `docs/contracts/tasks.md`.
+`routes/task_routers.py` (mounts `make_tasks_router` for CRUD, lifecycle, day view and settings, and `make_notices_router`
+for the inbox), `routes/push.py` and `task_support.py`. The note for the library is `bond_tasks_py.md`, the wire is `docs/contracts/tasks.md`.
 
 ## 1. The models
 
@@ -29,7 +29,12 @@ class PushDevice(PushDevicesMixin, Base): pass  # bond_push_py
 ```
 
 In a test, `create_engine("sqlite://")` (in memory) works once you call `sqlite_savepoint_setup(engine)`, but an in-memory
-database is per connection and thread: single-threaded use only. With a threaded server or a `TestClient` use a file URL or `StaticPool`.
+database is per connection and thread: single-threaded use only. With a threaded server or a `TestClient` use a file URL or `StaticPool`,
+or `make_session_factory("sqlite://")` from `bond_service_kit`, which shares one connection for an in-memory URL.
+
+When you mount the routes (`bond_tasks_py.md` section 6b), `session_scope=lambda: session_scope(app.state.session_factory)` needs
+`from bond_service_kit import make_session_factory, session_scope` (or your own equivalent). The callable must return a context
+manager that commits on exit and rolls back on an error.
 
 ## 2. Service calls
 
@@ -59,7 +64,7 @@ What three arguments of `create` and `update` mean:
   (`unknown_assignee` is never raised).
 
 More arguments of `create` and `update` (and `sync_routes`):
-- `prepare(session, task_or_None, actor_user_id, extras) -> dict`: runs after the permission check and before the app columns are stored. On update it sees the stored task before any field changes. It runs on create, update and sync put/patch only, not on complete, reopen, cancel, delete or a status-only patch, and it sees the extras (filtered to `host_columns`), not the other new values. The dict it returns is trusted server code: every key is stored if it is a column of your task model that the lib does not own, so it may add derived columns outside `host_columns`; a lib column or unknown name raises `ValueError` and a non-Mapping raises `TypeError`. It may raise `TaskError` and then nothing is written. Use it for rules such as "relinking needs owner rights". `sync_routes(prepare=)` runs it on put and patch too.
+- `prepare(session, task_or_None, actor_user_id, extras) -> dict`: runs after the permission check and before the app columns are stored. On update it sees the stored task before any field changes. It runs on create, update and sync put/patch only, not on complete, reopen, cancel, delete or a status-only patch, and it sees the extras (filtered to `host_columns`), not the other new values. The dict it returns is trusted server code: every key is stored if it is a column of your task model that the lib does not own, so it may add derived columns outside `host_columns`; a lib column or unknown name raises `ValueError` and a non-Mapping raises `TypeError`. It may raise `TaskError` and then nothing is written: `from bond_tasks_py import TaskError`, then `raise TaskError("relink_needs_owner", "Only the owner can change this.", 403)`. The route answers that status with `{"detail": {"code", "message"}}`. Use it for rules such as "relinking needs owner rights". `sync_routes(prepare=)` runs it on put and patch too.
 - `sync_routes(fields=)`: a list of the device-writable names (a subset of `FIELDS`); other fields from a device are dropped. It narrows the `FIELDS` columns only: status changes, cancel, delete and `host_columns` extras are not narrowed.
 - A `Permissions` object that needs a session can get it with `sqlalchemy.orm.object_session(task)`.
 - A renamed column works through a SQLAlchemy `synonym` named in `host_columns`. Streams stay the app's file.

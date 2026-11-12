@@ -12,7 +12,7 @@ HTTP `ApiClient`, typed exceptions and error hooks over `package:http`. Pure Dar
 | `timeout:` and `headerTimeout:` on `request`, the JSON helpers, `getBytes`, `requestBytes`, `openStream` | per-call limits; null uses the client's value. `timeout` is the overall limit of a call. For a JSON or bytes call it covers the wait for the headers and the whole body read. `headerTimeout` is only the wait for the response headers, and it is never longer than `timeout`. For `openStream` (and `sse`) both bound the wait for the headers, and `timeout` also bounds reading an error body; once a 2xx answer has started, neither limits the stream (the SSE idle timeout does). Null for either uses the client's value. |
 | `ApiException` family | `Unauthorized`, `Forbidden`, `NotFound`, `Conflict`, `BadRequest`, `ValidationError`, `ServerError`, `BadResponse`, `NetworkError`, `NetworkFailure(kind)` |
 | `ErrorBody.parse(status, body)` | maps string, dict and list `detail` forms to the right exception |
-| `networkFailureText(e, ApiLabels)` | one sentence for a failed request |
+| `networkFailureText(ApiException e, ApiLabels labels, {String baseUrl = ''}) -> String` | one sentence for a failed request |
 | `TokenSource`, `SessionRefresh` | session seam; `renewed`, `rejected`, `offline` |
 | `SseEvent`, `SseFrameSplitter`, `parseSseFrame` | the event-stream parser |
 | `authPathsExcludedFromRenewal` | `/auth/firebase`, `/auth/refresh`, `/auth/demo` |

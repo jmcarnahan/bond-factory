@@ -31,7 +31,8 @@ dismiss(session, Notice, user_id, notice_id, now)                            # P
 mark_all_read(session, Notice, user_id, now)                                 # POST /notices/read-all
 ```
 
-- Or mount all of it: `pip install bond_notify_py[http]`, then
+- Or mount all of it: install with the `http` extra (the lib is not on a package index; the git form is in `docs/sdk/README.md`, "Python": add
+`extras = ["http"]` to the Poetry line, or pip `pip install "bond_notify_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_notify_py"`), then
   `app.include_router(make_notices_router(notice_model=Notice, session_scope=lambda: session_scope(app.state.session_factory), user_dep=current_user_id, now=clock.utcnow_naive, on_act=on_act, act_dep=write_capability))`
   from `bond_notify_py.routes`. `on_act(session, notice, action, user_id, now)` runs after the owner check; it applies
   the action and returns a mapping (for example `{"task": item}`) that is merged next to `notice`. `after_act(background,

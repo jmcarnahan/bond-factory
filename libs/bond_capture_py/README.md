@@ -82,7 +82,7 @@ when the note stated a length and no end, and the event is timed. A task candida
 those keys only for a rich parse (`CaptureResult.to_dict()` follows `result.rich`); the default wire is unchanged
 (`expected_candidates.json` still matches byte for byte). Resolver rows keep extra scalar keys (a rank, a type) in
 rich mode only. With the model off, a rich parse still answers one plain draft with `notes: null`.
-Fixtures: `expected_candidates_rich.json`, `expected_degraded_rich.json`, `model_output_rich.json`, `rich_phrases.json`.
+Fixtures: `expected_candidates_rich.json`, `expected_degraded_rich.json`, `model_output_rich.json`, `rich_phrases.json`. The `expected_*_rich.json` fixtures assume a resolver that returns no candidates.
 
 `resolver_kinds=("contact", "place")` lets a link point at more than contacts: the schema enum and one extra prompt
 paragraph name the kinds (rule and examples too), and each link's name goes to `resolver.resolve(user_id, name, kind)` with its own kind.

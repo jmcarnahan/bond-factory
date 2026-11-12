@@ -201,11 +201,11 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
    (`sdk.todo.settings-save`). A date-only TODO's due time is not shown on its `/today` row: check that it moved to 18:00 local through `GET /tasks` (`due_at`) or the calendar lane. Change the zone
    (`sdk.todo.settings-zone`, pick a result `sdk.todo.settings-zone-result-<n>` (the chip `sdk.todo.settings-zone-picked-0` then shows the chosen zone), then `sdk.todo.settings-save`; the current zone reads in `sdk.todo.zone-state`, and shows the device zone before any change, because the device reports its zone on sign-in): the date-only due time follows (see `GET /tasks`). A timed TODO keeps its instant. Tick the clock across a stage after the change:
    no duplicate notice (the ledger key holds, `GET /notices` shows one row per stage).
-5a. **Settings reset.** Still on `/todo-settings` after step 5. Each field the person set shows an inline "Reset to default"
+5a. **Settings reset.** Still on `/todo-settings` after step 5. (On a fresh page `settings-reset-zone` is already present: the device zone is stored at sign-in, so the zone is the person's own value.) Each field the person set shows an inline "Reset to default"
    control (`sdk.todo.settings-reset-zone`, `-reset-start`, `-reset-end`, `-reset-lead`); a field that follows the app default
-   shows "Using the default" instead. After step 5, `settings-reset-end` and `settings-reset-zone` are present and
+   shows the text "Default" instead. After step 5, `settings-reset-end` and `settings-reset-zone` are present and
    `settings-reset-start` is not. Click `sdk.todo.settings-reset-end`: the field returns to the app default (17:00, or
-   `SDK_EXAMPLE_END_OF_DAY`), the control is replaced by "Using the default", `GET /tasks/settings` lists `overridden`
+   `SDK_EXAMPLE_END_OF_DAY`), the control is replaced by the text "Default", `GET /tasks/settings` lists `overridden`
    without `end_of_day`, and a date-only TODO's `due_at` in `GET /tasks` moves back to the default end of day. No dialog opens.
 6. **Stages in the app.** Create a timed TODO due at a minute you choose, with "Use my default" reminder (60 minutes).
    On `/today` set `clock-now` to 30 minutes before the due time and Tick: the stage banner

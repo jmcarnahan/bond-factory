@@ -196,4 +196,6 @@ columns declared with `tasksTables(extraColumns:)` round-trip through the same m
 
 An app may refuse a write with a rule of its own through `prepare(session, task or None, actor, extras)` on `create`,
 `update` and `sync_routes`. It runs after the permission check and before anything is written, on the REST and the sync
-path alike, and a `TaskError` it raises (a 403 becomes the sync verdict `forbidden`) writes nothing.
+path alike, and a `TaskError` it raises (a 403 becomes the sync verdict `forbidden`) writes nothing. Import it with
+`from bond_tasks_py import TaskError` and raise `TaskError("relink_needs_owner", "Only the owner can change this.", 403)`
+(`code`, `message`, `status`). The route answers that status with `{"detail": {"code", "message"}}`.
