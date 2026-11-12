@@ -2,7 +2,8 @@
 
 A small database-backed job queue: one table, atomic claims, retry with backoff, stall recovery, and a poll
 loop that runs inline in the API process or as its own worker. Depends only on SQLAlchemy 2.0. Tested on
-SQLite; the Postgres claim uses `FOR UPDATE SKIP LOCKED` (its SQL text is asserted in tests).
+SQLite; the Postgres claim uses `FOR UPDATE SKIP LOCKED` (its SQL text is asserted in tests, and tests marked
+`postgres` run it with two real processes when `BOND_TEST_POSTGRES_URL` is set).
 
 ## Attach the table
 
@@ -63,7 +64,8 @@ thread, loop = start_inline(step)                       # inline: daemon thread 
 `main --once` runs one pass and prints one line per job (`<status> <job_type>  <summary>`); it is the only
 `print()` in the library.
 
-`before` is the app's scheduler (enqueue what is due, using idempotency keys). A failing hook is logged and the
+`before` is the app's scheduler (enqueue what is due, using idempotency keys). `before_every=60` runs it at most
+once per 60 wall-clock seconds per process (the first tick always runs it); the default runs it every tick. A failing hook is logged and the
 due jobs still run. `session_factory` is a SQLAlchemy `sessionmaker`; each job runs in its own session and the
 engine commits it after the handler returns.
 
@@ -80,3 +82,15 @@ naive UTC; every function accepts aware or naive input.
 `run_job` take the engine and the job table (or model) explicitly. `run_due(engine, session_factory,
 registry, *, clock, wid=None, limit=200)` takes the `Clock`: `now()` once per pass, `real_now()` at every claim
 (so `locked_at` is the claim time, never the pass start).
+
+## Cancel and prune
+
+```python
+from bond_jobs import cancel, prune
+
+cancel(engine, idempotency_key="reminder:1", job_table=JobRecord)   # deletes pending jobs only; returns count (job_table is required)
+prune(engine, older_than=cutoff, job_table=JobRecord)               # done/dead rows updated before cutoff
+```
+
+`cancel` leaves a running job alone. `prune` takes `statuses=("done", "dead")` and `limit=10000`; pending and
+running rows are never deleted. Both are plain deletes on the engine and commit on their own.

@@ -2,7 +2,11 @@ import 'package:bond_tasks/bond_tasks.dart';
 import 'package:bond_ui/bond_ui.dart';
 import 'package:flutter/material.dart';
 
+import 'bond_link_chip.dart';
+import 'bond_priority_chip.dart';
 import 'task_format.dart';
+
+const int _kMaxLinks = 3;
 
 /// One task: complete button, title, due text, assignee, status and checklist
 /// progress. Tapping the body calls [onTap]; the leading button calls
@@ -16,8 +20,16 @@ class BondTaskRow extends StatelessWidget {
     this.labels = const TaskLabels(),
     this.semanticsId,
     this.completeSemanticsId,
+    this.now,
+    this.onLinkTap,
   });
 
+  /// With a [now] the row judges overdue by the one rule (`isOverdue`); without
+  /// it the task's own `overdue` flag decides. A normal priority shows no chip.
+  final DateTime? now;
+
+  /// Called when a link chip is tapped; null leaves the chips not tappable.
+  final ValueChanged<TaskLink>? onLinkTap;
   final Task task;
   final VoidCallback? onTap;
   final VoidCallback? onComplete;
@@ -32,7 +44,8 @@ class BondTaskRow extends StatelessWidget {
     final bl = BondLabels.of(context);
     final done = task.status != TaskStatus.open;
     final due = formatDue(task, bl);
-    final late = task.overdue && !done;
+    final late = !done && (now != null ? isOverdue(task, now!) : task.overdue);
+    final p = task.priority;
     final progress = task.checklist.isEmpty
         ? null
         : labels.checklistProgress(task.checklistDone, task.checklist.length);
@@ -61,6 +74,7 @@ class BondTaskRow extends StatelessWidget {
             runSpacing: BondSpace.s4,
             children: [
               if (task.assignedUserId != null) BondPersonChip(label: task.assigneeName ?? labels.unassigned, slot: 0),
+              if (p != null && p != TaskPriority.normal && !done) BondPriorityChip(priority: p, labels: labels),
               if (late) BondStatusChip(BondStatus(labels.overdue, tone: BondToneRole.danger)),
               if (done) BondStatusChip(BondStatus(labels.statusText(task.status), tone: BondToneRole.positive)),
             ],
@@ -86,11 +100,41 @@ class BondTaskRow extends StatelessWidget {
             onPressed: onComplete,
           ),
           Expanded(
-            child: BondPressable(
-              onTap: onTap,
-              semanticLabel: task.title,
-              semanticsId: semanticsId,
-              child: body,
+            child: Column(
+              // Stretch: the tappable body spans the whole row, as before the link chips.
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                BondPressable(
+                  onTap: onTap,
+                  semanticLabel: task.title,
+                  semanticsId: semanticsId,
+                  child: body,
+                ),
+                // Outside the tappable body so each chip is its own control.
+                if (task.links.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: BondSpace.s8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                      spacing: BondSpace.s8,
+                      runSpacing: BondSpace.s4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        for (var n = 0; n < task.links.length && n < _kMaxLinks; n++)
+                          BondLinkChip(
+                            link: task.links[n],
+                            labels: labels,
+                            onTap: onLinkTap == null ? null : () => onLinkTap!(task.links[n]),
+                            semanticsId: semanticsId == null ? null : '$semanticsId-link-$n',
+                          ),
+                        if (task.links.length > _kMaxLinks)
+                          Text(labels.moreLinksText(task.links.length - _kMaxLinks), style: text.small.copyWith(color: t.muted)),
+                      ],
+                    ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

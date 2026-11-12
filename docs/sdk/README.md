@@ -8,7 +8,7 @@ adapters (see `docs/decisions/2026-11-08-shared-modules-policy.md`).
 
 Toolchain: this branch and CI use Flutter 3.47.8 / Dart 3.13.7; the packages' floor is Flutter 3.41 and Dart ^3.11.
 Apps still on Flutter 3.47.2 should bump when they adopt a module.
-The two roof packages, `bond_roof` and `bond_roof_ui`, are MIT licensed; the other modules are GPL-3.0-or-later.
+Every module is MIT licensed except `services/roof_measure`, which is GPL-3.0-or-later (see `NOTICE`).
 
 ```yaml
 dependencies:
@@ -68,7 +68,7 @@ The roof pipeline is importable the same way:
 roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "<sha>", subdirectory = "services/roof_measure" }
 ```
 
-- roof-measure is GPL-3.0-or-later (CGAL through compas_cgal); the Dart packages bond_roof and bond_roof_ui are MIT. See docs/contract-0.2.md §3 for the library API.
+- roof-measure is GPL-3.0-or-later (CGAL through compas_cgal); everything else in the repository, the Dart packages bond_roof and bond_roof_ui included, is MIT. See docs/contract-0.2.md §3 for the library API.
 
 - The python image stage needs git: `apt-get update && apt-get install -y --no-install-recommends git`.
 - Alternative: every CI run builds one wheel per lib; tagged runs (`v*`) attach them to the GitHub Release.
@@ -115,14 +115,25 @@ roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
 | `bond_sync_py` | Python | 2 | Server side of sync upload |
 | `bond_oauth` | Python | 2 | OAuth flows with encrypted token storage |
 | `bond_calendar` | Python | 3 | Calendar provider protocol, Google and Microsoft mirrors |
-| `bond_tasks_py` | Python | 3 | Tasks, checklists and reminders |
-| `bond_tasks` | pure Dart | 3 | Task models and client |
-| `bond_tasks_ui` | Flutter | 3 | Task screens |
+| `bond_tasks_py` | Python | 3 | Tasks, checklists, due instant, per-user settings, three-stage notice ledger and sweep, calendar mirror |
+| `bond_tasks` | pure Dart | 3 | Task models, client, controller, due and stage helpers (headless) |
+| `bond_tasks_ui` | Flutter | 3 | Task widgets: Today list, form, stage banner, capture review, settings form |
 | `bond_connections` | pure Dart | 3 | Connection status models and client |
 | `bond_connections_ui` | Flutter | 3 | Connection status screens |
 | `bond_signin (py)` | Python | 4 | Direct Google/Microsoft sign-in: Protocol seams, scope policy, router factory |
 | `bond_signin (dart)` | pure Dart | 4 | Sign-in client: attempts, returns and the session gateway |
 | `bond_signin_ui` | Flutter | 4 | Sign-in screen, buttons, scope-ask card, system-browser port |
+| `bond_notify_py` | Python | 5 | Stored inbox: notices table, list, read, dismiss and sync handlers (the ledger, stages and sweep live in `bond_tasks_py`) |
+| `bond_push_py` | Python | 5 | Apple push sender (APNs over HTTP/2) and device tokens |
+| `bond_capture_py` | Python | 5 | Natural-language capture: parse model output into tasks and events |
+| `bond_notify` | pure Dart | 5 | Notice models, client and inbox stream |
+| `bond_notify_ui` | Flutter | 5 | Inbox and notice widgets |
+| `bond_push` | Flutter | 5 | Apple push registration plugin |
+| `bond_tasks_notifications` | Flutter | 5 | Local reminders for tasks: three stages, per-task budget, tap routing |
+| `bond_tasks_powersync` | Flutter | 5 | PowerSync adapter for task tables |
+| `bond_notify_powersync` | Flutter | 5 | PowerSync adapter for notice tables |
 
 `demos/sdk_demo` (Flutter web, :8078) and `services/sdk_example` (FastAPI, :8012) exercise every module in
-fake mode and are the reference for wiring. The walk recipe is `docs/test/WEB.md`.
+fake mode and are the reference for wiring. The walk recipe is `docs/test/WEB.md` (web) and `docs/test/MOBILE.md` (iOS simulator).
+The TODO modules (phase 5) are adopted in the order of `docs/migration/todo-checklist.md`. Pin the commit
+listed in `docs/sdk/sdk-pins.md` (see `docs/sdk/release-2026-11-todo.md`).

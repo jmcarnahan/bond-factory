@@ -9,6 +9,7 @@ import logging
 import os
 import socket
 import threading
+import weakref
 from collections.abc import Callable
 from datetime import datetime
 
@@ -258,22 +259,37 @@ def run_due(engine, session_factory, registry: HandlerRegistry, *, clock: Clock,
     return ran
 
 
-def tick(engine, session_factory, registry: HandlerRegistry, clock: Clock, *, before=None, limit: int = 200,
-         job_table=None) -> list[dict]:
+_BEFORE_LAST: "weakref.WeakKeyDictionary[HandlerRegistry, datetime]" = weakref.WeakKeyDictionary()
+
+
+def _before_due(registry: HandlerRegistry, clock: Clock, every: float | None) -> bool:
+    """True when the throttled ``before`` hook should run now. The wall clock times it."""
+    if every is None:
+        return True
+    last = _BEFORE_LAST.get(registry)
+    return last is None or (to_naive_utc(clock.real_now()) - last).total_seconds() >= every
+
+
+def tick(engine, session_factory, registry: HandlerRegistry, clock: Clock, *, before=None,
+         before_every: float | None = None, limit: int = 200, job_table=None) -> list[dict]:
     """One pass: reclaim stale jobs, run ``before(session, now)`` (the app's scheduler), run what is due.
 
-    A failing ``before`` hook is logged and the due jobs still run.
+    A failing ``before`` hook is logged and the due jobs still run. With ``before_every`` (seconds) the hook runs
+    at most that often per process (the first tick always runs it; a hook that fails runs again on the next tick);
+    ``None`` runs it on every tick.
     """
     table = _table(job_table) if job_table is not None else registry.job_table
     if table is None:
         raise ValueError("pass job_table or build the registry with HandlerRegistry(job_model)")
     now = clock.now()
     reclaim_stale(engine, table, now=now, real_now=clock.real_now())
-    if before is not None:
+    if before is not None and _before_due(registry, clock, before_every):
         try:
             with session_factory() as session:
                 before(session, to_naive_utc(now))
                 session.commit()
+            if before_every is not None:
+                _BEFORE_LAST[registry] = to_naive_utc(clock.real_now())  # only a successful run starts the wait
         except Exception:
             LOGGER.warning("before-tick hook failed", exc_info=True)
     return run_due(engine, session_factory, registry, clock=clock, limit=limit, job_table=table)

@@ -41,7 +41,7 @@ Status 422:
             "errors": [{"loc": ["body", "field"], "msg": "...", "type": "..."}]}}
 ```
 
-The server never echoes the rejected input.
+The server never echoes the rejected input. A host may map a framework validation error to a more specific code: the example does for a task priority outside 1 to 3 (`invalid_priority`) and a bad time zone (`invalid_time_zone`) through a body pre-check. Every other body error stays `validation_error`.
 
 ## Retry-After
 
@@ -58,5 +58,10 @@ the status is 401 or 403. `bond_service_kit` emits the object form; a compatibil
 ## Client parsing (`bond_api`)
 
 The parser accepts `detail` as a string, a map (`message` falling back to `detail`, plus `code` and `data`) or
-a list of field errors, and falls back to a top-level `code`. Typed errors: `Unauthorized`, `Forbidden`,
+a list of field errors, and falls back to the same keys at the top level.
+
+The error code is read with precedence `code`, then `error_code`, then `error`, first in the detail map and then at
+the top level. Only a string value counts. `error` is taken as the code only when it looks like one (matches
+`^[a-z][a-z0-9_]*$`, at most 64 characters), because servers also put human sentences there; it never replaces
+`message`. This tolerance exists for servers that predate this contract: servers should send `code`. Typed errors: `Unauthorized`, `Forbidden`,
 `NotFound`, `Conflict`, `BadRequest`, `ValidationError`, `ServerError`, `BadResponse`, `NetworkFailure`.

@@ -1,0 +1,29 @@
+[project]
+name = "bond_notify_py"
+version = "0.1.0"
+description = "Stored notice inbox: table mixin, inbox notifier, list and read services, sync routes"
+requires-python = ">=3.12,<3.14"
+license = "MIT"
+dependencies = [
+    "sqlalchemy>=2.0.36",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.6", "psycopg[binary]>=3.2"]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bond_notify_py*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["postgres: needs a PostgreSQL database (BOND_TEST_POSTGRES_URL); skipped when unset"]

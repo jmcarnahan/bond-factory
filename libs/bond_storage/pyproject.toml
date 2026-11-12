@@ -2,6 +2,7 @@
 name = "bond_storage"
 version = "0.1.0"
 description = "S3-compatible object storage and image helpers"
+license = "MIT"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "boto3>=1.34",

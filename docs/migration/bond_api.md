@@ -86,17 +86,15 @@ The exception names are the same (no edit needed; find them with `grep -rnwE "Ap
 None. P's `ServerError` now carries `code` (`db_unavailable`); `bond_service_kit` sends it.
 
 ## 5. Acceptance
-
 - A: `flutter test` in `packages/avalon_core` (`test/api/{api_client,robust_client,sse_client}_test.dart` move onto `MockClient`).
 - P: `flutter test` in `packages/pt_core` (`test/api/`). Neither app has a test that two concurrent 401s call the renewal hook once: write it.
 - `flutter analyze` clean. P's `networkFailureText` adapter is the same with `PtL10n` in place of `AvL10n`.
 
 ## 6. Known gaps (the app keeps these)
-
 - Dropped from the seed client: web-socket helper, explicit-bearer mode, push-token path exemption, file-path multipart,
   `installGlobalErrorHooks` (stays in `error_hooks.dart`), localized strings (`ApiLabels`), `kIsWeb` (`isWeb:`).
 - 405 and 429 map to `ServerError` with `statusCode`; there is no rate-limit class. `Conflict.existingDraftId` is gone: read `data`.
-- S: `ErrorBody` reads `code`, not `error_code`, and treats every 401 with a token as session over; S's `PayloadTooLarge`
+- S: `ErrorBody` now also reads `error_code` and a code-shaped `error` (servers should still send `code`), but treats every 401 with a token as session over; S's `PayloadTooLarge`
   (413) becomes `ServerError`, and `errorCode`/`details` become `code`/`data`. S waits for its backend to emit the shared body.
-
-S specifics: `sbel.md` §1 and §6.
+- Error code precedence is `code`, then `error_code`, then `error` (detail map first, then top level). The TODO routes send `code`
+  (`docs/contracts/tasks.md`). S specifics: `sbel.md` §1 and §6.

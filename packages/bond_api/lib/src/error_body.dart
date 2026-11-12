@@ -10,7 +10,8 @@ import 'exceptions.dart';
 /// The server speaks `{"detail": {"code", "message", ...}}` (a dict detail), but
 /// older routes answer `{"detail": "some_code"}` (a string) and FastAPI's own
 /// validation answers `{"detail": [{"loc": [...], "msg": "..."}]}` (a list).
-/// All three, and a top-level `code`, are read here.
+/// All three, and a top-level code, are read here. The code key is `code`,
+/// `error_code` or `error` (see [_readCode]).
 class ErrorBody {
   const ErrorBody({
     required this.status,
@@ -44,19 +45,31 @@ class ErrorBody {
         if (status == 401 || status == 403) code = detail;
       } else if (detail is Map) {
         message = (detail['message'] ?? detail['detail'] ?? message).toString();
-        final c = detail['code'];
-        code = c is String ? c : null;
+        code = _readCode(detail);
         data = _stringKeyed(detail);
         _readFields(detail['errors'], fields);
       } else if (detail is List) {
         _readFields(detail, fields);
         message = 'Validation failed';
       }
-      final top = decoded['code'];
-      code ??= top is String ? top : null;
+      code ??= _readCode(decoded);
       if (data.isEmpty && detail is! List) data = _stringKeyed(decoded);
     }
     return ErrorBody(status: status, message: message, code: code, data: data, fields: fields);
+  }
+
+  static final _codeShape = RegExp(r'^[a-z][a-z0-9_]*$');
+
+  /// The error code of [map]: `code`, then `error_code`, then `error`. Only a
+  /// string counts. `error` is taken only when it looks like a code (servers
+  /// also put human sentences there); it never touches the message.
+  static String? _readCode(Map<dynamic, dynamic> map) {
+    for (final key in const ['code', 'error_code']) {
+      final v = map[key];
+      if (v is String && v.trim().isNotEmpty) return v;
+    }
+    final e = map['error'];
+    return e is String && e.length <= 64 && _codeShape.hasMatch(e) ? e : null;
   }
 
   /// [ErrorBody.from] then [toException]. Never throws: a body of an unexpected

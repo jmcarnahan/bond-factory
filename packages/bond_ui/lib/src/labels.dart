@@ -23,6 +23,9 @@ class BondLabels {
     this.save = 'Save',
     this.search = 'Search',
     this.noResults = 'No results',
+    this.searching = 'Searching',
+    this.searchFailed = 'Search failed. Try again.',
+    this.remove = 'Remove',
     this.areYouSure = 'Are you sure?',
     this.selectDate = 'Select date',
     this.selectTime = 'Select time',
@@ -75,6 +78,9 @@ class BondLabels {
   final String save;
   final String search;
   final String noResults;
+  final String searching;
+  final String searchFailed;
+  final String remove;
 
   /// Prompt shown on the armed second step of an inline confirm.
   final String areYouSure;

@@ -33,7 +33,7 @@ and :8012 (same host, different port), so the connect flow's top-level navigatio
   `browser_evaluate` of `() => { document.querySelector('flt-semantics-placeholder').click(); return 'ok'; }`.
   A real click fails with "outside of the viewport". In-app navigation keeps semantics on. The demo also
   calls `ensureSemantics()` in `main()` as a convenience; do not rely on it.
-- Viewports: 1280x800 (desktop, left nav) and 390x844 (phone lane, `/ui` and `/tasks`; below 600 px the nav is
+- Viewports: 1280x800 (desktop, left nav) and 390x844 (phone lane, `/ui`, `/tasks` and the TODO pages; below 600 px the nav is
   a scrolling strip under the page, same `sdk.nav.<id>` ids). Nothing may overflow at 390.
 
 ## Selectors
@@ -46,6 +46,9 @@ and :8012 (same host, different port), so the connect flow's top-level navigatio
 - Every `sdk.*` text node exposes its text as the semantics label, so read `getAttribute('aria-label')` or
   the accessible name instead of taking screenshots.
 - Elements below the fold are absent from the tree: wheel-scroll until they appear.
+- `sdk.ui.text-field` is a wrapper: the input is its child. Plain text fields put the caret at the end on a mouse click.
+- At 390 px the nav strip scrolls sideways: ids to the right of the visible part are absent from the tree until the strip is
+  wheel-scrolled horizontally.
 - Helpers in `demos/sdk_demo/e2e/lib.mjs`: `enableSemantics(page)`, `sid(page, id)`, `typeInto(locator,
   text)`, `collectErrors(page)`.
 - `locator.fill` empties Flutter fields. Click the field, wait 400 ms, `ControlOrMeta+a`, then
@@ -61,17 +64,22 @@ Zero `[role=dialog],[role=alertdialog]`; empty `pageerror` list; no console mess
 
 | Route | Nav id | Shows |
 |---|---|---|
-| `/` | `sdk.nav.home` | The seven routes, one line each with module and phase |
+| `/` | `sdk.nav.home` | Every route, one line each with module and phase |
 | `/ui` | `sdk.nav.ui` | `bond_ui` gallery: primitives, inputs, select, confirm, navigation, states; `sdk.ui.last-event` |
 | `/api` | `sdk.nav.api` | Three probe buttons and one inline result line |
 | `/auth` | `sdk.nav.auth` | Sign-in buttons per fake provider, claims chips, refresh, simulate reuse, break-glass link (flag), sign out |
 | `/sync` | `sdk.nav.sync` | Row editor, upload with per-row verdicts, server clock, sync token |
 | `/connections` | `sdk.nav.connections` | A card per fake provider, return banner, simulate expiry, the wanted-scope ask card |
-| `/tasks` | `sdk.nav.tasks` | Landing: summary, list, quick add, form, run due jobs, reminder notices, mirror ids |
+| `/tasks` | `sdk.nav.tasks` | Landing: summary, list, quick add, form, run due jobs, mirror ids |
+| `/today` | `sdk.nav.today` | The day view (Overdue, Today, No date, Done today), stage banners, the TODO form with priority and links, the fake-clock strip |
+| `/capture` | `sdk.nav.capture` | A note field, the review of task and event candidates, accepted events sent count |
+| `/calendar` | `sdk.nav.calendar` | Month grid with due markers, the due lane of the selected day, accepted events |
+| `/todo-settings` | `sdk.nav.todo-settings` | Work day, lead minutes, quiet hours sentence, zone, phone-alert permission |
+| `/inbox` | `sdk.nav.inbox` | Unread badge, polling and watch feeds, the notice list with Done, Snooze, Cancel, undo, the fake-clock strip |
 
 ## Walk steps (ids are `[flt-semantics-identifier=...]`)
 
-1. **Home.** `sdk.home.route-<id>` for home, ui, api, auth, sync, connections, tasks; `sdk.errors` absent.
+1. **Home.** `sdk.home.route-<id>` for home, ui, api, auth, sync, connections, tasks, today, capture, calendar, todo-settings, inbox; `sdk.errors` absent.
 2. **UI.** Sections `sdk.ui.section-<id>`; widgets `sdk.ui.button`, `.text-field`, `.select`,
    `.select-chips`, `.select-radio`, `.segmented`, `.confirm`, `.banner`, `.table`, `.bottom-tasks`, `.nav-tasks`,
    `.error-state-retry`. Open `sdk.ui.select`: the list expands inline, no dialog. Confirm is two steps:
@@ -100,17 +108,16 @@ Zero `[role=dialog],[role=alertdialog]`; empty `pageerror` list; no console mess
    `fake-microsoft`. A failure shows in `sdk.connections.error`; a headless run that cannot navigate shows
    `sdk.connections.start-url`.
 7. **Tasks.** Quick add: `sdk.tasks.quick-add`, then `sdk.tasks.quick-add-add`. Form: `sdk.tasks.form-title`;
-   checklist input `sdk.tasks.form-checklist-add` and `sdk.tasks.form-checklist-add-button` (twice). A reminder
-   needs a due moment: `sdk.tasks.form-due-date` (opens an inline calendar, pick a day), then
-   `sdk.tasks.form-due-time-add` and `sdk.tasks.form-due-time` (`-remove` clears it). Then
-   `sdk.tasks.form-reminder` and its option "1 minute before", `sdk.tasks.form-mirror` for the calendar mirror,
-   `sdk.tasks.form-save`. Row `sdk.tasks.row-<id>`; tick a checklist item; `sdk.tasks.complete-<id>` completes
-   and reopens. Click `sdk.tasks.run-due-jobs` (the example ticks with `now` two minutes ahead), then read
-   `sdk.tasks.notices` and `sdk.tasks.notice-<n>` (or click `sdk.tasks.show-notices`). The mirror shows
-   `sdk.tasks.external-<id>` (the external id). Turn it off with the per-row toggle `sdk.tasks.mirror-<id>`:
-   `sdk.tasks.external-<id>` is then absent. Click `sdk.tasks.reload` after saving or toggling the mirror: the
-   mirror runs after the response as a background task, so the first answer does not carry its result yet.
-   Delete is two steps: `sdk.tasks.delete-<id>`, then `-confirm`. Messages: `sdk.tasks.info`, `sdk.tasks.error`.
+   checklist input `sdk.tasks.form-checklist-add` and `sdk.tasks.form-checklist-add-button` (twice). A due moment:
+   `sdk.tasks.form-due-date` (opens an inline calendar, pick a day), then `sdk.tasks.form-due-time-add`, the time boxes
+   `sdk.tasks.form-due-time-hour`, `-minute`, `-meridiem-am` and `-meridiem-pm` (the boxes select their text on focus, so typing replaces it),
+   and `sdk.tasks.form-due-time-remove` to clear it. Reminder choice `sdk.tasks.form-reminder` (the options include "Use my
+   default"), `sdk.tasks.form-mirror` for the calendar mirror, `sdk.tasks.form-save`. Row `sdk.tasks.row-<id>`; tick a
+   checklist item; `sdk.tasks.complete-<id>` completes and reopens. With the mirror on, `sdk.tasks.external-<id>` reads "Calendar: <status>". In fake mode it reads "Calendar: skipped", with or
+   without a connected Google account, because it shows an external id ("Calendar: google <event id>") only when the task has an `external_provider`. Turn the mirror off with the per-row toggle `sdk.tasks.mirror-<id>`: `sdk.tasks.external-<id>` is then absent and the row reads "Calendar: off". Click
+   `sdk.tasks.reload` after saving or toggling the mirror: the mirror runs after the response as a background task, so the
+   first answer does not carry its result yet. Delete is two steps: `sdk.tasks.delete-<id>`, then `-confirm`. Messages:
+   `sdk.tasks.info`, `sdk.tasks.error`. Notices for a due time are walked in "TODO checklist walk" below (the Tasks page keeps only `sdk.tasks.run-due-jobs`; the notice list and `show-notices` are gone).
 8. **Error check** after every step (section above).
 
 ## Sign-in walk (`/auth` and `/connections`)
@@ -144,8 +151,8 @@ click the semantics placeholder. The fake consent page (`:8012/connections/fake/
    (`sdk.scopes.ask-mail_send`) and "Calendar" (`sdk.scopes.ask-calendar`). Click the mail ask. First decline: untick
    `#sdk-consent-set-mail_send` (or click `#sdk-consent-deny`) and allow. The return is `/connections?connection=error&reason=
    consent_declined`, the banner reads "You did not allow that access. You can allow it later.", NO row was stored and the set is
-   still wanted. Ask again, leave both ticked, allow: the set is granted and the Google connection is connected. The ask stays
-   inline, no dialog.
+   still wanted. Ask again, leave both ticked, allow: the set is granted and the Google connection is connected. Each set is its own ask: if only the mail set was granted (calendar unticked), the calendar ask stays until it is granted too.
+   The ask stays inline, no dialog.
 7. **Break-glass.** Sign out. Stop the example and restart it with `SDK_EXAMPLE_BREAKGLASS=1 make serve-example`, then reload `/auth`:
    `sdk.signin.break-glass` is visible and opens the inline e-mail form (no dialog). `demo@example.com` signs in
    (`sdk.auth.sign-in`); `crew@example.com` answers 403 `provider_not_allowed` in `sdk.auth.error`. Restart without the flag afterwards.
@@ -153,6 +160,74 @@ click the semantics placeholder. The fake consent page (`:8012/connections/fake/
    connection connected at once (full scopes at sign-in) and the wanted list is empty.
 9. **Phone lane (390x844).** Steps 1, 2 and 6 wrap without horizontal overflow; the ask card and buttons stay reachable.
 10. **Error check** after every step: no dialog, no console error, no `pageerror`, `sdk.errors` absent.
+
+## TODO checklist walk (`/today`, `/capture`, `/calendar`, `/todo-settings`, `/inbox`)
+
+Contracts: `docs/contracts/tasks.md`, `docs/contracts/notices.md`. Lanes: 1280x800 and 390x844 for everything. The simulator
+step is in `docs/test/MOBILE.md`. Fake mode only. The numbers are the walk plan's step numbers (step 10 is the simulator).
+The example is in fake mode with the demo user `demo@example.com`, a pretend model and a pretend Apple sender.
+
+Routes the walk uses on the example (`:8012`), besides the task and notice routes of the contracts:
+
+| Route | Use |
+|---|---|
+| `GET /fake/clock`, `PUT /fake/clock` `{now: "<iso Z>" or null}` | pin the server clock to an instant, or release it (fake mode only). A tick with no pin releases the clock |
+| `POST /jobs/tick` `{now}` | runs the sweep (claims the notices due at `now`, writes inbox rows, queues push), then delivers, then runs due jobs. Answer: `{ran, sweep: {claimed, skipped, queued, repaired, errors}, deliver: {leased, sent, retryable, unregistered, failed, superseded, unrouted}}` |
+| `GET /fake/push/sent` | what the mock Apple sender received: `token`, `title`, `body`, `collapse_id`, `data` |
+| `PUT /fake/capture` `{down}` | switch the pretend model off (true) or on |
+| `PUT /fake/capture/limit` `{limit}` | tighten the per-person parse limit, to reach 429 `capture_denied` |
+| `GET /capture/events`, `POST /capture/events` | the accepted-event stub (in memory, fake mode only) |
+
+The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an ISO instant), `<page>.clock-tick`,
+`<page>.clock-real` and `<page>.clock-state`. Type an instant, click Tick: the page calls `PUT /fake/clock`, then
+`POST /jobs/tick` with the instant, then moves its own clock there and re-reads. `clock-real` (Real time) unpins it. Errors show in
+`<page>.clock-error`. Reset by deleting `services/sdk_example/out/`. Ids below use the page id: `sdk.today`, `sdk.capture`,
+`sdk.calendar`, `sdk.todo` (the settings page), `sdk.inbox`. A plain tap on a phone notification opens `/today` and shows
+`sdk.today.opened` (dismiss with `sdk.today.opened-dismiss`).
+
+1. **Today, by hand.** `/today`: fill `sdk.today.form-title`, pick priority high (the high option under `sdk.today.form-priority`), add a contact link with `sdk.today.form-links` (type a name, pick a result inline),
+   a due date today, `sdk.today.form-save`. The task appears in `sdk.today.section-today` (row `sdk.today.row-<id>`) with the
+   high-priority chip and the link chip (`sdk.today.row-<id>-link-<n>`).
+2. **Capture.** `/capture`: type "Call Sam tomorrow, send the estimate by Friday, and lunch with Dana at noon" in
+   `sdk.capture.text`, click `sdk.capture.parse`. The pretend model answers its fixed fixture whatever is typed: the drafts are "Call Sam", "Send the appraisal to Dana" and "Day off" (two tasks and one event). Flip one between task and event (`sdk.capture.review-item-<n>-kind-task` / `-kind-event`), accept
+   (`sdk.capture.review-accept`; `-discard` drops the review, the draft notice is `sdk.capture.review-notice` and a discarded count `sdk.capture.review-dropped`; the answer line is `sdk.capture.result`). The two accepted tasks are due tomorrow and Friday, so they are NOT on `/today`: find them on `/tasks` and on `/calendar` on their days. `sdk.capture.events-sent` reads "Events sent: 1".
+   Nothing is created by parsing alone.
+3. **Capture, model off.** Click `sdk.capture.model-off` (it calls `PUT /fake/capture {"down": true}`), parse again: one draft with the low-confidence mark and a degraded note, never an error. Switch it back.
+   `PUT /fake/capture/limit {"limit": 0}` then parse: the inline error reads the capture label "Too many notes in a short time. Try again in a minute." (429 `capture_denied`; the text is `CaptureLabels.captureDenied` in the source). Starting a new parse clears the old review.
+4. **Calendar.** `/calendar`: the month cell of a day with TODOs has the id `sdk.calendar.grid-<YYYY-MM-DD>` and a label like "12, 2 due" or "12, 2 overdue": click this cell to select a day and read the label from it. The count marker inside the cell is `sdk.calendar.marker-<YYYY-MM-DD>`, whose own label is the count text ("2 due"); the
+   due lane of the selected day lists the day's TODOs with their local times. An accepted event shows as
+   `sdk.calendar.event-<n>`. A past event reads "Missed", never "Overdue". The calendar follows the fake clock: `sdk.calendar.clock-state` reads "Clock: real time (today yyyy-mm-dd)" or "Clock: <iso> (today yyyy-mm-dd)", and today and the first selected day follow it unless you already picked a day. Set the clock on `/today` or `/inbox`, then open `/calendar` and check the state line.
+5. **Settings.** `/todo-settings`: change the end of the work day to 18:00 (`sdk.todo.settings-end`; also `settings-start`, `settings-lead`, `settings-quiet`), save
+   (`sdk.todo.settings-save`). A date-only TODO's due time is not shown on its `/today` row: check that it moved to 18:00 local through `GET /tasks` (`due_at`) or the calendar lane. Change the zone
+   (`sdk.todo.settings-zone`, pick a result `sdk.todo.settings-zone-result-<n>` (the chip `sdk.todo.settings-zone-picked-0` then shows the chosen zone), then `sdk.todo.settings-save`; the current zone reads in `sdk.todo.zone-state`, and shows the device zone before any change, because the device reports its zone on sign-in): the date-only due time follows (see `GET /tasks`). A timed TODO keeps its instant. Tick the clock across a stage after the change:
+   no duplicate notice (the ledger key holds, `GET /notices` shows one row per stage).
+6. **Stages in the app.** Create a timed TODO due at a minute you choose, with "Use my default" reminder (60 minutes).
+   On `/today` set `clock-now` to 30 minutes before the due time and Tick: the stage banner
+   (`sdk.today.task-<id>.banner`) says due soon and the inbox gains one notice. Tick to the due time: the banner changes
+   to due now, a second notice. Tick 20 minutes after: past-due, a third notice. The Overdue section holds the task.
+   `sdk.inbox.badge` equals the unread count of `GET /notices`.
+7. **Inbox, two feeds.** `/inbox`: `sdk.inbox.feed-polling` and `sdk.inbox.feed-watch` list the same notices. Read and
+   dismiss one (`sdk.inbox.list.row-<id>-dismiss`), switch feeds and back: the state persists.
+8. **Complete.** Click `sdk.today.complete-<id>` on the TODO: no further notice on the next Ticks, its unread notices are put
+   away (the badge drops), and `sdk.today.undo` reopens the task.
+9. **Two paths, one stage.** Tick the same instant twice (or open the task from two tabs): the inbox still has one notice per
+   stage and the web demo has no registered device, so `GET /fake/push/sent` is empty on web; the one-message-per-stage push half is covered by the example's tests.
+10. **Simulator.** The local notification, its permission and the three buttons: see `docs/test/MOBILE.md`.
+11. **No dialogs.** At 1280x800 and 390x844, on all five pages: zero `[role=dialog],[role=alertdialog]`, no console error, no
+    `pageerror`, `sdk.errors` absent.
+12. **Three actions, two places.** On a notice row (`sdk.inbox.list.row-<id>-done`, `-snooze`, `-cancel`) and on the stage
+    banner (`sdk.today.task-<id>.banner-done`, `-snooze`, `-cancel`) the results match: Done completes, Snooze puts the notice
+    or banner away and the next stage still arrives, Cancel cancels the task. An assignee who does not own the task sees no
+    Cancel on either (sign in as the assignee, or assign the TODO to another seeded user).
+13. **Overdue moves.** A TODO due at a time today moves from Today to Overdue when the clock passes the time: in the list
+    (`sdk.today.section-overdue`), in the count in its header, and in the calendar lane and grid label together (read `sdk.calendar.clock-state` first; pick the day if you had already chosen another). The word
+    "overdue" appears on no event.
+14. **Past-due series.** Tick the clock day by day from the due time: one notice each morning at the start of the work day
+    (08:00 local), the last one marked "Last reminder", none after it (5 mornings by default). The task still shows as overdue.
+15. **Quiet hours in words.** On `/todo-settings` the quiet hours sentence names the hours (after the end of the work day
+    until its start). Move the end of the work day: a date-only TODO's notice arrives at the new time, and a TODO timed for
+    the evening still alerts in the evening.
+16. **Error check** after every step. One console 401 from `POST /auth/refresh` on the first signed-out page load is expected: the demo tries the refresh cookie before it falls back to the demo sign-in. Every other console error fails the check.
 
 ## Cleanup
 

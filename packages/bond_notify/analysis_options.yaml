@@ -1,0 +1,14 @@
+# Pure Dart package: same rules as the workspace root, but package:lints instead of
+# package:flutter_lints so that `dart analyze` needs no Flutter dependency.
+include: package:lints/recommended.yaml
+analyzer:
+  exclude:
+    - build/**
+linter:
+  rules:
+    - prefer_const_constructors
+    - avoid_print
+    - always_declare_return_types
+    - unawaited_futures
+    - use_build_context_synchronously
+    - prefer_final_locals

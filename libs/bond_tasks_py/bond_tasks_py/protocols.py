@@ -1,16 +1,9 @@
 """Structural seams the app wires. This lib imports no sibling lib: the real objects come from the app."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any, Protocol
-
-
-class Scheduler(Protocol):
-    """Shape of the job queue's enqueue plus a cancel. ``dedupe_key`` names one live job per task reminder."""
-
-    def enqueue(self, session: Any, *, job_type: str, payload: dict, run_at: datetime, dedupe_key: str) -> None: ...
-
-    def cancel(self, session: Any, *, dedupe_key: str) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -59,3 +52,44 @@ class MirrorPointer:
     user_id: str
     provider: str | None
     event_id: str
+
+
+LINK_KIND_CONTACT = "contact"
+
+
+@dataclass(frozen=True)
+class UserPrefs:
+    """One user's work day. ``time_zone`` None means the app default. Quiet hours are derived: after
+    ``end_of_day`` until ``start_of_day``."""
+
+    time_zone: str | None = None
+    start_of_day: time = time(8, 0)
+    end_of_day: time = time(17, 0)
+    lead_minutes: int = 60
+
+
+class Preferences(Protocol):
+    """Where a user's ``UserPrefs`` come from; ``StoredPreferences`` reads the settings table."""
+
+    def for_user(self, session: Any, user_id: str) -> UserPrefs: ...
+
+
+class Permissions(Protocol):
+    """Who may do what to a task. ``DefaultPermissions`` is today's rule set."""
+
+    def can_edit(self, task: Any, user_id: str) -> bool: ...  # default: owner or assignee
+
+    def can_own(self, task: Any, user_id: str) -> bool: ...  # default: owner (delete, cancel, reassign)
+
+    def can_complete(self, task: Any, user_id: str) -> bool: ...  # default: can_edit
+
+
+class LinkResolver(Protocol):
+    """Labels for stored links and a search for the picker. Link dicts are ``{kind, id, label}``."""
+
+    def labels(self, session: Any, links: list[dict]) -> dict[tuple[str, str], str]: ...
+
+    def search(self, session: Any, user_id: str, kind: str, query: str, limit: int) -> list[dict]: ...
+
+
+AfterWrite = Callable[[Any, Any], None]  # (session, task), called after flush in create and update

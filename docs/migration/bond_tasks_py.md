@@ -1,69 +1,100 @@
 # Migrating to bond_tasks_py
 
-Task table, services, reminders and calendar mirror (`libs/bond_tasks_py`). Wired end to end in
+Task table, due instant, per-user settings, link index, three-stage notice ledger and sweep, calendar mirror
+(`libs/bond_tasks_py`). The wire is `docs/contracts/tasks.md` and `docs/contracts/notices.md`. Wired in
 `services/sdk_example` (`tasks_wiring.py`, `routes/tasks.py`, `routes/jobs.py`). Legend: `docs/migration/README.md`.
-Paths: S `sbelcrm/`, A `backend/avalon/`. The Dart side is `docs/migration/bond_tasks.md`.
+Dart side: `bond_tasks.md`. Adoption order: `todo-checklist.md`.
 
 ## 1. What it replaces
 
 | App | Goes away | Stays app-side |
 |---|---|---|
-| S | `TaskRecord` body (`db/models.py:2597`), `services/task_service.py` (CRUD, roles, list, summary, `to_item`), `services/task_outlook_mirror.py`, the `/tasks` router except `POST /tasks/parse`, `sync/app/handlers_tasks.py` | contact and loan columns and links, `relink_loan_ids`, `capture_service` and `/tasks/parse` (LLM), loan-actor co-edit rule, admin override |
-| A | `PersonalEventRecord` (`db/models.py:1626`) and `services/personal_events.py` reminder code (`schedule_reminder`, `_compute_remind`), `/me/events` router | the interpret route (LLM), the Today screen's day grouping, `worker.py` handler `event_reminder` body (becomes `notify`) |
+| S | `TaskRecord` body, `task_service.py` (CRUD, roles, list, summary, `to_item`), `task_outlook_mirror.py`, the `/tasks` router except parse, `handlers_tasks.py` | contact and loan columns, `relink_loan_ids`, parse (LLM), loan-actor rule, admin override |
+| A | `PersonalEventRecord`, `personal_events.py` reminder code, the `/me/events` router | the interpret route, the Today day grouping, the reminder job body |
 
-## 2. S: table and service diff
+Column renames from S: `mirror_to_outlook` is `mirror_enabled`. `outlook_event_id`, `outlook_event_user_id` are
+`external_event_id`, `external_account_user_id` (new `external_provider`, `external_etag`). Contact and loan ids become
+`links` `[{kind, id, label}]` (keep your FK columns on your subclass and list them in `host_columns`). Error codes are
+lower case (`task_not_found`) in `{"detail": {code, message}}`. A: checklist items (no start) become date-only tasks, timed
+entries keep `due_time`, `done_at` becomes `status = done`, `removed_at` has no equivalent (cancel instead).
 
-`TaskRecord` to `TasksMixin` (same table name `tasks`, same two composite indexes):
+## 2. What the app adds
+Six new tables in the SAME database as `tasks`, and two new columns on it. The lib ships no migration: write one
+revision and assert each `*_COLUMNS` constant in a test (`schema_contract` from `bond_service_kit`).
 
-| S column | Mixin | Do |
-|---|---|---|
-| `contact_id`, `loan_id`, `bytepro_file_data_id` | `links` JSON `[{kind, id, label}]` | keep your columns on your subclass if you need the FK or the backfill relink; also write `links` |
-| `mirror_to_outlook` | `mirror_enabled` | rename |
-| `outlook_event_id`, `outlook_event_user_id` | `external_event_id`, `external_account_user_id` | rename; also new `external_provider`, `external_etag` |
-| `due_time` `String(5)` | same | unchanged: local `HH:MM`, requires `due_date` |
-| (none) | `checklist`, `remind_minutes_before`, `remind_at`, `reminded_at` | new, defaults `[]`, `-2`, null, null |
+| Mixin | Table |
+|---|---|
+| `TasksMixin` | `tasks`: new `priority`, `due_at`, index `(status, due_at)` |
+| `TaskUserSettingsMixin`, `TaskLinkIndexMixin` | `task_user_settings`, `task_link_index` |
+| `NoticeLedgerMixin`, `NoticeOutboxMixin` | `task_notice_ledger`, `task_notice_outbox` |
+| `NoticesMixin`, `PushDevicesMixin` (sibling libs) | `notices`, `push_devices` |
 
-- Error codes lose their upper case: `TASK_NOT_FOUND` is `task_not_found`, and bodies are `{"detail": {code, message}}`
-  (was `{error_code, message}`). `bond_api` parses both; update S's Dart `TaskError` mapping.
-- Hard delete stays. The service returns a `MirrorPointer`; remove the event in a background task.
-- The mirror moves from Graph-only to any connection: build a `MirrorProviders` over `bond_oauth` + `bond_calendar`
-  (`sdk_example/tasks_wiring.py`). The calendar stays the source of truth for events; only the id and etag are stored.
-- `mirror_status` is now `mark_mirror`'s `pending` when an event exists but the task is no longer eligible, so the pass deletes it.
-- Sync handlers: replace `handlers_tasks.py` with `sync_routes(Task, scheduler=..., after_write=...)`, wrap each as
-  `Route(r.ops, r.handler, r.reads)` and map `TaskError` with `verdict_for` in `Host.reject_for`.
+Routes: copy `routes/tasks.py` and `routes/task_today.py`. `bond_tasks_py_host.md` lists every route, its service call, the
+signatures and the models block. Notice and device routes: `bond_notify_py.md`, `bond_push_py.md`. `now` is required in `task_item`, `list_tasks` and `summary` (no `today`). Pass the link index model to `delete`.
+Wire `after_write=make_link_hook(LinkIndex)`. `sync_routes(on_deleted=)` is called `(ctx, session, task_id, owner_user_id)`: dismiss notices there.
 
-## 3. A: personal events become tasks
+## 3. The reminder is removed
+Old queued reminder: `reminders.py`, the `Scheduler` protocol, `schedule_reminder`, `fire_reminder`, `cancel_reminder`, `compute_remind_at`, `refresh_remind_at`, `dedupe_key`, `JOB_TYPE`, the `scheduler=` parameter of `sync_routes`,
+the columns `remind_at` and `reminded_at`, the wire keys of the same names (TaskItem has 24 keys). Drop both columns in
+your revision and delete your `task_reminder` job type, its `Scheduler` and its `cancel_reminder` calls. A pending
+reminder job does nothing useful after the upgrade: let it drain or delete it.
+`remind_minutes_before` stays, with `-3` use my default now the default for new rows. Existing rows keep their value
+(`-2` stays "no close notice"). The due and past notices still go out for every open dated task, so pass `since=` on
+the first sweep. The sweep reads the value and no job is queued.
 
-- Checklist items (`start_at` NULL) become tasks with `due_date = day` and `due_time` null. Timed entries keep
-  `due_time` as local `HH:MM` of `start_at`; `end_at` has no column (a mirrored event lasts 30 minutes).
-- `done_at` becomes `status = done` plus `completed_at`. `removed_at` (soft delete, `/restore`) has no equivalent:
-  the lib hard-deletes. Keep your `restore` route only if the product needs undo, by cancelling instead (`status = cancelled`).
-- Reminder encoding is kept as is: `-2` none, `-1` morning of (08:00 local), `N` minutes before. A task with no due time
-  counts as due at 08:00 local for `N` minutes before. The job key changes from `event_reminder:<id>:<minute>` to `task_reminder:<id>`.
-- Data move: one INSERT ... SELECT per app into `tasks` (`owner_user_id = user_id`, `created_by = user_id`,
-  `source = 'user'` kept), then drop `personal_events` after one release. Pending `event_reminder` jobs: let them drain
-  or re-enqueue through `schedule_reminder`.
-- `PATCH /me/events/{id}` becomes `PUT /tasks/{id}` (omitted = unchanged, null clears); `done: true` becomes `POST /tasks/{id}/complete`.
+## 4. SQLite savepoint setup
+On SQLite call `sqlite_savepoint_setup(engine)` once, before the engine's first connection. Without it `sweep_due` and
+`deliver_pending` raise `RuntimeError`, because a released savepoint would commit the outer transaction. SQLite 3.35 or
+later is needed (`RETURNING`). PostgreSQL needs nothing.
 
-## 4. Reminders and the queue
+## 5. Running the sweep
+From a `bond_jobs` tick, as the `before` hook, throttled with `before_every`:
+```python
+# imports and models: bond_tasks_py_host.md (its `Notice` Protocol clashes with a model named Notice: import the module); push = PushNotifier(PushDevice, ApnsSender(key_pem, key_id, team_id))
+KW = dict(task_model=Task, ledger_model=TaskNoticeLedger, outbox_model=TaskNoticeOutbox)
+def sweep(session, now):  # bond_jobs.tick(..., before=sweep, before_every=60); tick commits after the hook
+    sweep_due(session, now=now, prefs=StoredPreferences(TaskUserSettings), tz="UTC",
+              transactional=[InboxNotifier(Notice)], channels=["push"], **KW)
+```
 
-- Provide a `Scheduler`: `enqueue` calls `bond_jobs.enqueue(..., key=dedupe_key)`; `cancel` deletes the non-running jobs with
-  that key (a done job must go too, or a moved reminder never runs again). The enqueue happens in the write's transaction.
-- Register the job type `task_reminder` (`JOB_TYPE`) calling `fire_reminder(session, Task, payload["task_id"], notify,
-  now=now)`. `notify` is the app's push or e-mail; the example appends to a list that `GET /tasks/notices` returns.
-- A reminder moved to a past instant fires on the next pass. Pass the app's IANA zone as `tz`; the example uses UTC.
+Run `deliver_pending` as a job (it needs a `commit` callable). Or a plain script, every minute:
 
-## 5. Routers
+```python
+with Session(engine) as s:   # engine = sqlite_savepoint_setup(create_engine(url)) on SQLite
+    sweep(s, now)            # pass since=activation_time on the first run
+    s.commit()
+    deliver_pending(s, ledger_model=TaskNoticeLedger, outbox_model=TaskNoticeOutbox, task_model=Task,
+                    notifiers={"push": push}, now=now, commit=s.commit)
+    prune_ledger(s, now=now, **KW)  # daily, then bond_notify_py.prune_notices(s, Notice, now)
+    s.commit()
+```
 
-Both apps' routers shrink to the example's `routes/tasks.py`: `unit(request)` (one transaction, `TaskError` to
-`ApiError`), `after_write` (reschedule, queue `sync_mirror` after commit). Keep S's company-wide visibility, loan-actor and
-admin rules in your own `require_*` wrapper before calling `update` or `delete`; the lib only knows owner and assignee.
-`GET /tasks` gains `link_kind` + `link_id` (replaces `contact_id`/`loan_id`; S's company-wide entity list is `scope=all` plus the link) and `status` `all` (includes cancelled). The example gates `scope=all` and reading another person's task behind capability `tasks.read_all`; `POST /tasks/{id}/cancel` is owner-only.
-Google write-back needs `calendar.events` scope: app A's users hold the read-only scope and must re-consent.
+Pass `since=` on first activation (old stage times are then skipped). List `"push"` only when a real sender is configured.
 
-## 6. Order and checks
+## 6. A chat-tool Notifier in 15 lines
 
-1. Add the mixin and a revision (copy `alembic/versions/0002_phase3.py`); backfill from `TaskRecord` or `personal_events`.
-2. Wire scheduler, reminder handler and `MirrorProviders`; swap the router; run the app's task tests.
-3. Assert `TASK_COLUMNS` against your engine; round-trip `fixtures/tasks/task.json` through `task_item`.
-4. Known limit: if an account holds both Google and Microsoft connections the example mirrors to Google only.
+A `Notifier` runs after commit and must be idempotent on `notice_id`. Return one of four strings.
+
+```python
+class ChatNotifier:
+    def __init__(self, post, seen): self.post, self.seen = post, seen  # post(text, key) -> bool
+    def send(self, session, notice):
+        if notice.notice_id in self.seen: return "ok"
+        try: sent = self.post(f"{notice.title}: {notice.body}", notice.notice_id)
+        except TimeoutError: return "retryable"
+        if not sent: return "failed"
+        self.seen.add(notice.notice_id)
+        return "ok"
+# sweep_due(..., channels=["chat"]); deliver_pending(..., notifiers={"chat": ChatNotifier(post, seen)})
+```
+
+## 7. Call-site changes and checks
+
+- On done, cancel and delete call `dismiss_for_source`, and when `due_date`, `due_time` or the assignee changes call
+  `dismiss_stale` (both are in `bond_notify_py`, not this lib). `apply_notice_action` is the one handler (done or cancel on a closed task does nothing). After a reassign use `notice_recipients(task)` and `bond_notify_py.dismiss_for_source(..., user_ids=)`.
+- Settings: `update_settings(..., on_recomputed=)` returns `(prefs, warnings)`; in the hook call `bond_notify_py.dismiss_stale`. Pass `time_zone` with client writes.
+- Order: revision, backfill, wire the sweep, swap the router. Assert every `*_COLUMNS`, round-trip
+  `fixtures/tasks/task.json` through `task_item`, run `make -C libs/bond_tasks_py test`.
+- Test: a fake clock sweep over close, due and past with an `InboxNotifier`, and one `sweep_due` twice (second claims 0).
+- Known limits: with both a Google and a Microsoft connection the example mirrors to Google only. A multi-process
+  SQLite app must retry on a busy error.

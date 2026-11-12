@@ -1,0 +1,43 @@
+{
+  "items": [
+    {
+      "kind": "task",
+      "title": "Call Sam",
+      "date": "2026-11-12",
+      "time": null,
+      "due_defaulted": false,
+      "priority": null,
+      "all_day": false,
+      "end_date": null,
+      "end_time": null,
+      "links": [{"text": "Sam", "kind": "contact"}],
+      "confidence": 0.95
+    },
+    {
+      "kind": "task",
+      "title": "Send the appraisal to Dana",
+      "date": "2026-11-13",
+      "time": "12:00",
+      "due_defaulted": false,
+      "priority": 3,
+      "all_day": false,
+      "end_date": null,
+      "end_time": null,
+      "links": [{"text": "Dana", "kind": "contact"}],
+      "confidence": 0.9
+    },
+    {
+      "kind": "event",
+      "title": "Day off",
+      "date": "2026-11-12",
+      "time": null,
+      "due_defaulted": false,
+      "priority": null,
+      "all_day": true,
+      "end_date": null,
+      "end_time": null,
+      "links": [],
+      "confidence": 0.9
+    }
+  ]
+}

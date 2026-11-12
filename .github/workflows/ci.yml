@@ -30,6 +30,8 @@ jobs:
       - run: flutter pub get
       - run: make analyze
       - run: make gates
+      - name: Dependency licence check (Dart side; the python job checks the Python side)
+        run: LICENCE_SKIP=python bash tool/licence_check.sh
       - run: make test-dart
       - run: make test-flutter
       - run: bash tool/consumer_check.sh
@@ -37,15 +39,37 @@ jobs:
   python:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: bond_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: '3.12'
-      # sdk_example depends on all nine libs, so this installs them without roof_measure's heavy geo stack.
+      # sdk_example depends on all twelve libs, so this installs them without roof_measure's heavy geo stack.
       - run: uv sync --locked --all-extras --package sdk_example
       - run: make test-libs
       - run: make lint-libs
+      - name: Postgres-marked tests (bond_jobs, bond_tasks_py, bond_notify_py, bond_push_py)
+        env:
+          BOND_TEST_POSTGRES_URL: postgresql+psycopg://postgres@localhost:5432/bond_test
+        run: |
+          for lib in libs/bond_jobs libs/bond_tasks_py libs/bond_notify_py libs/bond_push_py; do
+            (cd "$lib" && ../../.venv/bin/python -m pytest -q -m postgres) || { rc=$?; [ "$rc" -eq 5 ] || exit "$rc"; }
+          done
+      - name: Dependency licence check (Python side; this job has no Dart package config)
+        run: LICENCE_SKIP=dart bash tool/licence_check.sh
       - run: make test-example
       - run: make -C services/sdk_example lint
 
@@ -74,10 +98,10 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: '3.12'
-      - name: Build the nine library wheels
+      - name: Build the twelve library wheels
         run: |
           mkdir -p dist
-          for pkg in bond_service_kit bond_storage bond_auth_py bond_jobs bond_sync_py bond_oauth bond_calendar bond_tasks_py bond_signin; do
+          for pkg in bond_service_kit bond_storage bond_auth_py bond_jobs bond_sync_py bond_oauth bond_calendar bond_tasks_py bond_signin bond_notify_py bond_push_py bond_capture_py; do
             uv build --package "$pkg" --wheel --out-dir dist
           done
           ls -l dist

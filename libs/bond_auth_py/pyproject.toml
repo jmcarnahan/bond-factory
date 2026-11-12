@@ -2,6 +2,7 @@
 name = "bond_auth_py"
 version = "0.2.0"
 description = "Auth for the bond apps: ID token verification, session JWTs, refresh sessions (SQLAlchemy mixin), no web framework"
+license = "MIT"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "PyJWT>=2.10",

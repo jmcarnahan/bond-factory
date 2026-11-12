@@ -3,8 +3,8 @@
 - contracts/roof_model.md — the `bond.roof_model/0.1` wire contract shared by bond_roof and roof_measure
 - contract-0.2.md — the `bond.roof_model/0.2` job API and envelope (`result.model` is the 0.1 roof model)
 - decisions/2026-11-07-roof-poc-summary.md — what the roof POC proved and what was decided
-- decisions/2026-11-10-roof-module-v1.md — roof module v1 decisions D1 to D18, GPL-3 licence, hygiene gate, history rewrite runbook
-- decisions/2026-11-11-roof-dart-packages-mit.md — MIT for bond_roof and bond_roof_ui, roof_measure importable as a library, library-first default
+- decisions/2026-11-10-roof-module-v1.md — roof module v1 decisions D1 to D18, GPL-3 licence (licence section superseded by 2026-11-11-licence-mit.md), hygiene gate, history rewrite runbook
+- decisions/2026-11-11-roof-dart-packages-mit.md — MIT for bond_roof and bond_roof_ui, roof_measure importable as a library, library-first default (repository licence superseded by 2026-11-11-licence-mit.md)
 - contracts/error_body.md — the shared error body, status codes and Retry-After rules (bond_api, bond_service_kit)
 - contracts/auth.md — auth routes, user shape, session JWT, revocation, error codes, providers payload
 - contracts/signin.md — direct sign-in routes, cookies, device-bound hand-offs, refusal codes, security model
@@ -13,9 +13,30 @@
 - ../libs/bond_signin/README.md — direct Google/Microsoft sign-in lib: Protocol seams, scope policy, router factory (no sibling bond_* imports)
 - ../packages/bond_signin/README.md — pure-Dart sign-in client: attempts, returns, OIDC session gateway
 - ../packages/bond_signin_ui/README.md — sign-in screen, buttons, scope-ask card, system-browser port
+- decisions/2026-11-11-todo-scope.md — daily TODO checklist scope: what ships, what does not
+- decisions/2026-11-11-due-instant.md — the due instant: rules, time zones, overdue
+- decisions/2026-11-11-notify-ledger.md — three-stage notifications and the delivery ledger
+- decisions/2026-11-11-links.md — links on tasks and notices
+- contracts/tasks.md — tasks contract: due instant rules, overdue, settings, TaskItem, task routes, error codes, sync fields
+- contracts/notices.md — notices contract: stages, ids, ledger, quiet hours, actions, routes, phone payload, devices
+- decisions/2026-11-11-licence-mit.md — repository is MIT; roof service stays GPL-3.0-or-later
+- ../libs/bond_notify_py/README.md — stored inbox (notices table, list, read, dismiss, sync handlers); the ledger, stages and sweep live in bond_tasks_py (no sibling bond_* imports)
+- ../libs/bond_push_py/README.md — Apple push sender and device tokens (no sibling bond_* imports)
+- ../libs/bond_capture_py/README.md — natural-language capture: a phrase becomes task and event candidates through a model-client Protocol (no sibling bond_* imports)
+- ../packages/bond_notify/README.md — pure-Dart notice models, client and inbox stream
+- ../packages/bond_notify_ui/README.md — inbox and notice widgets
+- ../packages/bond_push/README.md — Apple push registration plugin
+- ../packages/bond_tasks_notifications/README.md — local reminders for tasks: stage scheduling, budget, taps
+- ../packages/bond_tasks_powersync/README.md — PowerSync adapter for task tables
+- ../packages/bond_notify_powersync/README.md — PowerSync adapter for notice tables
+- migration/todo-checklist.md — the order an app adopts the TODO modules in, with a link to each note
+- migration/bond_tasks_py_host.md — the code an app writes around bond_tasks_py: models, routes and the service call behind each, signatures
+- migration/README.md — one note per module: what it replaces, the adapter, call sites, data, acceptance
 - sdk/README.md — how an app consumes bond-factory (Dart git + SHA, Python Poetry or wheel), versioning, module index
 - sdk/sdk-pins.md — template an app copies to record its pins and local patches
-- test/WEB.md — Playwright walk recipe for demos/sdk_demo
+- sdk/release-2026-11-todo.md — release notes of the TODO checklist: new, removed, what an app must do, what is unproven
+- test/WEB.md — Playwright walk recipe for demos/sdk_demo, with the TODO checklist routes and walk steps
+- test/MOBILE.md — iOS simulator lane for the local notification step, and what needs a device
 - research/2026-11-07-roof-poc/README.md — research index for the POC
   - dart-diagrams/FINDINGS.md — Dart diagram rendering findings
   - footprints/FINDINGS.md — building footprint sources

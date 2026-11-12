@@ -1,4 +1,6 @@
-"""POST /jobs/tick: fake-mode time travel for the job queue."""
+"""POST /jobs/tick: fake-mode time travel for the sweep and the job queue."""
+
+from datetime import UTC, datetime, timedelta
 
 from connections_util import headers
 
@@ -7,7 +9,7 @@ from sdk_example.models.jobs import BackgroundJob
 
 def make_task(client, h, due_time):
     reply = client.post("/tasks", json={"title": f"at {due_time}", "due_date": "2026-11-08", "due_time": due_time,
-                                        "remind_minutes_before": 0}, headers=h)
+                                        "time_zone": "UTC"}, headers=h)
     assert reply.status_code == 201
     return reply.json()
 
@@ -16,22 +18,31 @@ def test_needs_a_session(client):
     assert client.post("/jobs/tick", json={}).status_code == 401
 
 
-def test_runs_only_what_is_due_as_of_now(client):
+def test_the_tick_runs_the_sweep_as_of_now(client):
     h = headers(client)
     make_task(client, h, "10:00")
     make_task(client, h, "12:00")
-    first = client.post("/jobs/tick", json={"now": "2026-11-08T10:30:00Z"}, headers=h).json()["ran"]
-    assert [r["job_type"] for r in first] == ["task_reminder"] and first[0]["status"] == "done"
-    second = client.post("/jobs/tick", json={"now": "2026-11-08T13:00:00Z"}, headers=h).json()["ran"]
-    assert len(second) == 1 and second[0]["id"] != first[0]["id"]
+    first = client.post("/jobs/tick", json={"now": "2026-11-08T10:30:00Z"}, headers=h).json()
+    # only the 10:00 task is due: past its 15-minute due window. The 12:00 task's close stage starts at 11:00.
+    assert first["sweep"] == {"claimed": 1, "skipped": 0, "queued": 1, "repaired": 0, "errors": 0}  # queued: its push row
+    [notice] = client.get("/notices", headers=h).json()["items"]
+    assert notice["data"]["stage"] == "past" and "at 10:00" in notice["title"]
+    again = client.post("/jobs/tick", json={"now": "2026-11-08T10:30:00Z"}, headers=h).json()
+    assert again["sweep"]["claimed"] == 0  # the same instant claims nothing new
+    noon = client.post("/jobs/tick", json={"now": "2026-11-08T11:30:00Z"}, headers=h).json()
+    assert noon["sweep"]["claimed"] == 1  # now the 12:00 task is in its close stage
+    stages = {n["title"]: n["data"]["stage"] for n in client.get("/notices", headers=h).json()["items"]}
+    assert sorted(stages.values()) == ["close", "past"]
 
 
-def test_result_rows_carry_the_runner_fields(client):
+def test_the_tick_still_runs_due_jobs(client):
     h = headers(client)
-    make_task(client, h, "10:00")
-    row = client.post("/jobs/tick", json={"now": "2026-11-08T10:00:00Z"}, headers=h).json()["ran"][0]
+    body = client.post("/jobs/tick", json={"now": "2026-11-08T10:30:00Z"}, headers=h).json()
+    assert [r["job_type"] for r in body["ran"]] == []  # only the daily prune job is queued, due at midnight
+    later = client.post("/jobs/tick", json={"now": "2026-11-09T00:30:00Z"}, headers=h).json()
+    row = next(r for r in later["ran"] if r["job_type"] == "signin_prune")
     assert {"id", "job_type", "key", "status", "error", "summary", "skipped"} <= set(row)
-    assert row["summary"] == "reminded" and row["error"] is None
+    assert row["status"] == "done" and row["error"] is None
 
 
 def test_the_clock_is_released_after_the_pass(client, app):
@@ -40,13 +51,20 @@ def test_the_clock_is_released_after_the_pass(client, app):
     assert app.state.clock.frozen is False
 
 
-def test_without_now_it_uses_real_time_and_old_jobs_run(client, app):
+def test_without_now_it_uses_real_time(client, app):
     h = headers(client)
-    make_task(client, h, "10:00")  # 2026-11-08 is not in the past of the real clock when the suite runs later
-    ran = [r for r in client.post("/jobs/tick", json={}, headers=h).json()["ran"] if r["job_type"] == "task_reminder"]
+    app.state.clock.unfreeze()  # the fixture pins 2026-11-08; with nothing pinned a bare tick reads real time
+    just_now = datetime.now(UTC) - timedelta(minutes=1)  # due a minute ago: inside its 15-minute due window
+    task = client.post("/tasks", json={"title": "Now", "due_date": just_now.date().isoformat(),
+                                       "due_time": just_now.strftime("%H:%M"), "time_zone": "UTC"}, headers=h).json()
+    reply = client.post("/jobs/tick", json={}, headers=h)
+    assert reply.status_code == 200 and set(reply.json()) == {"ran", "sweep", "deliver"}
+    assert reply.json()["sweep"]["claimed"] == 1  # the sweep ran at the real time, not the fixture's 2026-11-08
+    [notice] = client.get("/notices", headers=h).json()["items"]
+    assert notice["data"]["task_id"] == task["id"] and notice["data"]["stage"] == "due"
+    assert app.state.clock.frozen is False
     with app.state.session_factory() as session:
-        pending = session.query(BackgroundJob).filter_by(status="pending", job_type="task_reminder").count()
-    assert len(ran) + pending == 1  # (the daily signin_prune job is a different type)
+        assert session.query(BackgroundJob).filter_by(job_type="task_reminder").count() == 0
 
 
 def test_bad_now_is_a_422(client):
@@ -57,7 +75,8 @@ def test_bad_now_is_a_422(client):
 def test_a_naive_now_is_read_as_utc(client):
     h = headers(client)
     make_task(client, h, "10:00")
-    assert len(client.post("/jobs/tick", json={"now": "2026-11-08T10:30:00"}, headers=h).json()["ran"]) == 1
+    body = client.post("/jobs/tick", json={"now": "2026-11-08T10:30:00"}, headers=h).json()
+    assert body["sweep"]["claimed"] >= 1
 
 
 def test_real_mode_has_no_tick(client, app):

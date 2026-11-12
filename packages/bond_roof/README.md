@@ -96,4 +96,4 @@ whose `schema` or `contract` matches; other files are skipped. A generated fixtu
 ## License
 
 MIT, see `LICENSE` in this directory (Copyright (c) 2026 John Carnahan). The rest of the bond-factory
-repository is GPL-3.0-or-later; this package does not depend on any of it. Third-party notices: `lib/src/polylabel.dart` is a port of Mapbox polylabel under the ISC licence (notice in the file header).
+repository is MIT as well, except `services/roof_measure` (GPL-3.0-or-later), which this package does not depend on. Third-party notices: `lib/src/polylabel.dart` is a port of Mapbox polylabel under the ISC licence (notice in the file header).

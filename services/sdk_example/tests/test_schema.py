@@ -7,10 +7,18 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from bond_jobs import JobsMixin
+from bond_notify_py import NoticesMixin
 from bond_oauth.models import ConnectionsMixin
+from bond_push_py import PushDevicesMixin
 from bond_service_kit import SchemaContract, schema_contract
 from bond_storage import GrantsMixin
-from bond_tasks_py import TasksMixin
+from bond_tasks_py import (
+    NoticeLedgerMixin,
+    NoticeOutboxMixin,
+    TaskLinkIndexMixin,
+    TasksMixin,
+    TaskUserSettingsMixin,
+)
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import declarative_base
 
@@ -47,6 +55,35 @@ def test_connections_table_matches_the_oauth_lib(engine):
 
 def test_tasks_table_matches_the_tasks_lib(engine):
     lib_contract(TasksMixin, "tasks").assert_matches(engine)
+
+
+@pytest.mark.parametrize("mixin, table", [
+    (TaskUserSettingsMixin, "task_user_settings"), (TaskLinkIndexMixin, "task_link_index"),
+    (NoticeLedgerMixin, "task_notice_ledger"), (NoticeOutboxMixin, "task_notice_outbox"),
+    (NoticesMixin, "notices"), (PushDevicesMixin, "push_devices"),
+])
+def test_todo_tables_match_their_libs(engine, mixin, table):
+    lib_contract(mixin, table).assert_matches(engine)
+
+
+def test_tasks_no_longer_carry_the_reminder_columns(engine):
+    names = {c["name"] for c in inspect(engine).get_columns("tasks")}
+    assert not {"remind_at", "reminded_at"} & names
+    assert {"priority", "due_at", "remind_minutes_before"} <= names
+
+
+def test_downgrade_to_0004_and_back(tmp_path, monkeypatch):
+    url = f"sqlite:///{tmp_path}/down.db"
+    monkeypatch.setenv("SDK_EXAMPLE_DATABASE_URL", url)
+    config = Config()
+    config.set_main_option("script_location", str(SERVICE / "alembic"))
+    command.upgrade(config, "head")
+    command.downgrade(config, "0004")
+    names = set(inspect(create_engine(url)).get_table_names())
+    assert not {"notices", "push_devices", "task_notice_ledger"} & names
+    assert {"remind_at", "reminded_at"} <= {c["name"] for c in inspect(create_engine(url)).get_columns("tasks")}
+    command.upgrade(config, "head")
+    assert "notices" in set(inspect(create_engine(url)).get_table_names())
 
 
 def test_users_table_has_what_the_auth_lib_reads(engine):
@@ -99,7 +136,9 @@ def test_a_missing_index_is_noticed(engine):
 
 def test_the_example_tables_are_the_expected_set(engine):
     names = set(inspect(engine).get_table_names()) - {"alembic_version"}
-    assert {"users", "background_jobs", "download_grants", "documents", "notes", "oauth_connections", "tasks"} <= names
+    assert {"users", "background_jobs", "download_grants", "documents", "notes", "oauth_connections", "tasks",
+            "task_user_settings", "task_link_index", "task_notice_ledger", "task_notice_outbox", "notices",
+            "push_devices"} <= names
 
 
 def test_upgrade_head_on_a_fresh_database_matches_the_models(tmp_path, monkeypatch):
@@ -123,7 +162,7 @@ def test_a_database_the_fake_app_created_is_already_at_head(app, tmp_path, monke
     config.set_main_option("script_location", str(SERVICE / "alembic"))
     command.upgrade(config, "head")  # would raise "table already exists" if the stamp were missing
     with app.state.engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0003"
+        assert MigrationContext.configure(connection).get_current_revision() == "0005"
 
 
 def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
@@ -131,7 +170,7 @@ def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
     bootstrap_schema(engine)
     assert "users" in inspect(engine).get_table_names()
     with engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0003"
+        assert MigrationContext.configure(connection).get_current_revision() == "0005"
 
 
 def test_bootstrap_leaves_a_stale_database_alone_and_says_so(tmp_path, caplog):

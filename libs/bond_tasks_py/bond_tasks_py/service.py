@@ -1,22 +1,33 @@
 """Task service functions: ``fn(session, ...)``. They flush, never commit: the caller owns the transaction, so a task
-write and its reminder job commit together.
+write and its notices commit together.
 
 Authorization: an editor is the owner or the assignee. Delete, cancel and reassign are owner-only. Reading is open.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 
+from bond_tasks_py.due import compute_due_at, valid_zone
 from bond_tasks_py.errors import TaskError
-from bond_tasks_py.mirror import mark_mirror, pointer_of
+from bond_tasks_py.hostcols import apply_extras
+from bond_tasks_py.lifecycle import (
+    cancel,
+    complete,
+    delete,
+    is_editor,
+    reopen,
+    require_editor,
+    require_owner,
+    set_checklist_item,
+)
+from bond_tasks_py.mirror import mark_mirror
 from bond_tasks_py.models import TaskStatus
-from bond_tasks_py.protocols import MirrorPointer
-from bond_tasks_py.reminders import refresh_remind_at
+from bond_tasks_py.protocols import AfterWrite, Permissions, UserPrefs
 from bond_tasks_py.schema import TaskCreate, TaskUpdate, checklist_item, normalize_checklist, normalize_links
-from bond_tasks_py.timeutil import iso_z, parse_iso, to_naive_utc
+from bond_tasks_py.timeutil import parse_iso, to_naive_utc
 
 UserExists = Callable[[str], bool]
 
@@ -26,28 +37,6 @@ def get(session: Any, task_model: Any, task_id: str) -> Any:
     if task is None:
         raise TaskError("task_not_found")
     return task
-
-
-def is_editor(task: Any, user_id: str) -> bool:
-    return user_id in (task.owner_user_id, task.assigned_user_id)
-
-
-def require_editor(task: Any, user_id: str) -> None:
-    if not is_editor(task, user_id):
-        raise TaskError("not_task_editor")
-
-
-def require_owner(task: Any, user_id: str) -> None:
-    if user_id != task.owner_user_id:
-        raise TaskError("not_task_owner")
-
-
-def _require_for_revival(task: Any, user_id: str) -> None:
-    """Editors may complete and reopen; once the owner cancelled a task only the owner may change that."""
-    if task.status == TaskStatus.CANCELLED.value:
-        require_owner(task, user_id)
-    else:
-        require_editor(task, user_id)
 
 
 def _title(value: str | None) -> str:
@@ -71,10 +60,56 @@ def _check_time(task: Any) -> None:
         raise TaskError("due_time_requires_date")
 
 
-def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: str, data: TaskCreate, now: datetime,
-           tz: str = "UTC", user_exists: UserExists | None = None) -> Any:
-    """Insert a task. A client-chosen id replayed by the same owner returns the existing row; another owner's id is
-    ``id_taken``."""
+def _sent_zone(data: TaskCreate | TaskUpdate) -> str | None:
+    """The zone sent with a write (None when none was sent); an unknown name is ``invalid_time_zone``."""
+    name = data.time_zone
+    if name is None:
+        return None
+    if not valid_zone(name):
+        raise TaskError("invalid_time_zone")
+    return name
+
+
+def _write_zone(sent: str | None, writer_zone: str | None, prefs: Any, session: Any,
+                actor_user_id: str) -> str | None:
+    """The zone of a write: the zone sent, else ``writer_zone``, else the actor's stored zone from ``prefs``
+    (empty means not stored). None falls through to the app default. Called only when ``due_at`` is computed,
+    so a write that never needs a zone never reads ``prefs``; an error from ``prefs.for_user`` propagates."""
+    if sent:
+        return sent
+    if writer_zone:
+        return writer_zone
+    if prefs is not None:
+        return prefs.for_user(session, actor_user_id).time_zone or None
+    return None
+
+
+def _due_at(task: Any, data: TaskCreate | TaskUpdate, *, writer_zone: str | None, actor_user_id: str, tz: str,
+            session: Any, prefs: Any) -> datetime | None:
+    """The task's due instant under rules 3 and 4 of the due-instant decision. A timed task uses the zone of
+    the write (``_write_zone``); a date-only task uses it only when the writer is the responsible user."""
+    responsible = task.assigned_user_id or task.owner_user_id
+    if task.due_time:
+        zone = _write_zone(data.time_zone, writer_zone, prefs, session, actor_user_id)
+        return compute_due_at(task.due_date, task.due_time, writer_zone=zone, responsible_prefs=UserPrefs(),
+                              app_tz=tz, client_due_at=data.due_at, sent_zone=data.time_zone)
+    found = prefs.for_user(session, responsible) if prefs is not None else UserPrefs()
+    zone = (_write_zone(data.time_zone, writer_zone, prefs, session, actor_user_id)
+            if actor_user_id == responsible else None)
+    return compute_due_at(task.due_date, None, writer_zone=zone, responsible_prefs=found, app_tz=tz)
+
+
+def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: str, data: TaskCreate,
+           now: datetime, tz: str = "UTC", user_exists: UserExists | None = None,
+           writer_zone: str | None = None, prefs: Any = None, extras: Mapping[str, Any] | None = None,
+           host_columns: Collection[str] = (), after_write: AfterWrite | None = None) -> Any:
+    """Insert a task. A client-chosen id replayed by the same owner returns the existing row; another owner's
+    id is ``id_taken``.
+
+    ``writer_zone`` is the writer's stored zone. When it is None and ``prefs`` (a ``Preferences``; None means
+    the defaults for everyone) is given, a task that has a due date reads the actor's stored zone from
+    ``prefs``; an error that ``prefs.for_user`` raises then propagates. ``extras`` are app columns named in
+    ``host_columns``; ``after_write(session, task)`` runs after the flush."""
     if data.id:
         existing = session.get(task_model, data.id)
         if existing is not None:
@@ -82,9 +117,10 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
                 return existing
             raise TaskError("id_taken")
     now = to_naive_utc(now)
+    _sent_zone(data)  # an unknown zone name is refused even when no due instant is computed
     task = task_model(
         owner_user_id=owner_user_id, created_by=actor_user_id, title=_title(data.title), notes=data.notes,
-        due_date=data.due_date, due_time=data.due_time, status=TaskStatus.OPEN.value,
+        due_date=data.due_date, due_time=data.due_time, priority=data.priority, status=TaskStatus.OPEN.value,
         assigned_user_id=_check_assignee(data.assigned_user_id, user_exists),
         checklist=normalize_checklist(data.checklist, existing=None, now=now), links=normalize_links(data.links),
         remind_minutes_before=data.remind_minutes_before, mirror_enabled=data.mirror_enabled, source=data.source,
@@ -93,7 +129,10 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
     if data.id:
         task.id = data.id
     _check_time(task)
-    refresh_remind_at(task, tz)
+    apply_extras(task, extras, host_columns)
+    if task.due_date is not None:
+        task.due_at = _due_at(task, data, writer_zone=writer_zone, actor_user_id=actor_user_id, tz=tz,
+                              session=session, prefs=prefs)
     mark_mirror(task)
     try:
         with session.begin_nested():
@@ -106,19 +145,27 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
         if existing.owner_user_id == owner_user_id:
             return existing
         raise TaskError("id_taken") from None
+    if after_write is not None:
+        after_write(session, task)
     return task
 
 
 def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now: datetime, tz: str = "UTC",
-           user_exists: UserExists | None = None) -> Any:
+           user_exists: UserExists | None = None, writer_zone: str | None = None, prefs: Any = None,
+           permissions: Permissions | None = None, extras: Mapping[str, Any] | None = None,
+           host_columns: Collection[str] = (), after_write: AfterWrite | None = None) -> Any:
     """Apply the fields in ``data.model_fields_set``. Omitted = unchanged; ``None`` clears ``due_date`` (and so the
-    time), ``due_time``, ``assigned_user_id`` and ``notes``; ``title`` and ``mirror_enabled`` cannot be cleared."""
+    time and ``due_at``), ``due_time``, ``priority``, ``assigned_user_id`` and ``notes``; ``title`` and
+    ``mirror_enabled`` cannot be cleared. ``due_at`` is recomputed only when the date, the time or the assignee
+    actually differs from what is stored (a timed task is not recomputed by a reassignment)."""
     sent, now = data.model_fields_set, to_naive_utc(now)
+    _sent_zone(data)  # an unknown zone name is refused even when no due instant is computed
     reassigning = "assigned_user_id" in sent and (data.assigned_user_id or None) != task.assigned_user_id
     if reassigning:
-        require_owner(task, actor_user_id)
+        require_owner(task, actor_user_id, permissions)
     else:
-        require_editor(task, actor_user_id)
+        require_editor(task, actor_user_id, permissions)
+    before = (task.due_date, task.due_time)
     if "title" in sent:
         task.title = _title(data.title)
     if "notes" in sent:
@@ -129,6 +176,8 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
             task.due_time = None
     if "due_time" in sent:
         task.due_time = data.due_time
+    if "priority" in sent:
+        task.priority = data.priority
     if reassigning:
         task.assigned_user_id = _check_assignee(data.assigned_user_id, user_exists)
     if "checklist" in sent:
@@ -140,73 +189,18 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
     if "mirror_enabled" in sent:
         task.mirror_enabled = data.mirror_enabled
     _check_time(task)
-    refresh_remind_at(task, tz)
+    apply_extras(task, extras, host_columns)
+    if task.due_date is None:
+        task.due_at = None
+    elif before != (task.due_date, task.due_time) or (reassigning and not task.due_time):
+        task.due_at = _due_at(task, data, writer_zone=writer_zone, actor_user_id=actor_user_id, tz=tz,
+                              session=session, prefs=prefs)
     mark_mirror(task)
     task.updated_at = now
     session.flush()
+    if after_write is not None:
+        after_write(session, task)
     return task
-
-
-def complete(session: Any, task: Any, actor_user_id: str, now: datetime) -> Any:
-    """Idempotent. Open or cancelled becomes done; undoing a cancel is the owner's call."""
-    _require_for_revival(task, actor_user_id)
-    if task.status != TaskStatus.DONE.value:
-        task.status = TaskStatus.DONE.value
-        task.completed_at, task.completed_by = to_naive_utc(now), actor_user_id
-        task.updated_at = to_naive_utc(now)
-        mark_mirror(task)
-        session.flush()
-    return task
-
-
-def reopen(session: Any, task: Any, actor_user_id: str, now: datetime) -> Any:
-    """Idempotent. Done or cancelled becomes open; undoing a cancel is the owner's call."""
-    _require_for_revival(task, actor_user_id)
-    if task.status != TaskStatus.OPEN.value:
-        task.status = TaskStatus.OPEN.value
-        task.completed_at = task.completed_by = None
-        task.updated_at = to_naive_utc(now)
-        mark_mirror(task)
-        session.flush()
-    return task
-
-
-def cancel(session: Any, task: Any, actor_user_id: str, now: datetime) -> Any:
-    """Owner only; idempotent."""
-    require_owner(task, actor_user_id)
-    if task.status != TaskStatus.CANCELLED.value:
-        task.status = TaskStatus.CANCELLED.value
-        task.completed_at = task.completed_by = None
-        task.updated_at = to_naive_utc(now)
-        mark_mirror(task)
-        session.flush()
-    return task
-
-
-def delete(session: Any, task: Any, actor_user_id: str) -> MirrorPointer | None:
-    """Hard delete, owner only. Returns where the external event lives so the caller can remove it after commit."""
-    require_owner(task, actor_user_id)
-    pointer = pointer_of(task)
-    session.delete(task)
-    session.flush()
-    return pointer
-
-
-def set_checklist_item(task: Any, item_id: str, done: bool, now: datetime, *, actor_user_id: str | None = None) -> Any:
-    """Tick or untick one item. Pass ``actor_user_id`` to enforce the editor rule."""
-    if actor_user_id is not None:
-        require_editor(task, actor_user_id)
-    items = [dict(entry) for entry in (task.checklist or [])]
-    for entry in items:
-        if entry["id"] == item_id:
-            if done:
-                entry["done_at"] = entry.get("done_at") or iso_z(now)
-            else:
-                entry["done_at"] = None
-            task.checklist = items  # a new list: in-place edits of a JSON column are not tracked
-            task.updated_at = to_naive_utc(now)
-            return task
-    raise TaskError("checklist_item_not_found")
 
 
 __all__ = [

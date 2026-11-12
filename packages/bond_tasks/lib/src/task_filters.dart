@@ -23,6 +23,7 @@ class TaskFilters {
     this.linkId,
     this.limit,
     this.offset,
+    this.timeZone,
   });
 
   /// `mine` or `all`.
@@ -46,6 +47,9 @@ class TaskFilters {
   final int? limit;
   final int? offset;
 
+  /// The viewer's IANA zone name (query `time_zone`).
+  final String? timeZone;
+
   Map<String, Object?> toQuery() => {
         if (scope != null) 'scope': scope,
         if (status != null) 'status': status,
@@ -62,6 +66,7 @@ class TaskFilters {
         if (linkId != null) 'link_id': linkId,
         if (limit != null) 'limit': limit,
         if (offset != null) 'offset': offset,
+        if (timeZone != null) 'time_zone': timeZone,
       };
 }
 

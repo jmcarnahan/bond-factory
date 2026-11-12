@@ -16,6 +16,7 @@ from sqlalchemy.orm import declared_attr
 
 NO_REMINDER = -2
 MORNING_OF = -1
+USE_DEFAULT_REMINDER = -3
 
 
 class TaskStatus(StrEnum):
@@ -49,13 +50,13 @@ TASK_COLUMNS: dict[str, bool] = {
     "notes": True,
     "due_date": True,
     "due_time": True,
+    "priority": True,
+    "due_at": True,
     "status": False,
     "completed_at": True,
     "completed_by": True,
     "checklist": False,
     "remind_minutes_before": False,
-    "remind_at": True,
-    "reminded_at": True,
     "mirror_enabled": False,
     "mirror_status": False,
     "external_provider": True,
@@ -77,6 +78,7 @@ class TasksMixin:
         return (
             Index("ix_tasks_owner_status_due", "owner_user_id", "status", "due_date"),
             Index("ix_tasks_assignee_status_due", "assigned_user_id", "status", "due_date"),
+            Index("ix_tasks_status_due_at", "status", "due_at"),
         )
 
     id = Column(String, primary_key=True, default=_uuid)
@@ -87,13 +89,14 @@ class TasksMixin:
     notes = Column(Text, nullable=True)
     due_date = Column(Date, nullable=True, index=True)
     due_time = Column(String(5), nullable=True)  # "HH:MM" local wall clock; needs due_date
+    priority = Column(Integer, nullable=True)  # 1 low, 2 normal, 3 high, null not set
+    due_at = Column(DateTime, nullable=True)  # server-computed due instant, naive UTC, minute precision
     status = Column(String, nullable=False, default=TaskStatus.OPEN.value)
     completed_at = Column(DateTime, nullable=True)
     completed_by = Column(String, nullable=True)
     checklist = Column(JSON, nullable=False, default=list)  # [{id, text, done_at|None}]
-    remind_minutes_before = Column(Integer, nullable=False, default=NO_REMINDER)  # -2 none, -1 morning of, N before
-    remind_at = Column(DateTime, nullable=True)  # computed, naive UTC
-    reminded_at = Column(DateTime, nullable=True)
+    # -3 my default, -2 none, -1 morning of the due date, N minutes before
+    remind_minutes_before = Column(Integer, nullable=False, default=USE_DEFAULT_REMINDER)
     mirror_enabled = Column(Boolean, nullable=False, default=True)
     mirror_status = Column(String, nullable=False, default=MirrorStatus.PENDING.value)
     external_provider = Column(String, nullable=True)  # "google" | "microsoft"

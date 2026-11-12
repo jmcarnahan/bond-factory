@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 import pytest
-from conftest import NOW, FakeScheduler, Task
+from conftest import NOW, Task
 
-from bond_tasks_py import TaskError, service, sync_routes, verdict_for
+from bond_tasks_py import TaskCreate, TaskError, service, sync_routes, verdict_for
 
 
 @dataclass
@@ -38,7 +38,7 @@ def call(route, session, user, op, data=None):
 
 def test_the_route_table_has_the_four_keys():
     table = routes()
-    assert set(table) == {("tasks", None), ("tasks", "complete"), ("tasks", "reopen")}
+    assert set(table) == {("tasks", None), ("tasks", "complete"), ("tasks", "reopen"), ("tasks", "cancel")}
     assert table[("tasks", None)].ops == frozenset({"put", "patch", "delete"})
     assert "title" in table[("tasks", None)].reads and "status" in table[("tasks", None)].reads
 
@@ -118,16 +118,6 @@ def test_delete_is_hard_idempotent_and_owner_only(session):
     call(route, session, "u1", Op("t1", "delete"))  # replayed delete: success
 
 
-def test_scheduler_follows_writes_and_deletes(session):
-    scheduler = FakeScheduler()
-    route = routes(scheduler=scheduler)[("tasks", None)]
-    data = {"title": "A", "due_date": date(2026, 11, 9), "due_time": "10:00", "remind_minutes_before": 0}
-    call(route, session, "u1", Op("t1", "put"), data)
-    assert "task_reminder:t1" in scheduler.jobs
-    call(route, session, "u1", Op("t1", "delete"))
-    assert scheduler.jobs == {}
-
-
 def test_hooks_get_the_context_and_the_pointer(session):
     seen = []
     removed = []
@@ -167,3 +157,185 @@ def test_verdict_mapping():
 
 def test_service_still_importable_next_to_routes():
     assert service.get is not None
+
+
+def test_put_keeps_the_source_and_a_patch_cannot_change_it(session):
+    route = routes()[("tasks", None)]
+    assert "source" in route.reads
+    call(route, session, "u1", Op("d1", "put"), {"title": "A", "source": "capture"})
+    assert session.get(Task, "d1").source == "capture"
+    call(route, session, "u1", Op("d1", "patch"), {"source": "manual", "title": "B"})
+    task = session.get(Task, "d1")
+    assert (task.source, task.title) == ("capture", "B")
+
+
+def test_a_patch_clearing_the_date_clears_the_time_and_due_at(session):
+    route = routes()[("tasks", None)]
+    call(route, session, "u1", Op("d1", "put"), {"title": "A", "due_date": "2026-11-09", "due_time": "09:30"})
+    assert session.get(Task, "d1").due_at is not None
+    call(route, session, "u1", Op("d1", "patch"), {"due_date": None})
+    task = session.get(Task, "d1")
+    assert (task.due_date, task.due_time, task.due_at) == (None, None, None)
+
+
+def test_complete_and_cancel_are_idempotent_and_change_no_stamps(session):
+    table = routes()
+    call(table[("tasks", None)], session, "u1", Op("d1", "put"), {"title": "A"})
+    task = session.get(Task, "d1")
+    service.complete(session, task, "u1", NOW)
+    stamps = (task.completed_at, task.updated_at)
+    later = datetime(2030, 1, 1)
+    service.complete(session, task, "u1", later)
+    assert (task.completed_at, task.updated_at) == stamps
+    service.cancel(session, task, "u1", NOW)
+    stamps = (task.completed_at, task.updated_at)
+    service.cancel(session, task, "u1", later)
+    assert (task.status, task.completed_at, task.updated_at) == ("cancelled", *stamps)
+
+
+def test_fields_and_reads_carry_priority_and_due_at():
+    from bond_tasks_py.sync_routes import FIELDS, READS
+
+    assert {"priority", "due_at"} <= set(FIELDS) and {"priority", "due_at"} <= set(READS)
+
+
+def test_put_stores_priority_and_a_plausible_due_at_hint(session):
+    data = {"title": "A", "due_date": "2026-11-09", "due_time": "09:30", "priority": 3,
+            "due_at": "2026-11-09T14:30:00Z"}
+    call(routes()[("tasks", None)], session, "u1", Op("d1", "put"), data)
+    task = session.get(Task, "d1")
+    assert task.priority == 3 and task.due_at == datetime(2026, 11, 9, 14, 30)
+
+
+def test_a_bad_or_inconsistent_due_at_never_raises(session):
+    route = routes()[("tasks", None)]
+    for n, bad in enumerate(("garbage", 12, "", "2026-11-09T14:37:00Z", "0001-01-01T00:00:00Z", None)):
+        data = {"title": "A", "due_date": "2026-11-09", "due_time": "09:30", "due_at": bad}
+        call(route, session, "u1", Op(f"d{n}", "put"), data)
+        assert session.get(Task, f"d{n}").due_at == datetime(2026, 11, 9, 9, 30)  # computed in the app zone (UTC)
+    call(route, session, "u1", Op("d0", "patch"), {"due_time": "10:00", "due_at": "nonsense"})
+    assert session.get(Task, "d0").due_at == datetime(2026, 11, 9, 10, 0)
+
+
+def test_a_plausible_hint_is_kept_even_when_the_writer_has_a_stored_zone(session):
+    table = routes(zone_of=lambda ctx, sess, user_id: "America/New_York")
+    data = {"title": "A", "due_date": "2026-03-12", "due_time": "09:00", "due_at": "2026-03-12T16:00:00Z"}
+    call(table[("tasks", None)], session, "u1", Op("d1", "put"), data)
+    assert session.get(Task, "d1").due_at == datetime(2026, 3, 12, 16, 0)  # not New York's 13:00Z
+    call(table[("tasks", None)], session, "u1", Op("d1", "patch"),
+         {"due_time": "10:00", "due_at": "2026-03-12T17:00:00Z"})
+    assert session.get(Task, "d1").due_at == datetime(2026, 3, 12, 17, 0)
+
+
+def test_a_patch_with_only_a_hint_writes_nothing(session):
+    call(routes()[("tasks", None)], session, "u1", Op("d1", "put"), {"title": "A", "due_date": "2026-11-09"})
+    task = session.get(Task, "d1")
+    task.mirror_status = "mirrored"
+    before = (task.updated_at, task.mirror_status, task.due_at)
+    later = sync_routes(Task, now=lambda: datetime(2030, 1, 1))[("tasks", None)]
+    call(later, session, "u1", Op("d1", "patch"), {"due_at": "2026-11-09T14:30:00Z"})
+    assert (task.updated_at, task.mirror_status, task.due_at) == before
+
+
+def test_service_create_has_no_permissions_parameter(session):
+    with pytest.raises(TypeError):
+        service.create(session, task_model=Task, owner_user_id="u1", actor_user_id="u1",
+                       data=TaskCreate(title="A"), now=NOW, permissions=object())
+
+
+def test_delete_removes_the_link_index_rows_in_the_same_flush(session):
+    from conftest import LinkIndex
+
+    table = sync_routes(Task, now=lambda: NOW, link_index_model=LinkIndex)
+    route = table[("tasks", None)]
+    call(route, session, "u1", Op("d1", "put"), {"title": "A"})
+    call(route, session, "u1", Op("d2", "put"), {"title": "B"})
+    session.add_all([LinkIndex(task_id="d1", kind="contact", ref_id="c1"),
+                     LinkIndex(task_id="d2", kind="contact", ref_id="c1")])
+    session.flush()
+    call(route, session, "u1", Op("d1", "delete"))
+    assert [row.task_id for row in session.query(LinkIndex).all()] == ["d2"]
+    service.delete(session, session.get(Task, "d2"), "u1", link_index_model=LinkIndex)
+    assert session.query(LinkIndex).count() == 0
+
+
+def test_delete_without_the_index_model_leaves_rows_alone(session):
+    from conftest import LinkIndex
+
+    call(routes()[("tasks", None)], session, "u1", Op("d1", "put"), {"title": "A"})
+    session.add(LinkIndex(task_id="d1", kind="contact", ref_id="c1"))
+    session.flush()
+    call(routes()[("tasks", None)], session, "u1", Op("d1", "delete"))
+    assert session.query(LinkIndex).count() == 1
+
+
+def test_a_due_at_whose_parsing_overflows_is_dropped_never_raised(session):
+    route = routes()[("tasks", None)]
+    for n, bad in enumerate(("0001-01-01T00:00:00+14:00", "9999-12-31T23:59:59-12:00")):
+        data = {"title": "A", "due_date": "2026-11-09", "due_time": "09:30", "due_at": bad}
+        call(route, session, "u1", Op(f"o{n}", "put"), data)
+        assert session.get(Task, f"o{n}").due_at == datetime(2026, 11, 9, 9, 30)
+
+
+def test_zone_of_supplies_the_writers_stored_zone(session):
+    seen = []
+
+    def zone_of(ctx, sess, user_id):
+        seen.append(user_id)
+        return "America/New_York"
+
+    call(routes(zone_of=zone_of)[("tasks", None)], session, "u1", Op("d1", "put"),
+         {"title": "A", "due_date": "2026-11-09", "due_time": "09:30"})
+    assert seen == ["u1"] and session.get(Task, "d1").due_at == datetime(2026, 11, 9, 14, 30)  # EST
+
+
+def test_the_cancel_route_cancels_for_the_owner_only(session):
+    table = routes()
+    call(table[("tasks", None)], session, "u1", Op("d1", "put"), {"title": "A"})
+    session.get(Task, "d1").assigned_user_id = "u2"
+    with pytest.raises(TaskError) as caught:
+        call(table[("tasks", "cancel")], session, "u2", Op("d1", "patch"))
+    assert caught.value.code == "not_task_owner"
+    call(table[("tasks", "cancel")], session, "u1", Op("d1", "patch"))
+    assert session.get(Task, "d1").status == "cancelled"
+
+
+def test_permissions_and_link_hook_are_passed_down(session):
+    from support_core import CoOfficer
+
+    hooked = []
+    table = routes(permissions=CoOfficer(), link_hook=lambda sess, task: hooked.append(task.id))
+    call(table[("tasks", None)], session, "u1", Op("d1", "put"), {"title": "A"})
+    call(table[("tasks", None)], session, "u3", Op("d1", "patch"), {"title": "B"})  # u3 may edit under the policy
+    assert session.get(Task, "d1").title == "B" and hooked == ["d1", "d1"]
+
+
+def test_on_deleted_gets_the_id_and_owner_even_without_a_mirror(session):
+    seen = []
+    route = routes(on_deleted=lambda ctx, s, task_id, owner: seen.append((task_id, owner)))[("tasks", None)]
+    call(route, session, "u1", Op("t1", "put"), {"title": "A"})
+    call(route, session, "u1", Op("t1", "delete"))
+    call(route, session, "u1", Op("t1", "delete"))  # already gone: no second call
+    assert seen == [("t1", "u1")]
+
+
+@pytest.mark.parametrize("priority", [0, 7])
+def test_a_priority_outside_one_to_three_is_invalid_priority_on_put_and_patch(session, priority):
+    route = routes()[("tasks", None)]
+    with pytest.raises(TaskError) as caught:
+        call(route, session, "u1", Op("t9", "put"), {"title": "A", "priority": priority})
+    assert caught.value.code == "invalid_priority" and caught.value.status == 422
+    call(route, session, "u1", Op("t1", "put"), {"title": "A"})
+    with pytest.raises(TaskError) as caught:
+        call(route, session, "u1", Op("t1", "patch"), {"priority": priority})
+    assert caught.value.code == "invalid_priority"
+
+
+def test_an_unparseable_due_at_is_ignored_like_a_wrong_hint_on_put_and_patch(session):
+    route = routes()[("tasks", None)]
+    for n, bad in enumerate(("garbage", 12345, 1.5, ["x"], {"a": 1}, 10**30)):
+        data = {"title": "A", "due_date": "2026-11-09", "due_time": "09:30", "due_at": bad}
+        call(route, session, "u1", Op(f"g{n}", "put"), data)
+        assert session.get(Task, f"g{n}").due_at == datetime(2026, 11, 9, 9, 30)
+        call(route, session, "u1", Op(f"g{n}", "patch"), {"due_time": "11:00", "due_at": bad})
+        assert session.get(Task, f"g{n}").due_at == datetime(2026, 11, 9, 11, 0)

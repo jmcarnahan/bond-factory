@@ -1,0 +1,74 @@
+[
+  {
+    "task_id": "task-0001",
+    "user_id": "user-2",
+    "stage": "close",
+    "seq": 0,
+    "token": "29537310",
+    "notice_id": "c97f90088051a722ab12c5581c641b57",
+    "local_id": 2006628151
+  },
+  {
+    "task_id": "task-0001",
+    "user_id": "user-2",
+    "stage": "due",
+    "seq": 0,
+    "token": "29537310",
+    "notice_id": "b6c41700a321bd2d8c0375bce170285d",
+    "local_id": 1194970950
+  },
+  {
+    "task_id": "task-0001",
+    "user_id": "user-1",
+    "stage": "past",
+    "seq": 0,
+    "token": "29537310",
+    "notice_id": "77e2b48411c744d78988ecf4c07a635e",
+    "local_id": 83010776
+  },
+  {
+    "task_id": "task-0001",
+    "user_id": "user-2",
+    "stage": "past",
+    "seq": 5,
+    "token": "29537310",
+    "notice_id": "308cb41435037d92b164cd8715fb5f70",
+    "local_id": 110325898
+  },
+  {
+    "task_id": "task-0004",
+    "user_id": "user-1",
+    "stage": "due",
+    "seq": 0,
+    "token": "2026-03-12",
+    "notice_id": "e8599437e1212f0461abc169ad4d6fef",
+    "local_id": 1265723623
+  },
+  {
+    "task_id": "task-0004",
+    "user_id": "user-1",
+    "stage": "past",
+    "seq": 1,
+    "token": "2026-03-12",
+    "notice_id": "0077ba42a33b288113adb4c00547fe29",
+    "local_id": 2037433202
+  },
+  {
+    "task_id": "a1b2c3d4-0000-4000-8000-000000000001",
+    "user_id": "user-9",
+    "stage": "close",
+    "seq": 0,
+    "token": "2026-12-31",
+    "notice_id": "cb2b253a80e5c0aa588b4dec32e2fa1b",
+    "local_id": 1932803133
+  },
+  {
+    "task_id": "t",
+    "user_id": "u",
+    "stage": "past",
+    "seq": 3,
+    "token": "0",
+    "notice_id": "8b4f614bdf219f490900caf522bf147d",
+    "local_id": 1195508217
+  }
+]

@@ -29,6 +29,17 @@ Fill in a row only for modules the app imports; delete the rest. Update this fil
 | bond_signin_ui | | | |
 | bond_calendar | | | |
 | bond_tasks_py | | | |
+| bond_notify_py | | | |
+| bond_push_py | | | |
+| bond_capture_py | | | |
+| bond_notify | | | |
+| bond_notify_ui | | | |
+| bond_push | | | |
+| bond_tasks_notifications | | | |
+| bond_tasks_powersync | | | |
+| bond_notify_powersync | | | |
+
+The TODO modules (`bond_tasks*`, `bond_notify*`, `bond_push*`, `bond_capture_py`) are first pinned at `<this branch's merge commit>`. The commit id is filled in when the branch is merged.
 
 Rules:
 - A local patch names the file, the reason and the upstream issue or PR. No patch lives longer than one upgrade.

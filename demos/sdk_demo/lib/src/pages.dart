@@ -3,9 +3,14 @@ import 'package:flutter/widgets.dart';
 import 'pages/api_page.dart';
 import 'pages/auth_page.dart';
 import 'pages/connections_page.dart';
+import 'pages/capture_page.dart';
 import 'pages/home_page.dart';
+import 'pages/inbox_page.dart';
 import 'pages/sync_page.dart';
 import 'pages/tasks_page.dart';
+import 'pages/today_page.dart';
+import 'pages/todo_calendar_page.dart';
+import 'pages/todo_settings_page.dart';
 import 'pages/ui_page.dart';
 
 /// One route of the demo. Owners replace only their own page file; the class
@@ -37,6 +42,11 @@ Widget _auth(BuildContext context) => const AuthPage();
 Widget _sync(BuildContext context) => const SyncPage();
 Widget _connections(BuildContext context) => const ConnectionsPage();
 Widget _tasks(BuildContext context) => const TasksPage();
+Widget _today(BuildContext context) => const TodayPage();
+Widget _capture(BuildContext context) => const CapturePage();
+Widget _calendar(BuildContext context) => const TodoCalendarPage();
+Widget _todoSettings(BuildContext context) => const TodoSettingsPage();
+Widget _inbox(BuildContext context) => const InboxPage();
 
 const demoPages = [
   DemoPage(path: '/', title: 'Home', id: 'home', builder: _home, module: 'sdk_demo', phase: 1),
@@ -53,4 +63,16 @@ const demoPages = [
     phase: 3,
   ),
   DemoPage(path: '/tasks', title: 'Tasks', id: 'tasks', builder: _tasks, module: 'bond_tasks', phase: 3),
+  DemoPage(path: '/today', title: 'Today', id: 'today', builder: _today, module: 'bond_tasks_ui', phase: 3),
+  DemoPage(path: '/capture', title: 'Capture', id: 'capture', builder: _capture, module: 'bond_tasks_ui', phase: 3),
+  DemoPage(path: '/calendar', title: 'Calendar', id: 'calendar', builder: _calendar, module: 'bond_tasks_ui', phase: 3),
+  DemoPage(
+    path: '/todo-settings',
+    title: 'TODO settings',
+    id: 'todo-settings',
+    builder: _todoSettings,
+    module: 'bond_tasks_ui',
+    phase: 3,
+  ),
+  DemoPage(path: '/inbox', title: 'Inbox', id: 'inbox', builder: _inbox, module: 'bond_notify_ui', phase: 3),
 ];

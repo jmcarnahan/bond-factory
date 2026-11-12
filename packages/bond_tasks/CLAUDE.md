@@ -5,10 +5,13 @@ Role: Pure Dart task model, request bodies, filters and REST client for the `/ta
 - `lib/src/task.dart` (`Task`, `ChecklistItem`, `TaskLink`), `task_enums.dart` (`TaskStatus`, `MirrorStatus`, `kRemind*`).
 - `lib/src/task_draft.dart` (`TaskDraft`, `TaskPatch`, `Present`), `task_filters.dart` (`TaskFilters`, `TaskPage`, `TaskSummary`).
 - `lib/src/tasks_api.dart` (`TasksApi`, fake-mode-only `DemoJobsApi`), `task_labels.dart` (`TaskLabels`).
-- Shared fixtures: `../../fixtures/tasks/task.json`, `task_cancelled.json`.
+- `lib/src/task_stage.dart` (schedule, `stageTimesFor`, `noticeId`), `task_due.dart`, `task_today.dart`, `task_candidates.dart`, `task_settings*.dart`,
+  `task_repository.dart`, `remote_task_repository.dart`, `task_controller.dart`, `zone_reporter.dart`.
+- Shared fixtures: `../../fixtures/tasks/task.json`, `task_cancelled.json` and the other `fixtures/tasks/*.json`.
 
 ## Commands
 - `make test T=test/task_test.dart`
+- `make test` sets `TZ=America/Los_Angeles` itself (stage fixtures); a bare `dart test` in another zone skips them
 - `make analyze`
 
 ## Rules
@@ -16,6 +19,6 @@ Role: Pure Dart task model, request bodies, filters and REST client for the `/ta
 - `Task.toJson` writes exactly the `TaskItem` keys; due date and time stay `YYYY-MM-DD` / `HH:MM` strings.
 - `TaskPatch`: omitted field stays, `Present(null)` sends an explicit null.
 - Keep `DemoJobsApi` apart from `TasksApi`; apps must not get the fake routes by accident.
-- No codegen; hand-write fromJson.
+- No codegen; hand-write fromJson. Stage tests assert only `stage_times.json` cases whose `effective_zone` is America/Los_Angeles (run under `TZ=America/Los_Angeles`).
 - Barrel + CHANGELOG.md updated on every public API change.
 - 300-line soft cap per source file.

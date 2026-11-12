@@ -5,7 +5,7 @@ Role: PowerSync connector, store and opener for bond_sync. Flutter package.
 - `lib/src/connector.dart`: `SyncConnector`. `store.dart`: `PowerSyncSyncStore`. `policy.dart`: `SyncPolicy`.
 - `lib/src/store_apply.dart`, `store_resend.dart`: the SQL. `store_open.dart`: `openSyncStore`.
 - `lib/src/sync_db.dart`: `SyncDb`, the minimal database seam; `PowerSyncDb` wraps the real database.
-- `test/fake_sync_db.dart`: scripted `SyncDb` that records statements.
+- `lib/src/testing/fake_sync_db.dart` (exported by `lib/testing.dart`; `test/fake_sync_db.dart` re-exports): scripted, optionally table-backed `SyncDb`.
 
 ## Commands
 - `make test T=test/store_test.dart`

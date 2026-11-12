@@ -1,0 +1,65 @@
+{
+  "items": [
+    {
+      "id": "4bef1b8888fef279d89a41fdbd63b326",
+      "user_id": "user-1",
+      "kind": "task_due",
+      "title": "Due now: Send the signed estimate",
+      "body": "This task is due now.",
+      "data": {
+        "task_id": "task-0001",
+        "stage": "due",
+        "seq": 0,
+        "due_at": "2026-11-12T14:30:00Z",
+        "priority": 2,
+        "route": "/tasks/task-0001",
+        "actions": ["done", "snooze", "cancel"],
+        "last": false
+      },
+      "created_at": "2026-11-12T14:30:05Z",
+      "read_at": null,
+      "dismissed_at": null
+    },
+    {
+      "id": "55daa401f514c48bcfe12819d89444b8",
+      "user_id": "user-1",
+      "kind": "task_due",
+      "title": "Overdue: Call Sam",
+      "body": "This task is overdue. This is the last reminder.",
+      "data": {
+        "task_id": "task-0002",
+        "stage": "past",
+        "seq": 5,
+        "due_at": "2026-11-06T22:00:00Z",
+        "priority": null,
+        "route": "/tasks/task-0002",
+        "actions": ["done", "snooze"],
+        "last": true
+      },
+      "created_at": "2026-11-11T13:00:02Z",
+      "read_at": null,
+      "dismissed_at": null
+    },
+    {
+      "id": "3a176fec02c0ee0ccb3f18d6584ca7cb",
+      "user_id": "user-1",
+      "kind": "task_due",
+      "title": "Due soon: Order the shingles",
+      "body": "This task is due in 60 minutes.",
+      "data": {
+        "task_id": "task-0003",
+        "stage": "close",
+        "seq": 0,
+        "due_at": "2026-11-10T22:00:00Z",
+        "priority": 3,
+        "route": "/tasks/task-0003",
+        "actions": ["done", "snooze", "cancel"],
+        "last": false
+      },
+      "created_at": "2026-11-10T21:00:03Z",
+      "read_at": "2026-11-10T21:05:00Z",
+      "dismissed_at": null
+    }
+  ],
+  "unread_count": 2
+}

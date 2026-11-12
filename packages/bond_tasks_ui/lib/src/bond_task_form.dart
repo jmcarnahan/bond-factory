@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'bond_check_row.dart';
 import 'bond_task_checklist_editor.dart';
+import 'bond_task_form_due.dart';
+import 'bond_task_form_extras.dart';
 import 'task_format.dart';
 
 /// A person a task can be assigned to.
@@ -14,10 +16,10 @@ class TaskAssignee {
   final String name;
 }
 
-const List<int> _kRemindChoices = [kRemindNone, kRemindMorningOf, 1, 15, 60, 1440];
+const List<int> _kRemindChoices = [kRemindNone, kRemindUseDefault, kRemindMorningOf, 1, 15, 60, 1440];
 
-/// The full task form: title, notes, date and time, assignee, checklist,
-/// reminder and the calendar mirror switch. Save calls [onSubmit] with a
+/// The full task form: title, notes, date and time, assignee, priority, links
+/// (with [onSearchLinks]), checklist, reminder and the calendar mirror switch. Save calls [onSubmit] with a
 /// [TaskDraft] only when it is valid; otherwise the problems show inline
 /// (a title is required; a time needs a date). An edit passes the task as
 /// [initial] and turns the draft into a patch with `TaskPatch.fromDraft`.
@@ -38,6 +40,7 @@ class BondTaskForm extends StatefulWidget {
     this.busy = false,
     this.labels = const TaskLabels(),
     this.semanticsPrefix,
+    this.onSearchLinks,
   });
 
   final DateTime today;
@@ -50,6 +53,9 @@ class BondTaskForm extends StatefulWidget {
   final TaskLabels labels;
   final String? semanticsPrefix;
 
+  /// Searches records to link; with it the form shows the links picker.
+  final Future<List<TaskLink>> Function(String kind, String query)? onSearchLinks;
+
   @override
   State<BondTaskForm> createState() => _BondTaskFormState();
 }
@@ -61,9 +67,14 @@ class _BondTaskFormState extends State<BondTaskForm> {
   BondTime? _time;
   String _assignee = '';
   List<ChecklistItem> _checklist = const [];
-  int _remind = kRemindNone;
+  int _remind = kRemindUseDefault;
   bool _mirror = true;
+  TaskPriority? _priority;
+  List<TaskLink> _links = const [];
   bool _tried = false;
+
+  /// False while the time boxes hold something that is not a time; Save waits.
+  bool _timeValid = true;
 
   /// A date or time the server sent that this form cannot read: kept as it
   /// came and sent back unchanged unless the person picks or clears one.
@@ -82,8 +93,10 @@ class _BondTaskFormState extends State<BondTaskForm> {
     _badTime = _time == null && (t?.dueTime ?? '').isNotEmpty ? t!.dueTime : null;
     _assignee = t?.assignedUserId ?? '';
     _checklist = t?.checklist ?? const [];
-    _remind = t?.remindMinutesBefore ?? kRemindNone;
+    _remind = t?.remindMinutesBefore ?? kRemindUseDefault;
     _mirror = t?.mirrorEnabled ?? true;
+    _priority = t?.priority;
+    _links = t?.links ?? const [];
   }
 
   @override
@@ -104,7 +117,8 @@ class _BondTaskFormState extends State<BondTaskForm> {
         checklist: _checklist,
         remindMinutesBefore: _remind,
         mirrorEnabled: _mirror,
-        links: widget.initial?.links ?? const [],
+        links: _links,
+        priority: _priority,
       );
 
   void _save() {
@@ -117,8 +131,6 @@ class _BondTaskFormState extends State<BondTaskForm> {
   @override
   Widget build(BuildContext context) {
     final l = widget.labels;
-    final t = BondTokens.of(context);
-    final text = BondText(t);
     final problems = _draft().validate();
     final timeNeedsDate = problems.contains(TaskProblem.dueTimeRequiresDate);
     final reminderValues = {..._kRemindChoices, _remind}.toList();
@@ -139,67 +151,34 @@ class _BondTaskFormState extends State<BondTaskForm> {
         BondSpace.h12,
         BondTextField(controller: _notes, label: l.notes, maxLines: 3, semanticsId: _id('notes')),
         BondSpace.h12,
-        BondDateField(
-          label: l.dueDate,
-          placeholder: l.noDueDate,
-          value: _date,
+        BondTaskFormDue(
+          labels: l,
           today: widget.today,
-          onChanged: (d) => setState(() {
+          date: _date,
+          time: _time,
+          badDate: _badDate,
+          badTime: _badTime,
+          timeNeedsDate: timeNeedsDate,
+          onDate: (d) => setState(() {
             _badDate = null;
-            _date = DateTime(d.year, d.month, d.day);
+            _date = d;
           }),
-          onCleared: () => setState(() {
+          onClearDate: () => setState(() {
             _badDate = null;
             _date = null;
           }),
-          semanticsId: _id('due-date'),
+          onAddTime: () => setState(() {
+            _badTime = null;
+            _time = const BondTime(hour24: 9, minute: 0);
+          }),
+          onTime: (v) => setState(() => _time = v),
+          onRemoveTime: () => setState(() {
+            _time = null;
+            _timeValid = true;
+          }),
+          onTimeValid: (v) => setState(() => _timeValid = v),
+          idOf: _id,
         ),
-        if (_badDate != null)
-          Padding(
-            padding: const EdgeInsets.only(top: BondSpace.s4),
-            child: Text('${l.unrecognisedDate}: $_badDate', style: text.small.copyWith(color: t.danger.press)),
-          ),
-        BondSpace.h12,
-        if (_time == null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: BondButton(
-              label: l.addTime,
-              variant: BondButtonVariant.secondary,
-              onPressed: () => setState(() {
-                _badTime = null;
-                _time = const BondTime(hour24: 9, minute: 0);
-              }),
-              semanticsId: _id('due-time-add'),
-            ),
-          )
-        else ...[
-          BondTimeField(
-            label: l.dueTime,
-            value: _time!,
-            onChanged: (v) => setState(() => _time = v),
-            semanticsId: _id('due-time'),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: BondButton(
-              label: l.removeTime,
-              variant: BondButtonVariant.quiet,
-              onPressed: () => setState(() => _time = null),
-              semanticsId: _id('due-time-remove'),
-            ),
-          ),
-        ],
-        if (_badTime != null)
-          Padding(
-            padding: const EdgeInsets.only(top: BondSpace.s4),
-            child: Text('${l.unrecognisedTime}: $_badTime', style: text.small.copyWith(color: t.danger.press)),
-          ),
-        if (timeNeedsDate)
-          Padding(
-            padding: const EdgeInsets.only(top: BondSpace.s4),
-            child: Text(l.dueTimeNeedsDate, style: text.small.copyWith(color: t.danger.press)),
-          ),
         if (widget.assignees.isNotEmpty) ...[
           BondSpace.h12,
           BondSelect<String>(
@@ -214,6 +193,16 @@ class _BondTaskFormState extends State<BondTaskForm> {
             semanticsId: _id('assignee'),
           ),
         ],
+        BondSpace.h12,
+        BondTaskFormExtras(
+          labels: l,
+          priority: _priority,
+          onPriority: (v) => setState(() => _priority = v),
+          links: _links,
+          onLinks: (v) => setState(() => _links = v),
+          onSearchLinks: widget.onSearchLinks,
+          idOf: _id,
+        ),
         BondSpace.h12,
         BondTaskChecklistEditor(
           items: _checklist,
@@ -241,7 +230,7 @@ class _BondTaskFormState extends State<BondTaskForm> {
         BondSpace.h16,
         Row(
           children: [
-            BondButton(label: l.save, loading: widget.busy, onPressed: widget.busy ? null : _save, semanticsId: _id('save')),
+            BondButton(label: l.save, loading: widget.busy, onPressed: widget.busy || !_timeValid ? null : _save, semanticsId: _id('save')),
             if (widget.onCancel != null) ...[
               BondSpace.w8,
               BondButton(

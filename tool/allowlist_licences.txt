@@ -1,0 +1,4 @@
+# Dependencies whose licence tool/licence_check.sh cannot classify (or that are GPL-family on purpose).
+# One package name per line; `#` starts a comment; say why. Names compare case-insensitively, - = _.
+psycopg         # LGPL-3.0. Test-only Postgres driver (dev extras); imported, never modified or shipped in a wheel or an app.
+psycopg-binary  # LGPL-3.0. Same: the prebuilt build of the test-only driver.

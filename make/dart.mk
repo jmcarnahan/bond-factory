@@ -1,6 +1,10 @@
 # Dart and Flutter targets. DART_PKGS are pure Dart; FLUTTER_PKGS need the Flutter SDK.
-DART_PKGS = packages/bond_roof packages/bond_json packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections packages/bond_signin
-FLUTTER_PKGS = packages/bond_roof_ui demos/roof_demo packages/bond_test_support packages/bond_ui packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin_ui demos/sdk_demo
+DART_PKGS = packages/bond_roof packages/bond_json packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_notify packages/bond_connections packages/bond_signin
+FLUTTER_PKGS = packages/bond_notify_ui packages/bond_push packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync packages/bond_roof_ui demos/roof_demo packages/bond_test_support packages/bond_ui packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin_ui demos/sdk_demo
+
+# Tests run in one fixed non-UTC zone: the stage and day-view fixtures are asserted for America/Los_Angeles,
+# and a UTC machine would hide naive-timestamp bugs. Override with TEST_TZ=<zone>.
+TEST_TZ ?= America/Los_Angeles
 
 .PHONY: sync-fixtures demo-web demo-ios build-web demo-sdk-web test-dart test-flutter analyze
 
@@ -22,10 +26,10 @@ demo-ios: sync-fixtures ## Run the demo on the booted iOS simulator
 	cd demos/roof_demo && $(FLUTTER) run -d "$$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next((x["udid"] for v in d.values() for x in v), "iPhone"))')"
 
 test-dart: ## Run pure-Dart package tests
-	@for p in $(DART_PKGS); do echo "== $$p"; (cd $$p && $(DART) test) || exit 1; done
+	@for p in $(DART_PKGS); do echo "== $$p"; (cd $$p && TZ=$(TEST_TZ) $(DART) test) || exit 1; done
 
 test-flutter: sync-fixtures ## Run Flutter package and demo tests
-	@for p in $(FLUTTER_PKGS); do echo "== $$p"; (cd $$p && $(FLUTTER) test) || exit 1; done
+	@for p in $(FLUTTER_PKGS); do echo "== $$p"; (cd $$p && TZ=$(TEST_TZ) $(FLUTTER) test) || exit 1; done
 
 analyze: sync-fixtures ## Analyze all Dart and Flutter packages
 	@for p in $(DART_PKGS); do echo "== $$p"; (cd $$p && $(DART) analyze) || exit 1; done

@@ -1,0 +1,26 @@
+name: bond_tasks_notifications
+description: 'Local task alerts, notice actions and the alerts coordinator.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  bond_tasks:
+    path: ../bond_tasks
+  bond_notify:
+    path: ../bond_notify
+  bond_push:
+    path: ../bond_push
+  flutter_local_notifications: ^22.3.2
+  timezone: ^0.11.2
+  flutter_timezone: ^5.1.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bond_test_support:
+    path: ../bond_test_support

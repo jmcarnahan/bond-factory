@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime
 
 import pytest
@@ -5,8 +6,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from bond_tasks_py import TasksMixin
+from bond_tasks_py import (
+    NoticeLedgerMixin,
+    NoticeOutboxMixin,
+    TaskLinkIndexMixin,
+    TasksMixin,
+    TaskUserSettingsMixin,
+)
 from bond_tasks_py.protocols import MirrorDraft
+
+# Shared fakes and fixtures of the three feature groups live in these files; nothing else loads them.
+pytest_plugins = ["support_core", "support_read", "support_sweep"]
 
 NOW = datetime(2026, 11, 8, 12, 0, 0)  # naive UTC
 Base = declarative_base()
@@ -16,11 +26,43 @@ class Task(TasksMixin, Base):
     pass
 
 
+class UserSettings(TaskUserSettingsMixin, Base):
+    pass
+
+
+class LinkIndex(TaskLinkIndexMixin, Base):
+    pass
+
+
+class Ledger(NoticeLedgerMixin, Base):
+    pass
+
+
+class Outbox(NoticeOutboxMixin, Base):
+    pass
+
+
 @pytest.fixture
 def factory():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+@pytest.fixture
+def pg_engine():
+    """A PostgreSQL engine for tests marked ``postgres``; skipped unless BOND_TEST_POSTGRES_URL is set."""
+    url = os.environ.get("BOND_TEST_POSTGRES_URL")
+    if not url:
+        pytest.skip("BOND_TEST_POSTGRES_URL is not set")
+    engine = create_engine(url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    try:
+        yield engine
+    finally:
+        Base.metadata.drop_all(engine)
+        engine.dispose()
 
 
 @pytest.fixture
@@ -43,19 +85,6 @@ class ReconnectRequired(Exception):
 
 class Unavailable(Exception):
     status = 503
-
-
-class FakeScheduler:
-    def __init__(self):
-        self.jobs: dict[str, dict] = {}
-        self.cancelled: list[str] = []
-
-    def enqueue(self, session, *, job_type, payload, run_at, dedupe_key):
-        self.jobs[dedupe_key] = {"job_type": job_type, "payload": payload, "run_at": run_at}
-
-    def cancel(self, session, *, dedupe_key):
-        self.cancelled.append(dedupe_key)
-        self.jobs.pop(dedupe_key, None)
 
 
 class FakeMirror:

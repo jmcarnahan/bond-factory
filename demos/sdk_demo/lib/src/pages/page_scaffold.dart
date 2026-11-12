@@ -48,3 +48,12 @@ class PlaceholderPage extends StatelessWidget {
     );
   }
 }
+
+/// A text whose words are also the semantics label: a browser driver reads
+/// labels, not identifiers. The inner text is excluded so it is read once.
+Widget labelledText(String id, String text, [TextStyle? style]) => Semantics(
+      identifier: id,
+      label: text,
+      container: true,
+      child: ExcludeSemantics(child: Text(text, style: style)),
+    );

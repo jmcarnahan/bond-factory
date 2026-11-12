@@ -4,6 +4,7 @@ library;
 import 'package:bond_json/bond_json.dart';
 
 import 'task_enums.dart';
+import 'task_priority.dart';
 
 /// One checklist line. [doneAt] is null while open.
 class ChecklistItem {
@@ -64,6 +65,8 @@ class Task {
     this.notes,
     this.dueDate,
     this.dueTime,
+    this.priority,
+    this.dueAt,
     this.status = TaskStatus.open,
     this.ownerUserId = '',
     this.ownerName,
@@ -71,8 +74,6 @@ class Task {
     this.assigneeName,
     this.checklist = const [],
     this.remindMinutesBefore = kRemindNone,
-    this.remindAt,
-    this.remindedAt,
     this.links = const [],
     this.completedAt,
     this.mirrorEnabled = true,
@@ -91,6 +92,8 @@ class Task {
         notes: jstr(m, 'notes'),
         dueDate: jstr(m, 'due_date'),
         dueTime: jstr(m, 'due_time'),
+        priority: TaskPriority.fromWire(jint(m, 'priority')),
+        dueAt: jtime(m, 'due_at'),
         status: TaskStatus.fromWire(jstr(m, 'status')),
         ownerUserId: jstr(m, 'owner_user_id') ?? '',
         ownerName: jstr(m, 'owner_name'),
@@ -98,8 +101,6 @@ class Task {
         assigneeName: jstr(m, 'assignee_name'),
         checklist: jlist(m, 'checklist', ChecklistItem.fromJson),
         remindMinutesBefore: jint(m, 'remind_minutes_before') ?? kRemindNone,
-        remindAt: jtime(m, 'remind_at'),
-        remindedAt: jtime(m, 'reminded_at'),
         links: jlist(m, 'links', TaskLink.fromJson),
         completedAt: jtime(m, 'completed_at'),
         mirrorEnabled: jbool(m, 'mirror_enabled') ?? true,
@@ -117,6 +118,10 @@ class Task {
   final String? notes;
   final String? dueDate;
   final String? dueTime;
+  final TaskPriority? priority;
+
+  /// The server's due instant (UTC); null for an undated task or an old server.
+  final DateTime? dueAt;
   final TaskStatus status;
   final String ownerUserId;
   final String? ownerName;
@@ -126,8 +131,6 @@ class Task {
 
   /// [kRemindNone], [kRemindMorningOf] or minutes before the due time.
   final int remindMinutesBefore;
-  final DateTime? remindAt;
-  final DateTime? remindedAt;
   final List<TaskLink> links;
   final DateTime? completedAt;
   final bool mirrorEnabled;
@@ -145,6 +148,34 @@ class Task {
   bool get isDone => status == TaskStatus.done;
   int get checklistDone => checklist.where((c) => c.done).length;
 
+  /// A copy with the fields the controller changes optimistically.
+  Task copyWith({TaskStatus? status, DateTime? completedAt, bool? overdue, bool clearCompleted = false}) => Task(
+        id: id,
+        title: title,
+        notes: notes,
+        dueDate: dueDate,
+        dueTime: dueTime,
+        priority: priority,
+        dueAt: dueAt,
+        status: status ?? this.status,
+        ownerUserId: ownerUserId,
+        ownerName: ownerName,
+        assignedUserId: assignedUserId,
+        assigneeName: assigneeName,
+        checklist: checklist,
+        remindMinutesBefore: remindMinutesBefore,
+        links: links,
+        completedAt: clearCompleted ? null : (completedAt ?? this.completedAt),
+        mirrorEnabled: mirrorEnabled,
+        mirrorStatus: mirrorStatus,
+        externalProvider: externalProvider,
+        externalEventId: externalEventId,
+        source: source,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        overdue: overdue ?? this.overdue,
+      );
+
   /// Exactly the `TaskItem` keys.
   Map<String, Object?> toJson() => {
         'id': id,
@@ -152,6 +183,8 @@ class Task {
         'notes': notes,
         'due_date': dueDate,
         'due_time': dueTime,
+        'priority': priority?.wire,
+        'due_at': dueAt == null ? null : jiso(dueAt!),
         'status': status.wire,
         'owner_user_id': ownerUserId,
         'owner_name': ownerName,
@@ -159,8 +192,6 @@ class Task {
         'assignee_name': assigneeName,
         'checklist': [for (final c in checklist) c.toJson()],
         'remind_minutes_before': remindMinutesBefore,
-        'remind_at': remindAt == null ? null : jiso(remindAt!),
-        'reminded_at': remindedAt == null ? null : jiso(remindedAt!),
         'links': [for (final l in links) l.toJson()],
         'completed_at': completedAt == null ? null : jiso(completedAt!),
         'mirror_enabled': mirrorEnabled,

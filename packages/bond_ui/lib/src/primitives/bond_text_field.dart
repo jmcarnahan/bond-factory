@@ -112,13 +112,29 @@ class BondTextField extends StatelessWidget {
                 hintText: hint,
                 // A hint wraps (and the field grows) rather than being cut.
                 hintMaxLines: 2,
-                errorText: errorText,
+                // With an id the message is drawn below as its own node
+                // (`<id>-error`); the empty error widget keeps the red border.
+                errorText: semanticsId == null ? errorText : null,
+                error: semanticsId != null && errorText != null ? const SizedBox.shrink() : null,
                 prefixIcon: prefix,
                 focusedBorder: bondFocusedBorder(focusColor),
               ),
             ),
           ),
         ),
+        if (semanticsId != null && errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: BondSpace.s4, left: BondSpace.s12),
+            child: Semantics(
+              identifier: '$semanticsId-error',
+              label: errorText,
+              liveRegion: true,
+              container: true,
+              child: ExcludeSemantics(
+                child: Text(errorText!, style: text.small.copyWith(color: t.danger.press)),
+              ),
+            ),
+          ),
       ],
     );
   }

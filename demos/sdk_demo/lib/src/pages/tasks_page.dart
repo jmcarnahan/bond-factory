@@ -10,10 +10,11 @@ import 'package:flutter/material.dart';
 import '../example_api.dart';
 import '../theme.dart';
 import 'page_scaffold.dart';
+import 'tasks_row_extra.dart';
 
 /// Tasks against the example API: list in sections, quick add, the full form,
 /// complete and reopen, checklist ticks, a two-step delete, the calendar mirror
-/// result per task, and the reminder demo (`POST /jobs/tick` then the notices).
+/// result per task, and the fake-clock job run (`POST /jobs/tick`; the notices are on the Inbox page).
 /// Ids are `sdk.tasks.<element>`; see `docs/migration/bond_tasks.md` for the
 /// list of them.
 class TasksPage extends StatefulWidget {
@@ -47,7 +48,6 @@ class _TasksPageState extends State<TasksPage> {
 
   List<Task>? _tasks;
   TaskSummary? _summary;
-  List<Map<String, Object?>> _notices = const [];
   String? _error;
   String? _info;
   bool _busy = false;
@@ -126,77 +126,18 @@ class _TasksPageState extends State<TasksPage> {
     }
     await _run(() async {
       await _jobs.runDueJobs(at);
-      final notices = await _jobs.notices();
-      if (mounted) setState(() => _notices = notices);
     }, info: 'Ran the due jobs as of ${at.toIso8601String()}');
   }
 
-  Future<void> _showNotices() async {
-    await _run(() async {
-      final notices = await _jobs.notices();
-      if (mounted) setState(() => _notices = notices);
-    });
-  }
-
-  Widget _extra(BuildContext context, Task t) {
-    final text = BondText.of(context);
-    final tokens = BondTokens.of(context);
-    final external = t.externalProvider == null
-        ? 'Calendar: ${t.mirrorStatus.wire}'
-        : 'Calendar: ${t.externalProvider} ${t.externalEventId ?? ''}'.trim();
-    return Padding(
-      padding: const EdgeInsets.only(left: BondSpace.s16, top: BondSpace.s4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (t.checklist.isNotEmpty)
-            BondChecklist(
-              items: t.checklist,
-              semanticsPrefix: '$_id.check-${t.id}',
-              onToggle: (item, done) => _run(() => _api.setChecklistItem(t.id, item.id, done: done)),
-            ),
-          BondCheckRow(
-            checked: t.mirrorEnabled,
-            label: 'Add to my calendar',
-            semanticsId: '$_id.mirror-${t.id}',
-            onChanged: _busy
-                ? null
-                : (v) => _run(() async {
-                      await _api.update(t.id, TaskPatch(mirrorEnabled: v), today: dueDateString(_today));
-                    }),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: t.mirrorEnabled
-                    ? _labelled('$_id.external-${t.id}', external, text.caption.copyWith(color: tokens.muted))
-                    : Text('Calendar: off', style: text.caption.copyWith(color: tokens.muted)),
-              ),
-              BondTaskDeleteControl(
-                taskId: t.id,
-                semanticsId: '$_id.delete-${t.id}',
-                onDelete: () => _run(() => _api.delete(t.id)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _notice(int n, Map<String, Object?> m) {
-    final title = m['title'] ?? m['message'] ?? m['task_id'] ?? m['id'] ?? m.toString();
-    final id = m['task_id'];
-    return _labelled('$_id.notice-$n', id == null || id == title ? '$title' : '$title ($id)');
-  }
-
-  /// A text whose words are also the semantics label: a browser driver reads
-  /// labels, not identifiers. The inner text is excluded so it is read once.
-  Widget _labelled(String id, String text, [TextStyle? style]) => Semantics(
-        identifier: id,
-        label: text,
-        container: true,
-        child: ExcludeSemantics(child: Text(text, style: style)),
+  Widget _extra(BuildContext context, Task t) => TaskRowExtra(
+        task: t,
+        idPrefix: _id,
+        busy: _busy,
+        onChecklist: (item, done) => _run(() => _api.setChecklistItem(t.id, item.id, done: done)),
+        onMirror: (v) => _run(() async {
+          await _api.update(t.id, TaskPatch(mirrorEnabled: v), today: dueDateString(_today));
+        }),
+        onDelete: () => _run(() => _api.delete(t.id)),
       );
 
   @override
@@ -216,8 +157,8 @@ class _TasksPageState extends State<TasksPage> {
             }),
           ),
           if (_error != null)
-            _labelled('$_id.error', _error!, TextStyle(color: BondTokens.of(context).danger.press)),
-          if (_info != null) _labelled('$_id.info', _info!),
+            labelledText('$_id.error', _error!, TextStyle(color: BondTokens.of(context).danger.press)),
+          if (_info != null) labelledText('$_id.info', _info!),
           BondSpace.h8,
           BondTaskList(
             tasks: _error != null && tasks == null ? null : tasks,
@@ -253,28 +194,10 @@ class _TasksPageState extends State<TasksPage> {
                 onPressed: _busy ? null : _runDueJobs,
                 semanticsId: '$_id.run-due-jobs',
               ),
-              BondButton(
-                label: 'Show notices',
-                variant: BondButtonVariant.quiet,
-                onPressed: _busy ? null : _showNotices,
-                semanticsId: '$_id.show-notices',
-              ),
             ],
           ),
           BondSpace.h8,
-          Semantics(
-            identifier: '$_id.notices',
-            label: _notices.isEmpty ? 'No reminders delivered yet.' : 'Reminders delivered',
-            container: true,
-            explicitChildNodes: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_notices.isEmpty) const Text('No reminders delivered yet.'),
-                for (var i = 0; i < _notices.length; i++) _notice(i, _notices[i]),
-              ],
-            ),
-          ),
+          const Text('Reminders that were delivered are in the Inbox page.'),
           BondSpace.h24,
           Text('New task', style: BondText.of(context).lead),
           BondSpace.h8,

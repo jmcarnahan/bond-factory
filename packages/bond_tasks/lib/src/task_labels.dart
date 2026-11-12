@@ -2,6 +2,7 @@
 library;
 
 import 'task_enums.dart';
+import 'task_priority.dart';
 
 class TaskLabels {
   const TaskLabels({
@@ -57,6 +58,32 @@ class TaskLabels {
     this.summaryToday = 'Due today',
     this.summaryNoDate = 'No date',
     this.external = 'Calendar',
+    this.remindDefault = 'Use my default',
+    this.priorityLow = 'Low',
+    this.priorityNormal = 'Normal',
+    this.priorityHigh = 'High',
+    this.priority = 'Priority',
+    this.stageDueSoon = 'Due soon',
+    this.stageDueNow = 'Due now',
+    this.stageOverdue = 'Overdue',
+    this.actionDone = 'Done',
+    this.actionSnooze = 'Snooze',
+    this.actionCancelTask = 'Cancel task',
+    this.lastReminder = 'Last reminder',
+    this.undo = 'Undo',
+    this.missed = 'Missed',
+    this.sectionUndated = 'No date',
+    this.sectionDoneToday = 'Done today',
+    this.noPriority = 'No priority',
+    this.links = 'Links',
+    this.linkHint = 'Search to link a record',
+    this.removeLink = 'Remove link',
+    this.todayEmpty = 'Nothing due. Enjoy the day.',
+    this.laneEmpty = 'Nothing due this day.',
+    this.anytime = 'Any time',
+    this.dueMarker = 'due',
+    this.overdueMarker = 'overdue',
+    this.moreLinks = '+{n}',
   });
 
   final String title;
@@ -111,6 +138,48 @@ class TaskLabels {
   final String summaryToday;
   final String summaryNoDate;
   final String external;
+  final String remindDefault;
+  final String priorityLow;
+  final String priorityNormal;
+  final String priorityHigh;
+  final String priority;
+  final String stageDueSoon;
+  final String stageDueNow;
+  final String stageOverdue;
+  final String actionDone;
+  final String actionSnooze;
+  final String actionCancelTask;
+  final String lastReminder;
+  final String undo;
+
+  /// An event in the past (a task past its due time is "Overdue").
+  final String missed;
+  final String sectionUndated;
+  final String sectionDoneToday;
+  final String noPriority;
+  final String links;
+  final String linkHint;
+  final String removeLink;
+  final String todayEmpty;
+  final String laneEmpty;
+
+  /// The time column of a date-only task in a day view.
+  final String anytime;
+  final String dueMarker;
+  final String overdueMarker;
+  final String moreLinks;
+
+  /// "+2": how many links a row does not show.
+  String moreLinksText(int n) => moreLinks.replaceAll('{n}', '$n');
+
+  /// Spoken name of a month cell marker: "3 due" or "2 overdue".
+  String markerText(int count, {required bool overdue}) => '$count ${overdue ? overdueMarker : dueMarker}';
+
+  String priorityText(TaskPriority p) => switch (p) {
+        TaskPriority.low => priorityLow,
+        TaskPriority.normal => priorityNormal,
+        TaskPriority.high => priorityHigh,
+      };
 
   String statusText(TaskStatus s) => switch (s) {
         TaskStatus.open => statusOpen,
@@ -124,6 +193,7 @@ class TaskLabels {
         kRemindNone => remindNone,
         kRemindMorningOf => remindMorningOf,
         1 => remind1,
+        kRemindUseDefault => remindDefault,
         15 => remind15,
         60 => remind60,
         1440 => remind1440,

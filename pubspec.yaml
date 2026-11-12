@@ -17,6 +17,12 @@ workspace:
   - packages/bond_sync_powersync
   - packages/bond_tasks
   - packages/bond_tasks_ui
+  - packages/bond_notify
+  - packages/bond_notify_ui
+  - packages/bond_push
+  - packages/bond_tasks_notifications
+  - packages/bond_tasks_powersync
+  - packages/bond_notify_powersync
   - packages/bond_connections
   - packages/bond_connections_ui
   - packages/bond_signin

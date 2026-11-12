@@ -22,6 +22,7 @@ from bond_jobs.engine import (
     worker_id,
 )
 from bond_jobs.loop import Loop, main, start_inline
+from bond_jobs.maintenance import cancel, prune
 from bond_jobs.models import JobsMixin, TenantJobsMixin
 
 __version__ = "0.1.0"
@@ -40,10 +41,12 @@ __all__ = [
     "SystemClock",
     "TenantJobsMixin",
     "backoff",
+    "cancel",
     "claim_next",
     "enqueue",
     "finish",
     "main",
+    "prune",
     "reclaim_stale",
     "run_due",
     "run_job",

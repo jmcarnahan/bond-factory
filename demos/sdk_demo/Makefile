@@ -1,10 +1,11 @@
 FLUTTER ?= flutter
 T ?=
+TEST_TZ ?= America/Los_Angeles
 SDK_EXAMPLE_URL ?= http://localhost:8012
 
 .PHONY: test analyze run-web build-web serve-web
 test:
-	$(FLUTTER) test $(T)
+	TZ=$(TEST_TZ) $(FLUTTER) test $(T)
 
 analyze:
 	$(FLUTTER) analyze

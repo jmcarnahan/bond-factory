@@ -1,4 +1,4 @@
-"""Sync: the upload route for the one synced table (notes), the sync token and the JWKS.
+"""Sync: the upload route for the synced tables (notes, tasks, notices, push_devices), the sync token and the JWKS.
 
     POST /sync/upload      a device's queued writes, one verdict per op (session required)
     POST /sync/token       an ES256 token the sync service accepts (503 sync_off when SDK_EXAMPLE_SYNC_URL is empty)
@@ -17,7 +17,6 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-import bond_tasks_py as tasks
 from bond_service_kit import ApiError
 from bond_sync_py import (
     Ctx,
@@ -32,19 +31,18 @@ from bond_sync_py import (
     is_configured,
     jwks,
     mint_sync_token,
-    rejected,
     server_now_iso,
     upload,
-    written_by,
 )
-from bond_tasks_py import sync_routes, verdict_for
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from .. import tasks_wiring
+from .. import sync_todo, tasks_wiring
 from ..auth_dep import current_user_id
+from ..models.notices import Notice
+from ..models.push import PushDevice
 from ..models.sync import Note
 from ..models.tasks import Task
 
@@ -93,60 +91,19 @@ def _notes(session, ctx: Ctx, op, data: dict) -> None:
     note.updated_at = _now()
 
 
-class _LazyScheduler:
-    """The tasks routes build their scheduler later than this module registers (routes load alphabetically), so look it
-    up on the app when a task write needs it."""
-
-    def __init__(self, app: FastAPI) -> None:
-        self.app = app
-
-    def enqueue(self, session, **kwargs) -> None:
-        self.app.state.tasks_scheduler.enqueue(session, **kwargs)
-
-    def cancel(self, session, **kwargs) -> None:
-        self.app.state.tasks_scheduler.cancel(session, **kwargs)
-
-
-def _reject_for(session, user, op, exc):
-    """Map the tasks lib's TaskError to the sync vocabulary (forbidden, not_found, conflict, invalid)."""
-    verdict = verdict_for(exc)
-    return rejected(op.seq, verdict[0], verdict[1]) if verdict else None
-
-
-def _already_written(session, user, op) -> bool:
-    model = Task if op.table == "tasks" else Note
-    return written_by(session, model, "owner_user_id", user, op.id)
-
-
 def build_host(app: FastAPI) -> Host:
-    """Two synced tables: ``notes`` (handled here) and ``tasks`` (routes shipped by bond_tasks_py)."""
+    """Four synced tables: ``notes`` (handled here), ``tasks``, ``notices`` and ``push_devices`` (routes shipped by
+    the libs, wired in ``sync_todo.py``)."""
+    tasks_wiring.install(app)  # the preferences, link hook and sender the TODO routes use (routes load alphabetically)
     routes = {("notes", None): Route(frozenset({"put", "patch", "delete"}), _notes, ("title", "body"))}
-    tz = app.state.settings.tz
-
-    def after_write(ctx, session, task) -> None:
-        """Queue the calendar mirror for after the response (the ops have committed by then), as the REST routes do."""
-        if task.mirror_status == "pending" and ctx.background is not None:
-            ctx.background.add_task(tasks.sync_mirror, app.state.session_factory, Task, task.id,
-                                    app.state.mirror_providers, tz=tz)
-
-    def after_delete(ctx, session, pointer) -> None:
-        if pointer is not None and ctx.background is not None:
-            ctx.background.add_task(tasks.remove_event, app.state.session_factory, app.state.mirror_providers, pointer)
-
-    def user_exists(user_id: str) -> bool:
-        """The assignee must be an active user. A short read on its own session: the routes get no session to hand over."""
-        with app.state.session_factory() as session:
-            return tasks_wiring.user_exists(session)(user_id)
-
-    task_routes = sync_routes(Task, scheduler=_LazyScheduler(app), tz=tz, user_exists=user_exists,
-                              after_write=after_write, after_delete=after_delete)
-    routes.update({key: Route(r.ops, r.handler, r.reads) for key, r in task_routes.items()})
+    routes.update({key: Route(r.ops, r.handler, r.reads) for key, r in sync_todo.todo_routes(app).items()})
     return Host(
         routes=routes,
-        tables={"notes": Note.__table__, "tasks": Task.__table__},
-        single_action=frozenset({"notes", "tasks"}),
-        reject_for=_reject_for,
-        already_written=_already_written,
+        tables={"notes": Note.__table__, "tasks": Task.__table__, "notices": Notice.__table__,
+                "push_devices": PushDevice.__table__},
+        single_action=frozenset({"notes", "tasks", "notices", "push_devices"}),
+        reject_for=sync_todo.reject_for,
+        already_written=sync_todo.already_written,
     )
 
 

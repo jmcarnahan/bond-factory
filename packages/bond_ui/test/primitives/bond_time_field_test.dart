@@ -44,6 +44,40 @@ void main() {
     sem.dispose();
   });
 
+  testWidgets('an invalid box shows its message as a node <id>-error', (t) async {
+    final sem = t.ensureSemantics();
+    await pumpBond(t, field(got: []));
+    expect(find.bySemanticsIdentifier('start-hour-error'), findsNothing);
+    await t.enterText(find.byType(TextField).at(0), '99');
+    await t.pump();
+    expect(find.bySemanticsIdentifier('start-hour-error'), findsOneWidget);
+    expect(find.text('Enter a time like 11:45'), findsOneWidget);
+    await t.enterText(find.byType(TextField).at(0), '10');
+    await t.pump();
+    expect(find.bySemanticsIdentifier('start-hour-error'), findsNothing);
+    sem.dispose();
+  });
+
+  testWidgets('focusing a box selects its text so typing replaces it', (t) async {
+    final got = <BondTime>[];
+    final valid = <bool>[];
+    await pumpBond(t, field(got: got, valid: valid));
+    final hour = find.byType(TextField).at(0);
+    await t.tap(hour);
+    await t.pump();
+    await t.pump();
+    final c = t.widget<TextField>(hour).controller!;
+    expect(c.selection.baseOffset, 0);
+    expect(c.selection.extentOffset, c.text.length);
+    await t.enterText(hour, '12');
+    await t.pump();
+    expect(got.last, const BondTime(hour24: 0, minute: 5));
+    expect(valid, isEmpty);
+    await t.enterText(hour, '91');
+    await t.pump();
+    expect(valid.last, isFalse);
+  });
+
   testWidgets('typing a valid hour and minute reports the time', (t) async {
     final got = <BondTime>[];
     await pumpBond(t, field(got: got));

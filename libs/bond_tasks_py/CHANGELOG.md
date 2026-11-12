@@ -1,5 +1,120 @@
 # Changelog
 
+## 0.2.0 - unreleased
+Added
+- `service.create` / `update`: with `prefs` given and no zone sent and no `writer_zone`, a timed task uses the actor's
+  stored zone (`prefs.for_user(session, actor).time_zone`); an empty zone falls through to `tz`.
+  The lookup is lazy: a write that does not compute `due_at` (a title-only update, a task with no date) never
+  reads `prefs`.
+- `sync_routes(on_deleted=)`: `on_deleted(ctx, session, task_id, owner_user_id)` runs after every real delete
+  (mirrored or not), so a host can put away the task's notices. `after_delete` is unchanged.
+
+Added
+- `update_settings(..., on_recomputed=None)` and `recompute_day_due(..., on_recomputed=None)`:
+  `on_recomputed(task, old_due_at)` runs once per task whose `due_at` really changed, after the flush (the host calls
+  `dismiss_stale`). `notice_recipients(task) -> set[str]`: owner and assignee, for putting away the notices of users
+  who left after a reassign.
+- `apply_notice_action` "done" or "cancel" on a task that is not open is a no-op returning the task.
+- A `due_at` that does not parse is dropped by `TaskCreate` / `TaskUpdate` (it is only a hint), never a 422.
+
+Changed (breaking)
+- `now` is required (keyword): `task_item(task, *, today, now, names=None)`, `task_items(tasks, *, today, now,
+  names=None)`, `list_tasks(..., viewer_zone=None, now)`, `summary(session, *, task_model, user_id, now,
+  viewer_zone)` (`today` and the date-only counts are gone). The legacy date-based overdue path is removed.
+- `sync_routes` raises `TaskError("invalid_priority")` (422) for a priority outside 1 to 3 on put or patch
+  (before, a bare validation error).
+
+Removed
+- The queued single reminder: `reminders.py`, `compute_remind_at`, `schedule_reminder`, `cancel_reminder`,
+  `fire_reminder`, `dedupe_key`, `JOB_TYPE`, the `Scheduler` protocol and `sync_routes(scheduler=)`. The three-stage
+  sweep replaces it.
+- The columns and wire keys `remind_at` and `reminded_at` (`TASK_COLUMNS`, `ITEM_KEYS`). `TaskItem` has 24 keys.
+- Changed: the default `remind_minutes_before` of a new task is -3 (use my default), in the column and in
+  `TaskCreate`; an explicit value is kept.
+
+Due instant
+- Tasks gain `priority` (1 low, 2 normal, 3 high; null clears) and `due_at` (naive UTC, minute precision, null only
+  when `due_date` is null); index `ix_tasks_status_due_at`; `TASK_COLUMNS` updated. `TaskCreate` / `TaskUpdate`
+  accept `priority`, `due_at` (a hint) and `time_zone` (write-only, never stored on the task).
+- `compute_due_at`: a timed task uses the writer's zone (sent, else stored, else app default); a date-only task
+  uses the responsible user's end of day and zone. A client `due_at` is honoured only for a timed task, only as a
+  whole-quarter-hour offset within -12:00 to +14:00; `compute_due_at` gained `sent_zone`, and a hint is checked
+  only against a zone sent with the same write (the stored zone never rejects it); else ignored, never refused.
+  `update` recomputes only when the date, time or assignee differs from the stored value (a reassignment moves a
+  date-only task only); clearing `due_date` clears `due_at`. Nonexistent local times move forward, ambiguous take
+  the first occurrence.
+- One overdue definition, `is_overdue(task, now, viewer_today=None)`: open and `due_at < now`; a dated task with no
+  `due_at` yet falls back to its date before `viewer_today`. `task_item` / `task_items` take `now=`; without it the
+  old date rule applies. `TaskItem` has 26 keys (adds `priority`, `due_at`).
+- Zone helpers: `end_of_day_due`, `local_day_bounds`, `next_local_time`, `valid_zone` (checks the zone list),
+  `recompute_day_due`, `backfill_due_at`.
+- New error codes `invalid_time_zone`, `invalid_priority`, `invalid_work_day`, `invalid_action`.
+
+Permissions and app columns
+- Seams `Permissions` and `DefaultPermissions` (owner or assignee edits; owner deletes, cancels, reassigns; a
+  missing user id can do nothing). `update`, `complete`, `reopen`, `cancel`, `delete` and
+  `set_checklist_item` accept `permissions`. `apply_notice_action` (done, snooze, cancel; else `invalid_action`).
+- `apply_extras` and `host_columns`: app columns pass through create, update and sync by an allow-list; an unknown
+  allow-listed column is a `ValueError`. Input models still refuse unknown fields.
+- `AfterWrite` `(session, task)` runs after the flush in `create` and `update`. `create` takes no `permissions`.
+
+Today and summary
+- `today(...)` returns `TodayResult`: overdue, today, undated, done today, with counts. `list_tasks` takes
+  `viewer_zone` (instant ordering, date ranges as local days), `link_index_model` and `now`. `summary` takes `now`
+  and `viewer_zone` and uses the same overdue test; `viewer_today` is exported. TODAY (`queries.due_today_sql`,
+  used by `today`, `summary` and list ranges) is every open task that is not overdue and whose day is the viewer's
+  today or earlier.
+
+Links
+- `TaskLinkIndexMixin` and `TASK_LINK_INDEX_COLUMNS`; `reindex_links`, `make_link_hook`; the link filter becomes an
+  indexed lookup with SQL paging when `link_index_model` is passed. `LinkResolver`, `LINK_KIND_CONTACT`.
+  `retarget_links` (merge) and `remove_links` (delete). `normalize_links` drops repeated (kind, id) pairs.
+
+Settings
+- `TaskUserSettingsMixin`, `TASK_USER_SETTINGS_COLUMNS`, `UserPrefs`, `Preferences`, `StoredPreferences`,
+  `get_settings`, `update_settings` (recomputes date-only `due_at` when `end_of_day` or `time_zone` changes; warning
+  `lead_longer_than_work_day`, and `time_zone_unknown` when the work day changed and no zone is stored), `SettingsUpdate`, `settings_item`. Quiet hours are derived, never stored.
+
+Stages, sweep, outbox, retention
+- `remind_minutes_before` accepts `-3` ("use my default"); range -3 to 525600. `USE_DEFAULT_REMINDER = -3`. The
+  model column and `TaskCreate` default is still `-2`. `compute_remind_at` returns None below -1, so the old
+  queued reminder queues nothing for `-3`. The lead is capped at `MAX_LEAD_MINUTES = 10080` when used.
+- `stage_times`, `current_stage`, `StageTime` (with `send_at`), `notice_id`, `fnv1a31`, `deadline_token`,
+  `effective_zone`; stages close, due (15 minutes), past (one, then each morning, `max_past=5`).
+- Quiet hours (`in_quiet_hours`, `next_work_start`, `sendable`): the due stage and the close stage of a timed task
+  always send; past stages and the close stage of a date-only task wait for the work day.
+- `NoticeLedgerMixin`, `NoticeOutboxMixin` and their `*_COLUMNS`; `sweep_due` (set-based claim, one savepoint,
+  row-by-row retry with ledger status "error", `since` records older stages as "skipped", repairs missing
+  `due_at`; an idle sweep issues no INSERT; `Recipients` is asked only for the current stage; a row whose notifier
+  fails alone is not recorded, the next sweep retries it, `SweepResult.errors` counts it), `SweepResult`, `default_recipients`, `default_compose`, `dialect_insert` (PostgreSQL and SQLite).
+  `TransactionalNotifier`, `Notifier` ("ok", "retryable", "unregistered", "failed"), `Recipients`, `Compose`,
+  `Notice`, `STAGES`, `NOTICE_ACTIONS`, `NOTICE_CATEGORY`.
+- `deliver_pending(..., commit=, task_model)` (required keyword; `None` skips the check): exact `limit`, lease committed before any send, then send, stamp
+  and commit per row; at-least-once; `now` may be aware. With `task_model`, a row whose task is gone, closed or
+  postponed is stamped failed "superseded" (`DeliverResult.superseded`). `DeliverResult.unrouted` counts pending rows
+  of a channel with no notifier; they fail after 7 days.
+- The sweep checks the ledger before composing; outbox inserts are chunked under 900 bind parameters; the claim
+  needs SQLite 3.35 or later (`RETURNING`).
+- `prune_ledger` (old-deadline candidates read in pages) deletes finished-task rows, close and due rows after 8 days, superseded past rows after 2 days, and
+  rows of an old deadline after 8 days.
+- `stage_times` omits an impossible "past 0"; `past_days` is a window by start time; past numbers are decided by
+  instants; `in_quiet_hours` compares at minute precision.
+- `ensure_savepoint_safe(session)` (exported) is called first by `sweep_due` and `deliver_pending`; it raises
+  `RuntimeError` on a SQLite engine not prepared with `sqlite_savepoint_setup`.
+- `list_tasks` and `today` show only the viewer's own tasks (owner or assignee) unless `TaskFilters.scope="all"`,
+  which the app must gate.
+- `sqlite_savepoint_setup(engine)` (isolation_level None plus explicit BEGIN) for SQLite; exported with
+  `settings_item`, `effective_zone`, `sendable`, `default_recipients`, `viewer_today` and `MAX_LEAD_MINUTES`.
+
+Sync
+- `sync_routes` accepts `source` on put, ignores a patch that carries only a `due_at` hint, takes `link_index_model` (with
+  `service.delete`, the task's link-index rows go with the task) and gains `zone_of`, `prefs`, `permissions`, `host_columns`, `link_hook`, adds the `cancel` route, and
+  treats a malformed device `due_at` as absent. `scheduler` is optional.
+
+Tests and fixtures
+- Shared fixtures `fixtures/tasks/stage_times.json`, `notice_ids.json`. Dev extra gains `psycopg[binary]`; pytest
+  marker `postgres` (set `BOND_TEST_POSTGRES_URL`).
+
 ## 0.1.0 - unreleased
 - `TasksMixin` (table `tasks`), `TaskStatus`, `MirrorStatus`, `TASK_COLUMNS`.
 - Service: `create`, `update`, `complete`, `reopen`, `cancel`, `delete`, `get`, `set_checklist_item`, `list_tasks`,

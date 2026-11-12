@@ -146,7 +146,7 @@ void main() {
     final body = r.only('POST', '/tasks').json as Map;
     expect(body['title'], 'From form');
     expect(body['mirror_enabled'], isTrue);
-    expect(body['remind_minutes_before'], kRemindNone);
+    expect(body['remind_minutes_before'], kRemindUseDefault);
   });
 
   testWidgets('complete posts to the complete route', (t) async {
@@ -218,7 +218,7 @@ void main() {
     await t.pump(const Duration(seconds: 11));
   });
 
-  testWidgets('run due jobs ticks at the latest due time plus two minutes and lists the notice', (t) async {
+  testWidgets('run due jobs ticks at the latest due time plus two minutes', (t) async {
     final r = TasksRig([
       [
         task('a', 'Early', date: '2026-03-12', time: '09:30'),
@@ -228,21 +228,15 @@ void main() {
       ],
     ]);
     r.canned.responses.json('POST', '/jobs/tick', {
-      'ran': [
-        {'id': 'job-1', 'job_type': 'task_reminder', 'status': 'done'},
-      ],
-    });
-    r.canned.responses.json('GET', '/tasks/notices', {
-      'items': [
-        {'task_id': 'b', 'title': 'Late'},
-      ],
+      'ran': <Object?>[],
+      'sweep': {'claimed': 1, 'skipped': 0, 'queued': 0, 'repaired': 0, 'errors': 0},
+      'deliver': {'leased': 0, 'sent': 0, 'retryable': 0, 'unregistered': 0, 'failed': 0, 'superseded': 0, 'unrouted': 0},
     });
     await pumpPage(t, r);
     await t.ensureVisible(byId('sdk.tasks.run-due-jobs'));
     await t.tap(byId('sdk.tasks.run-due-jobs'));
     await settle(t);
     expect((r.only('POST', '/jobs/tick').json as Map)['now'], '2026-03-14T16:02:00.000Z');
-    expect(textOf(t, 'sdk.tasks.notice-0'), 'Late (b)');
   });
 
   testWidgets('the mirror result shows provider and external id', (t) async {
@@ -401,11 +395,6 @@ void main() {
       [task('a', 'Mirrored', date: '2026-03-12', provider: 'google', eventId: 'evt-77')],
     ]);
     r.canned.responses.json('POST', '/jobs/tick', {'ran': []});
-    r.canned.responses.json('GET', '/tasks/notices', {
-      'items': [
-        {'task_id': 'a', 'title': 'Mirrored'},
-      ],
-    });
     await pumpPage(t, r);
     String label(String id) => t.getSemantics(byId(id).first).label;
     expect(label('sdk.tasks.row-a'), 'Mirrored');
@@ -413,9 +402,7 @@ void main() {
     await t.ensureVisible(byId('sdk.tasks.run-due-jobs'));
     await t.tap(byId('sdk.tasks.run-due-jobs'));
     await settle(t);
-    expect(label('sdk.tasks.notice-0'), 'Mirrored (a)');
     expect(label('sdk.tasks.info'), 'Ran the due jobs as of 2026-03-13T00:01:00.000Z');
-    expect(label('sdk.tasks.notices'), isNotEmpty);
     handle.dispose();
   });
 
