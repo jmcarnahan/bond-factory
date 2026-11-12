@@ -20,8 +20,10 @@ commit and ship through the App Store, where GPL-3.0 is widely held to conflict 
 - **M4** Every Python project declares its licence in `pyproject.toml`. No per-file headers.
 - **M5** A script checks the licences of resolved Dart and Python dependencies of the MIT modules against an
   allowlist and fails on GPL or unknown. CI runs it.
-- **M6** This decision is the repository's licence position. Any other branch that changes licence files
-  conforms to it when merged.
+- **M6** This decision is the repository's licence position. It supersedes point L3 of
+  `2026-11-11-roof-dart-packages-mit.md` ("everything else is GPL"): everything else is MIT, the shared
+  `fixtures/` included. The rest of that record stands (the two roof Dart packages are MIT with their own
+  LICENSE files; `roof_measure` is importable as a library and stays GPL).
 
 ## Consequences
 

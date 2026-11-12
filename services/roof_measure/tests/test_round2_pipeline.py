@@ -257,3 +257,33 @@ def test_bad_data_while_listing_projects_is_permanent_not_an_outage(monkeypatch)
     with pytest.raises(LidarError) as e2:  # every project failed on bad data, not on the network
         lidar.fetch_best_points(34.0, -118.0, 30, 32611, footprint_m=None)
     assert not isinstance(e2.value, LidarUnavailable)
+
+
+def test_render_false_skips_the_picture_without_a_warning(tmp_path):
+    res = pipeline.run_pipeline("x", tmp_path / "off", "lidar_skeleton", blocks_path=BLOCKS, render=False)
+    assert "png" not in res.paths and not list((tmp_path / "off").glob("*.png"))
+    assert "png" not in res.model["debug"]
+    assert not any("debug picture" in w for w in res.envelope["warnings"])
+
+
+def test_render_true_writes_the_picture(tmp_path):
+    res = pipeline.run_pipeline("x", tmp_path / "on", "lidar_skeleton", blocks_path=BLOCKS)
+    assert res.paths["png"].is_file() and res.model["debug"]["png"] == res.paths["png"].name
+    assert json.loads(res.paths["model"].read_text())["debug"]["png"] == res.paths["png"].name  # written after render
+
+
+def test_a_missing_matplotlib_skips_the_picture_without_a_warning(tmp_path, monkeypatch):
+    import sys
+
+    import roof_measure
+
+    for name in ("matplotlib", "matplotlib.figure", "matplotlib.lines", "matplotlib.patches",
+                 "matplotlib.backends", "matplotlib.backends.backend_agg"):
+        monkeypatch.setitem(sys.modules, name, None)
+    monkeypatch.delitem(sys.modules, "roof_measure.render", raising=False)
+    monkeypatch.delattr(roof_measure, "render", raising=False)
+    res = pipeline.run_pipeline("x", tmp_path, "lidar_skeleton", blocks_path=BLOCKS)
+    assert "png" not in res.paths and not list(tmp_path.glob("*.png"))
+    assert not any("debug picture" in w for w in res.envelope["warnings"])
+    written = json.loads(next(tmp_path.glob("*_model.json")).read_text())
+    assert "png" not in written["debug"] and "png" not in res.model["debug"]

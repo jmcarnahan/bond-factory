@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 
+from . import config
 from .deadline import Deadline
 from .footprint_county import (  # noqa: F401  (re-exported: tests and callers import these from here)
     BUILDING_URL,
@@ -55,7 +56,8 @@ def _with_notes(fp: Footprint | None, notes: list[tuple[str, str]]) -> Footprint
 def fetch_footprint(lat: float, lng: float, address: Address, *, deadline: Deadline | None = None,
                     use_solar: bool = True, use_hull: bool = True) -> Footprint:
     """First building found by the chain; ``FootprintError`` (or ``AmbiguousBuilding``) when none has one."""
-    stage = Deadline.after(min(FOOTPRINT_STAGE_S, deadline.remaining())) if deadline else Deadline.after(FOOTPRINT_STAGE_S)
+    cap = config.footprint_stage_s() or FOOTPRINT_STAGE_S
+    stage = Deadline.after(min(cap, deadline.remaining())) if deadline else Deadline.after(cap)
     fp, notes, unreachable = fetch_county(lat, lng, address)  # unreachable: first link that could not be reached
     if fp is not None:
         return fp
@@ -64,7 +66,7 @@ def fetch_footprint(lat: float, lng: float, address: Address, *, deadline: Deadl
     def down(text: str, what: str) -> None:
         nonlocal unreachable, notes
         unreachable = unreachable or text
-        notes = [*notes, ("other", f"{what} could not be reached; footprint taken from another source.")]
+        notes = [*notes, ("source_unreachable", f"{what} could not be reached; footprint taken from another source.")]
 
     try:
         fp = _with_notes(fetch_osm(lat, lng, address, stage), notes)

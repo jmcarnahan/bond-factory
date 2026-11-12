@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg \
     PATH=/app/.venv/bin:$PATH \
     DATA_DIR=/data ROOF_MEASURE_CACHE=/data/cache ROOF_MEASURE_FIXTURES=/app/fixtures
 
-# libgomp1: OpenMP runtime some scientific wheels (CGAL via compas_cgal) link against.
+# libgomp1: kept as a precaution; the compas_cgal 0.10.0 wheel links no OpenMP (checked 2026-11-11).
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir uv==0.13.7
@@ -16,11 +16,11 @@ WORKDIR /app
 # dependencies first (cached until the lock or a pyproject changes)
 COPY pyproject.toml uv.lock ./
 COPY services/roof_measure/pyproject.toml services/roof_measure/pyproject.toml
-RUN uv sync --frozen --package roof-measure --no-dev --no-install-project
+RUN uv sync --frozen --package roof-measure --no-dev --no-install-project --extra service --extra render
 
 COPY services/roof_measure/ services/roof_measure/
 COPY fixtures/ fixtures/
-RUN uv sync --frozen --package roof-measure --no-dev --no-editable
+RUN uv sync --frozen --package roof-measure --no-dev --no-editable --extra service --extra render
 
 RUN useradd --create-home --uid 10001 app && mkdir -p /data/cache && chown -R app:app /data
 USER app

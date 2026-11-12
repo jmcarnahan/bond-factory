@@ -23,6 +23,7 @@ import anthropic
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
+from . import config
 from .classify import BlockSet, RoofBlock, complete_tiling, polygons_of, ridge_azimuth, ring_of
 from .deadline import Deadline
 from .skeleton import block_geometry, hip_roof_edges, measure, rect_fit, signed_area, split_footprint
@@ -353,7 +354,8 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
         seg_polys = {b.id: b.poly for b in blockset.blocks}
     ws = Workspace(blockset.footprint_ft, rows, seg_polys)
     if client is None:
-        client = anthropic.Anthropic(timeout=30.0, max_retries=0) if deadline else anthropic.Anthropic()
+        client = (anthropic.Anthropic(api_key=config.anthropic_key(), timeout=30.0, max_retries=0) if deadline
+                  else anthropic.Anthropic(api_key=config.anthropic_key()))
 
     fp_poly = blockset.footprint
     m = measure(blockset.footprint_ft)

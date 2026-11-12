@@ -7,10 +7,10 @@ any problem gives verdict ``unverified`` with the deterministic result kept.
 from __future__ import annotations
 
 import copy
-import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import config
 from .deadline import Deadline
 from .envelope import totals_from_model
 from .verify_llm import MODEL, run_loop
@@ -50,9 +50,10 @@ def verify(model: dict[str, Any], *, client: Any = None, api_key: str | None = N
     rounds, usage = 0, {"input_tokens": 0, "output_tokens": 0}
     transcript: list[dict[str, Any]] = []
     verdict, reason = "unverified", None
-    if client is None and (api_key or os.environ.get("ANTHROPIC_API_KEY")):
+    key = api_key or config.anthropic_key()
+    if client is None and key:
         import anthropic
-        client = anthropic.Anthropic(max_retries=0, **({"api_key": api_key} if api_key else {}))  # the deadline owns retries
+        client = anthropic.Anthropic(max_retries=0, api_key=key)  # the deadline owns retries
     if client is None:
         reason = "no ANTHROPIC_API_KEY: only the deterministic merge ran"
     elif budget.remaining() <= MIN_LLM_SECONDS:

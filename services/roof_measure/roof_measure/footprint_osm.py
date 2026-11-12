@@ -17,7 +17,7 @@ from typing import Any
 from shapely.geometry import Point, Polygon
 from shapely.geometry.polygon import orient
 
-from . import cache
+from . import cache, config
 from .deadline import Deadline
 from .footprint_types import Footprint, FootprintUnavailable, address_tokens, area_sqft
 from .frame import FT_PER_M
@@ -47,6 +47,8 @@ def overpass_query(lat: float, lng: float) -> str:
 
 def mirror_urls(env: dict[str, str] | None = None) -> tuple[str, ...]:
     """``ROOF_MEASURE_OVERPASS_URLS`` (comma separated) or the official instances."""
+    if env is None and config.current() is not None:  # a Runtime is authoritative: no fallback to the environment
+        return config.overpass_urls() or DEFAULT_OVERPASS_URLS
     raw = (os.environ if env is None else env).get("ROOF_MEASURE_OVERPASS_URLS", "")
     urls = tuple(u.strip() for u in raw.split(",") if u.strip())
     return urls or DEFAULT_OVERPASS_URLS

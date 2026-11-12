@@ -67,3 +67,8 @@ make gates              # no-popups gate
 ```
 
 `demos/roof_demo` is the reference consumer.
+
+## License
+
+MIT, see `LICENSE` in this directory (Copyright (c) 2026 John Carnahan). The rest of the bond-factory
+repository is MIT as well, except `services/roof_measure` (GPL-3.0-or-later), which this package does not depend on. Third-party notices: the Roboto font in `assets/fonts/` is Apache-2.0 (`Roboto_LICENSE.txt`). It depends on `bond_roof`, which is MIT as well.

@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from . import config
 from .classify import BlockSet
+from .config import SOLAR_KEY_ENV  # noqa: F401  (re-exported: tests and pipeline import it from here)
 from .deadline import Deadline
-
-SOLAR_KEY_ENV = ("GOOGLE_SOLAR_API_KEY",)  # only this key enables billable Solar calls
 
 
 class PipelineError(RuntimeError):
@@ -104,8 +103,9 @@ def _stage_blocks(address: str, out_dir: Path, tag: str, lat_lng: tuple[float, f
 
 
 def _solar_key() -> str:
-    for name in SOLAR_KEY_ENV:
-        if os.environ.get(name):
-            return os.environ[name]
-    raise PipelineError("The live Solar API needs a key in GOOGLE_SOLAR_API_KEY (and the API enabled on the "
-                        "project). Use --solar-fixture for the synthetic fixture.")
+    key = config.solar_key()
+    if key:
+        return key
+    raise PipelineError("The live Solar API needs a Google Solar key (the google_solar_api_key argument or "
+                        "GOOGLE_SOLAR_API_KEY) and the API enabled on the project. Use --solar-fixture for the "
+                        "synthetic fixture.")

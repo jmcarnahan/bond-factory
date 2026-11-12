@@ -23,6 +23,7 @@ from typing import Any
 
 import requests
 
+from . import config
 from .deadline import Deadline
 
 log = logging.getLogger(__name__)
@@ -48,8 +49,12 @@ stats = Stats()
 
 def cache_dir() -> Path:
     """Cache root: $ROOF_MEASURE_CACHE or `services/roof_measure/cache/` (gitignored)."""
-    env = os.environ.get("ROOF_MEASURE_CACHE")
-    d = Path(env) if env else Path(__file__).resolve().parents[1] / "cache"
+    root = config.cache_root()
+    if root:
+        d = root
+    else:
+        env = os.environ.get("ROOF_MEASURE_CACHE")
+        d = Path(env) if env else Path(__file__).resolve().parents[1] / "cache"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -112,6 +117,16 @@ def purge_old(days: float = 30.0, now: float | None = None) -> int:
 def force_refresh(flag: bool = True) -> None:
     """For the current thread/context only: skip reading cached bodies (fresh ones are still written)."""
     _FORCE.set(flag)
+
+
+@contextlib.contextmanager
+def force_scope(flag: bool) -> Iterator[None]:
+    """Set the force flag for this block and restore the caller's value afterwards (never clobber it)."""
+    token = _FORCE.set(flag)
+    try:
+        yield
+    finally:
+        _FORCE.reset(token)
 
 
 class BadResponse(ValueError):

@@ -189,7 +189,8 @@ the repo root. Written from the 2026-11-11 roof-module-v1 walk.
   `getByRole('checkbox', {name: 'roof_measurement_0.2_pass', exact: true})` (fixture chips are ChoiceChips and
   expose role checkbox; a "(service)" variant appears only for a service fixture that is not bundled),
   `getByRole('textbox')` (the address field), `getByText(...)` for inline status, totals rows and
-  warnings. Method segments are `getByRole('button', {name: /lidar_skeleton|lidar_agent|solar_agent|auto/})`.
+  warnings. Method segments are `getByRole('button', {name: 'LiDAR', exact: true})` etc. (labels Auto, LiDAR, LiDAR + agent,
+  Solar + agent); `EN`/`ES` need `exact: true` because "EN" also matches the agent labels.
 - Viewports: 1280x800 and 390x844. Below 600 px the report strip switches to the compact layout (800x1000 design
   size, two-column legend); above it the wide layout. Nothing may overflow at 390.
 - Print and Save/Share PDF: Print calls `Printing.layoutPdf` (the browser print dialog is allowed by the no-popups
@@ -203,7 +204,9 @@ the repo root. Written from the 2026-11-11 roof-module-v1 walk.
 
 ## Walk steps
 
-1. **Load.** Title "Roof measurement demo"; address field, method segments, Measure, EN/ES, "Load fixture" chips.
+1. **Load.** Heading "Roof measurement demo" (the browser tab title is "Roof demo"); address field, method segments
+   labelled Auto / LiDAR / LiDAR + agent / Solar + agent (values auto, lidar_skeleton, lidar_agent, solar_agent),
+   Measure, EN/ES, "Load fixture" chips.
 2. **Pass envelope.** Click the `roof_measurement_0.2_pass` chip: diagram visible, totals table with the paired
    variant rows (drip edge eave / eave+rake; ridge cap ridge / ridge+hip), the verdict line, the generated-at line.
 3. **Spanish.** Click `ES`: every label changes (e.g. "Aleros"), no overflow, chips still work. Click `EN` back.

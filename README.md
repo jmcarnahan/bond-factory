@@ -26,7 +26,7 @@ Requires Flutter 3.41 (Dart 3.11), Python 3.12 and [uv](https://docs.astral.sh/u
 Root make targets use `flutter` from your PATH; override with `make FLUTTER=/path/to/flutter ...`.
 
 ```
-make setup-service  # create the service virtualenv
+make setup-service  # create the service virtualenv (Python library use: docs/contract-0.2.md section 3)
 make test           # test-dart + test-flutter + test-service
 make analyze        # dart analyze / flutter analyze
 make gates          # no-popups gate
@@ -48,7 +48,7 @@ Apps consume these modules as described in `docs/sdk/README.md`.
 |---|---|---|
 | `packages/bond_roof` | pure Dart: roof model JSON, totals, diagram scenes, SVG and PDF export | 0.2.0 |
 | `packages/bond_roof_ui` | Flutter: widgets that draw a scene, print and share | 0.2.0 |
-| `services/roof_measure` | Python: address -> footprint + LiDAR (+ Solar) -> roof model JSON | 0.2.0 |
+| `services/roof_measure` | Python: address -> footprint + LiDAR (+ Solar) -> roof model JSON; also importable as a library | 0.2.0 |
 | `demos/roof_demo` | Flutter: type an address, see the three diagrams, print | POC |
 
 ## House rules

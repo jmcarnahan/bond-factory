@@ -6,19 +6,25 @@ Decision record: docs/decisions/2026-11-11-licence-mit.md.
 
 Exception: services/roof_measure is licensed under the GNU General Public
 License, version 3 or (at your option) any later version (GPL-3.0-or-later).
-Its own LICENSE file holds the full text. The reason: that service links
+Its own LICENSE file holds the full text. The reason: the roof pipeline links
 compas_cgal, which wraps the CGAL Straight_skeleton_2 package, and that CGAL
 component is GPL per the CGAL documentation. compas_cgal itself declares LGPL-3
-in its package metadata. An app that imports services/roof_measure as a library
-takes on GPL for that backend. Nothing else in this repository imports it.
+in its package metadata.
 
-The roof service is deployed as a hosted service. It is not distributed to
-end users as a binary or a package.
+The roof pipeline (services/roof_measure) runs either as a hosted service or as a
+Python library imported in-process by an application's backend. An application
+that imports it combines GPL code into that backend; this matters only if that
+application is itself conveyed to third parties. Nothing else in this repository
+imports it.
+
+packages/bond_roof and packages/bond_roof_ui carry their own MIT LICENSE files,
+the same licence as the rest of the repository. They parse and draw the roof
+model JSON and contain no code from services/roof_measure, compas_cgal or CGAL.
 
 Third-party notices:
 
-- packages/bond_roof/lib/src/polylabel.dart is a port of the polylabel
-  algorithm and keeps its ISC licence notice.
+- packages/bond_roof/lib/src/polylabel.dart is a port of Mapbox polylabel and
+  keeps its ISC licence notice.
 - The Roboto font in packages/bond_roof_ui/assets/fonts/ carries its own
   Apache-2.0 licence, which ships next to the font files and is not changed by
   this notice.
