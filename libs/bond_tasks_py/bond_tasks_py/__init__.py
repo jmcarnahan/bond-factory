@@ -71,19 +71,10 @@ from bond_tasks_py.protocols import (
     MirrorProviders,
     Permissions,
     Preferences,
-    Scheduler,
     UserPrefs,
 )
 from bond_tasks_py.queries import TaskFilters, list_tasks, summary, viewer_today
 from bond_tasks_py.quiet import in_quiet_hours, next_work_start, sendable
-from bond_tasks_py.reminders import (
-    JOB_TYPE,
-    cancel_reminder,
-    compute_remind_at,
-    dedupe_key,
-    fire_reminder,
-    schedule_reminder,
-)
 from bond_tasks_py.retention import prune_ledger
 from bond_tasks_py.schema import ChecklistInput, LinkInput, TaskCreate, TaskUpdate
 from bond_tasks_py.serialize import ITEM_KEYS, task_item, task_items
@@ -108,7 +99,7 @@ from bond_tasks_py.stages import (
     notice_id,
     stage_times,
 )
-from bond_tasks_py.sweep import SweepResult, default_recipients, sweep_due
+from bond_tasks_py.sweep import SweepResult, default_recipients, notice_recipients, sweep_due
 from bond_tasks_py.sync_routes import TaskRoute, sync_routes, verdict_for
 from bond_tasks_py.today import TodayResult, today
 from bond_tasks_py.usersettings import (
@@ -119,24 +110,24 @@ from bond_tasks_py.usersettings import (
     update_settings,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
-    "CODES", "ITEM_KEYS", "JOB_TYPE", "LINK_KIND_CONTACT", "MAX_LEAD_MINUTES", "NOTICE_ACTIONS", "NOTICE_CATEGORY", "STAGES",
+    "CODES", "ITEM_KEYS", "LINK_KIND_CONTACT", "MAX_LEAD_MINUTES", "NOTICE_ACTIONS", "NOTICE_CATEGORY", "STAGES",
     "TASK_COLUMNS", "TASK_LINK_INDEX_COLUMNS", "TASK_NOTICE_LEDGER_COLUMNS", "TASK_NOTICE_OUTBOX_COLUMNS",
     "TASK_USER_SETTINGS_COLUMNS", "USE_DEFAULT_REMINDER", "AfterWrite", "CalendarMirror", "ChecklistInput",
     "Compose", "DefaultPermissions", "DeliverResult", "LinkInput", "LinkResolver", "MirrorDraft", "MirrorPointer",
     "MirrorProviders", "MirrorStatus", "MirroredEvent", "Notice", "NoticeLedgerMixin", "NoticeOutboxMixin",
-    "Notifier", "Permissions", "Preferences", "Recipients", "Scheduler", "SettingsUpdate", "StageTime",
+    "Notifier", "Permissions", "Preferences", "Recipients", "SettingsUpdate", "StageTime",
     "StoredPreferences", "SweepResult", "TaskCreate", "TaskError", "TaskFilters", "TaskLinkIndexMixin",
     "TaskRoute", "TaskStatus", "TaskUpdate", "TaskUserSettingsMixin", "TasksMixin", "TodayResult",
     "TransactionalNotifier", "UserPrefs", "apply_extras", "apply_notice_action", "backfill_due_at", "cancel",
-    "cancel_reminder", "classify", "complete", "compute_due_at", "compute_remind_at", "create", "current_stage",
-    "deadline_token", "dedupe_key", "default_compose", "default_recipients", "delete", "deliver_pending", "dialect_insert",
-    "effective_zone", "end_of_day_due", "ensure_savepoint_safe", "fire_reminder", "fnv1a31", "get", "get_settings", "in_quiet_hours", "is_overdue",
+    "classify", "complete", "compute_due_at", "create", "current_stage",
+    "deadline_token", "default_compose", "default_recipients", "delete", "deliver_pending", "dialect_insert",
+    "effective_zone", "end_of_day_due", "ensure_savepoint_safe", "fnv1a31", "get", "get_settings", "in_quiet_hours", "is_overdue",
     "list_tasks", "local_day_bounds", "make_link_hook", "mark_mirror", "mirror_eligible", "next_local_time",
-    "next_work_start", "notice_id", "prune_ledger", "recompute_day_due", "reindex_links", "remove_event",
-    "remove_links", "reopen", "retarget_links", "schedule_reminder", "sendable", "service", "set_checklist_item", "settings_item", "sqlite_savepoint_setup",
+    "next_work_start", "notice_id", "notice_recipients", "prune_ledger", "recompute_day_due", "reindex_links", "remove_event",
+    "remove_links", "reopen", "retarget_links", "sendable", "service", "set_checklist_item", "settings_item", "sqlite_savepoint_setup",
     "stage_times", "summary", "sweep_due", "sync_mirror", "sync_routes", "task_item", "task_items", "today",
     "update", "update_settings", "valid_zone", "verdict_for", "viewer_today",
 ]

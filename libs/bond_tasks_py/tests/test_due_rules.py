@@ -195,9 +195,10 @@ def test_rule7_the_end_of_day_on_a_change_day_uses_the_offset_in_force(session):
     assert spring.due_at == datetime(2026, 3, 8, 21, 0)  # 17:00 EDT
 
 
-def test_rule11_the_default_reminder_when_not_sent_is_unchanged_and_minus_three_is_stored(session):
-    assert make(session, due_date=DAY).remind_minutes_before == -2
-    assert make(session, due_date=DAY, remind_minutes_before=-3).remind_minutes_before == -3
+def test_rule11_the_default_reminder_for_a_new_task_is_minus_three_and_an_explicit_value_is_kept(session):
+    assert make(session, due_date=DAY).remind_minutes_before == -3
+    assert make(session, due_date=DAY, remind_minutes_before=-2).remind_minutes_before == -2
+    assert make(session, due_date=DAY, remind_minutes_before=30).remind_minutes_before == 30
 
 
 def test_rule_priority_is_stored_as_sent_and_null_clears_it(session):

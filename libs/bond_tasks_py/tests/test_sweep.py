@@ -239,3 +239,13 @@ def test_an_old_overdue_task_is_not_a_candidate_forever(sq_factory):
         add_task(session, due_time="09:30", due_at=datetime(2025, 1, 1, 16, 30))
         assert sweep(session, datetime(2026, 3, 12, 16, 30), transactional=[inbox]).claimed == 0
         assert inbox.written == []
+
+
+def test_notice_recipients_is_owner_and_assignee_without_blanks():
+    from types import SimpleNamespace
+
+    from bond_tasks_py import notice_recipients
+
+    assert notice_recipients(SimpleNamespace(owner_user_id="u1", assigned_user_id=None)) == {"u1"}
+    assert notice_recipients(SimpleNamespace(owner_user_id="u1", assigned_user_id="u2")) == {"u1", "u2"}
+    assert notice_recipients(SimpleNamespace(owner_user_id="u1", assigned_user_id="u1")) == {"u1"}

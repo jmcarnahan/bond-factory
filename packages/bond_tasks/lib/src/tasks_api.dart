@@ -82,21 +82,12 @@ class TasksApi {
 /// Routes that exist only in the fake-mode example server. Kept apart from
 /// [TasksApi] so an app cannot call them by accident.
 class DemoJobsApi {
-  DemoJobsApi(this.client, {this.tickPath = '/jobs/tick', this.noticesPath = '/tasks/notices'});
+  DemoJobsApi(this.client, {this.tickPath = '/jobs/tick'});
 
   final ApiClient client;
   final String tickPath;
-  final String noticesPath;
 
   /// Runs every job due as of [now] and returns the server's answer.
   Future<Map<String, Object?>> runDueJobs(DateTime now) =>
       client.postJson(tickPath, body: {'now': jiso(now)});
-
-  /// The reminders the fake notifier has delivered. Accepts a bare list or
-  /// `{items: [...]}`.
-  Future<List<Map<String, Object?>>> notices() async {
-    final v = await client.request('GET', noticesPath);
-    final raw = v is Map ? v['items'] : v;
-    return jlistOf(raw, jmapOf);
-  }
 }

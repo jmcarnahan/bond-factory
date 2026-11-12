@@ -47,20 +47,19 @@ class _Rig {
 Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
-  test('list, today and summary pass the device date and zone', () async {
+  test('with a zone, reads send the zone and no date', () async {
     final r = _Rig();
     await r.repo.list(const TaskFilters(scope: 'mine', status: 'open'));
     expect(r.last.url.queryParameters, {
       'scope': 'mine',
       'status': 'open',
-      'today': '2026-03-12',
       'time_zone': 'America/Los_Angeles',
     });
     await r.repo.today();
     expect(r.last.url.path, '/v1/tasks/today');
-    expect(r.last.url.queryParameters, {'today': '2026-03-12', 'time_zone': 'America/Los_Angeles'});
+    expect(r.last.url.queryParameters, {'time_zone': 'America/Los_Angeles'});
     await r.repo.summary();
-    expect(r.last.url.queryParameters, {'today': '2026-03-12', 'time_zone': 'America/Los_Angeles'});
+    expect(r.last.url.queryParameters, {'time_zone': 'America/Los_Angeles'});
   });
 
   test('a filter that names its own today or zone keeps it', () async {
@@ -69,11 +68,11 @@ void main() {
     expect(r.last.url.queryParameters, {'today': '2026-01-01', 'time_zone': 'UTC'});
   });
 
-  test('no timeZone callback sends no time_zone', () async {
+  test('no timeZone callback sends the device date and no time_zone', () async {
     final repo = RemoteTaskRepository(TasksApi(ApiClient(
       baseUrl: Uri.parse('https://api.test/v1'),
       http: MockClient((req) async {
-        expect(req.url.queryParameters.containsKey('time_zone'), isFalse);
+        expect(req.url.queryParameters.keys.toSet(), {'today'}, reason: 'no zone: the device date is sent');
         return _json({'open': 0});
       }),
     )));
@@ -88,7 +87,7 @@ void main() {
     expect(DateTime.parse(body['due_at']! as String), DateTime(2026, 3, 12, 9, 30).toUtc());
     expect((body['due_at']! as String).endsWith('Z'), isTrue);
     expect(body['time_zone'], 'America/Los_Angeles');
-    expect(post.url.queryParameters['today'], '2026-03-12');
+    expect(post.url.queryParameters.containsKey('today'), isFalse);
 
     final r2 = _Rig();
     await r2.repo.create(const TaskDraft(title: 'b', dueDate: '2026-03-12'));

@@ -94,6 +94,7 @@ class SettingsLabels {
     this.invalidTime = 'Use the form HH:MM, for example 08:00.',
     this.sameTimes = 'The start and the end must be different times.',
     this.invalidLead = 'Enter a whole number of minutes from 0 to 10080.',
+    this.zoneSearchHint = 'Search for a time zone',
     this.quietHoursTemplate = 'Reminders for dated tasks wait while you are off, from {end} to {start}.',
   });
 
@@ -106,6 +107,7 @@ class SettingsLabels {
   final String save;
   final String saved;
   final String saveFailed;
+  final String zoneSearchHint;
   final String invalidTime;
   final String sameTimes;
   final String invalidLead;

@@ -31,7 +31,7 @@ def test_create_returns_201_and_the_full_item(client, h):
                 checklist=[{"text": "one"}, {"text": "two"}], links=[{"kind": "contact", "id": "c1", "label": "C"}])
     assert list(item) == list(ITEM_KEYS)
     assert (item["owner_user_id"], item["owner_name"], item["status"]) == (DEMO_USER_ID, "Demo User", "open")
-    assert item["remind_at"] == "2026-11-09T09:15:00Z" and item["overdue"] is False
+    assert "remind_at" not in item and item["overdue"] is False
     assert [c["text"] for c in item["checklist"]] == ["one", "two"] and item["links"][0]["id"] == "c1"
 
 

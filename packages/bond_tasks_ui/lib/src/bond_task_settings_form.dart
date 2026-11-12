@@ -26,6 +26,7 @@ class BondTaskSettingsForm extends StatefulWidget {
     this.busy = false,
     this.labels = const SettingsLabels(),
     this.semanticsPrefix,
+    this.zoneOptions,
   });
 
   final TaskSettings settings;
@@ -33,6 +34,10 @@ class BondTaskSettingsForm extends StatefulWidget {
   final bool busy;
   final SettingsLabels labels;
   final String? semanticsPrefix;
+
+  /// IANA zone names to choose from. When given the zone is chosen inline
+  /// (search, then pick) and goes out in the patch; null keeps it read-only.
+  final List<String>? zoneOptions;
 
   @override
   State<BondTaskSettingsForm> createState() => _BondTaskSettingsFormState();
@@ -45,9 +50,11 @@ class _BondTaskSettingsFormState extends State<BondTaskSettingsForm> {
 
   /// True once the person typed; a reload of [BondTaskSettingsForm.settings] then keeps their text.
   bool _edited = false;
+  String? _zone;
   @override
   void initState() {
     super.initState();
+    _zone = widget.settings.timeZone;
     _start = TextEditingController(text: widget.settings.startOfDay);
     _end = TextEditingController(text: widget.settings.endOfDay);
     _lead = TextEditingController(text: '${widget.settings.leadMinutes}');
@@ -64,6 +71,7 @@ class _BondTaskSettingsFormState extends State<BondTaskSettingsForm> {
       _end.text = b.endOfDay;
       _lead.text = '${b.leadMinutes}';
     }
+    if (a.timeZone != b.timeZone && !_edited) _zone = b.timeZone;
   }
 
   void _typed() => setState(() => _edited = true);
@@ -88,7 +96,8 @@ class _BondTaskSettingsFormState extends State<BondTaskSettingsForm> {
     final e = _normal(_end.text);
     final lead = _leadValue;
     if (s == null || e == null || s == e || lead == null) return;
-    widget.onSubmit(TaskSettingsPatch(startOfDay: s, endOfDay: e, leadMinutes: lead));
+    widget.onSubmit(TaskSettingsPatch(startOfDay: s, endOfDay: e, leadMinutes: lead,
+        timeZone: widget.zoneOptions == null ? null : _zone));
   }
 
   @override
@@ -104,7 +113,23 @@ class _BondTaskSettingsFormState extends State<BondTaskSettingsForm> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(l.timeZone, style: text.smallStrong),
-        Text(widget.settings.timeZone ?? '-', style: text.body.copyWith(color: t.muted)),
+        if (widget.zoneOptions == null)
+          Text(widget.settings.timeZone ?? '-', style: text.body.copyWith(color: t.muted))
+        else
+          BondSearchPicker<String>(
+            onSearch: (q) async => [
+              for (final z in widget.zoneOptions!)
+                if (z.toLowerCase().contains(q.toLowerCase())) z,
+            ].take(8).toList(),
+            labelOf: (z) => z,
+            picked: [?_zone],
+            onPick: (z) => setState(() {
+              _zone = z;
+              _edited = true;
+            }),
+            hint: l.zoneSearchHint,
+            semanticsId: _id('zone'),
+          ),
         BondSpace.h12,
         BondTextField(
           controller: _start,

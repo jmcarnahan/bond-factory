@@ -96,6 +96,38 @@ void main() {
     expect(text(1), '17:00', reason: 'and nothing else is overwritten either');
   });
 
+  for (final phone in [false, true]) {
+    testWidgets('zoneOptions: search, pick inline, and the zone is in the patch (phone=$phone)', (t) async {
+      final got = <TaskSettingsPatch>[];
+      await pumpAt(
+        t,
+        BondTaskSettingsForm(
+          settings: _settings,
+          onSubmit: got.add,
+          zoneOptions: const ['America/Los_Angeles', 'Europe/Paris', 'Europe/Berlin'],
+          semanticsPrefix: 's',
+        ),
+        phone: phone,
+      );
+      expect(find.bySemanticsIdentifier('s.settings-zone'), findsOneWidget);
+      await t.enterText(find.byType(TextField).first, 'paris');
+      await t.pump(const Duration(milliseconds: 300));
+      await t.pump();
+      await _tap(t, 'Europe/Paris');
+      await _tap(t, 'Save');
+      expect(got.single.timeZone, 'Europe/Paris');
+      await expectNoOverlays(t);
+      expect(t.takeException(), isNull);
+    });
+  }
+
+  testWidgets('without zoneOptions the zone is read-only and not sent', (t) async {
+    final got = <TaskSettingsPatch>[];
+    await pumpAt(t, BondTaskSettingsForm(settings: _settings, onSubmit: got.add));
+    await _tap(t, 'Save');
+    expect(got.single.timeZone, isNull);
+  });
+
   testWidgets('busy turns Save off; the zone is not editable', (t) async {
     final got = <TaskSettingsPatch>[];
     await pumpAt(t, BondTaskSettingsForm(settings: _settings, busy: true, onSubmit: got.add));

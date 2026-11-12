@@ -23,8 +23,6 @@ const List<String> kTaskColumns = [
   'completed_by',
   'checklist',
   'remind_minutes_before',
-  'remind_at',
-  'reminded_at',
   'mirror_enabled',
   'mirror_status',
   'external_provider',

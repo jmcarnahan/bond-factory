@@ -94,7 +94,7 @@ def test_update_omitted_is_unchanged_and_none_clears(session):
 def test_clearing_the_date_clears_the_time(session):
     task = make(session, due_date=date(2026, 11, 9), due_time="10:00")
     edit(session, task, "u1", due_date=None)
-    assert task.due_date is None and task.due_time is None and task.remind_at is None
+    assert task.due_date is None and task.due_time is None
 
 
 def test_update_title_cannot_be_blank_or_null(session):

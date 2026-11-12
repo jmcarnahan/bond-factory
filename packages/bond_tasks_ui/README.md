@@ -29,9 +29,9 @@ in, no API calls, no clock reads. Import `package:bond_tasks_ui/bond_tasks_ui.da
 - `BondTaskSummaryCard`, `BondTaskDeleteControl`: counts and an inline two-step delete.
 - `BondPriorityChip(priority)`, `BondLinkChip(link, onTap, onRemove)`, `BondLinkPickerRow(links, onSearch, onChanged)`.
 - `BondCaptureReview(items, degraded, onAccept, onDiscard, linkSearch, dictation, now, today)`: review what
-  natural-language capture found: edit title, kind, date, time, priority and link match; Accept returns the edits.
+  natural-language capture found: edit title, kind, date, time, priority and link match; Accept returns the edits. Each card has the id `<prefix>.review-item-<n>`.
 - `BondDictationSlot(builder)`: a place the app fills with its own dictation control.
-- `BondTaskSettingsForm(settings, onSubmit, busy)`: work day start and end, lead minutes, zone, quiet hours text.
+- `BondTaskSettingsForm(settings, onSubmit, busy, zoneOptions)`: work day start and end, lead minutes, quiet hours text; zone read-only, or chosen inline (id `<prefix>.settings-zone`) when `zoneOptions` is given.
 - Helpers: `dueDateString`, `parseDueDate`, `parseDueTime`, `dueTimeString`, `sectionOf`, `formatDue`,
   `formatTimeOfDay`.
 

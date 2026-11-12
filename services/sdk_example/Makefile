@@ -6,7 +6,7 @@ test:
 	$(PY) -m pytest -q $(T)
 
 lint:
-	../../.venv/bin/ruff check sdk_example tests alembic
+	../../.venv/bin/ruff check sdk_example tests alembic scripts
 
 serve:
 	mkdir -p out

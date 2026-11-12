@@ -177,13 +177,5 @@ void main() {
       expect(jsonDecode(r.seen.single.body), {'now': '2026-03-12T09:17:00.000Z'});
       expect(out['ran'], 1);
     });
-
-    test('notices accepts a list or an items envelope', () async {
-      final a = _Rig((_) => _json([{'task_id': 't1'}]));
-      expect((await a.demo.notices()).single['task_id'], 't1');
-      final b = _Rig((_) => _json({'items': [{'task_id': 't2'}]}));
-      expect((await b.demo.notices()).single['task_id'], 't2');
-      expect(b.seen.single.url.path, '/v1/tasks/notices');
-    });
   });
 }

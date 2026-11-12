@@ -33,9 +33,9 @@ def test_register_from_the_shared_fixture(session):
 def test_register_is_idempotent_per_user_and_device(session):
     first = reg(session)
     later = NOW + timedelta(days=1)
-    second = reg(session, token="tok2", platform="web", environment="production", topic="other", now=later)
+    second = reg(session, token="tok2", environment="production", topic="other", now=later)
     assert second is first and len(rows(session)) == 1
-    assert (first.token, first.platform, first.environment, first.topic) == ("tok2", "web", "production", "other")
+    assert (first.token, first.platform, first.environment, first.topic) == ("tok2", "ios", "production", "other")
     assert first.last_seen_at == later and first.created_at == NOW
 
 
@@ -100,11 +100,10 @@ def test_validation_errors_are_coded_and_write_nothing(session, override, code):
     assert rows(session) == []
 
 
-def test_all_three_platforms_and_both_environments_are_accepted(session):
-    for i, platform in enumerate(("ios", "android", "web")):
-        reg(session, device=f"d{i}", token=f"t{i}", platform=platform)
+def test_both_environments_are_accepted_and_only_ios_platform(session):
+    reg(session, device="ds", token="ts")
     reg(session, device="dp", token="tp", environment="production")
-    assert len(rows(session)) == 4
+    assert len(rows(session)) == 2
 
 
 def test_unregister(session):

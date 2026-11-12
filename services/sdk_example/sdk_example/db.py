@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from bond_tasks_py import sqlite_savepoint_setup
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
@@ -23,7 +24,10 @@ def make_engine(settings: Settings) -> Engine:
         path = url.split("///", 1)[-1]
         if path and path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-    return create_engine(url, **kwargs)
+    engine = create_engine(url, **kwargs)
+    if url.startswith("sqlite"):
+        sqlite_savepoint_setup(engine)  # the sweep uses savepoints; the default SQLite driver would commit them
+    return engine
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

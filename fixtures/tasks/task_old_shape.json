@@ -11,8 +11,6 @@
   "assignee_name": null,
   "checklist": [],
   "remind_minutes_before": -3,
-  "remind_at": null,
-  "reminded_at": null,
   "links": [],
   "completed_at": null,
   "mirror_enabled": true,

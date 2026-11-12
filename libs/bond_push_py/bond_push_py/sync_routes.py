@@ -17,7 +17,13 @@ from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 
-from bond_push_py.devices import check_fields, register_device, release_token, unregister_device
+from bond_push_py.devices import (
+    check_fields,
+    device_row_id,
+    register_device,
+    release_token,
+    unregister_device,
+)
 from bond_push_py.errors import PushError
 from bond_push_py.timeutil import to_naive_utc, utcnow
 
@@ -68,6 +74,8 @@ def device_routes(device_model: Any, now: Callable = utcnow) -> dict:
         owner = actor_of(ctx)
         row = owned(session, owner, op.id)
         device_id = row.device_id if row is not None else data.get("device_id")  # a row's device id is fixed
+        if row is None and isinstance(device_id, str) and op.id != device_row_id(owner, device_id):
+            raise PushError("not_device_owner")  # a new row's id must be the caller's own formula id
         register_device(
             session, device_model, user_id=owner, device_id=device_id,
             token=data.get("token"), platform=data.get("platform"),

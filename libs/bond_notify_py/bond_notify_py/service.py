@@ -4,6 +4,7 @@ Refusals raise ``NoticeError``.
 """
 
 import re
+from collections.abc import Collection
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -110,12 +111,19 @@ def dismiss(session: Any, notice_model: Any, user_id: str, notice_id: str, now: 
     return row
 
 
-def dismiss_for_source(session: Any, notice_model: Any, source_id: str, now: datetime) -> int:
-    """Put away every live notice of one task (all recipients); the app calls it on complete and cancel."""
+def dismiss_for_source(session: Any, notice_model: Any, source_id: str, now: datetime, *,
+                       user_ids: Collection[str] | None = None) -> int:
+    """Put away every live notice of one task; the app calls it on complete and cancel. ``user_ids`` limits it
+    to those users' notices (for example the old assignee after a reassignment); None means everyone and an
+    empty collection dismisses nothing."""
+    if user_ids is not None and not user_ids:
+        return 0
     now = to_naive_utc(now)
+    query = update(notice_model).where(notice_model.source_id == source_id, notice_model.dismissed_at.is_(None))
+    if user_ids is not None:
+        query = query.where(notice_model.user_id.in_(list(user_ids)))
     result = session.execute(
-        update(notice_model)
-        .where(notice_model.source_id == source_id, notice_model.dismissed_at.is_(None))
+        query
         .values(dismissed_at=now, read_at=func.coalesce(notice_model.read_at, now))
         .execution_options(synchronize_session="fetch")
     )

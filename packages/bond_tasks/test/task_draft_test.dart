@@ -8,7 +8,7 @@ void main() {
       expect(j['title'], 'Call back');
       expect(j.containsKey('notes'), isFalse);
       expect(j.containsKey('due_date'), isFalse);
-      expect(j['remind_minutes_before'], kRemindNone);
+      expect(j['remind_minutes_before'], kRemindUseDefault);
       expect(j['mirror_enabled'], isTrue);
       expect(j['checklist'], isEmpty);
     });

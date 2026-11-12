@@ -72,8 +72,6 @@ Task taskFromRow(SyncRow row, {required DateTime nowUtc}) {
     'assigned_user_id': _str(row['assigned_user_id']),
     'checklist': _list(row['checklist'], (e) => _ok(e, ChecklistItem.fromJson)),
     'remind_minutes_before': _int(row['remind_minutes_before']),
-    'remind_at': _time(row['remind_at']),
-    'reminded_at': _time(row['reminded_at']),
     'links': _list(row['links'], (e) => _ok(e, TaskLink.fromJson)),
     'completed_at': _time(row['completed_at']),
     'mirror_enabled': row['mirror_enabled'] == null ? null : _int(row['mirror_enabled']) != 0,

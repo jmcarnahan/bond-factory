@@ -30,8 +30,8 @@ FCM sender (the `PushSender` Protocol leaves room for one). Version 0.1.0.
   Non-text input is refused the same way. Two writers racing on one device or token are safe (a savepoint and one
   re-read; a persistent clash is `device_conflict`, never an `IntegrityError`). `now` may be aware; it is stored
   as naive UTC. `unregister_device(...) -> bool`, `devices_for(session, Device, user_id, platform="ios")` (live
-  rows; `platform=None` for all). `PLATFORMS` stays open (the table accepts "ios", "android", "web"), but only
-  "ios" rows are ever sent to.
+  rows; `platform=None` for all). `PLATFORMS` is `("ios",)`: only APNs can deliver here, so registering "android"
+  or "web" is `invalid_platform` (the column stays a plain string; an old row with another value is skipped).
 - `ApnsSender(key_pem, key_id, team_id)`: `send(messages) -> list[PushResult]`. The ES256 provider token is cached
   50 minutes, and a forced refresh (after `ExpiredProviderToken`) happens at most once per 20 minutes. 410,
   `BadDeviceToken`, `DeviceTokenNotForTopic` and `Unregistered` give `unregistered`. Retryable: 408, 429, 500,
@@ -46,8 +46,7 @@ FCM sender (the `PushSender` Protocol leaves room for one). Version 0.1.0.
   wins when any device was retryable: the sweep sends the notice again to all devices and the collapse id makes
   the repeat replace the first on a device that already has it. "ok" means no device was retryable and at least
   one accepted, or there is no live device: by design, a device registered a minute later does not receive that
-  notice. Only "ios" rows are sent to: a user with only web or android rows is "no live device" ("ok") and those
-  rows are left alone. It sends no Apple `category` unless given, because the phone plugin cannot say which
+  notice. Only "ios" rows are sent to; an old row of another platform is skipped and left alone. It sends no Apple `category` unless given, because the phone plugin cannot say which
   action button of a remote notification was pressed; a tap opens the task.
 
 ## Plugging into the task sweep
@@ -67,7 +66,8 @@ notifiers = {"push": PushNotifier(PushDevice, sender)}  # passed to deliver_pend
   change `token`, `platform`, `environment` and `topic` (a debug build becoming a release build), validated as
   `register_device` does; `last_seen_at` is the server's clock. Every row id is
   `device_row_id(user_id, device_id)` = `"d_"` + the first 32 hex of `sha256("<user_id>|<device_id>")`, on REST
-  and on the phone alike. If a user has an older row for that device under a random id (made before this
+  and on the phone alike. A sync put (or patch) whose row id is not the caller's own `device_row_id` is refused
+  `not_device_owner`, so nobody can squat another user's row id. If a user has an older row for that device under a random id (made before this
   formula), a put updates that row and it keeps its id. Wrap the route
   for your sync lib and map errors with `verdict_for(exc)`.
 - REST: call `register_device` and `unregister_device` from your own routes (`POST /push/devices`,

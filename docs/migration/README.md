@@ -35,13 +35,15 @@ Per-app notes live beside the module notes (`sbel.md`).
 | `bond_oauth` | `bond_oauth.md` | A, S |
 | `bond_calendar` | `bond_calendar.md` | S (Microsoft Graph), A (Google read); P adopts nothing |
 | `bond_tasks_py` | `bond_tasks_py.md` | S, A |
-| `bond_tasks`, `bond_tasks_ui` | `bond_tasks.md` | S web, S phone, A |
+| `bond_tasks`, `bond_tasks_ui` | `bond_tasks.md`, `bond_tasks_ui.md` | S web, S phone, A |
 | `bond_connections`, `bond_connections_ui` | `bond_connections.md` | A, S |
-| `bond_notify_py`, `bond_notify`, `bond_notify_ui` | `bond_notify.md` (to be written) | after `bond_tasks`: S, then A |
-| `bond_push_py`, `bond_push` | `bond_push.md` (to be written) | after `bond_tasks`: S, then A |
-| `bond_capture_py` | `bond_capture_py.md` (to be written) | after `bond_tasks`: S |
-| `bond_tasks_notifications` | `bond_tasks_notifications.md` (to be written) | after `bond_tasks`, `bond_notify`, `bond_push`: S |
-| `bond_tasks_powersync`, `bond_notify_powersync` | `bond_tasks_powersync.md`, `bond_notify_powersync.md` (to be written) | after `bond_sync_powersync` and `bond_tasks`: S |
+| `bond_notify_py` | `bond_notify_py.md` | after `bond_tasks_py`: S, then A |
+| `bond_notify`, `bond_notify_ui` | `bond_notify.md`, `bond_notify_ui.md` | after `bond_tasks`: S, then A |
+| `bond_push_py`, `bond_push` | `bond_push_py.md`, `bond_push.md` | after `bond_tasks`: S, then A |
+| `bond_capture_py` | `bond_capture_py.md` | after `bond_tasks_py`: S |
+| `bond_tasks_notifications` | `bond_tasks_notifications.md` | after `bond_tasks`, `bond_notify`, `bond_push`: S |
+| `bond_tasks_powersync`, `bond_notify_powersync` | `bond_tasks_powersync.md`, `bond_notify_powersync.md` | after `bond_sync_powersync` and `bond_tasks`: S |
+| the whole TODO checklist | `todo-checklist.md` | the order to adopt the modules above |
 | `bond_signin`, `bond_signin_ui` (Dart) and `libs/bond_signin` | `bond_signin.md`, `bond_signin-cutover.md` | S, A, P, after `bond_auth(_py)`, `bond_oauth`, `bond_connections` |
 
 ## Dart and Python pairs
@@ -76,7 +78,7 @@ whose core already has the shape the lib took, and last for A and P. The order k
    to it, so an app takes one step per module. Order inside it: S (single tenant, full scopes at sign-in, its phone is the
    main surface), then A (identity-only sign-in plus role asks), then P (identity only). Each app's first LIVE provider run
    is part of its acceptance (`bond_signin.md` section 6); nothing in the SDK has run against a live provider yet.
-7. The TODO modules (`bond_notify*`, `bond_push*`, `bond_capture_py`, `bond_tasks_notifications`, `bond_tasks_powersync`) AFTER `bond_tasks`/`bond_tasks_py` are adopted, in the same SHA bump.
+7. The TODO modules (`bond_notify*`, `bond_push*`, `bond_capture_py`, `bond_tasks_notifications`, `bond_tasks_powersync`) AFTER `bond_tasks`/`bond_tasks_py` are adopted, in the same SHA bump. The order inside them is `todo-checklist.md`.
 
 P is the cheapest first adopter for anything that touches the backend (2 Alembic revision files against 24 in A and 83 in S, head 082).
 

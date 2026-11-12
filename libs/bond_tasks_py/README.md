@@ -28,7 +28,8 @@ Service functions take a session, flush and never commit. Datetimes are naive UT
 - `Notifier.send(session, notice) -> "ok" | "retryable" | "unregistered" | "failed"`: push, chat, email; after commit.
 - `Recipients.for_stage(session, task, stage)`: who gets a stage; the default is `default_recipients`.
 - `Compose` `(task, stage, seq, prefs) -> (title, body)`: wording; the default is `default_compose`.
-- `CalendarMirror`, `MirrorProviders`, `Scheduler`: calendar provider, per-user lookup, job queue.
+- `sync_routes(on_deleted=)`: `(ctx, session, task_id, owner_user_id)` after each delete; `after_delete` still gets the mirror pointer.
+- `CalendarMirror`, `MirrorProviders`: calendar provider, per-user lookup.
 
 ## Create, settings, links
 ```python
@@ -49,12 +50,14 @@ prefs, warnings = update_settings(session, settings_model=Settings, task_model=T
 body = settings_item(prefs, warnings)   # time_zone, start_of_day, end_of_day, lead_minutes, warnings
 
 rows, total = list_tasks(session, task_model=Task, user_id=uid, link_index_model=LinkIndex,
-                         filters=TaskFilters(link_kind="contact", link_id="c1"), viewer_zone="America/Chicago")
+                         filters=TaskFilters(link_kind="contact", link_id="c1"), viewer_zone="America/Chicago", now=now)
 ```
 `update_settings` recomputes `due_at` of the user's open date-only tasks when `end_of_day` or `time_zone` changes.
 `retarget_links` (a merge) and `remove_links` (a delete) keep links true. `today(...)` returns four sections
 (overdue, today, undated, done today) with counts; TODAY holds every open task that is not overdue and whose day is
 the viewer's today or earlier. `summary(..., now=, viewer_zone=)` and list date ranges use the same test.
+`update_settings(..., on_recomputed=)` reports tasks whose instant moved; `notice_recipients(task)` is owner plus assignee.
+`now` is required in `task_item`, `task_items`, `list_tasks` and `summary` (no date-only fallback). A priority outside 1 to 3 on a sync write is `invalid_priority`.
 `list_tasks` and `today` show only tasks the viewer owns or is assigned (`TaskFilters.scope="mine"`, the default);
 `scope="all"` lists every task and the app decides who may ask for it. `update_settings` warnings (never blocking):
 `lead_longer_than_work_day`, and `time_zone_unknown` when the work day changed and no zone is stored.
@@ -106,8 +109,7 @@ notifier stay pending (`unrouted`) and fail after 7 days. `prune_ledger` also re
   its time; past notices and the close notice of a date-only task wait for the work day.
 - The ledger id `sha256("task|user|stage|seq|token")[:32]` is the notice id, outbox key and push collapse id;
   `fnv1a31` of it is the local notification id. Channels must be idempotent on it (delivery is at least once).
-- The older queued single reminder (`schedule_reminder`, `fire_reminder`, `remind_at`, `reminded_at`) still exists
-  and will be removed; use the stages for new work.
+- The queued single reminder is gone; the stages are the only reminder. A new task defaults to -3.
 - On plain SQLite with the default driver a SAVEPOINT can commit the outer transaction. Use SQLAlchemy's documented
   `isolation_level=None` on connect plus a `BEGIN` in the engine `begin` event: call `sqlite_savepoint_setup(engine)`
   once per engine, which does exactly that. Postgres is unaffected.

@@ -15,6 +15,7 @@ from bond_push_py import (
     PushNotifier,
     PushResult,
     device_routes,
+    device_row_id,
     devices_for,
     register_device,
     to_naive_utc,
@@ -76,7 +77,7 @@ class Op:
 
 def route_run(session, op, row_id, data, user="u1"):
     route = device_routes(PushDevice, now=lambda: NOW)[("push_devices", None)]
-    route.handler(session, Ctx(user), Op(op, row_id), data)
+    route.handler(session, Ctx(user), Op(op, device_row_id(user, "d1")), data)
 
 
 def good():
@@ -128,8 +129,8 @@ def test_register_device_stores_an_aware_now_as_naive_utc(session):
 
 def test_sync_handlers_store_naive_utc_for_an_aware_clock(session):
     route = device_routes(PushDevice, now=lambda: NOW_PLUS5)[("push_devices", None)]
-    route.handler(session, Ctx("u1"), Op("put", "row-1"), good())
-    route.handler(session, Ctx("u1"), Op("patch", "row-1"), {"token": "tok2"})
+    route.handler(session, Ctx("u1"), Op("put", device_row_id("u1", "d1")), good())
+    route.handler(session, Ctx("u1"), Op("patch", device_row_id("u1", "d1")), {"token": "tok2"})
     (row,) = rows(session)
     assert row.last_seen_at == NOW and row.created_at == NOW
 
@@ -156,30 +157,30 @@ def test_notifier_normalises_aware_times(session):
 
 # 3. iOS only ----------------------------------------------------------------------------------------------
 
-def test_devices_for_defaults_to_ios_and_can_be_widened(session):
-    reg(session, device="a", token="ta", platform="ios")
-    reg(session, device="b", token="tb", platform="web")
-    reg(session, device="c", token="tc", platform="android")
+def test_only_ios_can_be_registered(session):
+    for platform in ("android", "web"):
+        with pytest.raises(PushError) as err:
+            reg(session, platform=platform)
+        assert err.value.code == "invalid_platform" and "ios" in err.value.message
+    assert rows(session) == []
+
+
+def test_devices_for_filters_by_platform_when_asked(session):
+    reg(session, device="a", token="ta")
+    row = reg(session, device="b", token="tb")
+    row.platform = "web"  # a legacy row written before only ios was accepted
+    session.flush()
     assert [r.device_id for r in devices_for(session, PushDevice, "u1")] == ["a"]
-    assert {r.device_id for r in devices_for(session, PushDevice, "u1", None)} == {"a", "b", "c"}
-    assert [r.device_id for r in devices_for(session, PushDevice, "u1", "web")] == ["b"]
+    assert {r.device_id for r in devices_for(session, PushDevice, "u1", None)} == {"a", "b"}
 
 
-def test_a_user_with_only_web_or_android_rows_is_ok_and_those_rows_stay_live(session):
-    web = reg(session, device="b", token="tb", platform="web")
-    android = reg(session, device="c", token="tc", platform="android")
+def test_a_legacy_web_row_is_skipped_by_the_notifier_and_left_live(session):
+    web = reg(session, device="b", token="tb")
+    web.platform = "web"
+    session.flush()
     sender = MockSender()
     assert PushNotifier(PushDevice, sender, now=lambda: NOW).send(session, Notice()) == "ok"
-    assert sender.sent == []
-    assert web.disabled_at is None and android.disabled_at is None
-
-
-def test_only_the_ios_rows_receive_a_push(session):
-    reg(session, device="a", token="ta", platform="ios")
-    reg(session, device="b", token="tb", platform="web")
-    sender = MockSender()
-    PushNotifier(PushDevice, sender, now=lambda: NOW).send(session, Notice())
-    assert [m.token for m in sender.sent] == ["ta"]
+    assert sender.sent == [] and web.disabled_at is None
 
 
 # 4. the register race -------------------------------------------------------------------------------------

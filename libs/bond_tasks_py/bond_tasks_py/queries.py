@@ -80,11 +80,11 @@ def _link_matches(task: Any, kind: str | None, link_id: str) -> bool:
 
 def list_tasks(session: Any, *, task_model: Any, user_id: str, filters: TaskFilters | None = None, limit: int = 25,
                offset: int = 0, link_index_model: Any = None, viewer_zone: str | None = None,
-               now: datetime | None = None) -> tuple[list[Any], int]:
+               now: datetime) -> tuple[list[Any], int]:
     """Soonest due first, undated last. ``scope="all"`` lists everything on a record whoever owns it; the app decides who may ask for it.
 
     ``link_index_model`` turns the contact filter into an indexed lookup with SQL paging. ``viewer_zone`` orders by
-    the due instant and reads date ranges as the viewer's local days (see ``day_in_range``). With ``now`` too, a range that
+    the due instant and reads date ranges as the viewer's local days (see ``day_in_range``). With a ``viewer_zone``, a range that
     holds the viewer's today also holds the not-overdue tasks of earlier days (the TODAY section of ``today``)."""
     f, m = filters or TaskFilters(), task_model
     stmt = select(m)
@@ -103,10 +103,9 @@ def list_tasks(session: Any, *, task_model: Any, user_id: str, filters: TaskFilt
     elif viewer_zone and (f.on_or_before is not None or f.due_from is not None or f.due_to is not None):
         hi = min(d for d in (f.on_or_before, f.due_to) if d is not None) if (f.on_or_before or f.due_to) else None
         window = day_in_range(m, f.due_from, hi, viewer_zone)
-        if now is not None:  # a range that holds the viewer's today also holds the not-overdue earlier-day tasks
-            day = viewer_today(now, viewer_zone)
-            if (f.due_from is None or f.due_from <= day) and (hi is None or hi >= day):
-                window = or_(window, due_today_sql(m, to_naive_utc(now), day, viewer_zone))
+        day = viewer_today(now, viewer_zone)  # a range holding the viewer's today also holds not-overdue earlier days
+        if (f.due_from is None or f.due_from <= day) and (hi is None or hi >= day):
+            window = or_(window, due_today_sql(m, to_naive_utc(now), day, viewer_zone))
         stmt = stmt.where(or_(window, m.due_date.is_(None)) if f.include_undated else window)
     else:
         bounds = []
@@ -138,24 +137,19 @@ def list_tasks(session: Any, *, task_model: Any, user_id: str, filters: TaskFilt
     return list(session.execute(stmt.offset(offset).limit(limit)).scalars()), total
 
 
-def summary(session: Any, *, task_model: Any, user_id: str, today: date, now: datetime | None = None,
-            viewer_zone: str | None = None) -> dict[str, int]:
+def summary(session: Any, *, task_model: Any, user_id: str, now: datetime, viewer_zone: str) -> dict[str, int]:
     """Badge counts over the user's own (owner or assignee) open tasks.
 
-    With ``now`` and ``viewer_zone``: ``overdue`` is ``due_at < now`` (a dated task with no ``due_at`` yet: its
-    date before the viewer's today), ``due_today`` the not-overdue tasks whose day is the viewer's today.
-    Otherwise the date-only counts of old, with ``today`` as given."""
+    ``overdue`` is ``due_at < now`` (a dated task with no ``due_at`` yet: its date before the viewer's today),
+    ``due_today`` the not-overdue tasks whose day is the viewer's today in ``viewer_zone``."""
     m = task_model
     base = (mine(m, user_id), m.status == TaskStatus.OPEN.value)
 
     def count(*extra: Any) -> int:
         return session.execute(select(func.count()).select_from(m).where(*base, *extra)).scalar_one()
 
-    if now is not None and viewer_zone:
-        now, today = to_naive_utc(now), viewer_today(now, viewer_zone)
-        overdue = is_overdue_sql(m, now, today)
-        due_today = due_today_sql(m, now, today, viewer_zone)
-    else:
-        overdue, due_today = m.due_date < today, m.due_date == today
+    now, today = to_naive_utc(now), viewer_today(now, viewer_zone)
+    overdue = is_overdue_sql(m, now, today)
+    due_today = due_today_sql(m, now, today, viewer_zone)
     return {"open": count(), "overdue": count(overdue), "due_today": count(due_today),
             "no_date": count(m.due_date.is_(None))}

@@ -21,8 +21,8 @@ def row_from_wire(wire: dict) -> Task:
         due_time=wire["due_time"], priority=wire.get("priority"), due_at=stamp("due_at") if "due_at" in wire else None,
         status=wire["status"], owner_user_id=wire["owner_user_id"],
         created_by=wire["owner_user_id"], assigned_user_id=wire["assigned_user_id"], checklist=wire["checklist"],
-        remind_minutes_before=wire["remind_minutes_before"], remind_at=stamp("remind_at"),
-        reminded_at=stamp("reminded_at"), links=wire["links"], completed_at=stamp("completed_at"),
+        remind_minutes_before=wire["remind_minutes_before"],
+        links=wire["links"], completed_at=stamp("completed_at"),
         mirror_enabled=wire["mirror_enabled"], mirror_status=wire["mirror_status"],
         external_provider=wire["external_provider"], external_event_id=wire["external_event_id"],
         source=wire["source"], created_at=stamp("created_at"), updated_at=stamp("updated_at"),
@@ -47,23 +47,17 @@ def test_fixture_round_trips_exactly_by_the_instant(name):
     assert task_item(row_from_wire(wire), today=date(2026, 3, 11), names=named(wire), now=FIXTURE_NOW) == wire
 
 
-@pytest.mark.parametrize("name", FIXTURES)
-def test_fixture_round_trips_exactly_by_the_date_rule(name):
-    """Old path (``now`` omitted): with the viewer's today on 2026-03-12 every fixture agrees."""
-    wire = json.loads((FIXTURE.parent / name).read_text())
-    assert task_item(row_from_wire(wire), today=date(2026, 3, 12), names=named(wire)) == wire
-
 
 @pytest.mark.parametrize("name", FIXTURES)
 def test_fixture_has_exactly_the_item_keys(name):
     wire = json.loads((FIXTURE.parent / name).read_text())
-    assert set(wire) == set(ITEM_KEYS) and len(wire) == 26
+    assert set(wire) == set(ITEM_KEYS) and len(wire) == 24
 
 
 def test_old_shape_fixture_lacks_the_two_new_keys():
     wire = json.loads((FIXTURE.parent / "task_old_shape.json").read_text())
-    assert set(wire) == set(ITEM_KEYS) - {"priority", "due_at"} and len(wire) == 24
-    item = task_item(row_from_wire(wire), today=date(2026, 3, 11), names=named(wire))
+    assert set(wire) == set(ITEM_KEYS) - {"priority", "due_at"} and len(wire) == 22
+    item = task_item(row_from_wire(wire), today=date(2026, 3, 11), names=named(wire), now=FIXTURE_NOW)
     assert item["priority"] is None and item["due_at"] is None
 
 
@@ -101,8 +95,8 @@ def test_overdue_by_the_instant_needs_open_and_a_past_due_at(session):
                 due_at=datetime(2026, 3, 11, 16, 0), status="open")
     assert task_item(task, today=date(2026, 3, 11), now=datetime(2026, 3, 11, 16, 1))["overdue"] is True
     assert task_item(task, today=date(2026, 3, 11), now=datetime(2026, 3, 11, 16, 0))["overdue"] is False
-    # the date rule alone would say not overdue (today is the due date): the instant wins when ``now`` is given
-    assert task_item(task, today=date(2026, 3, 11))["overdue"] is False
+    # the date alone would say not overdue (today is the due date): the instant decides
+    assert task_item(task, today=date(2026, 3, 11), now=datetime(2026, 3, 11, 15, 0))["overdue"] is False
     task.status = "done"
     assert task_item(task, today=date(2026, 3, 12), now=datetime(2026, 3, 12))["overdue"] is False
 
@@ -127,23 +121,22 @@ def test_task_items_pass_now_through(session):
 def test_item_key_order_is_the_contract_order(session):
     task = service.create(session, task_model=Task, owner_user_id="u1", actor_user_id="u1",
                           data=TaskCreate(title="t"), now=NOW)
-    assert list(task_item(task, today=date(2026, 11, 8))) == list(ITEM_KEYS)
+    assert list(task_item(task, today=date(2026, 11, 8), now=NOW)) == list(ITEM_KEYS)
 
 
-def test_overdue_is_open_and_before_the_clients_today(session):
+def test_a_date_only_task_is_overdue_after_its_end_of_day_instant_and_not_when_done(session):
     task = service.create(session, task_model=Task, owner_user_id="u1", actor_user_id="u1",
                           data=TaskCreate(title="t", due_date=date(2026, 11, 7)), now=NOW)
-    assert task_item(task, today=date(2026, 11, 8))["overdue"] is True
-    assert task_item(task, today=date(2026, 11, 7))["overdue"] is False
-    assert task_item(task, today=date(2026, 11, 6))["overdue"] is False
+    assert task_item(task, today=date(2026, 11, 8), now=NOW)["overdue"] is True
+    assert task_item(task, today=date(2026, 11, 7), now=datetime(2026, 11, 7, 12, 0))["overdue"] is False
     service.complete(session, task, "u1", NOW)
-    assert task_item(task, today=date(2026, 11, 8))["overdue"] is False
+    assert task_item(task, today=date(2026, 11, 8), now=NOW)["overdue"] is False
 
 
 def test_an_undated_task_is_never_overdue(session):
     task = service.create(session, task_model=Task, owner_user_id="u1", actor_user_id="u1",
                           data=TaskCreate(title="t"), now=NOW)
-    assert task_item(task, today=date(2030, 1, 1))["overdue"] is False
+    assert task_item(task, today=date(2030, 1, 1), now=datetime(2030, 1, 1))["overdue"] is False
 
 
 def test_unknown_names_are_null_and_names_resolve_once(session):
@@ -155,7 +148,7 @@ def test_unknown_names_are_null_and_names_resolve_once(session):
         calls.append(ids)
         return {"u1": "Ann"}
 
-    items = task_items([task, task], today=date(2026, 11, 8), names=names)
+    items = task_items([task, task], today=date(2026, 11, 8), now=NOW, names=names)
     assert calls == [["u1", "u2"]]
     assert items[0]["owner_name"] == "Ann" and items[0]["assignee_name"] is None
 
@@ -163,7 +156,7 @@ def test_unknown_names_are_null_and_names_resolve_once(session):
 def test_serialized_lists_are_copies(session):
     task = service.create(session, task_model=Task, owner_user_id="u1", actor_user_id="u1",
                           data=TaskCreate(title="t", checklist=[{"text": "a"}]), now=NOW)
-    item = task_item(task, today=date(2026, 11, 8))
+    item = task_item(task, today=date(2026, 11, 8), now=NOW)
     item["checklist"][0]["text"] = "changed"
     assert task.checklist[0]["text"] == "a"
 
@@ -184,7 +177,7 @@ def check_wire_types(item: dict) -> None:
     assert item["priority"] in {None, 1, 2, 3}
     assert item["due_at"] is None or TIMESTAMP.match(item["due_at"])
     assert isinstance(item["overdue"], bool) and isinstance(item["mirror_enabled"], bool)
-    for key in ("remind_at", "reminded_at", "completed_at", "created_at", "updated_at"):
+    for key in ("completed_at", "created_at", "updated_at"):
         assert item[key] is None or TIMESTAMP.match(item[key]), key
     for key in ("owner_user_id", "owner_name", "assigned_user_id", "assignee_name", "external_event_id"):
         assert item[key] is None or isinstance(item[key], str), key
@@ -208,6 +201,6 @@ def test_a_served_item_has_the_wire_types(session):
         data=TaskCreate(title="t", due_date=date(2026, 11, 9), due_time="09:30", remind_minutes_before=15,
                         assigned_user_id="u2", checklist=[{"text": "a", "done": True}, {"text": "b"}],
                         links=[{"kind": "loan", "id": "L1", "label": "One"}]))
-    check_wire_types(task_item(task, today=date(2026, 11, 8), names={"u1": "Ann", "u2": "Bo"}))
+    check_wire_types(task_item(task, today=date(2026, 11, 8), now=NOW, names={"u1": "Ann", "u2": "Bo"}))
     service.complete(session, task, "u1", NOW)
-    check_wire_types(task_item(task, today=date(2026, 11, 8)))
+    check_wire_types(task_item(task, today=date(2026, 11, 8), now=NOW))

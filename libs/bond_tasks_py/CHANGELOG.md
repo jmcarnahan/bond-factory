@@ -1,6 +1,33 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+Added
+- `sync_routes(on_deleted=)`: `on_deleted(ctx, session, task_id, owner_user_id)` runs after every real delete
+  (mirrored or not), so a host can put away the task's notices. `after_delete` is unchanged.
+
+Added
+- `update_settings(..., on_recomputed=None)` and `recompute_day_due(..., on_recomputed=None)`:
+  `on_recomputed(task, old_due_at)` runs once per task whose `due_at` really changed, after the flush (the host calls
+  `dismiss_stale`). `notice_recipients(task) -> set[str]`: owner and assignee, for putting away the notices of users
+  who left after a reassign.
+- `apply_notice_action` "done" or "cancel" on a task that is not open is a no-op returning the task.
+- A `due_at` that does not parse is dropped by `TaskCreate` / `TaskUpdate` (it is only a hint), never a 422.
+
+Changed (breaking)
+- `now` is required (keyword): `task_item(task, *, today, now, names=None)`, `task_items(tasks, *, today, now,
+  names=None)`, `list_tasks(..., viewer_zone=None, now)`, `summary(session, *, task_model, user_id, now,
+  viewer_zone)` (`today` and the date-only counts are gone). The legacy date-based overdue path is removed.
+- `sync_routes` raises `TaskError("invalid_priority")` (422) for a priority outside 1 to 3 on put or patch
+  (before, a bare validation error).
+
+Removed
+- The queued single reminder: `reminders.py`, `compute_remind_at`, `schedule_reminder`, `cancel_reminder`,
+  `fire_reminder`, `dedupe_key`, `JOB_TYPE`, the `Scheduler` protocol and `sync_routes(scheduler=)`. The three-stage
+  sweep replaces it.
+- The columns and wire keys `remind_at` and `reminded_at` (`TASK_COLUMNS`, `ITEM_KEYS`). `TaskItem` has 24 keys.
+- Changed: the default `remind_minutes_before` of a new task is -3 (use my default), in the column and in
+  `TaskCreate`; an explicit value is kept.
+
 Due instant
 - Tasks gain `priority` (1 low, 2 normal, 3 high; null clears) and `due_at` (naive UTC, minute precision, null only
   when `due_date` is null); index `ix_tasks_status_due_at`; `TASK_COLUMNS` updated. `TaskCreate` / `TaskUpdate`

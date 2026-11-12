@@ -17,7 +17,7 @@ final schema = Schema([...tasksTables(), ...syncSupportTables()]);
 
 ```sql
 SELECT id, owner_user_id, created_by, assigned_user_id, title, notes, due_date, due_time, priority, due_at,
-       status, completed_at, completed_by, checklist, remind_minutes_before, remind_at, reminded_at,
+       status, completed_at, completed_by, checklist, remind_minutes_before,
        mirror_enabled, mirror_status, external_provider, external_event_id, external_account_user_id,
        external_etag, links, source, created_at, updated_at
 FROM tasks WHERE owner_user_id = auth.user_id() OR assigned_user_id = auth.user_id()

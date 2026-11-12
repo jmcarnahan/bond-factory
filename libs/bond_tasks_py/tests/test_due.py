@@ -105,11 +105,10 @@ def test_an_undated_task_is_never_overdue():
     assert is_overdue(task(), NOW, viewer_today=date(2030, 1, 1)) is False
 
 
-def test_serialize_uses_the_one_definition_and_keeps_the_legacy_path():
+def test_serialize_uses_the_one_definition():
     t = task(due_date=date(2026, 3, 11), due_time="09:00", due_at=datetime(2026, 3, 11, 16, 0))
     assert task_item(t, today=date(2026, 3, 11), now=NOW)["overdue"] is is_overdue(t, NOW) is True
-    assert task_item(t, today=date(2026, 3, 11))["overdue"] is False  # legacy: date rule, today is not after the date
-    assert task_item(t, today=date(2026, 3, 12))["overdue"] is True
+    assert task_item(t, today=date(2026, 3, 11), now=datetime(2026, 3, 11, 16, 0))["overdue"] is False  # at the instant
 
 
 def test_overdue_accepts_aware_values():

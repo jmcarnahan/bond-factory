@@ -48,3 +48,13 @@ def test_an_unknown_action_is_invalid_action_422(session):
 def test_the_policy_is_passed_through(session):
     task = make(session)
     assert act(session, task, "done", "u3", permissions=Anyone()).status == "done"
+
+
+@pytest.mark.parametrize("closed", ["done", "cancelled"])
+@pytest.mark.parametrize("action", ["done", "cancel"])
+def test_a_stale_done_or_cancel_on_a_closed_task_changes_nothing(session, closed, action):
+    task = make(session)
+    task.status = closed
+    before = (task.status, task.updated_at, task.completed_at)
+    assert act(session, task, action) is task
+    assert (task.status, task.updated_at, task.completed_at) == before

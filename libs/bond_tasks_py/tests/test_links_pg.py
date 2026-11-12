@@ -1,5 +1,6 @@
 """The link filter on a real PostgreSQL: same page and total as the JSON text match, and the index is used."""
 import random
+from datetime import datetime
 
 import pytest
 from conftest import LinkIndex, Task
@@ -11,6 +12,7 @@ from bond_tasks_py import TaskFilters, list_tasks
 
 pytestmark = pytest.mark.postgres
 
+NOW = datetime(2026, 11, 9, 12, 0)
 CONTACTS = [f"contact-{n:03d}" for n in range(200)]
 
 
@@ -25,9 +27,10 @@ def test_index_filter_matches_the_text_match_and_uses_the_index(pg_engine):
         session.execute(text("ANALYZE"))
         for contact in ("contact-007", "contact-123"):
             filters = TaskFilters(link_kind="contact", link_id=contact)
-            old, old_total = list_tasks(session, task_model=Task, user_id="u1", filters=filters, limit=10)
+            old, old_total = list_tasks(session, task_model=Task, user_id="u1", filters=filters, limit=10,
+                                        now=NOW)
             new, new_total = list_tasks(session, task_model=Task, user_id="u1", filters=filters, limit=10,
-                                        link_index_model=LinkIndex)
+                                        link_index_model=LinkIndex, now=NOW)
             assert new_total == old_total > 0
             assert [t.id for t in new] == [t.id for t in old]
         plan = "\n".join(row[0] for row in session.execute(text(

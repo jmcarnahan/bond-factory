@@ -24,10 +24,10 @@ Object? _canon(Object? v, [String key = '']) {
 void main() {
   group('task fixtures', () {
     for (final f in ['task.json', 'task_cancelled.json', 'task_timed.json', 'task_day_self.json', 'task_day_other_null_due.json', 'task_overdue.json']) {
-      test('$f round trips with 26 keys', () {
+      test('$f round trips with 24 keys', () {
         final src = _map(f);
         final out = Task.fromJson(src).toJson();
-        expect(out.length, 26);
+        expect(out.length, 24);
         expect(_canon(out), _canon(src));
       });
     }

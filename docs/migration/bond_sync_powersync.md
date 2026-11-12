@@ -64,3 +64,16 @@ None. The database file name stays through the prefix; `sync_rejections` and `sy
   checkout path short. Items 2 to 6 above (real sync service, damaged file, token expiry) still need a phone or simulator.
 - A's photos run before the rest of their transaction, so A needs its own ordering around `SyncUploader.uploadNext`;
   decide that before cutover.
+
+## 7. New for the TODO adapters
+
+Three additions, all optional. `bond_tasks_powersync.md` and `bond_notify_powersync.md` use them.
+
+- `waitForUploadDrain(db, {timeout, poll})` returns true once the CRUD queue is empty and false on timeout. Call it
+  between the last local write and the sign-out clear. Clearing first loses queued writes, such as a push device delete.
+- `package:bond_sync_powersync/testing.dart` exports `FakeSyncDb`, `Stmt` and `CrudRig`, so another package's tests can
+  fake the database (`test/fake_sync_db.dart` re-exports it).
+- `FakeSyncDb.tables({name: rows})` serves `SELECT .. FROM <name>`. With `applySql: true` and `columns: {...}` it evaluates
+  INSERT, UPDATE and DELETE and honours WHERE, ORDER BY and LIMIT in SELECT, so a wrong column or WHERE fails a test. A
+  statement shape it cannot read throws. The fake keeps one watch controller per SQL (`watchControllerFor`).
+- Add the new tables to the app schema beside `syncSupportTables()`: `tasksTables()`, `noticesTables()`, `pushDevicesTables()`.

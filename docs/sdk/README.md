@@ -115,9 +115,9 @@ roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
 | `bond_sync_py` | Python | 2 | Server side of sync upload |
 | `bond_oauth` | Python | 2 | OAuth flows with encrypted token storage |
 | `bond_calendar` | Python | 3 | Calendar provider protocol, Google and Microsoft mirrors |
-| `bond_tasks_py` | Python | 3 | Tasks, checklists and reminders |
-| `bond_tasks` | pure Dart | 3 | Task models and client |
-| `bond_tasks_ui` | Flutter | 3 | Task screens |
+| `bond_tasks_py` | Python | 3 | Tasks, checklists, due instant, per-user settings, three-stage notice ledger and sweep, calendar mirror |
+| `bond_tasks` | pure Dart | 3 | Task models, client, controller, due and stage helpers (headless) |
+| `bond_tasks_ui` | Flutter | 3 | Task widgets: Today list, form, stage banner, capture review, settings form |
 | `bond_connections` | pure Dart | 3 | Connection status models and client |
 | `bond_connections_ui` | Flutter | 3 | Connection status screens |
 | `bond_signin (py)` | Python | 4 | Direct Google/Microsoft sign-in: Protocol seams, scope policy, router factory |
@@ -134,4 +134,6 @@ roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
 | `bond_notify_powersync` | Flutter | 5 | PowerSync adapter for notice tables |
 
 `demos/sdk_demo` (Flutter web, :8078) and `services/sdk_example` (FastAPI, :8012) exercise every module in
-fake mode and are the reference for wiring. The walk recipe is `docs/test/WEB.md`.
+fake mode and are the reference for wiring. The walk recipe is `docs/test/WEB.md` (web) and `docs/test/MOBILE.md` (iOS simulator).
+The TODO modules (phase 5) are adopted in the order of `docs/migration/todo-checklist.md`. Pin the commit
+listed in `docs/sdk/sdk-pins.md` (see `docs/sdk/release-2026-11-todo.md`).

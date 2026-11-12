@@ -115,7 +115,10 @@ def set_checklist_item(task: Any, item_id: str, done: bool, now: datetime, *, ac
 def apply_notice_action(session: Any, *, task: Any, action: str, actor_user_id: str, now: datetime,
                         permissions: Permissions | None = None) -> Any:
     """Done completes; cancel cancels (needs ``can_own``); snooze changes nothing (the notice layer re-sends it
-    later). Anything else is ``invalid_action``. Returns the task."""
+    later). Anything else is ``invalid_action``. Returns the task. A done or cancel on a task that is not open is a
+    no-op (a stale button must not revive or convert a closed task)."""
+    if action in ("done", "cancel") and task.status != TaskStatus.OPEN.value:
+        return task
     if action == "done":
         return complete(session, task, actor_user_id, now, permissions=permissions)
     if action == "cancel":

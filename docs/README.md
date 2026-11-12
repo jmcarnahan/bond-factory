@@ -17,6 +17,8 @@
 - decisions/2026-11-11-due-instant.md — the due instant: rules, time zones, overdue
 - decisions/2026-11-11-notify-ledger.md — three-stage notifications and the delivery ledger
 - decisions/2026-11-11-links.md — links on tasks and notices
+- contracts/tasks.md — tasks contract: due instant rules, overdue, settings, TaskItem, task routes, error codes, sync fields
+- contracts/notices.md — notices contract: stages, ids, ledger, quiet hours, actions, routes, phone payload, devices
 - decisions/2026-11-11-licence-mit.md — repository is MIT; roof service stays GPL-3.0-or-later
 - ../libs/bond_notify_py/README.md — stored inbox (notices table, list, read, dismiss, sync handlers); the ledger, stages and sweep live in bond_tasks_py (no sibling bond_* imports)
 - ../libs/bond_push_py/README.md — Apple push sender and device tokens (no sibling bond_* imports)
@@ -27,9 +29,13 @@
 - ../packages/bond_tasks_notifications/README.md — local reminders for tasks: stage scheduling, budget, taps
 - ../packages/bond_tasks_powersync/README.md — PowerSync adapter for task tables
 - ../packages/bond_notify_powersync/README.md — PowerSync adapter for notice tables
+- migration/todo-checklist.md — the order an app adopts the TODO modules in, with a link to each note
+- migration/README.md — one note per module: what it replaces, the adapter, call sites, data, acceptance
 - sdk/README.md — how an app consumes bond-factory (Dart git + SHA, Python Poetry or wheel), versioning, module index
 - sdk/sdk-pins.md — template an app copies to record its pins and local patches
-- test/WEB.md — Playwright walk recipe for demos/sdk_demo
+- sdk/release-2026-11-todo.md — release notes of the TODO checklist: new, removed, what an app must do, what is unproven
+- test/WEB.md — Playwright walk recipe for demos/sdk_demo, with the TODO checklist routes and walk steps
+- test/MOBILE.md — iOS simulator lane for the local notification step, and what needs a device
 - research/2026-11-07-roof-poc/README.md — research index for the POC
   - dart-diagrams/FINDINGS.md — Dart diagram rendering findings
   - footprints/FINDINGS.md — building footprint sources

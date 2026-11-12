@@ -45,6 +45,12 @@ def default_recipients(task: Any, stage: str) -> list[str]:
     return [responsible]
 
 
+def notice_recipients(task: Any) -> set[str]:
+    """Every user who can hold a notice for the task: the owner and the assignee. A host that reassigns compares
+    this set before and after and puts away the notices of the users who left."""
+    return {user for user in (task.owner_user_id, task.assigned_user_id) if user}
+
+
 def _actions(task: Any, user_id: str, permissions: Permissions) -> tuple[str, ...]:
     actions = ["done"] if permissions.can_complete(task, user_id) else []
     actions.append("snooze")

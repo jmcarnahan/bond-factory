@@ -67,7 +67,7 @@ class _BondTaskFormState extends State<BondTaskForm> {
   BondTime? _time;
   String _assignee = '';
   List<ChecklistItem> _checklist = const [];
-  int _remind = kRemindNone;
+  int _remind = kRemindUseDefault;
   bool _mirror = true;
   TaskPriority? _priority;
   List<TaskLink> _links = const [];
@@ -90,7 +90,7 @@ class _BondTaskFormState extends State<BondTaskForm> {
     _badTime = _time == null && (t?.dueTime ?? '').isNotEmpty ? t!.dueTime : null;
     _assignee = t?.assignedUserId ?? '';
     _checklist = t?.checklist ?? const [];
-    _remind = t?.remindMinutesBefore ?? kRemindNone;
+    _remind = t?.remindMinutesBefore ?? kRemindUseDefault;
     _mirror = t?.mirrorEnabled ?? true;
     _priority = t?.priority;
     _links = t?.links ?? const [];

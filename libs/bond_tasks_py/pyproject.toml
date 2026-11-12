@@ -1,6 +1,6 @@
 [project]
 name = "bond_tasks_py"
-version = "0.1.0"
+version = "0.2.0"
 description = "Task models, services and reminder scheduling"
 license = "MIT"
 requires-python = ">=3.12,<3.14"

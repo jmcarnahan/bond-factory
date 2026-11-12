@@ -204,96 +204,101 @@ class _BondCaptureItemCardState extends State<BondCaptureItemCard> {
       if (!_isEvent && _priority != null && _priority != TaskPriority.normal)
         BondPriorityChip(priority: _priority!, labels: widget.taskLabels),
     ];
-    return Container(
-      padding: BondSpace.all12,
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: BondRadius.r12All,
-        border: Border.all(color: low ? t.caution.soft : t.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: BondTextField(
-                  controller: _title,
-                  label: l.itemTitle,
-                  errorText: widget.showErrors && _title.text.trim().isEmpty ? l.titleRequired : null,
-                  onChanged: (_) => _edit(() {}),
-                  semanticsId: _id('title'),
+    return Semantics(
+      identifier: widget.semanticsId,
+      container: true,
+      explicitChildNodes: true,
+      child: Container(
+        padding: BondSpace.all12,
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BondRadius.r12All,
+          border: Border.all(color: low ? t.caution.soft : t.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: BondTextField(
+                    controller: _title,
+                    label: l.itemTitle,
+                    errorText: widget.showErrors && _title.text.trim().isEmpty ? l.titleRequired : null,
+                    onChanged: (_) => _edit(() {}),
+                    semanticsId: _id('title'),
+                  ),
                 ),
-              ),
-              if (widget.onRemove != null)
-                BondIconButton(
-                  icon: Icons.delete_outline,
-                  label: l.removeItem,
-                  onPressed: widget.onRemove,
-                  semanticsId: _id('remove'),
-                ),
-            ],
-          ),
-          BondSpace.h8,
-          BondSegmented<String>(
-            segments: [BondSegment('task', l.asTask), BondSegment('event', l.asEvent)],
-            value: _isEvent ? 'event' : 'task',
-            onChanged: _switchTo,
-            semanticsId: _id('kind'),
-          ),
-          BondSpace.h12,
-          BondCaptureWhen(
-            isEvent: _isEvent,
-            allDay: _allDay,
-            date: _date,
-            time: _time,
-            today: _today,
-            onDate: _setDate,
-            onClearDate: _clearDate,
-            onTime: (v) => _edit(() => _time = v),
-            onAllDay: (v) => _edit(() {
-              _allDay = v;
-              if (!v && _time == null) _time = '09:00';
-            }),
-            idOf: _id,
-            showTimeNeedsDate: widget.showErrors,
-            labels: widget.labels,
-            taskLabels: widget.taskLabels,
-          ),
-          if (marks.isNotEmpty) ...[
-            BondSpace.h8,
-            Wrap(spacing: BondSpace.s8, runSpacing: BondSpace.s4, children: marks),
-          ],
-          if (!_isEvent) ...[
-            BondSpace.h8,
-            BondSegmented<int>(
-              segments: [
-                BondSegment(0, widget.taskLabels.noPriority),
-                for (final p in TaskPriority.values) BondSegment(p.wire, widget.taskLabels.priorityText(p)),
+                if (widget.onRemove != null)
+                  BondIconButton(
+                    icon: Icons.delete_outline,
+                    label: l.removeItem,
+                    onPressed: widget.onRemove,
+                    semanticsId: _id('remove'),
+                  ),
               ],
-              value: _priority?.wire ?? 0,
-              onChanged: (v) => _edit(() => _priority = TaskPriority.fromWire(v)),
-              semanticsId: _id('priority'),
             ),
-          ],
-          for (var n = 0; n < _links.length; n++) ...[
+            BondSpace.h8,
+            BondSegmented<String>(
+              segments: [BondSegment('task', l.asTask), BondSegment('event', l.asEvent)],
+              value: _isEvent ? 'event' : 'task',
+              onChanged: _switchTo,
+              semanticsId: _id('kind'),
+            ),
             BondSpace.h12,
-            BondCaptureLinkRow(
-              link: _links[n].view,
-              selected: _links[n].selected,
-              onSelect: (i) => _edit(() => _links[n].selected = i),
-              onFound: (o) => _edit(() {
-                _links[n].options.add(o);
-                _links[n].selected = _links[n].options.length - 1;
+            BondCaptureWhen(
+              isEvent: _isEvent,
+              allDay: _allDay,
+              date: _date,
+              time: _time,
+              today: _today,
+              onDate: _setDate,
+              onClearDate: _clearDate,
+              onTime: (v) => _edit(() => _time = v),
+              onAllDay: (v) => _edit(() {
+                _allDay = v;
+                if (!v && _time == null) _time = '09:00';
               }),
-              linkSearch: widget.linkSearch,
-              labels: l,
-              semanticsId: _id('link-$n'),
+              idOf: _id,
+              showTimeNeedsDate: widget.showErrors,
+              labels: widget.labels,
+              taskLabels: widget.taskLabels,
             ),
+            if (marks.isNotEmpty) ...[
+              BondSpace.h8,
+              Wrap(spacing: BondSpace.s8, runSpacing: BondSpace.s4, children: marks),
+            ],
+            if (!_isEvent) ...[
+              BondSpace.h8,
+              BondSegmented<int>(
+                segments: [
+                  BondSegment(0, widget.taskLabels.noPriority),
+                  for (final p in TaskPriority.values) BondSegment(p.wire, widget.taskLabels.priorityText(p)),
+                ],
+                value: _priority?.wire ?? 0,
+                onChanged: (v) => _edit(() => _priority = TaskPriority.fromWire(v)),
+                semanticsId: _id('priority'),
+              ),
+            ],
+            for (var n = 0; n < _links.length; n++) ...[
+              BondSpace.h12,
+              BondCaptureLinkRow(
+                link: _links[n].view,
+                selected: _links[n].selected,
+                onSelect: (i) => _edit(() => _links[n].selected = i),
+                onFound: (o) => _edit(() {
+                  _links[n].options.add(o);
+                  _links[n].selected = _links[n].options.length - 1;
+                }),
+                linkSearch: widget.linkSearch,
+                labels: l,
+                semanticsId: _id('link-$n'),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -10,7 +10,7 @@ from bond_tasks_py.schema import normalize_checklist
 
 LITERAL_COLUMNS = [
     "id", "owner_user_id", "created_by", "assigned_user_id", "title", "notes", "due_date", "due_time", "priority",
-    "due_at", "status", "completed_at", "completed_by", "checklist", "remind_minutes_before", "remind_at", "reminded_at",
+    "due_at", "status", "completed_at", "completed_by", "checklist", "remind_minutes_before",
     "mirror_enabled", "mirror_status", "external_provider", "external_event_id", "external_account_user_id",
     "external_etag", "links", "source", "created_at", "updated_at",
 ]
@@ -45,12 +45,12 @@ def test_defaults_on_insert(session):
     session.add(task)
     session.flush()
     assert (task.status, task.remind_minutes_before, task.mirror_enabled, task.mirror_status, task.source) == (
-        "open", -2, True, "pending", "manual")
+        "open", -3, True, "pending", "manual")
     assert task.checklist == [] and task.links == [] and task.id
 
 
 def test_item_keys_are_the_contract_list():
-    assert len(ITEM_KEYS) == 26 and ITEM_KEYS[0] == "id" and ITEM_KEYS[-1] == "overdue"
+    assert len(ITEM_KEYS) == 24 and ITEM_KEYS[0] == "id" and ITEM_KEYS[-1] == "overdue"
 
 
 def test_client_chosen_id_pattern():
@@ -167,3 +167,15 @@ def test_new_error_codes_are_422_with_messages():
         assert CODES[code][0] == 422 and CODES[code][1]
         err = TaskError(code)
         assert err.status == 422 and err.code == code and err.message == CODES[code][1]
+
+
+def test_a_new_task_schema_defaults_to_use_my_default():
+    assert TaskCreate(title="x").remind_minutes_before == -3
+    assert TaskCreate(title="x", remind_minutes_before=-2).remind_minutes_before == -2
+
+
+@pytest.mark.parametrize("bad", ["garbage", 12345, ["x"], {"a": 1}, "", 10**30])
+def test_an_unparseable_due_at_hint_is_dropped_not_rejected(bad):
+    assert TaskCreate(title="x", due_at=bad).due_at is None
+    assert TaskUpdate(due_at=bad).due_at is None
+    assert TaskCreate(title="x", due_at="2026-11-09T14:30:00Z").due_at is not None

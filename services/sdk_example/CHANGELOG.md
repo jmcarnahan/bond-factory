@@ -22,3 +22,14 @@
 - Fake consent page is an identity picker with scope-set boxes (`sdk-consent-*` ids). New settings
   `SDK_EXAMPLE_SIGNIN_PROVIDERS`, `_PUBLIC_BASE` (also the connect callback base), `_NATIVE_RETURN_BASE`,
   `_NATIVE_SCHEMES`, `_BREAKGLASS`, `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS`.
+- TODO checklist (migration `0005_todo_tables`): tables for user settings, link index, notice ledger and outbox,
+  inbox notices and push devices; `tasks.remind_at` and `reminded_at` are dropped. Routes: `GET /tasks/today`,
+  `GET|PUT /tasks/settings`, `GET /tasks/links/search`, `POST /tasks/parse`, `GET /notices`,
+  `POST /notices/{id}/read|dismiss|act`, `POST /notices/read-all`, `POST /push/devices`,
+  `DELETE /push/devices/{device_id}`, `POST|GET /capture/events`; task reads take `time_zone` and measure `overdue`
+  against the clock. `POST /jobs/tick` now also runs the sweep (`sweep`, `deliver` in the answer). Fake-mode
+  helpers: `GET /fake/push/sent`, `PUT /fake/capture`, `PUT /fake/capture/limit`. The sync host gains `notices` and
+  `push_devices`, and task writes over sync keep the inbox in step. `scripts/sweep_interval.py` runs the sweep with
+  no jobs table. SQLite engines are prepared with `sqlite_savepoint_setup`.
+- Breaking: the in-memory notices list, `GET /tasks/notices`, the `task_reminder` job and `AppScheduler` are gone; the
+  `today` query parameter no longer decides `overdue` (the clock and the viewer zone do).

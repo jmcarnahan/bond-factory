@@ -34,7 +34,7 @@ def test_fixture_summary_counts_match(session):
     load_today_fixture(session, Task)
     mk(session, Task, "task-later", owner="user-1", due=date(2026, 3, 20), due_time="10:00",
        due_at=local_to_utc(date(2026, 3, 20), time(10, 0), FIXTURE_ZONE))
-    got = summary(session, task_model=Task, user_id="user-1", today=date(2026, 3, 11), now=FIXTURE_NOW,
+    got = summary(session, task_model=Task, user_id="user-1", now=FIXTURE_NOW,
                   viewer_zone=FIXTURE_ZONE)
     assert got == load_fixture("summary.json")
 
@@ -122,7 +122,7 @@ def test_summary_and_today_agree(session, zone):
     mk(session, Task, "eod", due=date(2026, 3, 11), due_at=datetime(2026, 3, 12, 0))
     mk(session, Task, "none")
     result = run(session, FIXTURE_NOW, zone)
-    got = summary(session, task_model=Task, user_id="u1", today=date(2000, 1, 1), now=FIXTURE_NOW, viewer_zone=zone)
+    got = summary(session, task_model=Task, user_id="u1", now=FIXTURE_NOW, viewer_zone=zone)
     assert (got["overdue"], got["due_today"], got["no_date"]) == (
         result.counts["overdue"], result.counts["today"], result.counts["undated"])
 
@@ -134,7 +134,7 @@ def test_date_only_task_whose_date_passed_for_the_viewer_but_not_its_instant_is_
     for zone in ("Australia/Sydney", "America/Los_Angeles"):
         result = run(session, now, zone)
         assert ids(result.today) == ["far"] and result.overdue == [], zone
-    got = summary(session, task_model=Task, user_id="u1", today=date(2000, 1, 1), now=now,
+    got = summary(session, task_model=Task, user_id="u1", now=now,
                   viewer_zone="Australia/Sydney")
     assert got["due_today"] == 1 and got["overdue"] == 0
     after = run(session, datetime(2026, 11, 21, 1, 0, 1), "Australia/Sydney")
@@ -148,7 +148,7 @@ def test_summary_open_equals_the_sections_plus_later_days(session):
     mk(session, Task, "none")
     now = datetime(2026, 11, 21, 0, 0)
     for zone in ("Australia/Sydney", "America/Los_Angeles", "UTC", "Pacific/Kiritimati"):
-        got = summary(session, task_model=Task, user_id="u1", today=date(2000, 1, 1), now=now, viewer_zone=zone)
+        got = summary(session, task_model=Task, user_id="u1", now=now, viewer_zone=zone)
         result = run(session, now, zone)
         upcoming = 1  # "later"
         assert got["open"] == got["overdue"] + got["due_today"] + got["no_date"] + upcoming, zone
@@ -171,7 +171,7 @@ def test_due_exactly_now_is_not_overdue_and_is_today(session):
     mk(session, Task, "t", due=date(2026, 3, 11), due_time="13:00", due_at=datetime(2026, 3, 11, 20, 0))
     result = run(session, FIXTURE_NOW, FIXTURE_ZONE)
     assert ids(result.today) == ["t"] and result.overdue == []
-    got = summary(session, task_model=Task, user_id="u1", today=date(2000, 1, 1), now=FIXTURE_NOW,
+    got = summary(session, task_model=Task, user_id="u1", now=FIXTURE_NOW,
                   viewer_zone=FIXTURE_ZONE)
     assert got["overdue"] == 0 and got["due_today"] == 1
 

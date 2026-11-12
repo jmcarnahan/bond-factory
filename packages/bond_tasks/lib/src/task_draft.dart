@@ -39,7 +39,7 @@ class TaskDraft {
     this.dueTime,
     this.assignedUserId,
     this.checklist = const [],
-    this.remindMinutesBefore = kRemindNone,
+    this.remindMinutesBefore = kRemindUseDefault,
     this.mirrorEnabled = true,
     this.links = const [],
     this.source,

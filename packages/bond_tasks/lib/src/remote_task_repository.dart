@@ -44,51 +44,54 @@ class RemoteTaskRepository implements TaskRepository {
 
   String? get _zone => timeZone?.call();
 
+  /// The server derives the day from now and `time_zone`, so the date is sent only when no zone is.
+  String? _todayFor(String? zone) => zone == null ? _today : null;
+
   /// Emits the open tasks after [refresh] and after every write made through this repository; a failed
   /// re-read arrives as a stream error. No timer runs inside: the caller decides when to refresh.
   @override
   Stream<List<Task>> watchOpen() => _open.stream;
 
   @override
-  Future<TaskToday> today() => api.today(today: _today, timeZone: _zone);
+  Future<TaskToday> today() => api.today(today: _todayFor(_zone), timeZone: _zone);
 
   @override
   Future<TaskPage> list(TaskFilters f) => api.list(_withDevice(f));
 
   @override
-  Future<TaskSummary> summary() => api.summary(today: _today, timeZone: _zone);
+  Future<TaskSummary> summary() => api.summary(today: _todayFor(_zone), timeZone: _zone);
 
   @override
   Future<Task> create(TaskDraft d) async {
-    final t = await api.create(_draft(d), today: _today, timeZone: d.timeZone ?? _zone);
+    final t = await api.create(_draft(d), today: _todayFor(d.timeZone ?? _zone), timeZone: d.timeZone ?? _zone);
     await _notify();
     return t;
   }
 
   @override
   Future<Task> update(String id, TaskPatch p) async {
-    final t = await api.update(id, _patch(p), today: _today, timeZone: p.timeZone ?? _zone);
+    final t = await api.update(id, _patch(p), today: _todayFor(p.timeZone ?? _zone), timeZone: p.timeZone ?? _zone);
     await _notify();
     return t;
   }
 
   @override
   Future<Task> complete(String id) async {
-    final t = await api.complete(id, today: _today, timeZone: _zone);
+    final t = await api.complete(id, today: _todayFor(_zone), timeZone: _zone);
     await _notify();
     return t;
   }
 
   @override
   Future<Task> reopen(String id) async {
-    final t = await api.reopen(id, today: _today, timeZone: _zone);
+    final t = await api.reopen(id, today: _todayFor(_zone), timeZone: _zone);
     await _notify();
     return t;
   }
 
   @override
   Future<Task> cancel(String id) async {
-    final t = await api.cancel(id, today: _today, timeZone: _zone);
+    final t = await api.cancel(id, today: _todayFor(_zone), timeZone: _zone);
     await _notify();
     return t;
   }
@@ -111,7 +114,7 @@ class RemoteTaskRepository implements TaskRepository {
   TaskFilters _withDevice(TaskFilters f) => TaskFilters(
         scope: f.scope,
         status: f.status,
-        today: f.today ?? _today,
+        today: f.today ?? _todayFor(f.timeZone ?? _zone),
         onOrBefore: f.onOrBefore,
         dueFrom: f.dueFrom,
         dueTo: f.dueTo,
@@ -170,7 +173,7 @@ class RemoteTaskRepository implements TaskRepository {
       final page = await api.list(TaskFilters(
         scope: 'mine',
         status: 'open',
-        today: _today,
+        today: _todayFor(_zone),
         timeZone: _zone,
         limit: _pageSize,
         offset: offset,

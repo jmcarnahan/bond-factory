@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'errors.dart';
 import 'pages.dart';
 import 'theme.dart';
+import 'todo/todo_alerts.dart';
 
 GoRouter buildDemoRouter({String initialLocation = '/'}) {
   return GoRouter(
@@ -39,7 +40,19 @@ class _SdkDemoAppState extends State<SdkDemoApp> {
   late final GoRouter _router = buildDemoRouter(initialLocation: widget.initialLocation);
 
   @override
+  void initState() {
+    super.initState();
+    TodoAlerts.openedRoute.addListener(_opened);
+  }
+
+  /// A plain tap on a phone notification opens the task: the Today page names it.
+  void _opened() {
+    if (TodoAlerts.openedRoute.value != null) _router.go('/today');
+  }
+
+  @override
   void dispose() {
+    TodoAlerts.openedRoute.removeListener(_opened);
     _router.dispose();
     super.dispose();
   }

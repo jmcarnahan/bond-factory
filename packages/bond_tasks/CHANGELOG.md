@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+Removed
+- `Task.remindAt` and `Task.remindedAt` (and the `remind_at`, `reminded_at` wire keys); the queued reminder is gone.
+- Changed: `TaskDraft.remindMinutesBefore` defaults to -3 (`kRemindUseDefault`).
+
 - `Task.priority` (`TaskPriority`) and `Task.dueAt` (keys `priority`, `due_at`, right after `due_time`);
   `TaskDraft` and `TaskPatch` gain `priority`, `dueAt`, `timeZone`; `TaskFilters.timeZone`; `kRemindUseDefault` (-3);
   `Task.copyWith`.
@@ -35,6 +39,8 @@
   device-local date of `dueAt` (the dueDate string only when `dueAt` is unknown).
 - `CaptureLabels`: `droppedOne`, `droppedMany`, `droppedNotice(n)` (the inline note when the server discarded items) and
   `titleRequired`.
+- Removed: `DemoJobsApi.notices()` and `noticesPath` (the old reminder route is gone; `runDueJobs` stays).
+  `RemoteTaskRepository` sends `today` only when it has no time zone (the server derives the day from now and `time_zone`).
 - `ParseResult.dropped` (default 0): items the model returned that the server discarded (key `dropped`, sent only above zero).
 - `TaskCandidate.copyWith` and `EventCandidate.copyWith` (with `clear*` flags) for the capture review.
 - New dependency: `crypto` (sha256 for `noticeId`).

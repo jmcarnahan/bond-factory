@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Column, DateTime, String, UniqueConstraint
 from sqlalchemy.orm import declared_attr
 
-PLATFORMS = ("ios", "android", "web")
+PLATFORMS = ("ios",)  # the only platform a sender in this lib can deliver to (APNs)
 ENVIRONMENTS = ("sandbox", "production")
 
 

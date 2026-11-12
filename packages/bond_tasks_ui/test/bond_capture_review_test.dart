@@ -281,6 +281,16 @@ void main() {
     });
   }
 
+  testWidgets('each card carries its own id as a container', (t) async {
+    final sem = t.ensureSemantics();
+    await pumpAt(t, BondCaptureReview(items: _items(), onAccept: (_) {}, onDiscard: () {}, semanticsPrefix: 'c'));
+    for (var n = 0; n < 3; n++) {
+      expect(find.bySemanticsIdentifier('c.review-item-$n'), findsOneWidget);
+    }
+    expect(find.bySemanticsIdentifier('c.review-item-0-title'), findsOneWidget);
+    sem.dispose();
+  });
+
   testWidgets('a task time can be removed (date-only) and added back; clearing the date clears the time', (t) async {
     List<CaptureItem>? got;
     await pumpAt(

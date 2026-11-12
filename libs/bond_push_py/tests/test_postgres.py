@@ -11,7 +11,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import bond_push_py.devices as devices_module
-from bond_push_py import PushError, device_routes, devices_for, register_device, unregister_device
+from bond_push_py import (
+    PushError,
+    device_routes,
+    device_row_id,
+    devices_for,
+    register_device,
+    unregister_device,
+)
 
 pytestmark = pytest.mark.postgres
 
@@ -93,21 +100,21 @@ def body(device="d1", token="tok1"):
 
 
 def test_route_collisions_are_coded_refusals(pg_session):
-    run(pg_session, "u1", "put", "d_" + "a" * 32, body())
-    with pytest.raises(PushError) as err:  # another user's row id
-        run(pg_session, "u2", "put", "d_" + "a" * 32, body(token="other"))
+    run(pg_session, "u1", "put", device_row_id("u1", "d1"), body())
+    with pytest.raises(PushError) as err:  # squatting another user's row id
+        run(pg_session, "u2", "put", device_row_id("u1", "d1"), body(token="other"))
     assert err.value.code == "not_device_owner"
-    run(pg_session, "u2", "put", "d_" + "b" * 32, body(device="phone"))  # takes u1's token: it moves
+    run(pg_session, "u2", "put", device_row_id("u2", "phone"), body(device="phone"))  # takes u1's token
     assert [(r.user_id, r.token) for r in rows(pg_session)] == [("u2", "tok1")]
-    run(pg_session, "u2", "put", "d_" + "c" * 32, body(device="phone", token="tok2"))  # same device, new id
+    run(pg_session, "u2", "put", device_row_id("u2", "phone"), body(device="phone", token="tok2"))
     (row,) = rows(pg_session)
-    assert row.id == "d_" + "b" * 32 and row.token == "tok2"
+    assert row.id == device_row_id("u2", "phone") and row.token == "tok2"
 
 
 def test_route_patch_moves_a_held_token_and_changes_environment(pg_session):
-    run(pg_session, "u1", "put", "d_" + "a" * 32, body())
-    run(pg_session, "u2", "put", "d_" + "b" * 32, body(device="d2", token="tok2"))
-    run(pg_session, "u2", "patch", "d_" + "b" * 32, {"token": "tok1", "environment": "production"})
+    run(pg_session, "u1", "put", device_row_id("u1", "d1"), body())
+    run(pg_session, "u2", "put", device_row_id("u2", "d2"), body(device="d2", token="tok2"))
+    run(pg_session, "u2", "patch", device_row_id("u2", "d2"), {"token": "tok1", "environment": "production"})
     (row,) = rows(pg_session)
     assert (row.user_id, row.token, row.environment) == ("u2", "tok1", "production")
 

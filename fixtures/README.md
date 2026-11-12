@@ -50,4 +50,4 @@ Contract for the sync files: `docs/contracts/sync_upload.md`.
 Synthetic fixtures only; no third-party report data is tracked. Expected totals come from the closed-form
 geometry of each synthetic case.
 
-Note: `tasks/summary.json` counts five open tasks: the four open ones in `tasks/today.json` plus one due on a later day, which the day view does not list.
+Note: `tasks/summary.json` has `"open": 5`, which counts one later-day task that is not in `tasks/today.json`: five open tasks, the four open ones in `tasks/today.json` plus one due on a later day, which the day view does not list.

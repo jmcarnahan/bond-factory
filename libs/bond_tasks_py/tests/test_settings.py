@@ -138,3 +138,21 @@ def test_wire_item_matches_the_fixture(session):
     assert settings_item(UserPrefs(), ["lead_longer_than_work_day"]) == {
         "time_zone": None, "start_of_day": "08:00", "end_of_day": "17:00", "lead_minutes": 60,
         "warnings": ["lead_longer_than_work_day"]}
+
+
+def test_on_recomputed_is_called_once_per_task_whose_instant_really_moved(session):
+    day = date(2026, 3, 20)
+    update(session, time_zone=LA)
+    old = local_to_utc(day, time(17), LA)
+    mk(session, Task, "dated", due=day, due_at=old)
+    mk(session, Task, "timed", due=day, due_time="10:00", due_at=local_to_utc(day, time(10), LA))
+    mk(session, Task, "theirs", owner="u2", due=day, due_at=old)
+    seen = []
+    update_settings(session, settings_model=UserSettings, task_model=Task, user_id="u1",
+                    data=SettingsUpdate(end_of_day="18:30"), tz="UTC", now=NOW,
+                    on_recomputed=lambda task, was: seen.append((task.id, was, task.due_at)))
+    assert seen == [("dated", old, local_to_utc(day, time(18, 30), LA))]
+    seen.clear()  # nothing moves when the change does not touch the instant
+    update_settings(session, settings_model=UserSettings, task_model=Task, user_id="u1",
+                    data=SettingsUpdate(lead_minutes=45), tz="UTC", now=NOW, on_recomputed=lambda t, w: seen.append(t))
+    assert seen == []

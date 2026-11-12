@@ -4,6 +4,7 @@ No row means defaults. Two times define the work day; quiet hours are derived (a
 ``start_of_day``), so there are no quiet-hours columns.
 """
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -54,12 +55,15 @@ def _work_day_minutes(start: str, end: str) -> int:
 
 
 def update_settings(session: Any, *, settings_model: Any, task_model: Any, user_id: str, data: SettingsUpdate,
-                    tz: str, now: datetime) -> tuple[UserPrefs, list[str]]:
+                    tz: str, now: datetime,
+                    on_recomputed: Callable[[Any, datetime | None], None] | None = None) -> tuple[UserPrefs, list[str]]:
     """Upsert the row, recompute date-only due instants in the same transaction, return prefs and warnings.
 
     Only the fields sent change. An unknown zone is ``invalid_time_zone``; equal start and end is
     ``invalid_work_day``; a work day across midnight is fine. Changing ``end_of_day`` or ``time_zone`` moves the
     ``due_at`` of the user's open date-only tasks (``tz`` is the app default zone for a user with none stored).
+    ``on_recomputed(task, old_due_at)`` (optional) is called once per task whose ``due_at`` really changed, after
+    the flush, so a host can put away the stale notices (``dismiss_stale``).
     Warnings never block the write: ``lead_longer_than_work_day``, and ``time_zone_unknown`` when the work day
     changed while the user has no stored zone (their date-only tasks then follow the app default zone)."""
     sent = data.model_fields_set
@@ -85,7 +89,8 @@ def update_settings(session: Any, *, settings_model: Any, task_model: Any, user_
     prefs = _prefs(row)
     if prefs.end_of_day != before.end_of_day or prefs.time_zone != before.time_zone:
         due.recompute_day_due(session, task_model=task_model, user_id=user_id,
-                              prefs=StoredPreferences(settings_model), tz=tz, now=now)
+                              prefs=StoredPreferences(settings_model), tz=tz, now=now,
+                              on_recomputed=on_recomputed)
     warnings = []
     day_changed = (prefs.start_of_day, prefs.end_of_day) != (before.start_of_day, before.end_of_day)
     if day_changed and prefs.time_zone is None:

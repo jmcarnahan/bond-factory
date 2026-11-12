@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 import pytest
-from conftest import NOW, FakeScheduler, Task
+from conftest import NOW, Task
 
 from bond_tasks_py import TaskCreate, TaskError, service, sync_routes, verdict_for
 
@@ -116,16 +116,6 @@ def test_delete_is_hard_idempotent_and_owner_only(session):
     call(route, session, "u1", Op("t1", "delete"))
     assert session.get(Task, "t1") is None
     call(route, session, "u1", Op("t1", "delete"))  # replayed delete: success
-
-
-def test_scheduler_follows_writes_and_deletes(session):
-    scheduler = FakeScheduler()
-    route = routes(scheduler=scheduler)[("tasks", None)]
-    data = {"title": "A", "due_date": date(2026, 11, 9), "due_time": "10:00", "remind_minutes_before": 0}
-    call(route, session, "u1", Op("t1", "put"), data)
-    assert "task_reminder:t1" in scheduler.jobs
-    call(route, session, "u1", Op("t1", "delete"))
-    assert scheduler.jobs == {}
 
 
 def test_hooks_get_the_context_and_the_pointer(session):
@@ -318,3 +308,34 @@ def test_permissions_and_link_hook_are_passed_down(session):
     call(table[("tasks", None)], session, "u1", Op("d1", "put"), {"title": "A"})
     call(table[("tasks", None)], session, "u3", Op("d1", "patch"), {"title": "B"})  # u3 may edit under the policy
     assert session.get(Task, "d1").title == "B" and hooked == ["d1", "d1"]
+
+
+def test_on_deleted_gets_the_id_and_owner_even_without_a_mirror(session):
+    seen = []
+    route = routes(on_deleted=lambda ctx, s, task_id, owner: seen.append((task_id, owner)))[("tasks", None)]
+    call(route, session, "u1", Op("t1", "put"), {"title": "A"})
+    call(route, session, "u1", Op("t1", "delete"))
+    call(route, session, "u1", Op("t1", "delete"))  # already gone: no second call
+    assert seen == [("t1", "u1")]
+
+
+@pytest.mark.parametrize("priority", [0, 7])
+def test_a_priority_outside_one_to_three_is_invalid_priority_on_put_and_patch(session, priority):
+    route = routes()[("tasks", None)]
+    with pytest.raises(TaskError) as caught:
+        call(route, session, "u1", Op("t9", "put"), {"title": "A", "priority": priority})
+    assert caught.value.code == "invalid_priority" and caught.value.status == 422
+    call(route, session, "u1", Op("t1", "put"), {"title": "A"})
+    with pytest.raises(TaskError) as caught:
+        call(route, session, "u1", Op("t1", "patch"), {"priority": priority})
+    assert caught.value.code == "invalid_priority"
+
+
+def test_an_unparseable_due_at_is_ignored_like_a_wrong_hint_on_put_and_patch(session):
+    route = routes()[("tasks", None)]
+    for n, bad in enumerate(("garbage", 12345, 1.5, ["x"], {"a": 1}, 10**30)):
+        data = {"title": "A", "due_date": "2026-11-09", "due_time": "09:30", "due_at": bad}
+        call(route, session, "u1", Op(f"g{n}", "put"), data)
+        assert session.get(Task, f"g{n}").due_at == datetime(2026, 11, 9, 9, 30)
+        call(route, session, "u1", Op(f"g{n}", "patch"), {"due_time": "11:00", "due_at": bad})
+        assert session.get(Task, f"g{n}").due_at == datetime(2026, 11, 9, 11, 0)

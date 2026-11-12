@@ -57,8 +57,6 @@ TASK_COLUMNS: dict[str, bool] = {
     "completed_by": True,
     "checklist": False,
     "remind_minutes_before": False,
-    "remind_at": True,
-    "reminded_at": True,
     "mirror_enabled": False,
     "mirror_status": False,
     "external_provider": True,
@@ -97,9 +95,8 @@ class TasksMixin:
     completed_at = Column(DateTime, nullable=True)
     completed_by = Column(String, nullable=True)
     checklist = Column(JSON, nullable=False, default=list)  # [{id, text, done_at|None}]
-    remind_minutes_before = Column(Integer, nullable=False, default=NO_REMINDER)  # -2 none, -1 morning of, N before
-    remind_at = Column(DateTime, nullable=True)  # computed, naive UTC
-    reminded_at = Column(DateTime, nullable=True)
+    # -3 my default, -2 none, -1 morning of the due date, N minutes before
+    remind_minutes_before = Column(Integer, nullable=False, default=USE_DEFAULT_REMINDER)
     mirror_enabled = Column(Boolean, nullable=False, default=True)
     mirror_status = Column(String, nullable=False, default=MirrorStatus.PENDING.value)
     external_provider = Column(String, nullable=True)  # "google" | "microsoft"

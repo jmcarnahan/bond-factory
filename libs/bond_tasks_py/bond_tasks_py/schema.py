@@ -8,6 +8,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from bond_tasks_py.models import USE_DEFAULT_REMINDER
 from bond_tasks_py.timeutil import iso_z, parse_iso, to_naive_utc
 
 ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
@@ -67,8 +68,19 @@ class _TaskFields(BaseModel):
     assigned_user_id: Text | None = None
     checklist: list[ChecklistInput] = Field(default_factory=list, max_length=200)
     links: list[LinkInput] = Field(default_factory=list, max_length=50)
-    remind_minutes_before: int = Field(default=-2, ge=MIN_REMIND_MINUTES, le=MAX_REMIND_MINUTES)
+    remind_minutes_before: int = Field(default=USE_DEFAULT_REMINDER, ge=MIN_REMIND_MINUTES, le=MAX_REMIND_MINUTES)
     mirror_enabled: bool = True
+
+    @field_validator("due_at", mode="before")
+    @classmethod
+    def _hint_never_rejects(cls, value: object) -> object:
+        """``due_at`` is only a hint: a value that does not parse is dropped (the server computes), never a 422."""
+        if value is None or isinstance(value, datetime):
+            return value
+        try:
+            return parse_iso(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError, OverflowError):
+            return None
 
 
 class TaskCreate(_TaskFields):

@@ -1,54 +1,30 @@
-"""Wires bond_tasks_py into the example: the job-queue scheduler, the reminder handler and the calendar mirror.
+"""Wires bond_tasks_py into the example: the calendar mirror and the helpers the routes share.
 
-    AppScheduler    the lib's `Scheduler` over `bond_jobs.enqueue` (the dedupe key is the idempotency key)
-    install(app)    registers the `task_reminder` handler; its `notify` appends to `app.state.notices` (a fake
-                    notification channel that `GET /tasks/notices` reads back)
     MirrorProviders the lib's `MirrorProviders` over the user's live OAuth connection and `calendar_wiring`
+    install(app)    builds them and the TODO wiring (`todo_wiring.py`: preferences, inbox, push, capture)
+    user_names, user_exists   the two lookups the lib's service takes
 
-Nothing here is Task-specific beyond the model class, so an app copies this file and swaps its own notifier.
+Notices are not made here: the sweep (`sweep_wiring.py`) claims them and the inbox stores them.
 """
 
 from __future__ import annotations
 
-from collections import deque
-from datetime import datetime
 from typing import Any
 
 import bond_calendar as cal
-import bond_jobs
-from bond_tasks_py import JOB_TYPE, fire_reminder
 from bond_tasks_py.protocols import MirrorDraft
 from fastapi import FastAPI
-from sqlalchemy import delete
 
-from . import calendar_wiring
+from . import calendar_wiring, todo_wiring
 from .db import session_scope
 from .models.auth import User
 from .models.connections import OAuthConnection
-from .models.jobs import BackgroundJob
-from .models.tasks import Task
 from .oauth_wiring import FAKE_GOOGLE, FAKE_MICROSOFT
 from .settings import Settings
 
 #: registered OAuth provider name -> the label stored in tasks.external_provider
 LABELS = {FAKE_GOOGLE: "google", FAKE_MICROSOFT: "microsoft", "google": "google", "microsoft": "microsoft"}
 ORDER = {"fake": (FAKE_GOOGLE, FAKE_MICROSOFT), "real": ("google", "microsoft")}
-
-
-class AppScheduler:
-    """`Scheduler` over the example's job table. Cancel removes every job under the key that is not running, so a
-    reminder that already ran can be scheduled again after its time moves."""
-
-    def __init__(self, app: FastAPI) -> None:
-        self.app = app
-
-    def enqueue(self, session: Any, *, job_type: str, payload: dict, run_at: datetime, dedupe_key: str) -> None:
-        bond_jobs.enqueue(session, BackgroundJob, job_type, payload, run_at=run_at, key=dedupe_key,
-                          now=self.app.state.clock.now())
-
-    def cancel(self, session: Any, *, dedupe_key: str) -> None:
-        session.execute(delete(BackgroundJob).where(BackgroundJob.idempotency_key == dedupe_key,
-                                                    BackgroundJob.status != "running"))
 
 
 class _SessionMirror:
@@ -97,42 +73,12 @@ class MirrorProviders:
         return None
 
 
-NOTICE_LIMIT = 500
-
-
-def notices(app: FastAPI) -> deque[dict]:
-    """The fake notification channel: the newest 500 notices, in memory."""
-    if getattr(app.state, "notices", None) is None:
-        app.state.notices = deque(maxlen=NOTICE_LIMIT)
-    return app.state.notices
-
-
 def install(app: FastAPI) -> None:
-    """Idempotent. Builds the scheduler and providers and registers the reminder job handler."""
-    if getattr(app.state, "tasks_scheduler", None) is not None:
+    """Idempotent. Builds the calendar-mirror providers and the TODO wiring (preferences, inbox, push, capture)."""
+    if getattr(app.state, "mirror_providers", None) is not None:
         return
-    app.state.tasks_scheduler = AppScheduler(app)
     app.state.mirror_providers = MirrorProviders(app)
-    notices(app)
-
-    @app.state.job_registry.handler(JOB_TYPE)
-    def task_reminder(session: Any, payload: dict, now: datetime) -> dict:
-        def notify(task: Task) -> None:
-            who = task.assigned_user_id or task.owner_user_id
-            remind_at = task.remind_at.strftime("%Y-%m-%dT%H:%M:%SZ") if task.remind_at else None
-            if any(n["task_id"] == task.id and n["remind_at"] == remind_at for n in notices(app)):
-                return  # the job ran before and its transaction rolled back after notifying: not a second notice
-            notices(app).append({
-                "task_id": task.id, "title": task.title, "user_id": who, "owner_user_id": task.owner_user_id,
-                "assigned_user_id": task.assigned_user_id,
-                "remind_at": remind_at,
-                "fired_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "message": f"Reminder: {task.title}",
-            })
-
-        fired = fire_reminder(session, Task, payload["task_id"], notify, now=now)
-        return {"summary": "reminded" if fired else "nothing to remind", "skipped": not fired,
-                "reason": None if fired else "not_due_or_done"}
+    todo_wiring.install(app)
 
 
 def user_names(session: Any):

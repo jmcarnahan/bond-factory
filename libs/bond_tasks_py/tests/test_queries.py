@@ -15,7 +15,7 @@ def add(session, owner="u1", **fields):
 
 def titles(session, user="u1", limit=25, offset=0, **filters):
     rows, total = list_tasks(session, task_model=Task, user_id=user, filters=TaskFilters(**filters), limit=limit,
-                             offset=offset)
+                             offset=offset, now=NOW)
     return [t.title for t in rows], total
 
 
@@ -107,20 +107,21 @@ def test_link_ids_with_odd_characters_are_matched_exactly(session):
 
 def test_summary_counts_my_open_tasks(session):
     seed(session)
-    assert summary(session, task_model=Task, user_id="u1", today=TODAY) == {
-        "open": 6, "overdue": 1, "due_today": 3, "no_date": 1}
+    assert summary(session, task_model=Task, user_id="u1", now=NOW, viewer_zone="UTC") == {
+        "open": 6, "overdue": 2, "due_today": 2, "no_date": 1}  # at 12:00: late and today-a are past their instants
 
 
 def test_summary_ignores_other_users(session):
     seed(session)
-    assert summary(session, task_model=Task, user_id="u3", today=TODAY) == {
+    assert summary(session, task_model=Task, user_id="u3", now=NOW, viewer_zone="UTC") == {
         "open": 0, "overdue": 0, "due_today": 0, "no_date": 0}
 
 
 # --- viewer zone and the link index ---
 
 def viewer_rows(session, zone="America/Los_Angeles", **filters):
-    rows, total = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(**filters), viewer_zone=zone)
+    rows, total = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(**filters), viewer_zone=zone,
+                             now=NOW)
     return [t.id for t in rows], total
 
 
@@ -153,13 +154,14 @@ def test_viewer_zone_ranges_use_the_viewers_day(session):
 def test_without_viewer_zone_the_old_ranges_hold(session):
     seed_instants(session)
     day = date(2026, 3, 11)
-    rows, _ = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(due_from=day, due_to=day))
+    rows, _ = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(due_from=day, due_to=day),
+                         now=NOW)
     assert sorted(t.id for t in rows) == ["eod", "late-night", "morning"]
 
 
 def test_summary_with_a_viewer_counts_by_instant(session):
     seed_instants(session)
-    got = summary(session, task_model=Task, user_id="u1", today=date(2000, 1, 1), now=datetime(2026, 3, 11, 20, 0),
+    got = summary(session, task_model=Task, user_id="u1", now=datetime(2026, 3, 11, 20, 0),
                   viewer_zone="America/Los_Angeles")
     assert got == {"open": 6, "overdue": 2, "due_today": 2, "no_date": 1}  # morning and stale are overdue
 
@@ -170,10 +172,10 @@ def test_link_filter_through_the_index_pages_in_sql(session):
         mk(session, Task, f"t{n}", links=[link], index_model=LinkIndex)
     mk(session, Task, "other-kind", links=[{"kind": "project", "id": "c1", "label": "P"}], index_model=LinkIndex)
     filters = TaskFilters(link_kind="contact", link_id="c1")
-    old, old_total = list_tasks(session, task_model=Task, user_id="u1", filters=filters)
+    old, old_total = list_tasks(session, task_model=Task, user_id="u1", filters=filters, now=NOW)
     page, total = list_tasks(session, task_model=Task, user_id="u1", filters=filters, link_index_model=LinkIndex,
-                             limit=2, offset=2)
+                             limit=2, offset=2, now=NOW)
     assert total == old_total == 4 and [t.id for t in page] == [t.id for t in old][2:4]
     anykind, n = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(link_id="c1"),
-                            link_index_model=LinkIndex)
+                            link_index_model=LinkIndex, now=NOW)
     assert n == 5 and len(anykind) == 5

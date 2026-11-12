@@ -8,4 +8,5 @@
 - `notice_routes` (device patch of `read_at` and `dismissed_at` on own rows), `NoticeRoute`, `verdict_for`.
 - `dismiss_stale`; `InboxNotifier` puts away live notices made for an old due instant of the same user and task.
 - Postgres lane: every service test also runs on PostgreSQL when `BOND_TEST_POSTGRES_URL` is set.
+- `dismiss_for_source(..., user_ids=None)`: optionally limit to chosen users (empty dismisses nothing).
 - Error code `invalid_cursor` (422).

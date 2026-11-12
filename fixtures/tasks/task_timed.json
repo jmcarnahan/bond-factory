@@ -13,8 +13,6 @@
   "assignee_name": null,
   "checklist": [],
   "remind_minutes_before": -3,
-  "remind_at": null,
-  "reminded_at": null,
   "links": [
     {
       "kind": "contact",

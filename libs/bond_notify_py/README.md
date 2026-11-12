@@ -36,6 +36,8 @@ notice already read or dismissed stays so). Notices are read by attribute (`Noti
   too. Call `dismiss_stale(session, Notice, task_id, due_at, now)` when a task's due time changes (it puts away notices made for any other due instant; None puts away
   all). The notifier does the same for the writing user's task: a notice for a new due instant dismisses the
   live ones of that user and task made for an old instant.
+- After a reassignment, `dismiss_for_source(..., user_ids=[old_assignee])` puts away only that user's notices
+  of the task (None means everyone; an empty list dismisses nothing).
 - Reading or dismissing twice keeps the first stamp. `NoticeError`: `notice_not_found` (404),
   `not_notice_owner` (403), `invalid_cursor` (422).
 

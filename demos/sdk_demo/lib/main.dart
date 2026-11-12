@@ -4,6 +4,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'src/app.dart';
 import 'src/errors.dart';
+import 'src/todo/todo_alerts.dart';
 
 export 'src/app.dart' show SdkDemoApp;
 
@@ -14,5 +15,7 @@ void main() {
   // Walk harness only: never call this in a shipped app.
   SemanticsBinding.instance.ensureSemantics();
   installErrorCapture();
+  // The only alert wiring: a TaskAlertsCoordinator that starts after sign-in (see todo_alerts.dart).
+  TodoAlerts.install();
   runApp(const SdkDemoApp());
 }

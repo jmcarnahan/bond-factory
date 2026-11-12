@@ -67,7 +67,7 @@ def test_retarget_moves_links_in_json_and_index(session):
     assert by_id["other"].links == [link("keep")]
     assert_index_agrees(session)
     rows, total = list_tasks(session, task_model=Task, user_id="u1", link_index_model=LinkIndex,
-                             filters=TaskFilters(link_kind="contact", link_id="new"))
+                             filters=TaskFilters(link_kind="contact", link_id="new"), now=NOW)
     assert total == 2 and {t.id for t in rows} == {"only", "several"}
 
 

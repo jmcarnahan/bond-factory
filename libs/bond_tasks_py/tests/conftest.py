@@ -87,19 +87,6 @@ class Unavailable(Exception):
     status = 503
 
 
-class FakeScheduler:
-    def __init__(self):
-        self.jobs: dict[str, dict] = {}
-        self.cancelled: list[str] = []
-
-    def enqueue(self, session, *, job_type, payload, run_at, dedupe_key):
-        self.jobs[dedupe_key] = {"job_type": job_type, "payload": payload, "run_at": run_at}
-
-    def cancel(self, session, *, dedupe_key):
-        self.cancelled.append(dedupe_key)
-        self.jobs.pop(dedupe_key, None)
-
-
 class FakeMirror:
     def __init__(self):
         self.events: dict[str, dict] = {}

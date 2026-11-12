@@ -39,6 +39,8 @@ Fill in a row only for modules the app imports; delete the rest. Update this fil
 | bond_tasks_powersync | | | |
 | bond_notify_powersync | | | |
 
+The TODO modules (`bond_tasks*`, `bond_notify*`, `bond_push*`, `bond_capture_py`) are first pinned at `<this branch's merge commit>`. The commit id is filled in when the branch is merged.
+
 Rules:
 - A local patch names the file, the reason and the upstream issue or PR. No patch lives longer than one upgrade.
 - Divergence belongs in the app's adapters, not in a patched copy of a module.

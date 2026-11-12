@@ -16,8 +16,6 @@
     {"id": "chk-2", "text": "Attach the estimate", "done_at": null}
   ],
   "remind_minutes_before": 15,
-  "remind_at": "2026-03-12T09:15:00Z",
-  "reminded_at": null,
   "links": [
     {"kind": "contact", "id": "contact-1", "label": "Sample Customer"}
   ],

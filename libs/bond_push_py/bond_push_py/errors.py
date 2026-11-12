@@ -2,7 +2,7 @@
 
 #: code -> (HTTP status, default message)
 CODES: dict[str, tuple[int, str]] = {
-    "invalid_platform": (422, "Platform must be ios, android or web."),
+    "invalid_platform": (422, "Platform must be ios."),
     "invalid_environment": (422, "Environment must be sandbox or production."),
     "token_required": (422, "A device token is required."),
     "device_id_required": (422, "A device id is required."),

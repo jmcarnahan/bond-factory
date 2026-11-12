@@ -1,5 +1,5 @@
 """Task service functions: ``fn(session, ...)``. They flush, never commit: the caller owns the transaction, so a task
-write and its reminder job commit together.
+write and its notices commit together.
 
 Authorization: an editor is the owner or the assignee. Delete, cancel and reassign are owner-only. Reading is open.
 """
@@ -26,7 +26,6 @@ from bond_tasks_py.lifecycle import (
 from bond_tasks_py.mirror import mark_mirror
 from bond_tasks_py.models import TaskStatus
 from bond_tasks_py.protocols import AfterWrite, Permissions, UserPrefs
-from bond_tasks_py.reminders import refresh_remind_at
 from bond_tasks_py.schema import TaskCreate, TaskUpdate, checklist_item, normalize_checklist, normalize_links
 from bond_tasks_py.timeutil import parse_iso, to_naive_utc
 
@@ -112,7 +111,6 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
     _check_time(task)
     apply_extras(task, extras, host_columns)
     task.due_at = _due_at(task, data, zone=zone, actor_user_id=actor_user_id, tz=tz, session=session, prefs=prefs)
-    refresh_remind_at(task, tz)
     mark_mirror(task)
     try:
         with session.begin_nested():
@@ -175,7 +173,6 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
     elif before != (task.due_date, task.due_time) or (reassigning and not task.due_time):
         task.due_at = _due_at(task, data, zone=zone, actor_user_id=actor_user_id, tz=tz, session=session,
                               prefs=prefs)
-    refresh_remind_at(task, tz)
     mark_mirror(task)
     task.updated_at = now
     session.flush()

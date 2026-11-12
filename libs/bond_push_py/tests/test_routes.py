@@ -37,8 +37,25 @@ def route():
     return device_routes(PushDevice, now=lambda: LATER)[("push_devices", None)]
 
 
+ALIAS: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _clear_aliases():
+    ALIAS.clear()
+
+
+def real(alias):
+    return ALIAS.get(alias, alias)
+
+
 def run(route, session, user, op, row_id, data=None):
-    route.handler(session, Ctx(user), Op(op, row_id), data or {})
+    """``row-N`` aliases stand for the formula id of the first put's (user, device); other ids pass through."""
+    data = data or {}
+    if row_id.startswith("row-") and row_id not in ALIAS and op == "put" and isinstance(data.get("device_id"), str):
+        uid = user if isinstance(user, str) else user.user_id
+        ALIAS[row_id] = device_row_id(uid, data["device_id"])
+    route.handler(session, Ctx(user), Op(op, real(row_id)), data)
 
 
 def all_rows(session):
@@ -54,7 +71,7 @@ def test_route_shape(route):
 def test_put_creates_own_row_with_op_id_and_ignores_client_user_id(route, session):
     run(route, session, "u1", "put", "row-1", insert())
     (row,) = all_rows(session)
-    assert (row.id, row.user_id, row.device_id, row.token) == ("row-1", "u1", "d1", "tok1")
+    assert (row.id, row.user_id, row.device_id, row.token) == (real("row-1"), "u1", "d1", "tok1")
     assert row.last_seen_at == LATER
 
 
@@ -67,7 +84,7 @@ def test_put_replay_updates_the_same_row(route, session):
     run(route, session, "u1", "put", "row-1", insert())
     run(route, session, "u1", "put", "row-1", insert(token="tok2") | {"device_id": "changed"})
     (row,) = all_rows(session)
-    assert (row.id, row.device_id, row.token) == ("row-1", "d1", "tok2")
+    assert (row.id, row.device_id, row.token) == (real("row-1"), "d1", "tok2")
 
 
 def test_put_onto_another_users_row_id_is_refused(route, session):
@@ -81,7 +98,7 @@ def test_put_onto_another_users_row_id_is_refused(route, session):
 def test_put_with_a_token_held_elsewhere_moves_it(route, session):
     run(route, session, "u1", "put", "row-1", insert())
     run(route, session, "u2", "put", "row-2", insert(device="phone"))
-    assert [(r.id, r.user_id) for r in all_rows(session)] == [("row-2", "u2")]
+    assert [(r.id, r.user_id) for r in all_rows(session)] == [(real("row-2"), "u2")]
 
 
 def test_put_validation_is_a_coded_refusal(route, session):
@@ -99,8 +116,8 @@ def test_patch_updates_the_writable_fields_but_never_the_device_id(route, sessio
     row = all_rows(session)[0]
     row.disabled_at = NOW
     run(route, session, "u1", "patch", "row-1",
-        {"token": "tok2", "platform": "web", "topic": "com.example.other", "device_id": "zzz", "user_id": "x"})
-    assert (row.token, row.platform, row.topic) == ("tok2", "web", "com.example.other")
+        {"token": "tok2", "topic": "com.example.other", "device_id": "zzz", "user_id": "x"})
+    assert (row.token, row.platform, row.topic) == ("tok2", "ios", "com.example.other")
     assert (row.device_id, row.user_id, row.environment) == ("d1", "u1", "sandbox")
     assert row.last_seen_at == LATER and row.disabled_at is None
 
@@ -123,6 +140,47 @@ def test_patch_validates_like_register_and_writes_nothing_on_refusal(route, sess
         assert err.value.code == code
     row = all_rows(session)[0]
     assert (row.token, row.environment, row.platform, row.last_seen_at) == ("tok1", "sandbox", "ios", LATER)
+
+
+def test_android_and_web_are_refused_on_put_and_patch(route, session):
+    for platform in ("android", "web"):
+        with pytest.raises(PushError) as err:
+            run(route, session, "u1", "put", "row-1", insert() | {"platform": platform})
+        assert err.value.code == "invalid_platform"
+    run(route, session, "u1", "put", "row-1", insert())
+    with pytest.raises(PushError) as err:
+        run(route, session, "u1", "patch", "row-1", {"platform": "web"})
+    assert err.value.code == "invalid_platform"
+
+
+def test_squatting_another_users_row_id_is_rejected_and_the_victim_is_unharmed(route, session):
+    victim_id = device_row_id("u2", "phone-1")
+    with pytest.raises(PushError) as err:
+        run(route, session, "u1", "put", victim_id, insert(device="phone-1"))
+    assert err.value.code == "not_device_owner" and verdict_for(err.value) == ("forbidden", "not_device_owner")
+    assert all_rows(session) == []
+    with pytest.raises(PushError):  # any id that is not the caller's own formula id
+        run(route, session, "u1", "put", "d_" + "0" * 32, insert())
+    register_device(session, PushDevice, user_id="u2", device_id="phone-1", token="v", platform="ios",
+                    environment="sandbox", topic=None, now=NOW)  # the victim registers fine
+    run(route, session, "u2", "put", victim_id, insert(device="phone-1", token="v2"))  # and syncs fine
+    (row,) = all_rows(session)
+    assert (row.id, row.user_id, row.token) == (victim_id, "u2", "v2")
+
+
+def test_patch_and_delete_of_a_missing_squat_id_do_nothing_harmful(route, session):
+    with pytest.raises(PushError):
+        run(route, session, "u1", "patch", device_row_id("u2", "phone-1"), {"token": "x"})
+    run(route, session, "u1", "delete", device_row_id("u2", "phone-1"))
+    assert all_rows(session) == []
+
+
+def test_honest_row_stays_patchable_and_deletable(route, session):
+    run(route, session, "u1", "put", device_row_id("u1", "d1"), insert())
+    run(route, session, "u1", "patch", device_row_id("u1", "d1"), {"token": "n"})
+    assert all_rows(session)[0].token == "n"
+    run(route, session, "u1", "delete", device_row_id("u1", "d1"))
+    assert all_rows(session) == []
 
 
 def test_patch_can_clear_the_topic(route, session):
@@ -153,13 +211,13 @@ def test_phone_put_with_the_formula_id_then_rest_register_is_one_row(route, sess
 def test_put_with_the_phones_row_id_after_a_legacy_random_id_keeps_one_row_and_the_old_id(route, session):
     old = register_device(session, PushDevice, user_id="u1", device_id="d1", token="tok0", platform="ios",
                           environment="sandbox", topic=None, now=NOW, row_id="legacy-random-id")
-    run(route, session, "u1", "put", "d_" + "a" * 32, insert())
+    run(route, session, "u1", "put", device_row_id("u1", "d1"), insert())
     (row,) = all_rows(session)
-    assert row is old and row.token == "tok1" and row.id != "d_" + "a" * 32
+    assert row is old and row.token == "tok1" and row.id == "legacy-random-id"
 
 
 def test_rest_registration_after_the_phones_put_keeps_one_row_and_the_phones_id(route, session):
-    phone_id = "d_" + "b" * 32
+    phone_id = device_row_id("u1", "d1")
     run(route, session, "u1", "put", phone_id, insert())
     register_device(session, PushDevice, user_id="u1", device_id="d1", token="tok9", platform="ios",
                     environment="production", topic=None, now=NOW)
@@ -177,7 +235,7 @@ def test_patch_token_collision_moves_the_token(route, session):
     run(route, session, "u1", "put", "row-1", insert())
     run(route, session, "u2", "put", "row-2", insert(device="d2", token="tok2"))
     run(route, session, "u2", "patch", "row-2", {"token": "tok1"})
-    assert [(r.id, r.token) for r in all_rows(session)] == [("row-2", "tok1")]
+    assert [(r.id, r.token) for r in all_rows(session)] == [(real("row-2"), "tok1")]
 
 
 def test_patch_another_users_or_missing_row(route, session):

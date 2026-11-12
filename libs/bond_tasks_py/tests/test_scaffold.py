@@ -29,8 +29,7 @@ def test_all_exports_exist():
 
 
 def test_the_existing_public_names_are_still_exported():
-    for name in ("TASK_COLUMNS", "ITEM_KEYS", "JOB_TYPE", "Scheduler", "sync_routes", "compute_remind_at",
-                 "fire_reminder", "schedule_reminder", "task_item", "TasksMixin", "create", "summary"):
+    for name in ("TASK_COLUMNS", "ITEM_KEYS", "sync_routes", "task_item", "TasksMixin", "create", "summary"):
         assert name in lib.__all__
 
 

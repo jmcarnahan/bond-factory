@@ -6,8 +6,8 @@ Role: tasks table, services, due instants, notice stages, sweep, outbox, calenda
 - `due.py` zone arithmetic, `is_overdue`; `permissions.py`, `lifecycle.py`, `hostcols.py`; `today.py`, `links.py`
 - Mixins + `*_COLUMNS`: `usersettings.py`, `link_index.py`, `ledger.py`, `outbox.py` (`settings_schema.py` input)
 - `stages.py` notice_id/fnv1a31/stages; `quiet.py`; `sweep.py` + `sweep_claim.py` claim; `outbox.py` deliver; `retention.py`; `compose.py`
-- Seams: `protocols.py` (prefs, permissions, links, scheduler, mirror); `notify_protocols.py` (Notice, notifiers)
-- `reminders.py` queued reminder (to be removed); `mirror.py`; `sync_routes.py`; `dialect.py` ON CONFLICT insert, `sqlite_savepoint_setup`, `ensure_savepoint_safe`
+- Seams: `protocols.py` (prefs, permissions, links, mirror); `notify_protocols.py` (Notice, notifiers)
+- `mirror.py`; `sync_routes.py`; `dialect.py` ON CONFLICT insert, `sqlite_savepoint_setup`, `ensure_savepoint_safe`
 - Fixtures in `../../fixtures/tasks/` (task*.json, stage_times.json, notice_ids.json) pin Dart parity
 - Rules: `docs/decisions/2026-11-11-due-instant.md`, `-notify-ledger.md`, `-links.md`
 

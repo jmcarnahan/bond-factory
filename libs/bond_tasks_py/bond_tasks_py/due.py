@@ -5,6 +5,7 @@ exist (spring forward) moves forward and an ambiguous one (fall back) takes the 
 ``timeutil.local_to_utc`` already does.
 """
 
+from collections.abc import Callable
 from datetime import UTC, date, datetime, time, timedelta
 from functools import cache
 from typing import Any
@@ -87,23 +88,27 @@ def is_overdue(task: Any, now: datetime, *, viewer_today: date | None = None) ->
 
 
 def recompute_day_due(session: Any, *, task_model: Any, user_id: str, prefs: Preferences, tz: str,
-                      now: datetime) -> int:
+                      now: datetime, on_recomputed: Callable[[Any, datetime | None], None] | None = None) -> int:
     """Recompute ``due_at`` of the user's open date-only tasks after their end of day or zone changed. Returns the
-    number changed."""
+    number changed. ``on_recomputed(task, old_due_at)`` is called once per task whose ``due_at`` really changed,
+    after the flush (``task.due_at`` is the new value)."""
     prefs_of = prefs.for_user(session, user_id)
     tasks = session.execute(select(task_model).where(
         task_model.status == TaskStatus.OPEN.value, task_model.due_date.is_not(None), task_model.due_time.is_(None),
         or_(task_model.assigned_user_id == user_id,
             and_(task_model.assigned_user_id.is_(None), task_model.owner_user_id == user_id)))).scalars().all()
-    changed = 0
+    moved: list[tuple[Any, datetime | None]] = []
     for task in tasks:
         new = compute_due_at(task.due_date, None, writer_zone=None, responsible_prefs=prefs_of, app_tz=tz)
         if new != task.due_at:
+            moved.append((task, task.due_at))
             task.due_at = new
-            changed += 1
-    if changed:
+    if moved:
         session.flush()
-    return changed
+        if on_recomputed is not None:
+            for task, old in moved:
+                on_recomputed(task, old)
+    return len(moved)
 
 
 def backfill_due_at(session: Any, *, task_model: Any, prefs: Preferences, tz: str, now: datetime,

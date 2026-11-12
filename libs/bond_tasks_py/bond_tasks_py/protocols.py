@@ -6,14 +6,6 @@ from datetime import datetime, time
 from typing import Any, Protocol
 
 
-class Scheduler(Protocol):
-    """Shape of the job queue's enqueue plus a cancel. ``dedupe_key`` names one live job per task reminder."""
-
-    def enqueue(self, session: Any, *, job_type: str, payload: dict, run_at: datetime, dedupe_key: str) -> None: ...
-
-    def cancel(self, session: Any, *, dedupe_key: str) -> None: ...
-
-
 @dataclass(frozen=True)
 class MirrorDraft:
     """The event a task becomes. ``start``/``end`` are aware UTC. Field names follow the calendar lib's draft."""

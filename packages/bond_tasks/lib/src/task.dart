@@ -74,8 +74,6 @@ class Task {
     this.assigneeName,
     this.checklist = const [],
     this.remindMinutesBefore = kRemindNone,
-    this.remindAt,
-    this.remindedAt,
     this.links = const [],
     this.completedAt,
     this.mirrorEnabled = true,
@@ -103,8 +101,6 @@ class Task {
         assigneeName: jstr(m, 'assignee_name'),
         checklist: jlist(m, 'checklist', ChecklistItem.fromJson),
         remindMinutesBefore: jint(m, 'remind_minutes_before') ?? kRemindNone,
-        remindAt: jtime(m, 'remind_at'),
-        remindedAt: jtime(m, 'reminded_at'),
         links: jlist(m, 'links', TaskLink.fromJson),
         completedAt: jtime(m, 'completed_at'),
         mirrorEnabled: jbool(m, 'mirror_enabled') ?? true,
@@ -135,8 +131,6 @@ class Task {
 
   /// [kRemindNone], [kRemindMorningOf] or minutes before the due time.
   final int remindMinutesBefore;
-  final DateTime? remindAt;
-  final DateTime? remindedAt;
   final List<TaskLink> links;
   final DateTime? completedAt;
   final bool mirrorEnabled;
@@ -170,8 +164,6 @@ class Task {
         assigneeName: assigneeName,
         checklist: checklist,
         remindMinutesBefore: remindMinutesBefore,
-        remindAt: remindAt,
-        remindedAt: remindedAt,
         links: links,
         completedAt: clearCompleted ? null : (completedAt ?? this.completedAt),
         mirrorEnabled: mirrorEnabled,
@@ -200,8 +192,6 @@ class Task {
         'assignee_name': assigneeName,
         'checklist': [for (final c in checklist) c.toJson()],
         'remind_minutes_before': remindMinutesBefore,
-        'remind_at': remindAt == null ? null : jiso(remindAt!),
-        'reminded_at': remindedAt == null ? null : jiso(remindedAt!),
         'links': [for (final l in links) l.toJson()],
         'completed_at': completedAt == null ? null : jiso(completedAt!),
         'mirror_enabled': mirrorEnabled,

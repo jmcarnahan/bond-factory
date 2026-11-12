@@ -192,6 +192,15 @@ def test_dismiss_for_source_covers_every_user_and_only_that_task(session):
     assert dismiss_for_source(session, Notice, "task-1", NOW) == 0
 
 
+def test_dismiss_for_source_can_be_limited_to_chosen_users(session):
+    InboxNotifier(Notice).write(session, [N("a" * 32, user_id="u1"), N("b" * 32, user_id="u2")])
+    assert dismiss_for_source(session, Notice, "task-1", NOW, user_ids=[]) == 0
+    assert dismiss_for_source(session, Notice, "task-1", NOW, user_ids={"u1"}) == 1
+    assert stored(session, "a" * 32).dismissed_at == NOW
+    assert stored(session, "b" * 32).dismissed_at is None
+    assert dismiss_for_source(session, Notice, "task-1", NOW, user_ids=None) == 1
+
+
 def test_prune_removes_old_read_dismissed_and_very_old_only(session):
     old = NOW - timedelta(days=31)
     InboxNotifier(Notice).write(session, [

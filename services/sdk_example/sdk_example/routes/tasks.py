@@ -1,9 +1,7 @@
-"""Tasks: the reference wiring of bond_tasks_py.
+"""Tasks: the reference wiring of bond_tasks_py (CRUD and the status changes; the rest are in `task_*.py`).
 
-    GET    /tasks                          list (scope, status, date window, owner/assignee, link filters);
-                                           scope=all needs `tasks.read_all`, as does reading another person's task
+    GET    /tasks                          list (scope, status, date window, owner/assignee, link filters)
     GET    /tasks/summary                  {open, overdue, due_today, no_date} for the caller
-    GET    /tasks/notices                  fake mode only: the reminders the job queue has fired for the caller
     GET    /tasks/{id}                     one task
     POST   /tasks                          create (201); a client-chosen id replayed by its owner returns the row
     PUT    /tasks/{id}                     edit (omitted = unchanged, null clears)
@@ -11,28 +9,31 @@
     DELETE /tasks/{id}                     hard delete (204), owner only
     PUT    /tasks/{id}/checklist/{item_id} {"done": bool}
 
-Writes need the `tasks.write` capability. A write, its reminder job and its pending mirror state commit together; the
-calendar mirror then runs as a background task after the commit and never fails the request.
+Every read takes `time_zone` (an IANA name; else the person's stored zone, else the service default) and measures
+`overdue` against the clock: open and `due_at < now`. Writes need the `tasks.write` capability. A write and the
+notices it makes stale commit together; the calendar mirror runs as a background task after the commit and never fails
+the request.
+
+Static paths (`/tasks/today`, `/tasks/settings`, `/tasks/parse`, `/tasks/links/search`) live in `task_*.py`, which load
+BEFORE this file (modules register in name order), so `/tasks/{task_id}` never swallows them.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import date
 
 import bond_tasks_py as tasks
 from bond_auth_py import has
 from bond_service_kit import ApiError
-from bond_tasks_py import TaskCreate, TaskError, TaskFilters, TaskUpdate
+from bond_tasks_py import TaskCreate, TaskFilters, TaskUpdate
 from fastapi import BackgroundTasks, Depends, FastAPI, Query, Request, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy.orm import Session
 
-from .. import tasks_wiring
+from .. import tasks_wiring, todo_wiring
 from ..auth_dep import current_user, current_user_id, require_capability
-from ..db import session_scope
+from ..models.task_links import TaskLinkIndex
 from ..models.tasks import Task
+from ..task_support import after_write, check_body, clock_now, item, items, unit, viewer_zone, write_kwargs
 
 write = require_capability("tasks.write")
 READ_ALL = "tasks.read_all"
@@ -44,42 +45,10 @@ class ChecklistTick(BaseModel):
     done: bool
 
 
-@contextmanager
-def unit(request: Request) -> Iterator[Session]:
-    """One transaction: commit on success, roll back on any error. A `TaskError` becomes the shared error body."""
-    try:
-        with session_scope(request.app.state.session_factory) as session:
-            yield session
-    except TaskError as exc:
-        raise ApiError(exc.code, exc.message, status=exc.status) from None
-
-
 def require_read_all(request: Request) -> None:
     """Reading beyond your own tasks (scope=all, someone else's task) needs the `tasks.read_all` capability."""
     if not has(list(current_user(request).capabilities or []), READ_ALL):
         raise ApiError("forbidden", f"This needs the {READ_ALL} capability.", status=403)
-
-
-def clock_now(request: Request):
-    return request.app.state.clock.utcnow_naive()
-
-
-def client_today(request: Request, today: date | None) -> date:
-    return today or request.app.state.clock.today(request.app.state.settings.tz)
-
-
-def after_write(request: Request, background: BackgroundTasks, session: Session, task: Task) -> None:
-    """Inside the transaction: keep the reminder job in step. Then queue the mirror pass for after the commit."""
-    app, tz = request.app, request.app.state.settings.tz
-    tasks.schedule_reminder(session, task, app.state.tasks_scheduler, tz=tz)
-    if task.mirror_status == "pending":
-        background.add_task(tasks.sync_mirror, app.state.session_factory, Task, task.id, app.state.mirror_providers,
-                            tz=tz)
-
-
-def item(session: Session, task: Task, today: date) -> dict:
-    return tasks.task_item(task, today=today, names=tasks_wiring.user_names(session)(
-        [i for i in {task.owner_user_id, task.assigned_user_id} if i]))
 
 
 def register(app: FastAPI) -> None:
@@ -88,7 +57,7 @@ def register(app: FastAPI) -> None:
     @app.get("/tasks")
     def list_tasks(
         request: Request, user_id: str = Depends(current_user_id), scope: str = Query("mine", pattern="^(mine|all)$"),
-        status: str = Query("open", pattern="^(open|done|all)$"), today: date | None = None,
+        status: str = Query("open", pattern="^(open|done|all)$"), time_zone: str | None = None,
         on_or_before: date | None = None, due_from: date | None = None, due_to: date | None = None,
         include_undated: bool = False, no_date: bool = False, owner_user_id: str | None = None,
         assigned_user_id: str | None = None, assigned_to_me: bool = False, link_kind: str | None = None,
@@ -101,92 +70,81 @@ def register(app: FastAPI) -> None:
         if scope == "all":
             require_read_all(request)
         with unit(request) as session:
+            zone = viewer_zone(request, session, user_id, time_zone)
             rows, total = tasks.list_tasks(session, task_model=Task, user_id=user_id, filters=filters, limit=limit,
-                                           offset=offset)
-            items = tasks.task_items(rows, today=client_today(request, today), names=tasks_wiring.user_names(session))
-        return {"items": items, "total": total, "limit": limit, "offset": offset}
+                                           offset=offset, link_index_model=TaskLinkIndex, viewer_zone=zone,
+                                           now=clock_now(request))
+            out = items(request, session, rows, zone)
+        return {"items": out, "total": total, "limit": limit, "offset": offset}
 
     @app.get("/tasks/summary")
-    def summary(request: Request, today: date | None = None, user_id: str = Depends(current_user_id)) -> dict:
+    def summary(request: Request, time_zone: str | None = None, user_id: str = Depends(current_user_id)) -> dict:
         with unit(request) as session:
-            return tasks.summary(session, task_model=Task, user_id=user_id, today=client_today(request, today))
-
-    @app.get("/tasks/notices")
-    def notices(request: Request, user_id: str = Depends(current_user_id)) -> dict:
-        """Fake mode only: what the reminder job has 'sent' to this person (the example's stand-in for a push)."""
-        if request.app.state.settings.mode != "fake":
-            raise ApiError("not_found", "Not found.", status=404)
-        mine = [n for n in tasks_wiring.notices(request.app) if user_id in (n["owner_user_id"], n["assigned_user_id"])]
-        return {"items": mine}
+            zone = viewer_zone(request, session, user_id, time_zone)
+            now = clock_now(request)
+            return tasks.summary(session, task_model=Task, user_id=user_id, now=now, viewer_zone=zone)
 
     @app.get("/tasks/{task_id}")
-    def get_task(task_id: str, request: Request, today: date | None = None,
+    def get_task(task_id: str, request: Request, time_zone: str | None = None,
                  user_id: str = Depends(current_user_id)) -> dict:
         with unit(request) as session:
             task = tasks.get(session, Task, task_id)
             if not tasks.service.is_editor(task, user_id):
                 require_read_all(request)
-            return item(session, task, client_today(request, today))
+            return item(request, session, task, viewer_zone(request, session, user_id, time_zone))
 
-    @app.post("/tasks", status_code=201)
-    def create_task(body: TaskCreate, request: Request, background: BackgroundTasks, today: date | None = None,
+    @app.post("/tasks", status_code=201, dependencies=[Depends(check_body)])
+    def create_task(body: TaskCreate, request: Request, background: BackgroundTasks, time_zone: str | None = None,
                     user_id: str = Depends(write)) -> dict:
         with unit(request) as session:
             task = tasks.create(session, task_model=Task, owner_user_id=user_id, actor_user_id=user_id, data=body,
-                                now=clock_now(request), tz=request.app.state.settings.tz,
-                                user_exists=tasks_wiring.user_exists(session))
+                                **write_kwargs(request, session, user_id))
             after_write(request, background, session, task)
-            return item(session, task, client_today(request, today))
+            return item(request, session, task, viewer_zone(request, session, user_id, time_zone))
 
-    @app.put("/tasks/{task_id}")
+    @app.put("/tasks/{task_id}", dependencies=[Depends(check_body)])
     def update_task(task_id: str, body: TaskUpdate, request: Request, background: BackgroundTasks,
-                    today: date | None = None, user_id: str = Depends(write)) -> dict:
+                    time_zone: str | None = None, user_id: str = Depends(write)) -> dict:
         with unit(request) as session:
+            before = todo_wiring.recipients_of(session, task_id)
             task = tasks.update(session, task=tasks.get(session, Task, task_id), actor_user_id=user_id, data=body,
-                                now=clock_now(request), tz=request.app.state.settings.tz,
-                                user_exists=tasks_wiring.user_exists(session))
+                                **write_kwargs(request, session, user_id))
             after_write(request, background, session, task)
-            return item(session, task, client_today(request, today))
+            todo_wiring.dismiss_for_those_who_left(session, task, before, clock_now(request))
+            return item(request, session, task, viewer_zone(request, session, user_id, time_zone))
 
-    @app.post("/tasks/{task_id}/complete")
-    def complete_task(task_id: str, request: Request, background: BackgroundTasks, today: date | None = None,
-                      user_id: str = Depends(write)) -> dict:
-        with unit(request) as session:
-            task = tasks.complete(session, tasks.get(session, Task, task_id), user_id, clock_now(request))
-            after_write(request, background, session, task)
-            return item(session, task, client_today(request, today))
+    def lifecycle(change, name: str):
+        """One handler per status change: apply it, put away stale notices, answer the item."""
 
-    @app.post("/tasks/{task_id}/reopen")
-    def reopen_task(task_id: str, request: Request, background: BackgroundTasks, today: date | None = None,
+        @app.post(f"/tasks/{{task_id}}/{name}", name=f"{name}_task")
+        def handler(task_id: str, request: Request, background: BackgroundTasks, time_zone: str | None = None,
                     user_id: str = Depends(write)) -> dict:
-        with unit(request) as session:
-            task = tasks.reopen(session, tasks.get(session, Task, task_id), user_id, clock_now(request))
-            after_write(request, background, session, task)
-            return item(session, task, client_today(request, today))
+            with unit(request) as session:
+                task = change(session, tasks.get(session, Task, task_id), user_id, clock_now(request))
+                after_write(request, background, session, task)
+                return item(request, session, task, viewer_zone(request, session, user_id, time_zone))
 
-    @app.post("/tasks/{task_id}/cancel")
-    def cancel_task(task_id: str, request: Request, background: BackgroundTasks, today: date | None = None,
-                    user_id: str = Depends(write)) -> dict:
-        with unit(request) as session:
-            task = tasks.cancel(session, tasks.get(session, Task, task_id), user_id, clock_now(request))
-            after_write(request, background, session, task)
-            return item(session, task, client_today(request, today))
+        return handler
+
+    lifecycle(tasks.complete, "complete")
+    lifecycle(tasks.reopen, "reopen")
+    lifecycle(tasks.cancel, "cancel")
 
     @app.delete("/tasks/{task_id}", status_code=204)
     def delete_task(task_id: str, request: Request, background: BackgroundTasks,
                     user_id: str = Depends(write)) -> Response:
         with unit(request) as session:
-            pointer = tasks.delete(session, tasks.get(session, Task, task_id), user_id)
-            tasks.cancel_reminder(session, task_id, request.app.state.tasks_scheduler)
+            pointer = tasks.delete(session, tasks.get(session, Task, task_id), user_id, link_index_model=TaskLinkIndex)
+            todo_wiring.after_task_delete(session, task_id, clock_now(request))
         if pointer is not None:
             background.add_task(tasks.remove_event, request.app.state.session_factory,
                                 request.app.state.mirror_providers, pointer)
         return Response(status_code=204)
 
     @app.put("/tasks/{task_id}/checklist/{item_id}")
-    def tick_item(task_id: str, item_id: str, body: ChecklistTick, request: Request, today: date | None = None,
+    def tick_item(task_id: str, item_id: str, body: ChecklistTick, request: Request, time_zone: str | None = None,
                   user_id: str = Depends(write)) -> dict:
         with unit(request) as session:
             task = tasks.get(session, Task, task_id)
             tasks.set_checklist_item(task, item_id, body.done, clock_now(request), actor_user_id=user_id)
-            return item(session, task, client_today(request, today))
+            return item(request, session, task, viewer_zone(request, session, user_id, time_zone))

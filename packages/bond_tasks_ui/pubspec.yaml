@@ -2,7 +2,7 @@ name: bond_tasks_ui
 description: 'Task screens and widgets for the bond apps.'
 publish_to: none
 resolution: workspace
-version: 0.1.0
+version: 0.2.0
 environment:
   sdk: ^3.11.0
   flutter: '>=3.41.0'

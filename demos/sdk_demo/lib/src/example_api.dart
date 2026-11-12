@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bond_api/bond_api.dart';
 import 'package:bond_auth/bond_auth.dart';
 import 'package:bond_signin/bond_signin.dart';
@@ -71,7 +73,7 @@ class DemoSession {
   static AuthSession? get session => _session;
 
   static Future<void> _forget() async {
-    _session = null;
+    _setSession(null);
     await _wiring?.tokens.clear();
   }
 
@@ -80,7 +82,7 @@ class DemoSession {
     if (client != null) _http = client;
     if (base != null) baseUrl = base;
     _wiring = null;
-    _session = null;
+    _setSession(null);
     _signingIn = null;
     renewals.value = 0;
     endedReason.value = null;
@@ -95,6 +97,39 @@ class DemoSession {
     if (existing != null && tokens.token != null) return Future.value(existing);
     return _signingIn ??= _establish().whenComplete(() => _signingIn = null);
   }
+
+  /// The one place `_session` changes. When the person (user id) changes, the stop hooks run for the
+  /// one who left and the start hooks for the one who arrived, so the alerts always follow the
+  /// session: a server-ended session, a switch of user and a reset all stop them. Hooks are not awaited
+  /// (a hook must never fail a sign-in); `TodoAlerts` serialises them.
+  static void _setSession(AuthSession? s) {
+    _session = s;
+    final uid = s?.userId;
+    if (uid == _hooked) return;
+    final had = _hooked != null;
+    _hooked = uid;
+    if (had) unawaited(_runHooks(signOutHooks));
+    if (uid != null) unawaited(_runHooks(signInHooks));
+  }
+
+  /// The user id the start hooks last ran for; null when none.
+  static String? _hooked;
+
+  static Future<void> _runHooks(List<Future<void> Function()> hooks) async {
+    for (final hook in List.of(hooks)) {
+      try {
+        await hook();
+      } catch (_) {
+        // A hook (the alerts) must never fail a sign-in or a sign-out.
+      }
+    }
+  }
+
+  /// Run after each successful sign-in (the alerts coordinator starts here); `main()` adds them.
+  static final List<Future<void> Function()> signInHooks = [];
+
+  /// Run when the person signs out (the alerts coordinator stops here).
+  static final List<Future<void> Function()> signOutHooks = [];
 
   /// Whether [ensureSignedIn] first tries the cookie session; web only (tests flip it).
   static bool useCookieSession = kIsWeb;
@@ -136,7 +171,8 @@ class DemoSession {
     final s = await _w.oidc.completeWeb();
     _w.active = _w.oidc;
     endedReason.value = null;
-    return _session = s;
+    _setSession(s);
+    return s;
   }
 
   /// The sign-in providers the example offers (`GET /auth/providers`).
@@ -180,7 +216,8 @@ class DemoSession {
     final s = await _w.demo.signInDemo(userId);
     _w.active = _w.demo;
     endedReason.value = null;
-    return _session = s;
+    _setSession(s);
+    return s;
   }
 
   /// Signs in as [userId] with the demo route.
@@ -195,7 +232,8 @@ class DemoSession {
       final s = await _w.firebase.signInWithEmail(email, 'mock-password');
       _w.active = _w.firebase;
       endedReason.value = null;
-      return _session = s;
+      _setSession(s);
+      return s;
     } catch (_) {
       if (identical(_w.active, _w.demo)) _w.source.token = null;
       rethrow;
@@ -205,14 +243,19 @@ class DemoSession {
   /// Renews the session now, as a 401 would. Null when offline.
   static Future<AuthSession?> refresh() async {
     final s = await _w.active.refreshSession(expectedUserId: _session?.userId);
-    if (s != null) _session = s;
+    if (s != null) _setSession(s);
     return s;
   }
 
   /// Ends the session on the server and here.
   static Future<void> signOut() async {
     final active = _w.active;
-    _session = null;
+    // Stop the alerts while the token still works (push unregisters over the API), then end the session.
+    if (_hooked != null) {
+      _hooked = null;
+      await _runHooks(signOutHooks);
+    }
+    _setSession(null);
     await active.signOut();
   }
 
@@ -231,7 +274,7 @@ class _Wiring {
       tokens: tokens,
       refreshTokens: kIsWeb ? const NoRefreshTokenStore() : InMemoryRefreshTokenStore(),
     )..onSessionEnded = (code) {
-        DemoSession._session = null;
+        DemoSession._setSession(null);
         DemoSession.endedReason.value = code;
       };
     demo = DemoAuthGateway(api: api, tokens: tokens);

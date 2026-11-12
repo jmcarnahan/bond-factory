@@ -15,10 +15,11 @@ from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import ValidationError
+
 from bond_tasks_py import service
 from bond_tasks_py.errors import TaskError
-from bond_tasks_py.protocols import AfterWrite, MirrorPointer, Permissions, Scheduler
-from bond_tasks_py.reminders import cancel_reminder, schedule_reminder
+from bond_tasks_py.protocols import AfterWrite, MirrorPointer, Permissions
 from bond_tasks_py.schema import TaskCreate, TaskUpdate
 from bond_tasks_py.timeutil import parse_iso, utcnow
 
@@ -70,25 +71,35 @@ def verdict_for(exc: Exception) -> tuple[str, str] | None:
     return code, exc.code
 
 
+def _checked(model: type, **fields: Any) -> Any:
+    """Build ``TaskCreate`` / ``TaskUpdate``; a priority outside 1 to 3 is ``invalid_priority``, not a bare 422."""
+    try:
+        return model(**fields)
+    except ValidationError as exc:
+        if any(err["loc"] and err["loc"][0] == "priority" for err in exc.errors()):
+            raise TaskError("invalid_priority") from exc
+        raise
+
+
 def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
-                user_exists: Callable[[str], bool] | None = None, scheduler: Scheduler | None = None,
+                user_exists: Callable[[str], bool] | None = None,
                 after_write: Callable[[Any, Any, Any], None] | None = None,
                 after_delete: Callable[[Any, Any, MirrorPointer | None], None] | None = None,
                 zone_of: Callable[[Any, Any, str], str | None] | None = None, prefs: Any = None,
                 permissions: Permissions | None = None, host_columns: Collection[str] = (),
-                link_hook: AfterWrite | None = None, link_index_model: Any = None) -> dict:
-    """Routes bound to ``task_model``. ``scheduler`` (optional) keeps reminders in step. ``after_write(ctx, session,
+                link_hook: AfterWrite | None = None, link_index_model: Any = None,
+                on_deleted: Callable[[Any, Any, str, str], None] | None = None) -> dict:
+    """Routes bound to ``task_model``. ``after_write(ctx, session,
     task)`` and ``after_delete(ctx, session, pointer)`` let the app start the mirror after the op commits (for
     example ``ctx.background.add_task``). ``zone_of(ctx, session, user_id)`` supplies the writer's stored zone (sync
     carries none per write), ``prefs`` and ``permissions`` are passed to the service, ``host_columns`` names the app
     columns a device may write and read, and ``link_hook(session, task)`` runs inside the service after each write.
-    ``link_index_model`` (optional) has a deleted task's link index rows removed with it."""
+    ``link_index_model`` (optional) has a deleted task's link index rows removed with it. ``on_deleted(ctx, session,
+    task_id, owner_user_id)`` runs after each real delete, mirrored or not (for example to put away its notices)."""
     host = tuple(host_columns)
     reads = READS + host
 
     def changed(ctx: Any, session: Any, task: Any) -> None:
-        if scheduler is not None:
-            schedule_reminder(session, task, scheduler, tz=tz)
         if after_write is not None:
             after_write(ctx, session, task)
 
@@ -109,7 +120,7 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
             return  # a replay of a create the server already has
         body = {k: v for k, v in _fields(data).items() if v is not None}
         task = service.create(session, task_model=task_model, owner_user_id=owner, actor_user_id=owner,
-                              data=TaskCreate(id=op.id, **body), **write_kwargs(ctx, session, owner, data))
+                              data=_checked(TaskCreate, id=op.id, **body), **write_kwargs(ctx, session, owner, data))
         changed(ctx, session, task)
 
     def patch(session: Any, ctx: Any, op: Any, data: dict) -> None:
@@ -123,7 +134,7 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
         if set(fields) == {"due_at"}:
             fields = {}  # a lone hint changes nothing: no write, no resync
         if fields or extras:
-            task = service.update(session, task=task, actor_user_id=actor, data=TaskUpdate(**fields),
+            task = service.update(session, task=task, actor_user_id=actor, data=_checked(TaskUpdate, **fields),
                                   permissions=permissions, **write_kwargs(ctx, session, actor, data))
         if status == "done":
             task = service.complete(session, task, actor, now(), permissions=permissions)
@@ -136,10 +147,11 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
         task = session.get(task_model, op.id)
         if task is None:
             return  # deleting what is already gone is success
+        owner = task.owner_user_id
         pointer = service.delete(session, task, actor_of(ctx), permissions=permissions,
                                  link_index_model=link_index_model)
-        if scheduler is not None:
-            cancel_reminder(session, op.id, scheduler)
+        if on_deleted is not None:
+            on_deleted(ctx, session, op.id, owner)
         if after_delete is not None:
             after_delete(ctx, session, pointer)
 

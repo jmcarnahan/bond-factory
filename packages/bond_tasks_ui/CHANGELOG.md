@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+- `BondTaskSettingsForm.zoneOptions` (`List<String>?`): choose the zone inline; capture cards carry `<prefix>.review-item-<n>`.
+Removed
+- Uses of `Task.remindAt` / `remindedAt`. Changed: a new task in `BondTaskForm` starts at "use my default" (-3).
+
 - Not exported (internal splits): `BondTaskFormDue`, `BondTaskFormExtras`, `BondCaptureLinkRow`, `BondCaptureWhen`.
 - `sectionOf(..., now:)` is exactly `sectionTasks`; `BondStageBanner` draws nothing for `upcoming`; a time needs a
   date in the capture card (no "Add a time" without a date, Accept refuses it); the capture card reads a UTC `now`
