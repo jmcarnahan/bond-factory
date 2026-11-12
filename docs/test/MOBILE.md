@@ -95,3 +95,25 @@ phone's clock: its fake clock pins an absolute instant on the server and on the 
 Kill the pids in `tmp/logs/` (`kill $(cat tmp/logs/sdk_example.pid)`) and confirm port 8012 is free. Stop the demo
 with `q` in its terminal. State lives in `services/sdk_example/out/` (gitignored). To remove the simulator app:
 `xcrun simctl uninstall booted <bundle id>`.
+
+## The real-service sync lane
+
+Status: written, never run. This repo ships no PowerSync service, no compose file and no Postgres, so nobody has
+executed it. Expect to fix small things on the first run.
+
+`make test-sync-service` runs `packages/bond_tasks_powersync/test/real_service_test.dart` (tag `real_service`). It opens a
+real local PowerSync database, uploads through the example's `POST /sync/upload`, and checks four things for tasks and for
+notices: a put, a patch, a complete (tasks) and a refused write (kept in `sync_rejections`). The default `make test` and
+`flutter test` leave it out (`--exclude-tags real_service`), so the default suite count does not change.
+
+Point it at your own stack, then run it. Without all four variables the target prints what is missing and exits 0.
+
+| Variable | What |
+|---|---|
+| `BOND_SYNC_API_URL` | the example service, for example `http://localhost:8012` (sync on: `SDK_EXAMPLE_SYNC_URL` set) |
+| `BOND_SYNC_API_TOKEN` | a session bearer token of a test user on that service |
+| `BOND_SYNC_SERVICE_URL` | your PowerSync service; overrides the endpoint the token answer names |
+| `BOND_SYNC_POSTGRES_URL` | the database that service replicates from; checked to be set, the Dart test never opens it |
+
+The notices test needs one notice made by the server for the test user (run a sweep with a task due soon); without one it
+checks the refused put only and says so. Use a throwaway user and database.

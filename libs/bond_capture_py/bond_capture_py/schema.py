@@ -4,6 +4,9 @@ The server maps each item to a ``TaskCandidate`` or ``EventCandidate``. Contact 
 ``fixtures/capture/schema.json`` is this dict as JSON; a test asserts they are equal.
 """
 
+import copy
+import re
+
 MAX_TEXT = 500  # characters of user text accepted
 MAX_ITEMS = 8  # items the model may return
 MAX_LINKS = 5  # links per item
@@ -55,3 +58,46 @@ MODEL_SCHEMA: dict = {
         },
     },
 }
+
+DEFAULT_KINDS = ("contact",)  # what a link may point at unless the app passes ``resolver_kinds``
+MAX_ATTENDEES = 10  # names per event in rich mode
+MAX_DURATION = 7 * 24 * 60  # minutes; a longer stated length is a model slip and is dropped to null
+LOCATION_CAP, NOTES_CAP, ATTENDEE_CAP = 200, 1000, 80
+_KIND = re.compile(r"[a-z][a-z0-9_]{0,23}", re.ASCII)
+
+_RICH_PROPERTIES = {
+    "location": {"type": ["string", "null"], "maxLength": LOCATION_CAP},
+    "notes": {"type": ["string", "null"], "maxLength": NOTES_CAP},
+    "duration_minutes": {"type": ["integer", "null"], "minimum": 1, "maximum": MAX_DURATION},
+    "attendees": {"type": "array", "maxItems": MAX_ATTENDEES,
+                  "items": {"type": "string", "minLength": 1, "maxLength": ATTENDEE_CAP}},
+}
+
+
+def check_kinds(kinds) -> tuple[str, ...]:
+    """The link kinds an app resolves: a non-empty sequence of distinct lower-case names (``[a-z][a-z0-9_]*``,
+    at most 24 characters). ``ValueError`` otherwise (``TypeError`` for a bare string): the names go into the prompt, so they are checked."""
+    if isinstance(kinds, str):
+        raise TypeError("resolver_kinds is a sequence of names, not one string")
+    out = tuple(kinds)
+    if not out or len(set(out)) != len(out) or not all(isinstance(k, str) and _KIND.fullmatch(k) for k in out):
+        raise ValueError("resolver_kinds must be distinct names such as 'contact'")
+    return out
+
+
+def model_schema(rich: bool = False, kinds=DEFAULT_KINDS) -> dict:
+    """The schema for one call. The default arguments give ``MODEL_SCHEMA`` itself. ``rich`` adds the four rich
+    properties (all required, nullable); ``kinds`` is the enum of a link's kind."""
+    kinds = check_kinds(kinds)
+    if not rich and kinds == DEFAULT_KINDS:
+        return MODEL_SCHEMA
+    schema = copy.deepcopy(MODEL_SCHEMA)
+    item = schema["properties"]["items"]["items"]
+    item["properties"]["links"]["items"]["properties"]["kind"]["enum"] = list(kinds)
+    if rich:
+        item["properties"].update(copy.deepcopy(_RICH_PROPERTIES))
+        item["required"] = [*item["required"], *_RICH_PROPERTIES]
+    return schema
+
+
+RICH_MODEL_SCHEMA: dict = model_schema(rich=True)  # = ``../../fixtures/capture/schema_rich.json``

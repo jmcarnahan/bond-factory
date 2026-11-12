@@ -46,7 +46,7 @@ class BondAccountCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: t.ground,
-        borderRadius: BondRadius.r16All,
+        borderRadius: t.shape.r16All,
         border: Border.all(color: t.line),
       ),
       child: Column(
@@ -71,7 +71,7 @@ class BondAccountCard extends StatelessWidget {
             excludeChildren: true,
             child: BondPressable(
               onTap: onToggle,
-              borderRadius: BondRadius.r16All,
+              borderRadius: t.shape.r16All,
               minSize: BondLayout.minTap,
               child: Padding(
                 padding: BondSpace.all12,
@@ -117,7 +117,7 @@ class BondAccountRow extends StatelessWidget {
       onTap: onTap,
       semanticLabel: label,
       semanticsId: semanticsId,
-      borderRadius: BondRadius.r8All,
+      borderRadius: t.shape.r8All,
       minSize: BondLayout.minTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: BondSpace.s8),

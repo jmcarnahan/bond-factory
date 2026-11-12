@@ -56,7 +56,7 @@ class BondNoticeRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(BondSpace.s12, BondSpace.s8, BondSpace.s4, BondSpace.s8),
       decoration: BoxDecoration(
         color: unread ? t.accent.wash : t.surface,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         border: Border.all(color: unread ? t.accent.soft : t.line),
       ),
       child: Row(

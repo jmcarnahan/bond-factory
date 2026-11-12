@@ -3,9 +3,9 @@ Role: natural-language capture: one note to task and event candidates through a 
 State: implemented (prompt, orchestrator, local answer validation, English and Spanish rule fallback).
 
 ## Key files
-- `schema.py` `MODEL_SCHEMA` (= `../../fixtures/capture/schema.json`), limits; `candidates.py` wire shapes
+- `schema.py` `MODEL_SCHEMA` (= `../../fixtures/capture/schema.json`), `RICH_MODEL_SCHEMA` (= `schema_rich.json`), `model_schema`, limits; `candidates.py` wire shapes
 - `protocols.py` `LlmClient`, `EntityResolver`, `CaptureGuard`; `errors.py` coded errors
-- `prompt.py` + `prompt_v1.md` (package data); `capture.py` `parse_capture`; `validate.py` answer checks and mapping; `fallback.py` `degraded_draft`
+- `prompt.py` + `prompt_v1.md`, `prompt_v2.md` (rich mode; package data); `rich.py` rich fields and end from duration; `capture.py` `parse_capture`; `validate.py` answer checks and mapping; `fallback.py` `degraded_draft`
 - `tools/score.py` scores a results dir (or `--run-fallback`) against `../../fixtures/capture/phrases.jsonl`
 
 ## Commands

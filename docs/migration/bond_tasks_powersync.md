@@ -61,6 +61,7 @@ one row. A malformed JSON cell gives an empty list.
   rest of the row in `Task.extras`. Add the columns to the sync stream query and the upload route yourself.
 - `enricher:` (must return the same number of tasks, else `StateError`) fills owner and assignee names (null from the synced store) inside the read snapshot; `extraWatchTables:` re-emits
   `watchOpen` when one of those tables changes.
+- `mirrorStatusFor: (SyncRow row) => ...` returns a mirror state wire value (`pending`, `mirrored`, `skipped`, `failed`) to show for a row, or null to keep the stored one. Use it so an offline row shows the right state (for example `skipped` when the row has mirroring off) before the server sets it. It only changes what is read; nothing is written back. An unknown string shows as `pending`. A hook that throws keeps the stored value for that row and the list still shows. Default null: the stored value shows.
 
 ## 5. Sign-out
 

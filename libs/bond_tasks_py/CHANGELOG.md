@@ -2,6 +2,14 @@
 
 ## 0.2.0 - unreleased
 Added
+- `bond_tasks_py.routes.make_tasks_router(...)` (new file; needs extra `http` = fastapi; the package never imports it):
+  list, summary, today, get, create, update, complete, reopen, cancel, delete, checklist tick, and settings get/put
+  (only with `settings_model`). `error_map(TaskError) -> (status, body)`, `item_extras(task)`, `extra_where_for(request,
+  user_id)`, hooks `after_write`, `after_delete`, `after_commit`, `after_delete_commit`, `snapshot`, `on_recomputed`.
+  `error_map` must return `(status, body)`; any other return, or a raise, is a `TypeError` naming `error_map`. Include the router after the app's own static `/tasks/<name>` routes. `extra_where_for` narrows the list route only (not `/summary`, `/today`, `/{id}`) and is not a visibility rule.
+  Default error body `{"detail": {"code", "message"}}`. `scope=all` and other people's tasks are refused (403
+  `forbidden`) unless `read_all_dep` is given. `routes_core.py` holds its fastapi-free rules.
+- `task_item(extra=)` / `task_items(extras=)`: keys merged after the 24 item keys; a base key always wins.
 - `service.create` / `update` / `sync_routes(prepare=)`: `prepare(session, stored task or None on create, actor user id,
   extras) -> dict` runs after the permission check and before the extras are applied (on update before any field
   changes), on create, update and sync put/patch only (not complete, reopen, cancel, delete or a status-only patch).

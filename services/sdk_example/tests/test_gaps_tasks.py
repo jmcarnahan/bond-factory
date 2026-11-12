@@ -5,6 +5,7 @@ import asyncio
 
 import pytest
 from bond_notify_py import get_owned
+from bond_notify_py import service as notice_service
 from bond_storage import make_download_router
 from bond_sync_py import Ctx, UploadRequest, upload
 from connections_util import connect, headers
@@ -17,7 +18,6 @@ from todo_util import grant_write, inbox, sweep, timed
 from sdk_example.models.auth import DEMO_USER_ID, VIEWER_USER_ID
 from sdk_example.models.grants import DownloadGrant
 from sdk_example.models.tasks import Task
-from sdk_example.routes import notices as notices_routes
 from sdk_example.routes.storage import _load_document
 from sdk_example.routes.sync import build_host
 
@@ -126,7 +126,7 @@ def test_act_asks_get_owned_first_and_a_refusal_changes_nothing(client, app, h, 
         seen.append((user_id, notice_id))
         return get_owned(session, notice_model, user_id, notice_id)
 
-    monkeypatch.setattr(notices_routes.inbox, "get_owned", spy)
+    monkeypatch.setattr(notice_service, "get_owned", spy)
     reply = client.post(f"/notices/{notice['id']}/act", json={"action": "done"}, headers=stranger)
     assert reply.status_code == 403 and code(reply) == "not_notice_owner"
     assert seen == [(VIEWER_USER_ID, notice["id"])]

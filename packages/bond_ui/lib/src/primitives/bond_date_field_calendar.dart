@@ -35,7 +35,7 @@ class BondTimeChips extends StatelessWidget {
       padding: BondSpace.all8,
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         border: Border.all(color: t.line),
       ),
       child: SingleChildScrollView(

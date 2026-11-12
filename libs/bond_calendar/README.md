@@ -23,6 +23,7 @@ provider.update_event(made.id, {"subject": "Call (moved)"}, etag=made.etag)  # E
   A refresh that raises becomes `ReconnectRequired` (the original is `__cause__`).
 - Errors: `NotFound`, `EtagMismatch` (412), `ReconnectRequired` (401), `Forbidden` (403, provider code in `.code`; a throttle 403 is `Unavailable`),
   `Unavailable` (5xx, 429, timeout).
+- Draft `attendees` are e-mail strings or `Person(name, email)`: the name is written as the display name on both providers. Duplicates merge by lower-cased address (a named entry wins); a `Person` with no address raises `InvalidAttendee` (422).
 - `CalendarEventDraft(..., reminder_off=True)` creates an event with no reminder (Graph `isReminderOn: false`, Google
   `useDefault: false`, no overrides). `reminder_minutes` wins if both are set. On update, patch `reminder_minutes` to `None`.
 - `FakeCalendarProvider` is an in-memory stand-in with etags and `fail_next(exc)` for tests and demos.

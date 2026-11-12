@@ -1,6 +1,14 @@
 """Calendar provider clients for Google and Microsoft: one normalised event, typed errors, no storage."""
 
-from .errors import CalendarError, EtagMismatch, Forbidden, NotFound, ReconnectRequired, Unavailable
+from .errors import (
+    CalendarError,
+    EtagMismatch,
+    Forbidden,
+    InvalidAttendee,
+    NotFound,
+    ReconnectRequired,
+    Unavailable,
+)
 from .fake import FakeCalendarProvider
 from .google import GoogleCalendarProvider
 from .graph import MsGraphCalendarProvider
@@ -31,6 +39,7 @@ __all__ = [
     "FakeCalendarProvider",
     "Forbidden",
     "GoogleCalendarProvider",
+    "InvalidAttendee",
     "MsGraphCalendarProvider",
     "NotFound",
     "Person",

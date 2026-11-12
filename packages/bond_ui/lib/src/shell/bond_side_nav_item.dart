@@ -114,7 +114,7 @@ class BondNavTile extends StatelessWidget {
       excludeChildren: true,
       child: BondPressable(
         onTap: onTap,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         color: active ? t.ground : null,
         child: Container(
           height: BondLayout.control,

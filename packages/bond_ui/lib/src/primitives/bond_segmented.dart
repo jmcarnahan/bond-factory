@@ -58,7 +58,7 @@ class BondSegmented<T> extends StatelessWidget {
           padding: BondSpace.all4,
           decoration: BoxDecoration(
             color: t.line,
-            borderRadius: BondRadius.r12All,
+            borderRadius: t.shape.r12All,
           ),
           child: wrap
               ? Wrap(children: items)
@@ -129,7 +129,7 @@ class _Cell<T> extends StatelessWidget {
       excludeChildren: true,
       child: BondPressable(
         onTap: onTap,
-        borderRadius: BondRadius.r8All,
+        borderRadius: t.shape.r8All,
         color: selected ? t.surface : null,
         child: Container(
           constraints: const BoxConstraints(

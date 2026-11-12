@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.1.0 - unreleased
+- `CalendarEventDraft.attendees` (and the `attendees` patch key) may hold `str | Person`. A `Person` with a name writes the
+  display name to both providers (Graph `emailAddress.name`, Google `displayName`); a plain string behaves as before, so
+  the default payload is unchanged. A `Person` with no address raises `InvalidAttendee` (new, exported; a `CalendarError` and a `ValueError`; status 422, code `invalid_attendee`). Duplicate attendees merge by lower-cased address, a named entry winning (`models.merged_attendees`). New helper `attendee_parts`
+  (in `bond_calendar.models`, not exported from the barrel). The fake keeps the name on the `Attendee`.
 - `Forbidden(CalendarError)`: HTTP 403 from either provider now raises it (status 403, the provider's own code kept in
   `.code`, for example `insufficientPermissions` or `ErrorAccessDenied`). It is a `CalendarError`, so code that caught
   `CalendarError` for a 403 still works.

@@ -15,8 +15,15 @@ from .models import (
     EventPage,
     EventPatch,
     Person,
+    attendee_parts,
+    merged_attendees,
     to_utc,
 )
+
+
+def _attendee(value: str | Person) -> Attendee:
+    name, address = attendee_parts(value)
+    return Attendee(name, address, "required", "notResponded")
 
 
 class FakeCalendarProvider:
@@ -75,7 +82,7 @@ class FakeCalendarProvider:
             is_all_day=draft.is_all_day, location=draft.location, organizer=self._organizer, is_organizer=True,
             show_as="busy", event_type="singleInstance", preview=(draft.body or "")[:255] or None,
             response_status="organizer", sensitivity="normal", categories=list(draft.categories),
-            attendees=[Attendee(None, a, "required", "notResponded") for a in draft.attendees],
+            attendees=[_attendee(a) for a in merged_attendees(draft.attendees)],
             body=draft.body, body_content_type=draft.body_type if draft.body is not None else None,
         )
         self._next_id += 1
@@ -97,7 +104,7 @@ class FakeCalendarProvider:
             if key in ("start", "end"):
                 value = to_utc(value)
             elif key == "attendees":
-                value = [Attendee(None, a, "required", "notResponded") for a in value or []]
+                value = [_attendee(a) for a in merged_attendees(value)]
             elif key == "categories":
                 value = list(value or [])
             elif key == "body":

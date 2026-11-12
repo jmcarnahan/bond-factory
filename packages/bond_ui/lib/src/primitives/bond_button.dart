@@ -109,7 +109,7 @@ class BondButton extends StatelessWidget {
       excludeChildren: true,
       child: BondPressable(
         onTap: enabled ? onPressed : null,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         color: lit ? bg : disabledBg,
         child: Container(
           height: wrapLabel ? null : height,
@@ -117,7 +117,7 @@ class BondButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(
               horizontal: BondSpace.s16, vertical: wrapLabel ? BondSpace.s8 : 0),
           decoration: BoxDecoration(
-            borderRadius: BondRadius.r12All,
+            borderRadius: t.shape.r12All,
             border: Border.all(color: lit ? border : BondTokens.transparent),
           ),
           child: Center(widthFactor: expand ? null : 1, child: content),

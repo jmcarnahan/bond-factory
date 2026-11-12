@@ -102,3 +102,18 @@ def test_the_fake_switches_are_fake_mode_only_and_parse_needs_a_session(client, 
     object.__setattr__(app.state.settings, "mode", "real")
     assert client.put("/fake/capture", json={"down": True}, headers=h).status_code == 404
     assert client.get("/fake/push/sent", headers=h).status_code == 404
+
+
+def test_rich_is_opt_in_and_the_default_answer_has_no_rich_keys(client, h):
+    plain = parse(client, h, today="2026-11-11").json()
+    assert plain == parse(client, h, today="2026-11-11", rich=False).json()
+    assert not {"location", "notes", "duration_minutes", "attendees"} & set(plain["items"][2])
+
+
+def test_rich_gives_location_notes_duration_and_attendees(client, h):
+    body = parse(client, h, "Site meeting at 2pm, call Sam", today="2026-11-11", rich=True).json()
+    event, task = body["items"]
+    assert event["kind"] == "event" and event["location"] == "Example Plaza office"
+    assert event["notes"] == "Bring the permit drawings" and event["duration_minutes"] == 90
+    assert event["attendees"] == ["Dana", "Lee"] and event["end_time"] == "15:30"
+    assert task["notes"] == "Ask about the invoice"

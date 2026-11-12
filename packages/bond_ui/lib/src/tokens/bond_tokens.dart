@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'bond_shape.dart';
 import 'bond_tone_role.dart';
 
 /// One semantic colour family: a solid fill ([base]), its pressed or text
@@ -83,6 +84,7 @@ class BondTokens extends ThemeExtension<BondTokens> {
     this.fontFamily,
     this.fontPackage,
     this.personPalette = _people,
+    this.shape = const BondShape(),
   });
 
   /// Strongest text and icons.
@@ -124,6 +126,9 @@ class BondTokens extends ThemeExtension<BondTokens> {
 
   /// Colours for people, groups or series; index wraps. Never empty.
   final List<Color> personPalette;
+
+  /// Corner radii. Defaults to the classic bond shape.
+  final BondShape shape;
 
   /// A fully transparent colour for widgets that need "no fill".
   static const Color transparent = Color(0x00000000);
@@ -235,6 +240,7 @@ class BondTokens extends ThemeExtension<BondTokens> {
     String? fontFamily,
     String? fontPackage,
     List<Color>? personPalette,
+    BondShape? shape,
   }) =>
       BondTokens(
         ink: ink ?? this.ink,
@@ -254,6 +260,7 @@ class BondTokens extends ThemeExtension<BondTokens> {
         fontFamily: fontFamily ?? this.fontFamily,
         fontPackage: fontPackage ?? this.fontPackage,
         personPalette: personPalette ?? this.personPalette,
+        shape: shape ?? this.shape,
       );
 
   @override
@@ -277,6 +284,7 @@ class BondTokens extends ThemeExtension<BondTokens> {
       fontFamily: t < 0.5 ? fontFamily : other.fontFamily,
       fontPackage: t < 0.5 ? fontPackage : other.fontPackage,
       personPalette: _lerpPalette(personPalette, other.personPalette, t),
+      shape: BondShape.lerp(shape, other.shape, t),
     );
   }
 

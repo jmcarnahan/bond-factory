@@ -62,7 +62,7 @@ class BondMessagePreview extends StatelessWidget {
           padding: BondSpace.all16,
           decoration: BoxDecoration(
             color: t.ground,
-            borderRadius: BondRadius.r12All,
+            borderRadius: t.shape.r12All,
             border: Border.all(color: t.line),
           ),
           child: SelectableText(current?.body ?? '', style: text.small),

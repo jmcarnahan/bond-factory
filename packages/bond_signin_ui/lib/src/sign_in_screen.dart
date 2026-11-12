@@ -111,7 +111,7 @@ class _ErrorStrip extends StatelessWidget {
     final c = t.colorsFor(BondToneRole.danger);
     return Container(
       padding: BondSpace.all16,
-      decoration: BoxDecoration(color: c.background, borderRadius: BondRadius.r12All, border: Border.all(color: c.border)),
+      decoration: BoxDecoration(color: c.background, borderRadius: t.shape.r12All, border: Border.all(color: c.border)),
       child: Semantics(
         identifier: id,
         label: message,

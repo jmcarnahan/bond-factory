@@ -104,6 +104,28 @@ class ChatNotifier:
   idempotency key checks for a duplicate only when `attempt > 1`. For a channel where a repeat is worse than a loss, pass
   `deliver_pending(..., at_most_once=["chat"])`: `delivered_at` is stamped and committed before the send; if the send then fails or raises, `failed_at` is set too, so a monitor on `failed_at` sees it.
 
+## 6b. Mount the routes instead of copying them
+
+`pip install bond_tasks_py[http]`, then (module `bond_tasks_py.routes`; the package never imports fastapi):
+
+```python
+from bond_tasks_py.routes import make_tasks_router
+app.include_router(make_tasks_router(
+    task_model=Task, settings_model=TaskUserSettings, link_index_model=TaskLinkIndex,
+    session_scope=lambda: session_scope(app.state.session_factory),  # a context manager factory: commit on exit
+    user_dep=current_user_id, write_dep=require_capability("tasks.write"), read_all_dep=require_read_all,
+    now=clock.utcnow_naive, tz=settings.tz, defaults=default_prefs, prefs=todo_prefs, link_hook=link_hook,
+    prepare=owner_edits_closed, names=lambda s, ids: ..., labels=contacts.labels, user_exists=lambda s, uid: ...,
+    after_write=lambda s, task, now, before: ..., after_commit=queue_mirror))
+```
+
+Include it AFTER the app's own static `/tasks/<name>` routes (such as `/tasks/export`): routes match in registration order, and `/{id}` would swallow them with 404 `task_not_found` if the factory came first. `scope=all` and other people's tasks
+are refused with 403 `forbidden` unless `read_all_dep(request)` is given. `error_map(TaskError) -> (status, body)` keeps
+a legacy error body; `item_extras(task)` adds keys after the 24 (never replaces one); `extra_where_for(request,
+user_id)` narrows the LIST route and its count only (not `/summary`, `/today` or `/{id}`); it is not a visibility rule, use `permissions` and `read_all_dep` for that. `error_map` must return `(status, body)`; anything else raises a `TypeError` naming it. `after_write(session, task, now, before)` runs in the transaction after every
+write (`before` = `snapshot(session, task_id)` taken before an update, else None); `after_commit(background, task)`
+queues work for after the response; `after_delete` and `after_delete_commit(background, pointer)` do the same for delete.
+
 ## 7. Call-site changes and checks
 
 - On done, cancel and delete call `dismiss_for_source`, and when `due_date`, `due_time` or the assignee changes call

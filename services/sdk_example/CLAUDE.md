@@ -6,7 +6,7 @@ State: sign-in, auth, storage, sync, connections, tasks (due instants, day view,
 - `sdk_example/wiring.py`: auth settings, storage, jobs registry, clock, middleware (installed by `routes/a0_wiring.py`).
 - `sdk_example/auth_dep.py`: `current_claims`, `current_user`, `current_user_id`, `require_capability`.
 - `signin_wiring.py` mounts `bond_signin`; `directory.py` and `scope_policy.py` are what an app rewrites; `providers_wiring.py` builds providers; `fake_routes.py` and `routes/fake_todo.py` are fake mode only. README has the copy/replace table.
-- TODO checklist: `todo_wiring.py` (state on `app.state`, `after_task_write`, `default_prefs`, the `prepare` rule), `clock_pin.py` (the `fake_clock_router` adapter), `task_support.py` (zone, item, write hook), `routes/task_*.py` (must sort before `tasks.py`), `routes/notices.py`, `routes/push.py`, `sync_todo.py`, `sweep_wiring.py`, `scripts/sweep_interval.py`, `contacts.py`, `capture_wiring.py`.
+- TODO checklist: `todo_wiring.py` (state on `app.state`, `after_task_write`, `default_prefs`, the `prepare` rule), `clock_pin.py` (the `fake_clock_router` adapter), `task_support.py` (transaction, zone), `routes/task_routers.py` (mounts the tasks and notices router factories), `routes/task_capture.py`, `routes/push.py`, `sync_todo.py`, `sweep_wiring.py`, `scripts/sweep_interval.py`, `contacts.py`, `capture_wiring.py`.
 - `sdk_example/models/`: one file per concern; `alembic/versions/` holds the single migration chain.
 
 ## Commands

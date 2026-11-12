@@ -15,7 +15,7 @@ Seams added after the first release, all defaulting to the old behaviour. Read t
 work-day defaults with the `overridden` answer and the nullable columns), `bond_notify_py.md` (`get_owned` first in an act
 route), `bond_sync_py.md` (`now=`), `bond_jobs.md` (`run_schedule`), `bond_service_kit.md` (`fake_clock_router`),
 `bond_tasks.md` and `bond_tasks_powersync.md` (`Task.extras`, the enricher, the clock levers), `bond_push_apple.md` and
-`bond_auth_secure_storage.md` (the splits). The index is in `docs/migration/README.md`.
+`bond_auth_secure_storage.md` (the splits). Wave B: the router factories, rich capture and `BondShape` (list in `docs/migration/README.md`). The index is in `docs/migration/README.md`.
 
 ## Before you start
 
@@ -27,7 +27,7 @@ route), `bond_sync_py.md` (`now=`), `bond_jobs.md` (`run_schedule`), `bond_servi
 
 1. **Tables and the sweep** (`bond_tasks_py.md`). One revision: the new `tasks` columns (`priority`, `due_at`), drop
    `remind_at` and `reminded_at`, and add `task_user_settings`, `task_link_index`, `task_notice_ledger`,
-   `task_notice_outbox`. Mount the task routes (list, summary, today, CRUD, lifecycle, settings): `bond_tasks_py_host.md` gives each route and its service call, and the reference host is `services/sdk_example/sdk_example/routes/tasks.py` and `task_today.py`. Pass `now` and the viewer zone. On SQLite call `sqlite_savepoint_setup`.
+   `task_notice_outbox`. Mount the task routes (list, summary, today, CRUD, lifecycle, settings): `bond_tasks_py_host.md` gives each route and its service call, and or mount `bond_tasks_py.routes.make_tasks_router` (extra `http`); the reference host is `services/sdk_example/sdk_example/routes/task_routers.py`. Pass `now` and the viewer zone. On SQLite call `sqlite_savepoint_setup`.
    Run `sweep_due` with `since=` set to the activation time. Backfill with `backfill_due_at` or let the sweep repair rows.
    Check: a task due in two minutes yields a ledger row at the right stage, and a second sweep claims nothing.
 2. **Inbox** (`bond_notify_py.md`). Add the `notices` table beside `tasks`, list `InboxNotifier(Notice)` in

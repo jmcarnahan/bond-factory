@@ -1,4 +1,9 @@
+# real_service is left out of the default run by the Makefile (`--exclude-tags real_service`); only
+# `make test-sync-service` includes it.
+
 tags:
   real_db:
     # Opens a real PowerSync database; needs the core library that powersync's
     # build hook downloads on first run (network once, then cached in build/).
+  real_service:
+    # Needs a PowerSync service and the example service. Written, never run here.

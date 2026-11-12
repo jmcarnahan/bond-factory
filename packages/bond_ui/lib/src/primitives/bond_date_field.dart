@@ -157,7 +157,7 @@ class _BondDateFieldState extends State<BondDateField> {
 
     final field = BondPressable(
       onTap: widget.enabled ? () => setState(() => _open = !_open) : null,
-      borderRadius: BondRadius.r12All,
+      borderRadius: t.shape.r12All,
       semanticsId: id,
       semanticLabel: widget.label == null ? shown : '${widget.label}: $shown',
       child: Container(
@@ -165,7 +165,7 @@ class _BondDateFieldState extends State<BondDateField> {
         padding: const EdgeInsets.symmetric(horizontal: BondSpace.s12),
         decoration: BoxDecoration(
           color: widget.enabled ? t.surface : t.ground,
-          borderRadius: BondRadius.r12All,
+          borderRadius: t.shape.r12All,
           border: Border.all(
             color: _open ? t.accent.base : t.lineStrong,
             width: _open ? BondLayout.rule : BondLayout.hairline,

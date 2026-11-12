@@ -15,7 +15,8 @@ A missing key or `null` reads as `null` (an empty list for lists). A value of th
 | `jmap(m, k)` | string-keyed copy of a nested map |
 | `jlist(m, k, f)` | list read element by element; missing or null gives `const []` |
 | `jlistOf(v, f)` | the same for a top-level array |
-| `jtime(m, k)` | ISO-8601 string to UTC `DateTime`; `Z`, offset and naive (taken as UTC) all work; ints throw |
+| `jtime(m, k)` | ISO-8601 string to UTC `DateTime`; `Z`, offset and naive (taken as UTC) all work; ints throw; an impossible date or time throws (month, day, hour above 23 incl. `24:00`, minute or second above 59 incl. `23:59:60`; extended, basic and hour-only forms; signed or 5-digit years are not checked) |
+| `jtimeOrNull(m, k)` | like `jtime` but never throws: missing, null, empty, non-String or malformed reads as null |
 | `jiso(t)` | UTC, millisecond precision, trailing `Z` |
 | `enumByWire(values, wire, wireOf)` | enum member or null for an unknown string |
 | `JsonShapeError` | `path`, `expected`, `actual` |

@@ -79,3 +79,6 @@ noticeId(taskId, userId, 'close', 0, deadlineToken(task)); // stage is a String:
 `ApiClient(baseUrl: Uri.parse(...), http: client)` builds the client; a test passes `MockClient` from `package:http/testing.dart`.
 The stage functions use the DEVICE zone and the server the user's stored zone: before `ZoneReporter`'s report lands, local alert
 ids can differ from server ids and a duplicate alert is possible.
+
+## Capture rich mode
+`EventCandidate` also reads `location`, `notes`, `duration_minutes` and `attendees` (names, not matched) and `TaskCandidate` reads `notes`, when the server sends them. Without the keys they are null (an empty list), so nothing changes for an app that does not use rich mode. `TaskCandidate.toDraft()` carries `notes` into the draft.

@@ -149,7 +149,7 @@ class _BondSelectState<T> extends State<BondSelect<T>> {
             excludeChildren: true,
             child: BondPressable(
               onTap: () => _pick(o.value, collapseOnPick),
-              borderRadius: BondRadius.r8All,
+              borderRadius: t.shape.r8All,
               minSize: BondLayout.minTap,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: BondSpace.s8),
@@ -194,7 +194,7 @@ class _BondSelectState<T> extends State<BondSelect<T>> {
     return Container(
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         border: Border.all(color: t.lineStrong),
       ),
       child: Column(
@@ -210,7 +210,7 @@ class _BondSelectState<T> extends State<BondSelect<T>> {
             excludeChildren: true,
             child: BondPressable(
               onTap: () => setState(() => _open = !_open),
-              borderRadius: BondRadius.r12All,
+              borderRadius: t.shape.r12All,
               minSize: BondLayout.control,
               child: Padding(
                 padding: const EdgeInsets.symmetric(

@@ -65,6 +65,10 @@ Each seam defaults to the old behaviour, so a pinned app is not affected until i
 - `bond_push_py` (`bond_push_py.md`): the opt-in live Apple check and `send_test`.
 - `bond_tasks`, `bond_tasks_powersync`, `bond_tasks_ui` (`bond_tasks.md`, `bond_tasks_powersync.md`, `bond_tasks_ui.md`):
   `Task.extras`, extra columns, `TaskEnricher`, `TaskTicker.tick()`, `TaskClock.offsetBy`, the settings reset control.
+- Wave B: `make_tasks_router` and `make_notices_router` (extra `http`; `bond_tasks_py_host.md`, `bond_notify_py.md`), rich
+  capture and `resolver_kinds` (`bond_capture_py.md`), attendees as `Person` (`bond_calendar.md`), `jtimeOrNull`
+  (`bond_json.md`), rich candidates (`bond_tasks.md`), `mirrorStatusFor` (`bond_tasks_powersync.md`), `BondShape`
+  (`bond_ui.md`).
 - Two package splits: `bond_push_apple` (`bond_push_apple.md`, with `bond_push.md`) and `bond_auth_secure_storage`
   (`bond_auth_secure_storage.md`, with `bond_signin.md`). The moved classes are not re-exported: change the import.
 

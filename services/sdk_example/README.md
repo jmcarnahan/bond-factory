@@ -22,15 +22,15 @@ fake mode and logs one warning. Real mode needs `SDK_EXAMPLE_AUTH_SECRET`, and a
 | Connections, role asks, fake consent page | `routes/connections.py`, `connect_helpers.py`, `fake_routes.py`, `oauth_wiring.py` | bond_oauth, bond_signin |
 | Documents, share links | `routes/storage.py`, `models/grants.py` | bond_storage |
 | Job table, registry, fake-mode tick | `models/jobs.py`, `wiring.py`, `routes/jobs.py` | bond_jobs |
-| Tasks, day view, settings, links | `routes/tasks.py`, `routes/task_*.py`, `task_support.py`, `tasks_wiring.py`, `contacts.py` | bond_tasks_py |
-| Inbox, push devices, capture, sweep | `routes/notices.py`, `routes/push.py`, `routes/task_capture.py`, `todo_wiring.py`, `sweep_wiring.py` | bond_notify_py, bond_push_py, bond_capture_py |
+| Tasks, day view, settings, links | `routes/task_routers.py` (mounts `make_tasks_router`), `routes/task_capture.py`, `task_support.py`, `tasks_wiring.py`, `contacts.py` | bond_tasks_py |
+| Inbox, push devices, capture, sweep | `routes/task_routers.py` (`make_notices_router`), `routes/push.py`, `routes/task_capture.py`, `todo_wiring.py`, `sweep_wiring.py` | bond_notify_py, bond_push_py, bond_capture_py |
 | Sync host (notes, tasks, notices, push_devices) | `routes/sync.py`, `sync_todo.py` | bond_sync_py |
 | Calendar events | `routes/calendar.py`, `calendar_wiring.py` | bond_calendar |
 | Migrations | `alembic/versions/0001` to `0005_todo_tables.py` | |
 
 `routes/a0_wiring.py` sorts before every other route module (middleware and error handlers must be in place first).
-`routes/task_*.py` sort before `routes/tasks.py` on purpose: `/tasks/today` and the like must register before
-`/tasks/{task_id}`.
+`routes/task_capture.py` sorts before `routes/task_routers.py` so `/tasks/parse` and `/tasks/links/search` register
+before the router's `/tasks/{task_id}` routes.
 
 ## TODO checklist routes
 

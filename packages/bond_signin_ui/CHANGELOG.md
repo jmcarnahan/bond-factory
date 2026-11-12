@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Corner radii now come from `BondTokens.of(context).shape` (bond_ui `BondShape`) instead of `BondRadius`; defaults are unchanged.
 - BREAKING: `SecureRefreshTokenStore` moved to the new `bond_auth_secure_storage` package; no re-export. This package drops `flutter_secure_storage` (it kept a web app with `file_picker ^8` from resolving).
 - `BondSignInScreen`, `BondSignInButtons`, `BondScopeAskCard`.
 - `BrowserAuth` port with `defaultBrowserAuth()` (conditional import: top-level navigation on web, `flutter_web_auth_2` elsewhere) and `replaceAddress`.

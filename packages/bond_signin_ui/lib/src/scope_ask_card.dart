@@ -56,7 +56,7 @@ class _BondScopeAskCardState extends State<BondScopeAskCard> {
       padding: BondSpace.all16,
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         border: Border.all(color: t.line),
       ),
       child: Column(

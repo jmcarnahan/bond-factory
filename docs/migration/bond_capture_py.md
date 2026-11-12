@@ -66,6 +66,30 @@ parse_capture("Call Sam tomorrow", user_id="u1", today=date(2026, 11, 11), time_
 - The note, the answer, titles and vendor errors are never logged. The note reaches the model HTML-escaped inside
   `<untrusted_text>` tags.
 
+## 4b. Rich mode and more link kinds
+
+Use this to retire an app's own event quick-capture. Pass `rich=True`:
+
+```python
+result = parse_capture(text, ..., rich=True, resolver_kinds=("contact", "property"))
+```
+
+- The model reads `prompt_v2.md` and `RICH_MODEL_SCHEMA`. Events gain `location`, `notes`, `duration_minutes` and
+  `attendees`; tasks gain `notes`. The end of a timed event is start plus the stated length when the note gave no end.
+- Attendees are names as written. The lib never resolves them and never sends ids. Match them to contacts in the app. An attendee with `@` or `://` is dropped.
+- `location`, `notes` and `attendees` are untrusted model text. Never turn them into an address, a link or an id without the user's review.
+- A wrong type in an optional rich field (`attendees: null`, `duration_minutes: "30"`, `notes: 5`) becomes null or empty and the item stays; a whole positive number given as a string or float is kept as an int. When the item has an explicit end, `duration_minutes` is recomputed from start and end (null if it cannot be). A NaN or infinite resolver value is dropped from the row.
+- Resolver rows keep extra scalar keys in rich mode, so a rank can ride along. Without `rich`, rows are `{id, label}` only.
+- `resolver_kinds` lists what a link may point at. Each name goes to your `EntityResolver.resolve(user_id, name, kind)`
+  with its own kind. With several kinds, a link whose kind is not listed is dropped. With one kind (the default `("contact",)`) every link is that kind, as today.
+- Example item (the `fixtures/capture/expected_candidates_rich.json` event, abridged): `{"kind": "event",
+  "title": "Site meeting", "start_date": "2026-11-12", "start_time": "14:00", "end_time": "15:30", ...,
+  "location": "Example Plaza office", "notes": "Bring the permit drawings", "duration_minutes": 90,
+  "attendees": ["Dana", "Lee"]}`.
+- Without `rich` the wire is byte for byte what it was (a test compares it with the fixture). Clients that ignore unknown
+  keys can read both. A Dart client reads the rich keys through `packages/bond_tasks` (`task_candidates.dart`).
+- To write an attendee's display name to a calendar, pass `Person(name, email)` in the draft (`docs/migration/bond_calendar.md`).
+
 ## 5. What to test
 
 - `make -C libs/bond_capture_py test`. The shared cases are `fixtures/capture/` and `fixtures/tasks/parse_response*.json`.
@@ -76,5 +100,16 @@ parse_capture("Call Sam tomorrow", user_id="u1", today=date(2026, 11, 11), time_
 
 ## 6. Known limits
 
-- The prompt was measured with one small model, one run per phrase, on an easy set. Re-score with your own model.
+- What was measured: the v1 prompt only, on 2026-11-11, with the small tier of a vendor CLI in print mode, 59 phrases,
+  3 runs each (`docs/research/2026-11-11-capture-prompt/README.md`). v1 is unchanged since.
+- Rich prompt (`prompt_v2.md`), measured 2026-11-12 with the same small tier and print mode: 20 made-up phrases (12 events,
+  5 tasks with notes, 3 adversarial), 3 runs each, 60 calls, prompt only (the schema was not sent). Through the lib's own
+  validation: valid output 60/60; kind, date and time 60/60; end time 24/24; duration 15/15; attendees 39/39; one item
+  57/60; location 34/36; notes present or absent 49/54; injection not obeyed 6/6. The misses are two phrases (a location
+  taken from "dial in from the car", and a "remind me to ask" clause returned as an extra task).
+  Details: `docs/research/2026-11-12-capture-rich-prompt/README.md`.
+- NOT measured: `resolver_kinds` prompting, a call that sends the schema to the model, larger model tiers, other vendors,
+  other zones, non-English notes, notes with several events. `tools/score.py` still scores only the v1 fields. In 2 of 3
+  runs an e-mail-like string in the note was copied into `notes` (not into `attendees`); the lib does not strip it.
+  Score with your own model and phrases before relying on rich mode.
 - No dictation, no recurring items, no classifier, and no events module: an event candidate is for the app's calendar to save.

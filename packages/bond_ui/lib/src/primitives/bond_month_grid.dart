@@ -63,7 +63,7 @@ class BondMonthGrid extends StatelessWidget {
       padding: BondSpace.all8,
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         border: Border.all(color: t.line),
       ),
       child: Column(
@@ -180,7 +180,7 @@ class _DayCell extends StatelessWidget {
       excludeChildren: true,
       child: BondPressable(
         onTap: enabled ? () => onSelect(date) : null,
-        borderRadius: BondRadius.r8All,
+        borderRadius: t.shape.r8All,
         child: Container(
           constraints: dayBuilder == null
               ? const BoxConstraints.tightFor(height: BondLayout.controlSm)
@@ -188,7 +188,7 @@ class _DayCell extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: isSelected ? t.accent.base : null,
-            borderRadius: BondRadius.r8All,
+            borderRadius: t.shape.r8All,
             border:
                 isToday && !isSelected ? Border.all(color: t.accent.base) : null,
           ),
@@ -231,7 +231,7 @@ class _NavButton extends StatelessWidget {
       onTap: onPressed,
       semanticLabel: label,
       semanticsId: semanticsId,
-      borderRadius: BondRadius.r8All,
+      borderRadius: BondTokens.of(context).shape.r8All,
       minSize: BondLayout.controlSm,
       child: Icon(icon,
           size: BondLayout.icon, color: BondTokens.of(context).muted),

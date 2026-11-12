@@ -36,7 +36,7 @@ class BondCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? t.surface,
-        borderRadius: BondRadius.r16All,
+        borderRadius: t.shape.r16All,
         border: Border.all(color: borderColor ?? t.line),
         boxShadow: BondShadows.card,
       ),
@@ -48,7 +48,7 @@ class BondCard extends StatelessWidget {
     }
     return BondPressable(
       onTap: onTap,
-      borderRadius: BondRadius.r16All,
+      borderRadius: t.shape.r16All,
       semanticLabel: semanticLabel,
       semanticsId: semanticsId,
       child: box,

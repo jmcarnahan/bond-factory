@@ -68,7 +68,7 @@ class BondListRow extends StatelessWidget {
           horizontal: BondSpace.s12, vertical: BondSpace.s12),
       decoration: BoxDecoration(
         color: urgent ? t.danger.wash : t.surface,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         // A dashed row keeps a clear border so it lines up with its solid
         // neighbours; the dashes are painted over it.
         border: Border.all(
@@ -134,7 +134,7 @@ class BondListRow extends StatelessWidget {
     }
     return BondPressable(
       onTap: onTap,
-      borderRadius: BondRadius.r12All,
+      borderRadius: t.shape.r12All,
       semanticsId: semanticsId,
       child: shown,
     );

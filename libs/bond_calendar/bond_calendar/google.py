@@ -10,7 +10,16 @@ from typing import Any
 import httpx
 
 from .errors import CalendarError, NotFound
-from .models import PATCH_KEYS, CalendarEvent, CalendarEventDraft, EventPage, EventPatch, to_utc
+from .models import (
+    PATCH_KEYS,
+    CalendarEvent,
+    CalendarEventDraft,
+    EventPage,
+    EventPatch,
+    attendee_parts,
+    merged_attendees,
+    to_utc,
+)
 from .normalize import google_body, google_event, google_is_dropped
 from .times import all_day_dates, iso_z
 from .transport import call, json_body
@@ -27,6 +36,11 @@ MAX_PAGES = 25
 def _time(value: datetime, all_day: bool) -> dict[str, str]:
     value = to_utc(value)
     return {"date": value.date().isoformat()} if all_day else {"dateTime": iso_z(value), "timeZone": "UTC"}
+
+
+def _attendee(value: Any) -> dict[str, str]:
+    name, address = attendee_parts(value)
+    return {"email": address} if not name else {"email": address, "displayName": name}
 
 
 def wire_fields(values: dict[str, Any], *, all_day: bool | None = None) -> dict[str, Any]:
@@ -48,7 +62,7 @@ def wire_fields(values: dict[str, Any], *, all_day: bool | None = None) -> dict[
     if "body" in values:
         out["description"] = values["body"] or ""
     if "attendees" in values:
-        out["attendees"] = [{"email": a} for a in values["attendees"] or []]
+        out["attendees"] = [_attendee(a) for a in merged_attendees(values["attendees"])]
     if "reminder_minutes" in values:  # present and None clears the reminder
         minutes = values["reminder_minutes"]
         out["reminders"] = {"useDefault": False, "overrides": (

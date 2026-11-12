@@ -39,13 +39,13 @@ class BondGoogleSignInButton extends StatelessWidget {
           onTap: onPressed,
           semanticLabel: label,
           semanticsId: semanticsId,
-          borderRadius: BondRadius.r12All,
+          borderRadius: t.shape.r12All,
           color: enabled ? t.surface : t.line,
           minSize: BondLayout.minTap + BondSpace.s8,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: BondSpace.s16),
             decoration: BoxDecoration(
-              borderRadius: BondRadius.r12All,
+              borderRadius: t.shape.r12All,
               border: Border.all(color: enabled ? t.lineStrong : t.line),
             ),
             child: Row(

@@ -131,8 +131,10 @@ is 403 `not_task_owner`. An action id other than the three is 422 `invalid_actio
 | `POST /push/devices` (201) | `{device_id, token, platform (ios), environment, topic?}` | `{device_id}` |
 | `DELETE /push/devices/{device_id}` (204) | none | none |
 
+`bond_notify_py.routes.make_notices_router` serves every notice route above; `act` is mounted only when the host passes `on_act` (which applies the action and may return a mapping merged beside `notice`). The act route does not read a `time_zone` query value.
+
 `act` loads the notice with `bond_notify_py.get_owned(session, Notice, user_id, notice_id)` FIRST (404 `notice_not_found`, 403 `not_notice_owner`), because `apply_notice_action` never sees the notice and a route that skips the check lets any user complete or cancel a task through another user's notice id. It then loads the task, applies the action (`apply_notice_action`), marks the notice read, and on done or cancel puts away the task's other notices. The
-`act` route and the device routes are the app's own. In the example, `act` needs the `tasks.write` capability (read and dismiss need only a session). `GET /notices` shows the user's own, undismissed notices, newest
+device routes are the app's own. `bond_notify_py.routes.make_notices_router` serves `act` when the host gives `on_act` (the task action) and, if it wants one, a capability check (`act_dep`); a host may still write its own `act` route by the rule above. In the example, `act` needs the `tasks.write` capability (read and dismiss need only a session). `GET /notices` shows the user's own, undismissed notices, newest
 first by `(created_at, id)`. `list_notices` also returns the next cursor: an app that pages sends it as `before`. Errors: 404 `notice_not_found`, 403 `not_notice_owner`, 422 `invalid_cursor`. Device
 errors (`PushError`): 422 `invalid_platform`, `invalid_environment`, `token_required`, `device_id_required`,
 `token_too_long`, `device_id_too_long`, `invalid_topic`, `topic_too_long`; 404 `device_not_found`; 403

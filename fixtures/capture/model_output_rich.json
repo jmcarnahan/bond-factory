@@ -1,0 +1,38 @@
+{
+  "items": [
+    {
+      "kind": "event",
+      "title": "Site meeting",
+      "date": "2026-11-12",
+      "time": "14:00",
+      "due_defaulted": false,
+      "priority": null,
+      "all_day": false,
+      "end_date": null,
+      "end_time": null,
+      "links": [],
+      "confidence": 0.9,
+      "location": "Example Plaza office",
+      "notes": "Bring the permit drawings",
+      "duration_minutes": 90,
+      "attendees": ["Dana", "Lee"]
+    },
+    {
+      "kind": "task",
+      "title": "Call Sam",
+      "date": "2026-11-12",
+      "time": null,
+      "due_defaulted": false,
+      "priority": null,
+      "all_day": false,
+      "end_date": null,
+      "end_time": null,
+      "links": [{"text": "Sam", "kind": "contact"}],
+      "confidence": 0.95,
+      "location": null,
+      "notes": "Ask about the invoice",
+      "duration_minutes": null,
+      "attendees": []
+    }
+  ]
+}

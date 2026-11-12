@@ -31,7 +31,7 @@ class BondNoticeBadge extends StatelessWidget {
         constraints: const BoxConstraints(minWidth: BondSpace.s20, minHeight: BondSpace.s20),
         padding: const EdgeInsets.symmetric(horizontal: BondSpace.s4),
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: t.danger.base, borderRadius: BondRadius.r12All),
+        decoration: BoxDecoration(color: t.danger.base, borderRadius: t.shape.r12All),
         child: Text(
           unread > 99 ? '99+' : '$unread',
           style: BondText(t).style(BondText.caption12, BondText.semibold, color: t.onFill),

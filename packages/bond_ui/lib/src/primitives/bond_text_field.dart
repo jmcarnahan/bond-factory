@@ -117,7 +117,7 @@ class BondTextField extends StatelessWidget {
                 errorText: semanticsId == null ? errorText : null,
                 error: semanticsId != null && errorText != null ? const SizedBox.shrink() : null,
                 prefixIcon: prefix,
-                focusedBorder: bondFocusedBorder(focusColor),
+                focusedBorder: bondFocusedBorder(focusColor, t.shape),
               ),
             ),
           ),
@@ -141,10 +141,10 @@ class BondTextField extends StatelessWidget {
 }
 
 /// The theme's focused border shape in [color]; null defers to the theme.
-InputBorder? bondFocusedBorder(Color? color) => color == null
+InputBorder? bondFocusedBorder(Color? color, [BondShape shape = const BondShape()]) => color == null
     ? null
     : OutlineInputBorder(
-        borderRadius: BondRadius.r12All,
+        borderRadius: shape.r12All,
         borderSide: BorderSide(color: color, width: BondLayout.rule),
       );
 
@@ -214,7 +214,7 @@ class BondSearchField extends StatelessWidget {
           hintText: hint,
           prefixIcon: Icon(icon, size: BondLayout.icon, color: t.muted),
           suffixIcon: trailing,
-          focusedBorder: bondFocusedBorder(focusColor),
+          focusedBorder: bondFocusedBorder(focusColor, t.shape),
         ),
       ),
     );

@@ -9,7 +9,7 @@ class BondDashedBorder extends StatelessWidget {
     super.key,
     required this.child,
     this.color,
-    this.radius = BondRadius.r12,
+    this.radius,
     this.fill,
   });
 
@@ -17,19 +17,21 @@ class BondDashedBorder extends StatelessWidget {
 
   /// Dash colour; defaults to the strong line token.
   final Color? color;
-  final double radius;
+  /// Corner radius; defaults to the shape token `r12`.
+  final double? radius;
   final Color? fill;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
         foregroundPainter: _DashPainter(
           color: color ?? BondTokens.of(context).lineStrong,
-          radius: radius,
+          radius: radius ?? BondTokens.of(context).shape.r12,
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: fill,
-            borderRadius: BorderRadius.circular(radius),
+            borderRadius: BorderRadius.circular(
+                radius ?? BondTokens.of(context).shape.r12),
           ),
           child: child,
         ),

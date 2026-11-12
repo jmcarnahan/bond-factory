@@ -53,9 +53,9 @@ The `*Labels` objects (`ApiLabels`, `BondLabels`, `TaskLabels`, `ConnectionLabel
 | `bond_jobs` | `models/jobs.py`, the registry in `wiring.py`; `scripts/sweep_interval.py` runs `run_schedule` | none | none (the sweep row below) |
 | `bond_sync_py`, `bond_sync`, `bond_sync_powersync` | `routes/sync.py`, `models/sync.py` | `sync_page.dart`: rows, upload verdicts, token | `/sync` |
 | `bond_oauth` | `routes/connections.py`, `oauth_wiring.py`, `models/connections.py`; routes: `GET /connections`, `GET /connections/{provider}/start`, `GET /connections/{provider}/go?state=` (sets the nonce cookie, then redirects to the provider), `GET /connections/{provider}/callback`, `POST /connections/{provider}/redeem` (device secret), `DELETE /connections/{provider}`, `GET /connections/fake/consent`, `POST /connections/{provider}/simulate-expiry` | `connections_page.dart` | `/connections` |
-| `bond_tasks_py`, `bond_tasks`, `bond_tasks_ui` | `tasks_wiring.py` (mirror providers, name lookups), `todo_wiring.py` (preferences, link resolver, inbox, push sender, capture model and guard), `task_support.py` (one transaction, the viewer's zone, the wire item, the write hook), `routes/tasks.py` (CRUD, lifecycle, `/tasks/summary`), `routes/task_today.py` (`/tasks/today`, `/tasks/settings`), `routes/jobs.py` (`POST /jobs/tick`), `models/tasks.py`, `models/task_settings.py`, `models/task_links.py`, `models/task_ledger.py` | `tasks_page.dart`: quick add, list, mirror, summary; `today_page.dart`, `todo_calendar_page.dart`, `todo_settings_page.dart` | `/tasks`, `/today`, `/calendar`, `/todo-settings` |
+| `bond_tasks_py`, `bond_tasks`, `bond_tasks_ui` | `tasks_wiring.py` (mirror providers, name lookups), `todo_wiring.py` (preferences, link resolver, inbox, push sender, capture model and guard), `task_support.py` (one transaction and the viewer's zone for the capture and push routes), `routes/task_routers.py` (mounts `make_tasks_router`: CRUD, lifecycle, summary, today, settings, and `make_notices_router`), `routes/jobs.py` (`POST /jobs/tick`), `models/tasks.py`, `models/task_settings.py`, `models/task_links.py`, `models/task_ledger.py` | `tasks_page.dart`: quick add, list, mirror, summary; `today_page.dart`, `todo_calendar_page.dart`, `todo_settings_page.dart` | `/tasks`, `/today`, `/calendar`, `/todo-settings` |
 | `bond_jobs` with the notice sweep | `sweep_wiring.py` (`run_sweep` claims then delivers, `before_hook` for `bond_jobs.tick(..., before=, before_every=)`, `sweep_app`), `routes/jobs.py` (fake-mode `POST /jobs/tick {now}` runs the sweep, then the due jobs), `scripts/sweep_interval.py` (the same sweep from a plain timer, no jobs table; `--every` must be at least 1) | the fake-clock strip on `/today` and `/inbox` | `/today`, `/inbox` |
-| `bond_notify_py`, `bond_notify`, `bond_notify_ui` | `models/notices.py`, `routes/notices.py` (`GET /notices`, read, dismiss, read-all, `POST /notices/{id}/act`), `InboxNotifier` in the sweep | `inbox_page.dart`: badge, polling and watch feeds, rows with the three actions, undo | `/inbox` |
+| `bond_notify_py`, `bond_notify`, `bond_notify_ui` | `models/notices.py`, `routes/task_routers.py` (`make_notices_router`: `GET /notices`, read, dismiss, read-all, `POST /notices/{id}/act`), `InboxNotifier` in the sweep | `inbox_page.dart`: badge, polling and watch feeds, rows with the three actions, undo | `/inbox` |
 | `bond_push_py`, `bond_push`, `bond_tasks_notifications` | `models/push.py`, `routes/push.py` (`POST /push/devices`, `DELETE /push/devices/{id}`), the mock sender and `GET /fake/push/sent` in `routes/fake_todo.py`; real mode builds an `ApnsSender` only when `SDK_EXAMPLE_APNS_KEY_FILE`, `_KEY_ID` and `_TEAM_ID` are set | `lib/src/todo/todo_alerts.dart` (the coordinator, the only alert wiring; the plugin classes `PushPlugin`, `DefaultPushPlugin`, `PluginPushTokenSource` and `PluginPushTaps` come from `package:bond_push_apple/bond_push_apple.dart`, the rest from `bond_push`), the iOS simulator lane | `docs/test/MOBILE.md` |
 | `bond_capture_py` | `capture_wiring.py` (the replay model, the rate guard, the accepted-event log), `routes/task_capture.py` (`POST /tasks/parse`, `GET /tasks/links/search`, the event stub), `contacts.py` (the link resolver and entity resolver over invented contacts) | `capture_page.dart`: note field, review, events sent | `/capture` |
 | `bond_sync_powersync` and the two TODO sync adapters | `sync_todo.py` (the sync upload hosts `notes`, `tasks`, `notices` (patch `read_at`, `dismissed_at`) and `push_devices` (put, patch, delete), through the libs' handlers), `routes/sync.py` | `lib/src/todo/sync_mirror_notice_feed.dart` (the demo's stand-in for the watch feed) | `/inbox` (Watch feed) |
@@ -166,6 +166,32 @@ from bond_service_kit import fake_clock_router
 
 app.include_router(fake_clock_router(clock, enabled=lambda: settings.mode == "fake",
                                      dependencies=[Depends(current_user_id)]))
+```
+
+Both Python router factories, mounted (`services/sdk_example/sdk_example/routes/task_routers.py`, 113 lines in place of
+about 290 of hand-written routes; install the extra `http` of each lib):
+
+```python
+from bond_notify_py.routes import make_notices_router
+from bond_tasks_py.routes import make_tasks_router
+
+app.include_router(make_tasks_router(task_model=Task, settings_model=TaskUserSettings, link_index_model=TaskLinkIndex,
+                                     session_scope=scope, user_dep=current_user_id, now=now, write_dep=write,
+                                     read_all_dep=require_read_all, defaults=default_prefs, after_write=after_write))
+app.include_router(make_notices_router(notice_model=Notice, session_scope=scope, user_dep=current_user_id, now=now,
+                                       on_act=on_act, act_dep=write))
+```
+
+Corner shape is a token. A squarer app sets it once; widgets follow (`BondRadius.rN` is deprecated):
+
+```dart
+BondTokens.fallback.copyWith(shape: const BondShape(r8: 2))
+```
+
+A server time that may be missing or malformed reads as null instead of throwing:
+
+```dart
+final seen = jtimeOrNull(json, 'last_seen_at'); // null for absent, empty or impossible dates (2026-02-30)
 ```
 
 ## Web token delivery

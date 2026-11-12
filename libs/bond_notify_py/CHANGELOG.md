@@ -12,3 +12,8 @@
 - Error code `invalid_cursor` (422).
 - `get_owned(session, notice_model, user_id, notice_id)` is public (404 `notice_not_found`, 403 `not_notice_owner`);
   `service._owned` stays as an alias. A host's own act route must call it first.
+- `bond_notify_py.routes.make_notices_router(notice_model, session_scope, user_dep, now, on_act=None, prefix)` (new file;
+  needs extra `http` = fastapi; the package never imports it): list, read, dismiss, read-all, and `act`, which calls
+  `get_owned` first, then `on_act(session, notice, action, user_id, now)`, then marks the notice read. No `on_act`, no act route.
+  Also `act_dep`, `actions`, `after_act`.
+- `make_notices_router(error_map=)`: asked for any exception escaping a route. By default any exception with a str `code`, a str `message` and an int `status` (and no `detail` of its own) is answered as `status` with `{"detail": {"code", "message"}}`, so a coded error from `on_act` is no longer a 500. In the act answer `notice` always wins over a result key.

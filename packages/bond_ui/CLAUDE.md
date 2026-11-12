@@ -3,7 +3,7 @@ Role: Shared Flutter design tokens, theme, labels and widgets for the bond app f
 
 ## Key files
 - `lib/bond_ui.dart`: the barrel; nothing else is imported by apps.
-- `lib/src/tokens/`: `BondTokens` (colours, font), `BondSpace`, `BondRadius`, `BondText`, `BondLayout`. Raw colours live only here.
+- `lib/src/tokens/`: `BondTokens` (colours, font), `BondShape` (themable radii, read as `BondTokens.of(context).shape`), `BondSpace`, `BondRadius` (deprecated rN aliases, `pill`), `BondText`, `BondLayout`. Raw colours live only here.
 - `lib/src/theme/`: `BondTheme.build`, `BondScope` (the one injection point).
 - `lib/src/labels.dart`: `BondLabels`, every string a widget shows. `lib/src/semantics.dart`: `bondSemantics`.
 - `lib/src/primitives/`: the `Bond<Name>` primitive widgets (plus small internal helpers: confirm line, date calendar, date format). Tests in `test/primitives/`.

@@ -1,7 +1,7 @@
 # Tasks contract
 
 Normative for `libs/bond_tasks_py`, `packages/bond_tasks`, `packages/bond_tasks_ui`, `packages/bond_tasks_powersync`
-and the task routes an app mounts (the example mounts them in `services/sdk_example/sdk_example/routes/tasks.py`).
+and the task routes an app mounts (the example mounts `make_tasks_router` in `services/sdk_example/sdk_example/routes/task_routers.py`).
 Notices, stages and the ledger are in `docs/contracts/notices.md`. Reasons for the rules:
 `docs/decisions/2026-11-11-due-instant.md`. Errors use `docs/contracts/error_body.md`. Shared cases:
 `fixtures/tasks/`. All instants are naive UTC in storage and ISO 8601 with a trailing `Z` on the wire.
@@ -151,6 +151,15 @@ flags, degraded}`, an event item is `{kind: "event", title, start_date, start_ti
 links, confidence, flags, degraded}`. A link is `{text, kind, candidates: [{id, label}]}`. At most 8 items and 5 links
 per item. `flags`: `low_confidence` (below 0.5), and `missed` on an event dated before today. `reason` is null,
 `model_unavailable` or `invalid_output`. `dropped` (items discarded) appears only above zero. A guard refusal is 429.
+
+Rich parse (opt in: `parse_capture(rich=True)`; the example takes `rich: true` in the body). Only a rich answer carries
+these keys: an event item adds `location`, `notes`, `duration_minutes`, `attendees` (names, never resolved); a task item
+adds `notes`. A resolver row keeps extra scalar keys beside `id` and `label`. A default parse has none of them.
+Fixtures: `fixtures/capture/model_output_rich.json`, `expected_candidates_rich.json`, `expected_degraded_rich.json`,
+`schema_rich.json`, `rich_phrases.json`; `packages/bond_tasks` reads them too.
+
+Router factory: `bond_tasks_py.routes.make_tasks_router` serves the list, summary, today, settings, item, create, update,
+status, delete and checklist routes above. `item_extras(task)` adds keys to an item; a base key always wins.
 
 ## Error codes
 

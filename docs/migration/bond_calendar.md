@@ -51,7 +51,7 @@ use it inside the block that loaded the connection. Read-only paths may pass `ma
 ## 4. Call-site changes
 
 - Names: `start/end/is_all_day/...` are unchanged; `crm_*` keys are gone; people are `Person` and `Attendee`
-  dataclasses; `attendees` in a draft are e-mail addresses.
+  dataclasses; `attendees` in a draft are e-mail addresses, or `Person(name, email)` to write a display name too. Duplicates merge by lower-cased address (a named entry wins); a `Person` with no address raises `InvalidAttendee` (a `CalendarError`, 422 `invalid_attendee`).
 - Reads drop cancelled events unless `include_cancelled=True`. Google also drops events the signed-in person declined.
 - `delete_event` is idempotent: 204, 404 and 410 all succeed.
 - A patch holds only the changed draft keys. When moving a Google all-day event, include `is_all_day` with the new

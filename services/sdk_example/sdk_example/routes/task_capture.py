@@ -1,7 +1,8 @@
 """Natural-language capture and the link search.
 
-    POST /tasks/parse           {text, today?, time_zone?} -> {items: [TaskCandidate | EventCandidate], degraded, reason}
-                                creates nothing; 429 `capture_denied` when the guard refuses; 422 `text_required` or
+    POST /tasks/parse           {text, today?, time_zone?, rich?} -> {items: [TaskCandidate | EventCandidate], degraded, reason}
+                                `rich: true` also asks for location, notes, duration and attendees (default false: the
+                                answer is unchanged); creates nothing; 429 `capture_denied` when the guard refuses; 422 `text_required` or
                                 `text_too_long`. No model (real mode without a vendor client, or the fake switch)
                                 gives one degraded task draft, never an error.
     GET  /tasks/links/search    ?kind=contact&q=sam -> {items: [{kind, id, label}]}
@@ -35,6 +36,7 @@ class ParseBody(BaseModel):
     text: str  # the library checks it (422 text_required / text_too_long), so the codes are its own
     today: date | None = None
     time_zone: str | None = None
+    rich: bool = False  # opt in to location, notes, duration_minutes and attendees; false keeps the answer as it was
 
 
 class EventBody(BaseModel):
@@ -58,7 +60,8 @@ def register(app: FastAPI) -> None:
         day = body.today or tasks.viewer_today(clock_now(request), zone)
         try:
             result = parse_capture(body.text, user_id=user_id, today=day, time_zone=zone, end_of_day=end_of_day,
-                                   llm=state.capture_llm, resolver=state.contacts, guard=state.capture_guard)
+                                   llm=state.capture_llm, resolver=state.contacts, guard=state.capture_guard,
+                                   rich=body.rich)
         except CaptureError as exc:
             raise ApiError(exc.code, exc.message, status=exc.status) from None
         return result.to_dict()

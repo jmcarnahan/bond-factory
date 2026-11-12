@@ -2,6 +2,7 @@
 
 ## 0.1.0 - unreleased
 - Scaffold.
+- Tasks and inbox routes are the libs' router factories (`routes/task_routers.py`); `routes/tasks.py`, `task_today.py` and `notices.py` are gone, the wire is unchanged. `POST /tasks/parse` takes `rich` (default false).
 - Connections: native-app flow (`start?mode=native`, cookie-less `/go` and callback for native states, `POST
   /connections/{provider}/redeem`); `SDK_EXAMPLE_NATIVE_REDIRECTS` (default `sdkdemo://connections`).
 - Direct sign-in: `signin_wiring.py` (library objects, cookies, router and well-known mounts), `directory.py` (the

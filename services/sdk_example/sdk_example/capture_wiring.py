@@ -1,7 +1,7 @@
 """REPLACE the fake model with a vendor client; keep the guard as a pattern. Fake mode only gets the fake model.
 
-    ReplayLlm      an `LlmClient` that answers `fixtures/capture/model_output.json` whatever the note says, or
-                   raises `LlmUnavailable` while `down` is set (the switch the walk uses to see the degraded path)
+    ReplayLlm      an `LlmClient` that answers `fixtures/capture/model_output.json` whatever the note says (the
+                   `_rich` file when the schema asked for rich fields), or raises `LlmUnavailable` while `down` is set (the switch the walk uses to see the degraded path)
     RateGuard      a per-user `CaptureGuard`: at most `limit` parses per `window` seconds (429 `capture_denied`)
     EventLog       what the demo's "accept event" stub recorded (in memory; a real app creates a calendar event)
 """
@@ -17,6 +17,7 @@ from pathlib import Path
 from bond_capture_py import CaptureDenied, LlmUnavailable
 
 FIXTURE = Path(__file__).resolve().parents[3] / "fixtures" / "capture" / "model_output.json"
+RICH_FIXTURE = FIXTURE.with_name("model_output_rich.json")
 
 
 class ReplayLlm:
@@ -29,7 +30,8 @@ class ReplayLlm:
         self.calls += 1
         if self.down:
             raise LlmUnavailable()
-        return json.loads(self.path.read_text())
+        rich = '"attendees"' in json.dumps(schema)  # only the rich schema has them
+        return json.loads((RICH_FIXTURE if rich and self.path == FIXTURE else self.path).read_text())
 
 
 class RateGuard:

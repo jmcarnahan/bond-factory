@@ -53,7 +53,7 @@ Route the banner's action through the same handler as notices (`NoticeActionHand
 - A task past its due instant shows "Overdue". An event in the past shows "Missed". Never "Overdue" on an event.
 - A banner exists for `close`, `due` and `past` only. `upcoming` and none show nothing.
 - Capture: a link set to "No match" is dropped from its item. The chosen match is first among its alternatives.
-  `BondCaptureReview.onAccept` gives the edited items. The app creates each one through the normal create call.
+  `BondCaptureReview.onAccept` gives the edited items. An edit keeps every field the card does not show (an event's location, notes, duration and attendees; a task's notes); changing the kind carries the notes across. The app creates each one through the normal create call.
 - Semantics ids: single widgets take `semanticsId`. Composite ones take `semanticsPrefix` and derive
   `<prefix>.row-<id>`, `<prefix>.complete-<id>`, `<prefix>.form-<part>`.
 

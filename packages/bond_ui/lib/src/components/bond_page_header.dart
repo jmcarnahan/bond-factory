@@ -106,7 +106,7 @@ class _Crumbs extends StatelessWidget {
       onTap: c.onTap,
       semanticLabel: c.label,
       semanticsId: c.semanticsId,
-      borderRadius: BondRadius.r4All,
+      borderRadius: t.shape.r4All,
       child: Padding(padding: const EdgeInsets.symmetric(vertical: BondSpace.s4), child: words),
     );
   }

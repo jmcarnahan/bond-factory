@@ -51,3 +51,12 @@ class Unavailable(CalendarError):
     def __init__(self, message: str = "The calendar service is unavailable.", status: int = 503,
                  code: str = "unavailable") -> None:
         super().__init__(status, code, message)
+
+
+class InvalidAttendee(CalendarError, ValueError):
+    """An attendee that cannot be written: a ``Person`` with no address (status 422, code ``invalid_attendee``).
+    Also a ``ValueError``, as the bare error it replaces was."""
+
+    def __init__(self, message: str = "An attendee given as a Person needs an email address.", status: int = 422,
+                 code: str = "invalid_attendee") -> None:
+        super().__init__(status, code, message)

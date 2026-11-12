@@ -1,11 +1,13 @@
 """The lib imports only sqlalchemy, pydantic and the standard library."""
 
 import ast
+import subprocess
 import sys
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parents[1] / "bond_tasks_py"
 ALLOWED = {"sqlalchemy", "pydantic", "bond_tasks_py"}
+HTTP_FILES = {"routes.py"}  # the only file that may import fastapi (extra `http`)
 
 
 def imported_roots(path: Path) -> set[str]:
@@ -21,6 +23,8 @@ def imported_roots(path: Path) -> set[str]:
 def test_only_sqlalchemy_pydantic_and_the_standard_library():
     stdlib = set(sys.stdlib_module_names)
     for path in PACKAGE.rglob("*.py"):
+        if path.name in HTTP_FILES:
+            continue
         stray = {r for r in imported_roots(path) if r not in stdlib and r not in ALLOWED}
         assert not stray, f"{path.name} imports {sorted(stray)}"
 
@@ -34,3 +38,13 @@ def test_no_sibling_bond_lib_is_imported():
 def test_no_source_file_is_over_the_line_cap():
     for path in PACKAGE.rglob("*.py"):
         assert len(path.read_text().splitlines()) <= 300, path.name
+
+
+def test_only_routes_py_imports_fastapi():
+    for path in PACKAGE.rglob("*.py"):
+        assert ("fastapi" in imported_roots(path)) == (path.name in HTTP_FILES), path.name
+
+
+def test_importing_the_package_does_not_import_fastapi():
+    code = "import bond_tasks_py, sys; assert 'fastapi' not in sys.modules"
+    subprocess.run([sys.executable, "-c", code], check=True)

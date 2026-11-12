@@ -2,6 +2,11 @@
 
 ## 0.1.0 - unreleased
 
+### Added (themable shape)
+- `BondShape` (`r4, r8, r12, r16, r20`, plus `r4All` to `r20All`, `copyWith`, `lerp`, equality) and `BondTokens.shape` (default `const BondShape()`, same values as before). Every widget reads its corner radii from `BondTokens.of(context).shape`.
+- `BondRadius.r4` to `r20` and `r4All` to `r20All` are `@Deprecated` aliases for one release. `BondRadius.pill` and `pillAll` stay (a pill is not a shape step).
+- `BondPressable.borderRadius`, `BondPhoto.radius` and `BondDashedBorder.radius` are now nullable and default to the shape token (`r8`, `r12`, `r12`); passing a value works as before. `bondFocusedBorder` takes an optional `BondShape`.
+
 ### Added (task widgets support)
 - `BondMonthGrid` is exported (moved to `primitives/bond_month_grid.dart`) with `dayBuilder` (a widget under each day number) and `firstWeekday` (default Sunday). `BondDateField` is unchanged.
 - `BondMonthGrid.daySemantics`: text appended to a cell's spoken label (a `dayBuilder` marker is hidden from screen readers).

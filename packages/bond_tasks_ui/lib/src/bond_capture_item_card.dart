@@ -4,35 +4,10 @@ import 'package:flutter/material.dart';
 
 import 'bond_capture_link_row.dart';
 import 'bond_capture_when.dart';
+import 'capture_item_build.dart';
+import 'capture_link_state.dart';
 import 'bond_priority_chip.dart';
 import 'task_format.dart';
-
-class _LinkState {
-  _LinkState(LinkCandidate l)
-      : text = l.text,
-        kind = l.kind,
-        options = [...l.candidates],
-        selected = l.candidates.isEmpty ? -1 : 0;
-
-  final String text;
-  final String kind;
-  final List<LinkOption> options;
-
-  /// Index into [options], or -1 for no match.
-  int selected;
-
-  LinkCandidate? get result {
-    if (selected < 0 || selected >= options.length) return null;
-    final chosen = options[selected];
-    return LinkCandidate(
-      text: text,
-      kind: kind,
-      candidates: [chosen, for (final o in options) if (o != chosen) o],
-    );
-  }
-
-  LinkCandidate get view => LinkCandidate(text: text, kind: kind, candidates: options);
-}
 
 /// One captured item for review: an editable title, a Task / Event switch that
 /// converts it, the date and time, the priority (tasks), the mentions with
@@ -89,14 +64,14 @@ class _BondCaptureItemCardState extends State<BondCaptureItemCard> {
   String? _endDate;
   String? _endTime;
   TaskPriority? _priority;
-  late final List<_LinkState> _links;
+  late final List<CaptureLinkState> _links;
 
   @override
   void initState() {
     super.initState();
     final i = widget.item;
     _title = TextEditingController(text: i.title);
-    _links = [for (final l in i.links) _LinkState(l)];
+    _links = [for (final l in i.links) CaptureLinkState(l)];
     switch (i) {
       case TaskCandidate():
         _isEvent = false;
@@ -120,35 +95,26 @@ class _BondCaptureItemCardState extends State<BondCaptureItemCard> {
     super.dispose();
   }
 
+  // The last event this card held: switching to a task and back keeps its place, guests and length.
+  EventCandidate? _event;
+
   CaptureItem _build() {
-    final i = widget.item;
-    final links = [
-      for (final l in _links) ?l.result,
-    ];
-    return _isEvent
-        ? EventCandidate(
-            title: _title.text,
-            links: links,
-            confidence: i.confidence,
-            flags: i.flags,
-            degraded: i.degraded,
-            startDate: _date,
-            startTime: _allDay ? null : _time,
-            allDay: _allDay,
-            endDate: _endDate,
-            endTime: _endTime,
-          )
-        : TaskCandidate(
-            title: _title.text,
-            links: links,
-            confidence: i.confidence,
-            flags: i.flags,
-            degraded: i.degraded,
-            dueDate: _date,
-            dueTime: _time,
-            dueDefaulted: _defaulted,
-            priority: _priority,
-          );
+    final current = widget.item;
+    if (current is EventCandidate) _event = current;
+    return buildEditedCaptureItem(
+        current,
+        remembered: _event,
+        title: _title.text,
+        links: [for (final l in _links) ?l.result],
+        isEvent: _isEvent,
+        date: _date,
+        time: _time,
+        allDay: _allDay,
+        defaulted: _defaulted,
+        endDate: _endDate,
+        endTime: _endTime,
+        priority: _priority,
+      );
   }
 
   void _edit(VoidCallback change) {
@@ -212,7 +178,7 @@ class _BondCaptureItemCardState extends State<BondCaptureItemCard> {
         padding: BondSpace.all12,
         decoration: BoxDecoration(
           color: t.surface,
-          borderRadius: BondRadius.r12All,
+          borderRadius: t.shape.r12All,
           border: Border.all(color: low ? t.caution.soft : t.line),
         ),
         child: Column(

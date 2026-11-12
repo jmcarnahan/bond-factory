@@ -28,6 +28,7 @@ class PowerSyncTaskRepository implements TaskRepository {
     this.extraColumns = const {},
     this.enricher,
     this.extraWatchTables = const [],
+    this.mirrorStatusFor,
   }) {
     checkExtraColumnNames(extraColumns);
   }
@@ -47,6 +48,14 @@ class PowerSyncTaskRepository implements TaskRepository {
   /// Other tables [enricher] reads: a change in one re-emits [watchOpen].
   final List<String> extraWatchTables;
 
+  /// Lets the app show the right mirror state while a row is offline (the server sets
+  /// `mirror_status` and a row that has not synced still says `pending`). Called with each stored
+  /// row, synchronously, on every read and on a write's result. Return a `MirrorStatus` wire value
+  /// (`pending`, `mirrored`, `skipped`, `failed`) to show it instead of the stored one, or null to
+  /// keep the stored one. Null (the default) uses the stored value for every row. The hook only
+  /// changes what is read: nothing is written back.
+  final MirrorStatusFor? mirrorStatusFor;
+
   Future<List<Task>> _enrich(SyncSql sql, List<Task> tasks) async {
     final e = enricher;
     if (e == null || tasks.isEmpty) return tasks;
@@ -57,7 +66,7 @@ class PowerSyncTaskRepository implements TaskRepository {
     return out;
   }
 
-  List<Task> _decode(List<SyncRow> rows, DateTime now) => [for (final r in rows) taskFromRow(r, nowUtc: now)];
+  List<Task> _decode(List<SyncRow> rows, DateTime now) => [for (final r in rows) taskFromRow(r, nowUtc: now, mirrorStatusFor: mirrorStatusFor)];
 
   Future<List<Task>> _open(SyncSql sql, DateTime now) async => _decode(
         await sql.getAll("SELECT * FROM $kTasksTable WHERE status = 'open' AND $_mine $_order", [userId, userId]),
@@ -151,7 +160,7 @@ class PowerSyncTaskRepository implements TaskRepository {
   Future<Task> _read(SyncSql sql, String id) async {
     final row = await sql.getOptional('SELECT * FROM $kTasksTable WHERE id = ?', [id]);
     if (row == null) throw StateError('task_not_found: $id');
-    final task = taskFromRow(row, nowUtc: clock.nowUtc());
+    final task = taskFromRow(row, nowUtc: clock.nowUtc(), mirrorStatusFor: mirrorStatusFor);
     return (await _enrich(sql, [task])).single;
   }
 

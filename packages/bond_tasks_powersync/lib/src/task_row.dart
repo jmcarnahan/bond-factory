@@ -22,6 +22,22 @@ String? _time(Object? v) {
   return d == null ? null : isoZ(d);
 }
 
+/// Gives the mirror state to show for a stored row, as a `MirrorStatus` wire value, or null to keep
+/// the stored one. See `PowerSyncTaskRepository.mirrorStatusFor`.
+typedef MirrorStatusFor = String? Function(SyncRow row);
+
+String? _mirror(SyncRow row, MirrorStatusFor? hook) {
+  if (hook != null) {
+    try {
+      final v = hook(row);
+      if (v != null) return v;
+    } catch (_) {
+      // keep the stored value for this row
+    }
+  }
+  return _str(row['mirror_status']);
+}
+
 String? _str(Object? v) => v?.toString();
 
 int? _int(Object? v) {
@@ -63,7 +79,12 @@ final Set<String> _known = {'id', '_metadata', ...kTaskColumns};
 /// Decodes a `tasks` row. Booleans are 0 or 1, JSON columns are text, `overdue` is derived from
 /// [nowUtc] and the names of the owner and assignee are null (they are not stored). Every column
 /// outside the built-in set (an adopting app's own) lands in `Task.extras` as the row holds it.
-Task taskFromRow(SyncRow row, {required DateTime nowUtc}) {
+///
+/// [mirrorStatusFor] (default null: the stored `mirror_status` is used) is asked for each row. A
+/// non-null answer is a `MirrorStatus` wire value (`pending`, `mirrored`, `skipped`, `failed`) that
+/// replaces the stored one; null keeps the stored value. An unknown string shows as `pending`. A hook
+/// that throws keeps the stored value for that row; the rest of the list still reads.
+Task taskFromRow(SyncRow row, {required DateTime nowUtc, MirrorStatusFor? mirrorStatusFor}) {
   final m = <String, Object?>{
     'id': _str(row['id']),
     'title': _str(row['title']),
@@ -80,7 +101,7 @@ Task taskFromRow(SyncRow row, {required DateTime nowUtc}) {
     'links': _list(row['links'], (e) => _ok(e, TaskLink.fromJson)),
     'completed_at': _time(row['completed_at']),
     'mirror_enabled': row['mirror_enabled'] == null ? null : _int(row['mirror_enabled']) != 0,
-    'mirror_status': _str(row['mirror_status']),
+    'mirror_status': _mirror(row, mirrorStatusFor),
     'external_provider': _str(row['external_provider']),
     'external_event_id': _str(row['external_event_id']),
     'source': _str(row['source']),

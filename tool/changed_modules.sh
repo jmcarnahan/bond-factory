@@ -58,7 +58,7 @@ affected() {
     fixtures/tasks/*)        echo packages/bond_tasks packages/bond_tasks_ui packages/bond_tasks_notifications packages/bond_tasks_powersync libs/bond_tasks_py services/sdk_example demos/sdk_demo ;;
     fixtures/notify/*)       echo libs/bond_notify_py packages/bond_notify packages/bond_notify_ui packages/bond_notify_powersync services/sdk_example demos/sdk_demo ;;
     fixtures/push/*)         echo libs/bond_push_py packages/bond_push services/sdk_example ;;
-    fixtures/capture/*)      echo libs/bond_capture_py services/sdk_example ;;
+    fixtures/capture/*)      echo libs/bond_capture_py packages/bond_tasks services/sdk_example ;;
     fixtures/signin/*)       echo libs/bond_signin packages/bond_signin packages/bond_signin_ui services/sdk_example demos/sdk_demo ;;
     fixtures/*)              echo packages/bond_roof services/roof_measure demos/roof_demo ;;
     docs/contracts/*|docs/contract-0.2.md) echo packages/bond_roof services/roof_measure demos/roof_demo ;;
