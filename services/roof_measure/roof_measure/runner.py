@@ -23,7 +23,7 @@ log = logging.getLogger("roof_measure.runner")
 
 
 def _fixture(settings: Settings, name: str | None) -> Path | None:
-    from .api import fixture_path
+    from .fixtures import fixture_path
 
     return fixture_path(settings, name)
 

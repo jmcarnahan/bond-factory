@@ -7,14 +7,10 @@ Colours are the contract palette (docs/contracts/roof_model.md section 4).
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 from typing import Any
 
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
-from matplotlib.patches import Polygon as MplPolygon
+from .text import ft_in, slug  # noqa: F401  (re-exported: callers import these from here)
 
 PALETTE = {"eave": "#2E7D32", "ridge": "#8BC34A", "hip": "#5E35B1", "valley": "#E53935", "rake": "#FBC02D",
            "step_flashing": "#8D6E63", "wall_flashing": "#1E88E5", "parapet": "#FB8C00",
@@ -23,18 +19,13 @@ DASHED = {"step_flashing", "wall_flashing"}
 FILL = {"flat": "#E3F2FD", "sloped": "#FFF8E1"}
 
 
-def slug(text: str) -> str:
-    """File-name slug of an address or label."""
-    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")[:60] or "model"
-
-
-def ft_in(v: float) -> str:
-    total = round(v * 12)
-    return f"{total // 12}ft {total % 12}in"
-
-
 def render_png(model: dict[str, Any], path: str | Path) -> Path:
     """Write the debug PNG for ``model`` and return its path."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg  # lazy: the `render` extra
+    from matplotlib.figure import Figure
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Polygon as MplPolygon
+
     fig = Figure(figsize=(15, 8), dpi=110)  # no pyplot: no global state shared between worker threads, nothing to leak
     FigureCanvasAgg(fig)
     ax = fig.add_subplot()

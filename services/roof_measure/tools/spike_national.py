@@ -27,7 +27,7 @@ from roof_measure import lidar as lidar_mod
 from roof_measure.deadline import Deadline
 from roof_measure.errors import error_from
 from roof_measure.pipeline import run_pipeline
-from roof_measure.render import slug
+from roof_measure.text import slug
 
 SEEDS = {  # state: (city, lat, lng)
     "TX": ("Austin", 30.37, -97.76), "FL": ("Orlando", 28.47, -81.44),

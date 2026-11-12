@@ -4,6 +4,7 @@
 - contract-0.2.md — the `bond.roof_model/0.2` job API and envelope (`result.model` is the 0.1 roof model)
 - decisions/2026-11-07-roof-poc-summary.md — what the roof POC proved and what was decided
 - decisions/2026-11-10-roof-module-v1.md — roof module v1 decisions D1 to D18, GPL-3 licence, hygiene gate, history rewrite runbook
+- decisions/2026-11-11-roof-dart-packages-mit.md — MIT for bond_roof and bond_roof_ui, roof_measure importable as a library, library-first default
 - contracts/error_body.md — the shared error body, status codes and Retry-After rules (bond_api, bond_service_kit)
 - contracts/auth.md — auth routes, user shape, session JWT, revocation, error codes, providers payload
 - contracts/signin.md — direct sign-in routes, cookies, device-bound hand-offs, refusal codes, security model

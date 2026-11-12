@@ -1,17 +1,26 @@
 bond-factory
-Copyright (C) bond-factory contributors
+Copyright (C) 2026 John Carnahan
 
-This repository is licensed under the GNU General Public License, version 3 or
-(at your option) any later version (GPL-3.0-or-later). The full text is in LICENSE.
+Except for the MIT exceptions listed below, this repository is licensed under the
+GNU General Public License, version 3 or (at your option) any later version
+(GPL-3.0-or-later). The full text is in LICENSE.
 
-Why GPL: the roof measurement service (services/roof_measure) links compas_cgal,
+Why GPL: the roof measurement pipeline (services/roof_measure) links compas_cgal,
 which wraps the CGAL Straight_skeleton_2 package. That CGAL component is GPL per
 the CGAL documentation. compas_cgal itself declares LGPL-3 in its package
-metadata. The whole repository carries one licence for now rather than a
-per-module split. This may change later; it is not legal advice.
+metadata. This may change later; it is not legal advice.
 
-The roof service is deployed as a hosted service. It is not distributed to
-end users as a binary or a package.
+The roof pipeline (services/roof_measure) runs either as a hosted service or as a
+Python library imported in-process by an application's backend. An application
+that imports it combines GPL code into that backend; this matters only if that
+application is itself conveyed to third parties. Nothing here is legal advice.
+
+MIT exceptions: packages/bond_roof and packages/bond_roof_ui are licensed under
+the MIT License (Copyright (c) 2026 John Carnahan); each directory carries its own
+LICENSE file, which governs that directory. They parse and draw the roof model
+JSON and contain no code from services/roof_measure, compas_cgal or CGAL.
+packages/bond_roof/lib/src/polylabel.dart is a port of Mapbox polylabel and keeps
+its ISC notice.
 
 The Roboto font in packages/bond_roof_ui/assets/fonts/ carries its own
 Apache-2.0 licence, which ships next to the font files and is not changed by

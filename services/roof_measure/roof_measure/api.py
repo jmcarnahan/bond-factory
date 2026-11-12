@@ -12,7 +12,6 @@ import logging
 import os
 import re
 import sys
-from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
@@ -24,6 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import auth
 from .errors import error_body
+from .fixtures import fixture_path
 from .jobs import QueueFull
 from .service import RunFn, Service
 from .settings import Settings
@@ -89,18 +89,6 @@ def _invalid(errors: list[Any]) -> JSONResponse:
             "string_too_long": "is too long", "string_too_short": "must not be empty",
             "json_invalid": "is not valid JSON"}.get(kind, f"is invalid ({kind})")
     return _err(422, "invalid_request", f"Invalid request: {where or 'body'} {hint}.")
-
-
-def fixture_path(settings: Settings, name: str | None) -> Path | None:
-    """Resolve a fixture NAME strictly under the fixtures dir; None for no name; ValueError otherwise."""
-    if name is None:
-        return None
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+\.json", name) or ".." in name:
-        raise ValueError("fixture names look like 'site1_blocks.json'")
-    path = settings.fixtures_dir / name
-    if not path.is_file():
-        raise ValueError(f"no fixture {name!r}")
-    return path
 
 
 def create_app(settings: Settings | None = None, *, token: str | None = None, run: RunFn | None = None,

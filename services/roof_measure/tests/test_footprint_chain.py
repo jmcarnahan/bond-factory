@@ -119,7 +119,7 @@ def test_county_layer_unreachable_falls_to_osm_with_a_note(net):
         net.routes[u] = {"elements": [osm_way(3)]}
     fp = footprint.fetch_footprint(LAT, LNG, ADDR)
     assert fp.source == "osm" and fp.warnings[0] == "LA County layer unreachable; footprint from OpenStreetMap."
-    assert fp.warning_codes == ["other", "footprint_osm"]
+    assert fp.warning_codes == ["source_unreachable", "footprint_osm"]
 
 
 def test_building_layer_failure_after_a_parcel_match_falls_through_to_osm_with_a_note(net):
@@ -128,7 +128,7 @@ def test_building_layer_failure_after_a_parcel_match_falls_through_to_osm_with_a
     for u in footprint_osm.OVERPASS_URLS:
         net.routes[u] = {"elements": [osm_way(4)]}
     fp = footprint.fetch_footprint(LAT, LNG, ADDR)
-    assert fp.source == "osm" and fp.warning_codes == ["other", "footprint_osm"]
+    assert fp.source == "osm" and fp.warning_codes == ["source_unreachable", "footprint_osm"]
     assert "could not be queried" in fp.warnings[0] and "ConnectionError" in fp.warnings[0]
 
 
@@ -273,7 +273,7 @@ def test_osm_outage_is_a_skipped_link_the_hull_still_runs(net, monkeypatch):
     monkeypatch.setattr(footprint, "fetch_hull", lambda lat, lng, deadline=None: hull)
     fp = footprint.fetch_footprint(LAT, LNG, ADDR)
     assert fp.source == "lidar_hull"
-    assert fp.warning_codes == ["other", "footprint_lidar_hull"] and "OpenStreetMap could not be reached" in fp.warnings[0]
+    assert fp.warning_codes == ["source_unreachable", "footprint_lidar_hull"] and "OpenStreetMap could not be reached" in fp.warnings[0]
 
 
 def test_a_used_up_stage_cap_does_not_stop_the_chain(net, monkeypatch):
@@ -306,3 +306,16 @@ def test_every_link_failed_with_one_unreachable_is_upstream_unavailable_with_the
     with pytest.raises(FootprintError) as e:
         footprint.fetch_footprint(LAT, LNG, ADDR)
     assert code_for(e.value) == "upstream_unavailable" and "no smooth roof" in str(e.value)
+
+
+def test_outage_note_carries_the_source_unreachable_code(net, monkeypatch):
+    from shapely.geometry import box
+
+    net.routes["LACounty_Parcel"] = {"features": []}
+    for u in footprint_osm.OVERPASS_URLS:
+        net.routes[u] = requests.ConnectionError("down")
+    hull = Footprint(provider="lidar_hull", id="lidar_hull", polygon_wgs84=box(LNG, LAT, LNG + D, LAT + D),
+                     height_ft=20.0, area_sqft=1000.0, parcel_id=None, source="lidar_hull")
+    monkeypatch.setattr(footprint, "fetch_hull", lambda lat, lng, deadline=None: hull)
+    fp = footprint.fetch_footprint(LAT, LNG, ADDR)
+    assert "source_unreachable" in fp.warning_codes

@@ -1,8 +1,8 @@
 # Roof measurement service contract 0.2
 
-`bond.roof_model/0.2` is the result envelope of the `roof_measure` service. The service is private: it is deployed
-as a Docker image (GPL straight skeleton through compas_cgal) and apps talk to it only over HTTP. This document is
-what an app copies: the API, the envelope, the error codes, the environment variables and one example. The model
+`bond.roof_model/0.2` is the result envelope of the `roof_measure` service. The pipeline is reachable two ways, with the same
+envelope: the job API of §1 (the private service, deployed as a Docker image) or in-process through the Python
+library of §3. Both link the GPL straight skeleton through compas_cgal. This document is what an app copies: the API, the envelope, the error codes, the environment variables and one example. The model
 inside the envelope is `bond.roof_model/0.1`, specified in [contracts/roof_model.md](contracts/roof_model.md).
 
 ## 1. API
@@ -26,7 +26,7 @@ never holds it.
 - `GET /v1/measurements/{id}` returns
   `{"id", "status": "queued" | "running" | "done" | "failed", "stage"?: str, "error"?: {code, message, retryable},
   "result"?: <envelope>}`. `stage` (geocode, footprint, lidar, blocks, model, verify, render) appears while
-  `running` and is for display only. Poll every 2 seconds. An unknown id is `404 unknown_job`: the service keeps
+  `running` and is for display only (the library reports the same names through `on_stage`, §3.4). Poll every 2 seconds. An unknown id is `404 unknown_job`: the service keeps
   jobs on disk, but a client that gets a 404 should simply submit again.
 
 ### 1.1 Error object
@@ -127,6 +127,7 @@ for anything not listed.
 | `footprint_osm` | footprint from OpenStreetMap (no parcel data) |
 | `footprint_solar` | footprint estimated from Google Solar roof segments |
 | `footprint_lidar_hull` | footprint derived from the LiDAR point cloud |
+| `source_unreachable` | a data source could not be reached and the footprint came from another link; treat the result as degraded |
 | `parcel_without_building` | the parcel matched but the county layer has no building |
 | `other_buildings_on_parcel` | more than one building outline on the parcel; the largest was measured |
 | `low_point_density` | LiDAR density below 8 points per square metre (the job fails below 4) |
@@ -563,7 +564,197 @@ placeholder address. Copy it as an app's mock fixture.
 }
 ```
 
+## 3. Library use
+
+The same pipeline runs in-process: `roof_measure.measure(...)` returns the envelope of §2 as a `dict` and raises
+`MeasureError` with the job codes of §1.1. Keys and directories are arguments. When a call is configured, the library does not read keys or
+`ROOF_MEASURE_*` settings from the environment: `None` means the built-in default (Appendix A). The library is GPL-3.0-or-later like the service, because the straight
+skeleton links CGAL through compas_cgal.
+
+### 3.1 Install
+
+Pin a full 40-character commit SHA. Tags are labels only. The extras `service` and `render` are never pulled by
+default; a consumer that wants them asks for `roof-measure[service,render]`. The install was verified (spikes.md §4)
+with pip's `git+file` transport from a checkout; the https and archive forms below differ only in transport and are
+confirmed once the branch is on GitHub.
+
+```
+pip install "roof-measure @ git+https://github.com/jmcarnahan/bond-factory.git@<full sha>#subdirectory=services/roof_measure"
+```
+
+Poetry:
+
+```toml
+roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "<full sha>", subdirectory = "services/roof_measure" }
+```
+
+Git-free alternative (a GitHub archive of the same commit):
+
+```
+pip install "roof-measure @ https://github.com/jmcarnahan/bond-factory/archive/<sha>.zip#subdirectory=services/roof_measure"
+```
+
+- **Core install only.** The core dependencies are numpy, scipy, shapely, pyproj, laspy with lazrs, requests,
+  compas_cgal and anthropic. The extras `service` (fastapi, uvicorn) and `render` (matplotlib) are for the job API and
+  the debug PNG; a library consumer does not need them. `import roof_measure` pulls in none of the heavy modules.
+- **git.** The `python:3.12-slim` images have no git, so the git form needs `apt-get install -y --no-install-recommends git`.
+  The archive form needs no git.
+- **libgomp1 is not required.** The compas_cgal wheel links no OpenMP (verified in `python:3.12.9-slim`).
+- **linux/amd64 only.** compas_cgal 0.10.0 ships manylinux x86_64 wheels and no linux aarch64 wheel. Build images
+  with `--platform linux/amd64`.
+- **Versions.** A git or Poetry install ignores this repository's `uv.lock` and resolves again. The app's own lock
+  pins the versions; `anthropic>=0.60` accepts the app's 1.x or 2.x.
+
+### 3.2 Signature
+
+```python
+def measure(address: str, *, lat: float | None = None, lng: float | None = None, method: str = "auto",
+            verify: bool = True, force: bool = False, deadline_s: float = 180.0, cache_dir: str | Path,
+            work_dir: str | Path | None = None, anthropic_api_key: str | None = None,
+            google_solar_api_key: str | None = None, overpass_urls: Sequence[str] | None = None,
+            on_stage: Callable[[str], None] | None = None, isolate: bool = True,
+            blocks_path: str | Path | None = None, solar_fixture: str | Path | None = None) -> dict[str, Any]
+```
+
+| Parameter | Meaning |
+|---|---|
+| `address` | the address, or a label when coordinates are given; must not be empty unless `lat` and `lng` are given |
+| `lat`, `lng` | both or neither; when given the geocoder is skipped |
+| `method` | `"auto"`, `"lidar_skeleton"`, `"lidar_agent"` or `"solar_agent"`; `auto` falls back to `solar_agent` only when BOTH keys are passed as arguments |
+| `verify` | run the verifier; `True` without `anthropic_api_key` gives verdict `unverified`, not an error |
+| `force` | bypass the on-disk fetch cache for this call |
+| `deadline_s` | cooperative time budget in seconds, must be above 0; the call may block up to `deadline_s + 30` s (§3.5) |
+| `cache_dir` | required; the fetch cache lives here and grows (§3.6) |
+| `work_dir` | where the run's files go; `None` uses a temp dir that is removed afterwards (§3.6) |
+| `anthropic_api_key` | key for the verifier and the agent methods; `None` means no key, whatever the environment holds |
+| `google_solar_api_key` | key for the Solar footprint link and `solar_agent`; `None` means no key |
+| `overpass_urls` | Overpass mirror URLs to use instead of the defaults |
+| `on_stage` | called with each stage name, in the caller's thread (§3.4) |
+| `isolate` | `True` (default) runs the pipeline in a child interpreter (§3.5); `False` runs it in the caller's thread |
+| `blocks_path`, `solar_fixture` | test hooks that run the synthetic fixtures offline (§3.10) |
+
+The return value is the envelope of §2. The library also exports `MeasureError`, `purge_cache`, `STAGES` and
+`KILL_GRACE_S` (30 s).
+
+### 3.3 Errors
+
+`MeasureError(code, message, retryable)` carries the error object of §1.1 as attributes. `to_dict()` returns
+`{"code", "message", "retryable"}` and `str()` gives `code: message`. The codes are the job codes of the §1.1 table
+except `interrupted`, with the same retryable flags. `interrupted` is never raised by the library: it means a service restart, and
+there is no service. `message` is for logs and support, never for end users (it can carry a stderr tail or a
+library message).
+
+Programmer errors are `ValueError`, not `MeasureError`:
+
+- an unknown `method`
+- `lat` without `lng`, or the reverse
+- out-of-range or non-numeric coordinates
+- `deadline_s` of 0 or less, or not finite
+- an empty `address` with no coordinates, or an `address` that is not a string
+- an `overpass_urls` that is a string instead of a sequence
+- a `work_dir` or `cache_dir` that is a file
+- a missing fixture file passed as `blocks_path` or `solar_fixture`
+
+A request whose network timeout was capped by the deadline is reported as `upstream_unavailable`. A deadline already
+spent before a request starts is `timeout`, as is the hard kill at `deadline_s + 30` s (§3.5).
+
+Omitting `cache_dir` is a `TypeError` (it is a required keyword).
+
+### 3.4 Stages
+
+`on_stage(name)` is called in the caller's thread, in order, with one of
+`STAGES = ("geocode", "footprint", "lidar", "blocks", "model", "verify", "render")`, the same names as the job
+API's `stage` field (§1). Names may be skipped (a `blocks_path` run skips `geocode`, `footprint`, `lidar` and `blocks`; `verify=False` drops
+`verify`; `solar_agent` has no `lidar` or `blocks`) or repeat (the `auto` fallback runs a second method). `geocode`
+is emitted even when `lat` and `lng` skip the geocoder. The library renders no debug PNG, but `render` is announced
+anyway (the stage marks the output step).
+
+### 3.5 Isolation
+
+With `isolate=True` the library starts a fresh interpreter, `python -P -m roof_measure._child`, sends it one JSON
+request on stdin and reads stage and result lines from its stdout. It does not re-import the caller's `__main__`.
+The child imports `roof_measure` from the interpreter's installed packages (`python -P -m roof_measure._child`); a
+source checkout reachable only through `sys.path` edits or the working directory gives `measurement_failed` with a
+ModuleNotFoundError tail: install the package or use `isolate=False`.
+
+- **Environment.** The child gets a whitelist, not the caller's environment: `PATH`, `HOME`, `TMPDIR`, `TMP`,
+  `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE`, `PYTHONPATH`, `PYTHONHOME`, `VIRTUAL_ENV`, `LD_LIBRARY_PATH`, `SYSTEMROOT`, the
+  SSL and CA bundle variables (`SSL_CERT_FILE`, `SSL_CERT_DIR`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`) and the proxy
+  variables in upper and lower case, plus `OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1`,
+  `RAYON_NUM_THREADS=2`, `MPLBACKEND=Agg` and `PYTHONUNBUFFERED=1`. The exact list is `_isolate.CHILD_ENV_KEYS`.
+  Keys travel in the request, never in the environment or on the command line.
+- **Hard kill.** If the child has not answered by `deadline_s + 30` s (`KILL_GRACE_S`), it is killed and the call
+  raises `timeout` (retryable).
+- **Crash.** A child that exits without an answer gives `measurement_failed` with "exited with code N" and the tail of
+  the child's stderr, which is kept in `<work_dir>/child.stderr`. The message can exceed 300 characters because it
+  carries that tail.
+- **`isolate=False`.** The pipeline runs in the caller's process and thread, with the same error mapping. Native
+  code cannot be interrupted there, so a stuck skeleton or LiDAR step holds the thread past the deadline. Use it for
+  tests and for callers that already isolate the work. The Anthropic SDK still reads `ANTHROPIC_BASE_URL` and
+  `ANTHROPIC_AUTH_TOKEN` from the caller's environment in this mode; the child whitelist drops both.
+
+### 3.6 Caching and storage
+
+- **No result cache.** The library returns a fresh result each call; the caller stores results.
+- **Fetch cache.** HTTP bodies (LiDAR tiles, geocoder answers) are cached under `cache_dir`, which is created if
+  missing. It grows without
+  bound unless the caller schedules `roof_measure.purge_cache(cache_dir, days=30)`, which deletes stale entries and
+  returns a count. `measure()` never purges. `force=True` bypasses the cache for that call.
+- **`work_dir`.** `None` creates a temp dir that is removed afterwards, also after a kill. A directory you pass is
+  kept and is yours to clean up. It receives `<slug>_blocks.json`, `<slug>_model.json`, `verifier_transcript.json`,
+  `agent_transcript.json` and `child.stderr`, depending on the method. If the caller process itself is killed, its
+  temp `work_dir` can be left behind.
+
+### 3.7 Threads and concurrency
+
+`measure()` blocks for up to `deadline_s + 30` s. Do not call it on a request thread, and do not call it inline in a
+serial worker loop that has other jobs waiting. Run it from a small pool of one or two threads. The child caps its
+numeric libraries at one thread (lazrs at two), so one or two concurrent measurements per container is the intended
+load. The library has no internal semaphore.
+
+### 3.8 Degraded results
+
+When a data source was down and the footprint came from another link in the chain, the envelope carries the warning
+`source_unreachable` (§2.3). The result is valid but degraded: retry later rather than persist it as final.
+
+### 3.9 Size and timing
+
+Measured in `python:3.12.9-slim`, linux/amd64, with the method in
+[research/2026-11-10-roof-module-v1/spikes.md](research/2026-11-10-roof-module-v1/spikes.md) section 4.
+
+| metric | value |
+|---|---|
+| install from git, seconds | 69.0 s (second run 109.9 s; varies with network), plus 14.2 s for apt git |
+| site-packages size, core install | 366 MB, 37 packages |
+| image size | 843 MB for the committed spike container (base 189 MB + site-packages 366 MB + about 290 MB of apt git, pip cache and clone residue that a clean Dockerfile build would not keep); a clean core install is about 555 MB |
+| cold `import roof_measure.pipeline`, seconds | 1.8 s (second run 2.1 s); `import roof_measure` alone 0.1 s |
+| `measure()` on the blocks fixture, `isolate=True`, seconds | 11.0 s first call, 10.1 s and 10.2 s after (second run 9.3, 10.4, 7.4 s); `isolate=False` 6.1 s |
+| child peak RSS | 268.8 MB (second run 271.0 MB) |
+
+The container ran on an Apple-silicon Mac under linux/amd64 emulation (colima), which inflates CPU-bound times several-fold: the `import`, `measure()` and in-process seconds are upper bounds, not what a native amd64 host sees (the same fixture run takes 1.0 s isolated and 0.7 s in-process on the Mac natively). Sizes and the install/package facts are unaffected.
+
+An earlier install on a Mac (arm64 wheels, which bundle fewer native libraries than the manylinux ones), with the
+`service` and `render` extras and before the extras were split out, was 51
+packages and 235 MB of site-packages.
+
+### 3.10 Offline testing
+
+`blocks_path` runs the pipeline from a saved blocks file, for example a copy of this repository's
+`fixtures/site1_blocks.json` (a consumer has no `fixtures/` directory: copy the file or point at the checkout), and
+`solar_fixture` is the matching hook for Solar data. Pass `verify=False` to skip the verifier. With these,
+`isolate=True` also works offline, so a test can exercise the child process without network or keys.
+
+```python
+import tempfile
+from roof_measure import measure
+cache_dir = tempfile.mkdtemp()          # any writable directory
+env = measure("100 Example Ave, Sampletown, CA 90000", cache_dir=cache_dir, verify=False,
+              blocks_path="fixtures/site1_blocks.json")
+```
+
 ## Appendix A. Environment variables
+
+When a call is configured, the library does not read keys or `ROOF_MEASURE_*` settings from the environment: `None` means the built-in default (see §3).
 
 | Var | Required | Default | Meaning |
 |---|---|---|---|
