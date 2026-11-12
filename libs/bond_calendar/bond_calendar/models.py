@@ -72,6 +72,10 @@ class CalendarEventDraft:
     categories: list[str] = field(default_factory=list)
     attendees: list[str] = field(default_factory=list)  # e-mail addresses
     reminder_minutes: int | None = None
+    #: Create only. True switches the reminder off on a new event instead of leaving the mailbox default.
+    #: Ignored when ``reminder_minutes`` is set. Not a patch key: to clear a reminder later, patch
+    #: ``reminder_minutes`` to None.
+    reminder_off: bool = False
 
 
 @dataclass

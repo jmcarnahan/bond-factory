@@ -2,6 +2,41 @@
 
 ## 0.2.0 - unreleased
 Added
+- `service.create` / `update` / `sync_routes(prepare=)`: `prepare(session, stored task or None on create, actor user id,
+  extras) -> dict` runs after the permission check and before the extras are applied (on update before any field
+  changes), on create, update and sync put/patch only (not complete, reopen, cancel, delete or a status-only patch).
+  It sees only the extras, filtered to `host_columns`, not the other new values. What it returns is trusted server
+  code: every key is stored if it is a column of the task model that is not in `TASK_COLUMNS` (`host_columns` is not
+  needed for it); a lib column or an unknown name raises `ValueError`, a non-Mapping raises `TypeError`. A `TaskError`
+  it raises writes nothing. None = unchanged.
+- `list_tasks(extra_where=())`: a sequence (a single clause raises `TypeError`) of SQLAlchemy criteria on the app's own columns, applied before the count and the paging.
+  `TaskFilters.status` also takes `cancelled` and `active` (open and done); an unknown value acts like `all`. An app whose older clients cannot tell a
+  cancelled task apart should filter cancelled rows out of its sync stream.
+- `task_item(labels=)` takes a Mapping `{(kind, id): label}`, `task_items(labels=)` a callable that gets the page's links and
+  returns that Mapping; a label replaces the stored one at read time.
+- `sync_routes(fields=)`: narrows the device-writable `FIELDS` columns only; others are dropped like unknown ones.
+  Status changes, cancel, delete and `host_columns` extras are not narrowed. A name outside the device set raises `ValueError`.
+- App-set work-day defaults: `get_settings(..., defaults=None)`, `StoredPreferences(settings_model, defaults=None)`,
+  `update_settings(..., defaults=None)` (a `UserPrefs`; None keeps the old constants; build ONE `StoredPreferences(
+  settings_model, defaults)` and pass it to every reader: `prefs=` of `create`, `update` and `sync_routes`, `sweep_due`,
+  `backfill_due_at`, `recompute_day_due`; leave `defaults.time_zone` None, `tz=` is the app zone), `settings_overridden(row)`, and
+  `settings_item(prefs, warnings=(), overridden=None)` (adds `"overridden"` only when given). `SettingsUpdate` takes null
+  on any field to reset it. A reset that changes the effective end of day or zone recomputes due instants too.
+- `TASK_USER_SETTINGS_COLUMNS`: `start_of_day`, `end_of_day` and `lead_minutes` are now nullable and the mixin has no
+  column default (NULL = follow the app default). Existing stored values stay and read as overridden (a migration may set to
+  NULL the values equal to the old constants: 08:00, 17:00, 60). A reset can be refused with `invalid_work_day` when the
+  default equals the other stored bound: reset both together. Hosts need a revision that drops NOT NULL on the three columns.
+
+- `sync_mirror(draft_for=)`: `draft_for(session, task, draft)` returns the event to send (body, length, categories,
+  reminder), called while the snapshot session is open. If it raises, returns something that is not a `MirrorDraft`, or
+  the task's date or time is malformed, the row ends `failed` before any provider call (it used to stay `pending`).
+  It must not write: a flush is rolled back, a commit would persist. If it fails during a reassignment the old event
+  stays until the next good sync. `failed` is not terminal: the next write sets `pending` again. Default None: unchanged.
+- `sweep_due(grandfather_before=)`: a task due before it gets a `skipped` ledger row for every stage (close, due, past
+  up to `max_past`), so no later pass claims it. `backfill_due_at(open_only=)` leaves done and cancelled tasks alone.
+- `Notice.attempt` (default 1): `deliver_pending` sets it from the outbox row's existing `attempts` counter (1 first,
+  +1 for each later lease). No column change. `deliver_pending(at_most_once=)`: for those channels `delivered_at` is
+  stamped and committed BEFORE the send; a send that then fails or raises, and any early failure, also sets `failed_at`.
 - `service.create` / `update`: with `prefs` given and no zone sent and no `writer_zone`, a timed task uses the actor's
   stored zone (`prefs.for_user(session, actor).time_zone`); an empty zone falls through to `tz`.
   The lookup is lazy: a write that does not compute `due_at` (a title-only update, a task with no date) never
@@ -9,7 +44,6 @@ Added
 - `sync_routes(on_deleted=)`: `on_deleted(ctx, session, task_id, owner_user_id)` runs after every real delete
   (mirrored or not), so a host can put away the task's notices. `after_delete` is unchanged.
 
-Added
 - `update_settings(..., on_recomputed=None)` and `recompute_day_due(..., on_recomputed=None)`:
   `on_recomputed(task, old_due_at)` runs once per task whose `due_at` really changed, after the flush (the host calls
   `dismiss_stale`). `notice_recipients(task) -> set[str]`: owner and assignee, for putting away the notices of users

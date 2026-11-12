@@ -35,7 +35,13 @@ String _checklist(List<ChecklistItem> l) => jsonEncode([for (final c in l) c.toJ
 String _links(List<TaskLink> l) => jsonEncode([for (final c in l) c.toJson()]);
 
 /// INSERT of a new task; returns its id.
-Future<String> insertTask(SyncSql tx, TaskDraft d, {required String userId, required DateTime nowUtc}) async {
+Future<String> insertTask(
+  SyncSql tx,
+  TaskDraft d, {
+  required String userId,
+  required DateTime nowUtc,
+  Set<String> extraColumns = const {},
+}) async {
   final problems = d.validate();
   if (problems.isNotEmpty) throw ArgumentError('invalid task draft: ${problems.map((p) => p.name).join(', ')}');
   final id = d.id ?? newTaskId();
@@ -64,6 +70,7 @@ Future<String> insertTask(SyncSql tx, TaskDraft d, {required String userId, requ
     'source': d.source ?? 'manual',
     'created_at': now,
     'updated_at': now,
+    ..._extraValues(d.extras, extraColumns),
   };
   final cols = values.keys.toList();
   await tx.execute(
@@ -73,10 +80,22 @@ Future<String> insertTask(SyncSql tx, TaskDraft d, {required String userId, requ
   return id;
 }
 
+/// The extras to store: only the declared [columns], with a bool as 0 or 1 and a list or map as JSON text.
+Map<String, Object?> _extraValues(Map<String, Object?> extras, Set<String> columns) => {
+      for (final c in columns)
+        if (extras.containsKey(c))
+          c: switch (extras[c]) {
+            final bool b => b ? 1 : 0,
+            final List<Object?> l => jsonEncode(l),
+            final Map<Object?, Object?> m => jsonEncode(m),
+            final v => v,
+          },
+    };
+
 String? _blank(String? s) => s == null || s.isEmpty ? null : s;
 
 /// The columns a [patch] changes, in a fixed order, given the stored [row]; empty when nothing changes.
-Map<String, Object?> patchColumns(SyncRow row, TaskPatch p) {
+Map<String, Object?> patchColumns(SyncRow row, TaskPatch p, {Set<String> extraColumns = const {}}) {
   final set = <String, Object?>{};
   if (p.title != null) set['title'] = p.title;
   if (p.notes != null) set['notes'] = _blank(p.notes!.value);
@@ -106,6 +125,7 @@ Map<String, Object?> patchColumns(SyncRow row, TaskPatch p) {
     final at = timed ? deviceDueAt(newDate, newTime) : null;
     set['due_at'] = at == null ? null : isoZ(at);
   }
+  set.addAll(_extraValues(p.extras, extraColumns));
   return set;
 }
 

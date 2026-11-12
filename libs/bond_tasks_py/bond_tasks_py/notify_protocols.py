@@ -33,6 +33,7 @@ class Notice:
     created_at: datetime
     actions: tuple[str, ...]  # subset of NOTICE_ACTIONS, by the recipient's permissions
     last: bool  # True on the final past-due notice
+    attempt: int = 1  # 1 on the first delivery, +1 on each redelivery after an expired lease (outbox only)
 
 
 class TransactionalNotifier(Protocol):

@@ -10,3 +10,5 @@
 - Postgres lane: every service test also runs on PostgreSQL when `BOND_TEST_POSTGRES_URL` is set.
 - `dismiss_for_source(..., user_ids=None)`: optionally limit to chosen users (empty dismisses nothing).
 - Error code `invalid_cursor` (422).
+- `get_owned(session, notice_model, user_id, notice_id)` is public (404 `notice_not_found`, 403 `not_notice_owner`);
+  `service._owned` stays as an alias. A host's own act route must call it first.

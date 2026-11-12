@@ -65,8 +65,10 @@ class _TodayPageState extends State<TodayPage> {
     super.dispose();
   }
 
+  /// The fake clock moved (Tick or Real time): `TaskTicker.tick()` emits a minute tick now (so the controller
+  /// re-derives its overdue flags) and a day tick when the local date changed.
   void _clockMoved() {
-    _c.refreshDerived();
+    _ticker.tick();
     if (mounted) setState(() {});
   }
 

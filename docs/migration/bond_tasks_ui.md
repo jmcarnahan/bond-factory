@@ -65,6 +65,12 @@ Route the banner's action through the same handler as notices (`NoticeActionHand
 | a date-only overdue badge | `BondTaskRow(now: ...)`: overdue follows `isOverdue` |
 | A reminder pick list | `BondTaskForm` reminder with "Use my default" (-3) |
 
+## 5a. Settings reset (adoption gaps)
+`BondTaskSettingsForm` shows a quiet "Default" under a setting that follows the app default. Once the setting is in
+`TaskSettings.overridden` it shows an inline "Reset to default" control instead. Tapping it calls `onSubmit` with a
+`TaskSettingsPatch(reset: {field})`; the app sends it as the usual save. Keys: `task-settings-reset-<wire field>`; with a
+`semanticsPrefix`, `<prefix>.settings-reset-zone`, `-start`, `-end`, `-lead`. Words: `SettingsLabels.resetToDefault`, `usingDefault`; screen reader names `resetTimeZone`, `resetWorkDayStart`, `resetWorkDayEnd`, `resetLeadMinutes`. The control is 48 high. An older server (no `overridden`) shows neither hint nor control. Save sends only the fields that changed or are already set, and does nothing when none changed (against an older server, which does not send `overridden`, Save sends every field as before). Keep `busy` true while a save or reset runs; when it ends with the field still overridden the reset counts as failed.
+
 ## 6. What to test
 
 - `make -C packages/bond_tasks_ui test` and `analyze`: each widget at 1280 and 390 px.

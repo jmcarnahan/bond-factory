@@ -1,6 +1,6 @@
 # Dart and Flutter targets. DART_PKGS are pure Dart; FLUTTER_PKGS need the Flutter SDK.
 DART_PKGS = packages/bond_roof packages/bond_json packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_notify packages/bond_connections packages/bond_signin
-FLUTTER_PKGS = packages/bond_notify_ui packages/bond_push packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync packages/bond_roof_ui demos/roof_demo packages/bond_test_support packages/bond_ui packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin_ui demos/sdk_demo
+FLUTTER_PKGS = packages/bond_notify_ui packages/bond_push packages/bond_push_apple packages/bond_auth_secure_storage packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync packages/bond_roof_ui demos/roof_demo packages/bond_test_support packages/bond_ui packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin_ui demos/sdk_demo
 
 # Tests run in one fixed non-UTC zone: the stage and day-view fixtures are asserted for America/Los_Angeles,
 # and a UTC machine would hide naive-timestamp bugs. Override with TEST_TZ=<zone>.

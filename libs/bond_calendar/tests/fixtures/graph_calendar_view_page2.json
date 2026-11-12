@@ -1,0 +1,14 @@
+{
+  "value": [
+    {
+      "id": "AAMkAGI2example3",
+      "subject": "Holiday",
+      "start": {"dateTime": "2026-07-04T00:00:00.0000000", "timeZone": "UTC"},
+      "end": {"dateTime": "2026-07-05T00:00:00.0000000", "timeZone": "UTC"},
+      "isAllDay": true,
+      "isCancelled": false,
+      "type": "singleInstance",
+      "showAs": "free"
+    }
+  ]
+}

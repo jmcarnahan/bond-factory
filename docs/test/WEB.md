@@ -201,6 +201,12 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
    (`sdk.todo.settings-save`). A date-only TODO's due time is not shown on its `/today` row: check that it moved to 18:00 local through `GET /tasks` (`due_at`) or the calendar lane. Change the zone
    (`sdk.todo.settings-zone`, pick a result `sdk.todo.settings-zone-result-<n>` (the chip `sdk.todo.settings-zone-picked-0` then shows the chosen zone), then `sdk.todo.settings-save`; the current zone reads in `sdk.todo.zone-state`, and shows the device zone before any change, because the device reports its zone on sign-in): the date-only due time follows (see `GET /tasks`). A timed TODO keeps its instant. Tick the clock across a stage after the change:
    no duplicate notice (the ledger key holds, `GET /notices` shows one row per stage).
+5a. **Settings reset.** Still on `/todo-settings` after step 5. Each field the person set shows an inline "Reset to default"
+   control (`sdk.todo.settings-reset-zone`, `-reset-start`, `-reset-end`, `-reset-lead`); a field that follows the app default
+   shows "Using the default" instead. After step 5, `settings-reset-end` and `settings-reset-zone` are present and
+   `settings-reset-start` is not. Click `sdk.todo.settings-reset-end`: the field returns to the app default (17:00, or
+   `SDK_EXAMPLE_END_OF_DAY`), the control is replaced by "Using the default", `GET /tasks/settings` lists `overridden`
+   without `end_of_day`, and a date-only TODO's `due_at` in `GET /tasks` moves back to the default end of day. No dialog opens.
 6. **Stages in the app.** Create a timed TODO due at a minute you choose, with "Use my default" reminder (60 minutes).
    On `/today` set `clock-now` to 30 minutes before the due time and Tick: the stage banner
    (`sdk.today.task-<id>.banner`) says due soon and the inbox gains one notice. Tick to the due time: the banner changes
@@ -228,6 +234,31 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
     until its start). Move the end of the work day: a date-only TODO's notice arrives at the new time, and a TODO timed for
     the evening still alerts in the evening.
 16. **Error check** after every step. One console 401 from `POST /auth/refresh` on the first signed-out page load is expected: the demo tries the refresh cookie before it falls back to the demo sign-in. Every other console error fails the check.
+
+## Adopter lever: pin the clock and run the sweep once
+
+An adopting app gets the same walk levers as the example with three small pieces. None of them is on in production.
+
+1. **Mount the router behind your own flag.** One `Clock` (`bond_service_kit.Clock`) is the app's only source of "now": routes,
+   the sweep and the sync upload read it. Mount `fake_clock_router` with a switch the app owns and an auth dependency:
+
+   ```python
+   app.include_router(fake_clock_router(app.state.clock, enabled=lambda: settings.walk_mode,
+                                        dependencies=[Depends(current_user_id)]))
+   ```
+
+   With the flag off every request answers 404 before the body is read and before auth runs. The library reads no
+   environment: the flag is yours (the example uses `settings.mode == "fake"`).
+2. **Pin and release.** `PUT /fake/clock {"now": "2026-11-09T09:30:00Z"}` pins the app clock; `GET /fake/clock` reads it back;
+   `{"now": null}` releases it. Pass the clock to `bond_sync_py.upload(..., now=app.state.clock.now)` so the upload's
+   `server_now` follows the pin (a phone's `ServerClock` then follows too).
+3. **Run the sweep once.** Call your own sweep as of the pin: the example's `POST /jobs/tick {now}` (fake mode), or
+   `python services/sdk_example/scripts/sweep_interval.py --once --now 2026-11-09T09:30:00Z`, which prints one JSON line
+   with the claimed counts. In a worker built on `bond_jobs.run_cli`, `--once` runs each entry once and exits 0 or 1.
+
+Walk the day-boundary and notice stages by pinning, running the sweep once, and reading `GET /notices`. To start from old
+data, set `SDK_EXAMPLE_GRANDFATHER_BEFORE` (an app: pass `grandfather_before=` to `sweep_due`) to the activation instant:
+a task due before it sends nothing on any later pass.
 
 ## Cleanup
 

@@ -44,11 +44,11 @@ All take a session first, flush and never commit. `now` is a datetime (naive UTC
 | `get` | `get(session, task_model, task_id)` raises `task_not_found` |
 | `set_checklist_item` | `set_checklist_item(task, item_id, done, now, *, actor_user_id=None, permissions=None)` (no session) |
 | `apply_notice_action` | `apply_notice_action(session, *, task, action, actor_user_id, now, permissions=None)`: `"done"`, `"cancel"`, `"snooze"` (no change) |
-| `list_tasks` | `list_tasks(session, *, task_model, user_id, filters=None, limit=25, offset=0, link_index_model=None, viewer_zone=None, now)` returns `(rows, total)` |
+| `list_tasks` | `list_tasks(session, *, task_model, user_id, filters=None, limit=25, offset=0, link_index_model=None, viewer_zone=None, now, extra_where=())` returns `(rows, total)`. `extra_where` is a sequence of SQLAlchemy criteria on your own columns (a single clause raises `TypeError`), applied before the count and the paging. `TaskFilters.status` is `open`, `done`, `cancelled`, `active` (open and done) or `all` (an unknown value acts like `all`). If older clients cannot show a cancelled task, filter cancelled rows out of your sync stream. |
 | `summary` | `summary(session, *, task_model, user_id, now, viewer_zone)` |
 | `today` | `today(session, *, task_model, user_id, now, viewer_zone)` |
-| `task_item` | `task_item(task, *, today, now, names=None)` (`today` is `viewer_today(now, zone)`); `task_items(tasks, *, today, now, names=None)` for a list, `names` being a callable from user ids to a name map |
-| settings | `get_settings(session, settings_model, user_id)`, `update_settings(session, *, settings_model, task_model, user_id, data, tz, now, on_recomputed=None)` |
+| `task_item` | `task_item(task, *, today, now, names=None, labels=None)` (`today` is `viewer_today(now, zone)`); `task_items(tasks, *, today, now, names=None, labels=None)` for a list, `names` being a callable from user ids to a name map. `labels` is a Mapping `{(kind, id): label}` for `task_item` and a callable for `task_items`; the callable gets every link of the page once (`[{kind, id, label}]`) and returns `{(kind, id): label}`; a returned label replaces the stored one, so a renamed contact shows its new name |
+| settings | `get_settings(session, settings_model, user_id, defaults=None)`, `update_settings(session, *, settings_model, task_model, user_id, data, tz, now, on_recomputed=None, defaults=None)`, `settings_overridden(row)`, `settings_item(prefs, warnings=(), overridden=None)` |
 
 What three arguments of `create` and `update` mean:
 - `prefs`: a `Preferences` such as `StoredPreferences(TaskUserSettings)`. It supplies each user's zone and work day. With `None` everyone has the defaults.
@@ -57,6 +57,16 @@ What three arguments of `create` and `update` mean:
   responsible user (that user's own stored zone wins). The device `due_at` hint is checked only against a zone SENT with the write.
 - `user_exists`: a callable `(user_id) -> bool` checked for `assigned_user_id`. With `None` the check is skipped and any assignee id is accepted
   (`unknown_assignee` is never raised).
+
+More arguments of `create` and `update` (and `sync_routes`):
+- `prepare(session, task_or_None, actor_user_id, extras) -> dict`: runs after the permission check and before the app columns are stored. On update it sees the stored task before any field changes. It runs on create, update and sync put/patch only, not on complete, reopen, cancel, delete or a status-only patch, and it sees the extras (filtered to `host_columns`), not the other new values. The dict it returns is trusted server code: every key is stored if it is a column of your task model that the lib does not own, so it may add derived columns outside `host_columns`; a lib column or unknown name raises `ValueError` and a non-Mapping raises `TypeError`. It may raise `TaskError` and then nothing is written. Use it for rules such as "relinking needs owner rights". `sync_routes(prepare=)` runs it on put and patch too.
+- `sync_routes(fields=)`: a list of the device-writable names (a subset of `FIELDS`); other fields from a device are dropped. It narrows the `FIELDS` columns only: status changes, cancel, delete and `host_columns` extras are not narrowed.
+- A `Permissions` object that needs a session can get it with `sqlalchemy.orm.object_session(task)`.
+- A renamed column works through a SQLAlchemy `synonym` named in `host_columns`. Streams stay the app's file.
+- An app with one org zone passes `tz=` and nothing else: no `prefs`, no `writer_zone`, no `zone_of`.
+- The act route must check that the notice belongs to the user (`bond_notify_py` ownership check) before it calls `apply_notice_action`, which never sees the notice.
+
+Work-day defaults: build ONE `StoredPreferences(TaskUserSettings, defaults)` and pass it everywhere preferences are read (`create`, `update` and `sync_routes` `prefs=`, `sweep_due`, `backfill_due_at`, `recompute_day_due`; with `prefs=None` those use the lib constants), and `defaults=` to `get_settings` and `update_settings`. Leave `defaults.time_zone` as None: `tz=` is the app zone for a user with none stored, and a zone in `defaults` would be reported as the user's zone and hide the `time_zone_unknown` warning. Rows written before this change hold explicit values and read as overridden: a migration may set to NULL the values equal to the old constants (08:00, 17:00, 60). A reset can be refused with `invalid_work_day` when the default equals the other stored bound: reset both together. A user with no row, and any field a user has not set, takes it. The three time columns are nullable (NULL = not set). A settings answer is `settings_item(prefs, warnings, settings_overridden(session.get(Settings, user_id)))`, which adds `"overridden": [names]` (in the order time_zone, start_of_day, end_of_day, lead_minutes). A `PUT` with a field set to null resets it. Your revision must drop NOT NULL on the three columns.
 
 ## 3. Routes and the call behind each
 

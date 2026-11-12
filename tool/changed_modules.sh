@@ -9,7 +9,7 @@ if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
   echo "changed_modules: base ref '$BASE' cannot be resolved (shallow clone? run: git fetch origin $BASE:$BASE, or set BASE=<ref>)" >&2
   exit 2
 fi
-ALL="packages/bond_roof packages/bond_roof_ui demos/roof_demo services/roof_measure packages/bond_json packages/bond_api packages/bond_test_support packages/bond_ui packages/bond_auth packages/bond_auth_firebase packages/bond_sync packages/bond_sync_powersync packages/bond_tasks packages/bond_tasks_ui packages/bond_connections packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin services/sdk_example packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync libs/bond_notify_py libs/bond_push_py libs/bond_capture_py"
+ALL="packages/bond_roof packages/bond_roof_ui demos/roof_demo services/roof_measure packages/bond_json packages/bond_api packages/bond_test_support packages/bond_ui packages/bond_auth packages/bond_auth_firebase packages/bond_sync packages/bond_sync_powersync packages/bond_tasks packages/bond_tasks_ui packages/bond_connections packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin services/sdk_example packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_push_apple packages/bond_auth_secure_storage packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync libs/bond_notify_py libs/bond_push_py libs/bond_capture_py"
 
 # prefix -> affected modules (reverse dependencies)
 affected() {
@@ -18,11 +18,11 @@ affected() {
     packages/bond_roof_ui/*) echo packages/bond_roof_ui demos/roof_demo ;;
     demos/roof_demo/*)       echo demos/roof_demo ;;
     services/roof_measure/*) echo services/roof_measure ;;
-    packages/bond_json/*)  echo packages/bond_json packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync ;;
-    packages/bond_api/*)   echo packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync ;;
+    packages/bond_json/*)  echo packages/bond_json packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_push_apple packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync packages/bond_auth_secure_storage ;;
+    packages/bond_api/*)   echo packages/bond_api packages/bond_auth packages/bond_sync packages/bond_tasks packages/bond_connections packages/bond_auth_firebase packages/bond_sync_powersync packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_push_apple packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync packages/bond_auth_secure_storage ;;
     packages/bond_test_support/*)  echo packages/bond_test_support packages/bond_ui packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin_ui demos/sdk_demo packages/bond_notify_ui packages/bond_push packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync ;;
     packages/bond_ui/*)    echo packages/bond_ui packages/bond_tasks_ui packages/bond_connections_ui packages/bond_signin_ui demos/sdk_demo packages/bond_notify_ui ;;
-    packages/bond_auth/*)  echo packages/bond_auth packages/bond_auth_firebase packages/bond_signin packages/bond_signin_ui demos/sdk_demo ;;
+    packages/bond_auth/*)  echo packages/bond_auth packages/bond_auth_secure_storage packages/bond_auth_firebase packages/bond_signin packages/bond_signin_ui demos/sdk_demo ;;
     packages/bond_auth_firebase/*)  echo packages/bond_auth_firebase demos/sdk_demo ;;
     packages/bond_sync/*)  echo packages/bond_sync packages/bond_sync_powersync demos/sdk_demo packages/bond_tasks_powersync packages/bond_notify_powersync ;;
     packages/bond_sync_powersync/*)  echo packages/bond_sync_powersync demos/sdk_demo packages/bond_tasks_powersync packages/bond_notify_powersync ;;
@@ -34,7 +34,9 @@ affected() {
     packages/bond_signin_ui/*)  echo packages/bond_signin_ui demos/sdk_demo ;;
     packages/bond_notify/*)  echo packages/bond_notify packages/bond_notify_ui packages/bond_tasks_notifications packages/bond_notify_powersync demos/sdk_demo ;;
     packages/bond_notify_ui/*)  echo packages/bond_notify_ui demos/sdk_demo ;;
-    packages/bond_push/*)  echo packages/bond_push packages/bond_tasks_notifications packages/bond_notify_powersync demos/sdk_demo ;;
+    packages/bond_push/*)  echo packages/bond_push packages/bond_push_apple packages/bond_tasks_notifications packages/bond_notify_powersync demos/sdk_demo ;;
+    packages/bond_push_apple/*)  echo packages/bond_push_apple demos/sdk_demo ;;
+    packages/bond_auth_secure_storage/*)  echo packages/bond_auth_secure_storage ;;
     packages/bond_tasks_notifications/*)  echo packages/bond_tasks_notifications demos/sdk_demo ;;
     packages/bond_tasks_powersync/*)  echo packages/bond_tasks_powersync demos/sdk_demo ;;
     packages/bond_notify_powersync/*)  echo packages/bond_notify_powersync demos/sdk_demo ;;

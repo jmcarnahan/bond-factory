@@ -24,6 +24,7 @@ Service functions take a session, flush and never commit. Datetimes are naive UT
 - `Preferences.for_user(session, user_id) -> UserPrefs`: work day and zone; `StoredPreferences(Settings)` reads the table.
 - `Permissions` (`can_edit`, `can_own`, `can_complete`): who may do what; `DefaultPermissions` is owner or assignee.
 - `LinkResolver` (`labels`, `search`): current labels and picker search; the lib owns no contact data.
+- `prepare` `(session, task or None, actor, extras) -> extras` on create, update and sync put/patch only. It sees the `host_columns` extras; what it returns is trusted and may set any non-lib model column.
 - `AfterWrite` `(session, task)`: runs after the flush in create and update; `make_link_hook(Index)` is one.
 - `TransactionalNotifier.write(session, notices)`: the inbox; runs inside the claim, a raise cancels the batch.
 - `Notifier.send(session, notice) -> "ok" | "retryable" | "unregistered" | "failed"`: push, chat, email; after commit.
@@ -116,4 +117,4 @@ notifier stay pending (`unrouted`) and fail after 7 days. `prune_ledger` also re
   once per engine, which does exactly that. Postgres is unaffected.
 
 Refusals raise `TaskError(code, message, status)`; `CODES` lists them (`not_task_editor`, `invalid_time_zone`, ...).
-The calendar mirror (`sync_mirror`, `remove_event`) is unchanged: see its docstrings and the CHANGELOG.
+The calendar mirror (`sync_mirror`, `remove_event`) takes `draft_for=` to reshape the event (it must not write; `failed` is retried on the next write): see its docstrings and the CHANGELOG.

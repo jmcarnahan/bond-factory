@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+- `BondTaskSettingsForm`: a quiet "Default" hint under each setting, and an inline "Reset to default" control (key
+  `task-settings-reset-<wire field>`, semantics `<prefix>.settings-reset-zone|start|end|lead`) once the setting is in `TaskSettings.overridden`. Neither shows when `overridden` is null (older server). The control is 48 high and each is named by `SettingsLabels.resetNameFor`. Save sends only fields that changed or are already overridden, and nothing when none (against an older server, which does not send `overridden`, Save sends every field as before); a reset that fails (busy ends, field still overridden) is forgotten, and an edit of a field forgets its pending reset.
 - `BondTaskFormDue.onTimeValid` (internal); `BondTaskForm` disables Save while the time box holds an invalid time.
 - `BondTaskRow` shows up to 3 link chips and "+N"; `onLinkTap` on the row, `BondTaskList`, `BondTodayList`.
 - `BondTaskSettingsForm.zoneOptions` (`List<String>?`): choose the zone inline; capture cards carry `<prefix>.review-item-<n>`.

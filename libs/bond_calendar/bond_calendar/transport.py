@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from .errors import CalendarError, EtagMismatch, NotFound, ReconnectRequired, Unavailable
+from .errors import CalendarError, EtagMismatch, Forbidden, NotFound, ReconnectRequired, Unavailable
 
 
 def error_detail(response: httpx.Response) -> tuple[str, str]:
@@ -26,6 +26,11 @@ def error_detail(response: httpx.Response) -> tuple[str, str]:
         str(err.get("message") or "")[:300]
 
 
+# Google answers a throttle as 403 with one of these reasons. It is transient, so it is Unavailable, not Forbidden.
+GOOGLE_THROTTLE_REASONS = frozenset({
+    "rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded", "dailyLimitExceeded", "calendarUsageLimitsExceeded"})
+
+
 def raise_for(response: httpx.Response) -> None:
     """Map a non-2xx answer to a typed error. Nothing here ever includes a token or a request body."""
     status = response.status_code
@@ -34,6 +39,10 @@ def raise_for(response: httpx.Response) -> None:
     code, message = error_detail(response)
     if status == 401:
         raise ReconnectRequired(message or "The calendar provider refused the token.")
+    if status == 403 and code in GOOGLE_THROTTLE_REASONS:
+        raise Unavailable(message or "The calendar provider is throttling requests.", status=403, code=code)
+    if status == 403:
+        raise Forbidden(message or "The calendar provider refused the request.", code=code)
     if status in (404, 410):
         raise NotFound(message or "The event does not exist.", status=status)
     if status == 412:

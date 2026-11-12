@@ -1,5 +1,5 @@
-/// The four calls bond_push makes on the `push` plugin, behind a seam so tests
-/// never touch a platform channel. Not exported from the barrel.
+/// The calls bond_push_apple makes on the `push` plugin, behind a seam so tests
+/// never touch a platform channel.
 library;
 
 import 'package:push/push.dart';

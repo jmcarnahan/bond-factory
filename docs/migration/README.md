@@ -39,12 +39,36 @@ Per-app notes live beside the module notes (`sbel.md`).
 | `bond_connections`, `bond_connections_ui` | `bond_connections.md` | A, S |
 | `bond_notify_py` | `bond_notify_py.md` | after `bond_tasks_py`: S, then A |
 | `bond_notify`, `bond_notify_ui` | `bond_notify.md`, `bond_notify_ui.md` | after `bond_tasks`: S, then A |
-| `bond_push_py`, `bond_push` | `bond_push_py.md`, `bond_push.md` | after `bond_tasks`: S, then A |
+| `bond_push_py`, `bond_push`, `bond_push_apple` | `bond_push_py.md`, `bond_push.md`, `bond_push_apple.md` | after `bond_tasks`: S, then A (`bond_push_apple` only for an app with push on) |
+| `bond_auth_secure_storage` | `bond_auth_secure_storage.md` | any app that keeps a refresh token in the keychain |
 | `bond_capture_py` | `bond_capture_py.md` | after `bond_tasks_py`: S |
 | `bond_tasks_notifications` | `bond_tasks_notifications.md` | after `bond_tasks`, `bond_notify`, `bond_push`: S |
 | `bond_tasks_powersync`, `bond_notify_powersync` | `bond_tasks_powersync.md`, `bond_notify_powersync.md` | after `bond_sync_powersync` and `bond_tasks`: S |
 | the whole TODO checklist | `todo-checklist.md` | the order to adopt the modules above |
 | `bond_signin`, `bond_signin_ui` (Dart) and `libs/bond_signin` | `bond_signin.md`, `bond_signin-cutover.md` | S, A, P, after `bond_auth(_py)`, `bond_oauth`, `bond_connections` |
+
+## What changed on 2026-11-12 (adoption gaps)
+
+Each seam defaults to the old behaviour, so a pinned app is not affected until it uses one. Notes per module:
+
+- `bond_api` (`bond_api.md`): `endsSession`, `requestBytes`, per-call `timeout`, the 401 and 403 error-code rule.
+- `bond_tasks_py` (`bond_tasks_py.md`, `bond_tasks_py_host.md`): `prepare`, `extra_where`, `cancelled` and `active` status
+  filters, read-time link `labels`, `grandfather_before`, `backfill_due_at(open_only=)`, `Notice.attempt`, `at_most_once`,
+  mirror `draft_for`, app-set work-day defaults and the `overridden` settings answer (the column change is a host revision).
+- `bond_notify_py` (`bond_notify_py.md`): `get_owned`, the owner check an act route must call first.
+- `bond_sync_py` (`bond_sync_py.md`): `upload(now=, close_sessions=)`, `DbUnavailable.db_unavailable`.
+- `bond_calendar` (`bond_calendar.md`): `Forbidden`, `reminder_off`, recorded fixtures and an opt-in live test.
+- `bond_storage` (`bond_storage.md`): redirect delivery, `on_claim`, `mint(extra=)` and the other grant switches.
+- `bond_jobs` (`bond_jobs.md`): `Every`, `run_schedule`, `run_every`, `run_cli`.
+- `bond_service_kit` (`bond_service_kit.md`): `fake_clock_router`, `code_aliases`, a callable `rate`, the 503 for any
+  `db_unavailable` exception.
+- `bond_push_py` (`bond_push_py.md`): the opt-in live Apple check and `send_test`.
+- `bond_tasks`, `bond_tasks_powersync`, `bond_tasks_ui` (`bond_tasks.md`, `bond_tasks_powersync.md`, `bond_tasks_ui.md`):
+  `Task.extras`, extra columns, `TaskEnricher`, `TaskTicker.tick()`, `TaskClock.offsetBy`, the settings reset control.
+- Two package splits: `bond_push_apple` (`bond_push_apple.md`, with `bond_push.md`) and `bond_auth_secure_storage`
+  (`bond_auth_secure_storage.md`, with `bond_signin.md`). The moved classes are not re-exported: change the import.
+
+Reasons are in the six `docs/decisions/2026-11-12-*.md` files. The example service and the demo exercise each seam.
 
 ## Dart and Python pairs
 
@@ -56,7 +80,7 @@ A wire contract has a client half and a server half. Migrate both halves of a pa
 | `bond_sync`, `bond_sync_powersync` | `bond_sync_py` |
 | `bond_tasks`, `bond_tasks_ui` | `bond_tasks_py`, with `bond_calendar` for the mirror |
 | `bond_notify`, `bond_notify_ui`, `bond_notify_powersync` | `bond_notify_py` |
-| `bond_push` | `bond_push_py` |
+| `bond_push`, `bond_push_apple` | `bond_push_py` |
 | `bond_tasks_notifications` | `bond_notify_py`, `bond_push_py` |
 | `bond_tasks_powersync` | `bond_tasks_py` (table shapes) |
 | `bond_connections`, `bond_connections_ui` | `bond_oauth` |

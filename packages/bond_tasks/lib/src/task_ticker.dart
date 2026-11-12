@@ -6,7 +6,8 @@ import 'dart:async';
 import 'task_clock.dart';
 
 class TaskTicker {
-  TaskTicker({TaskClock clock = const TaskClock()}) : _clock = clock {
+  TaskTicker({TaskClock clock = const TaskClock()}) : _clock = clock,
+        _lastDay = _ymd(clock.nowLocal()) {
     _minutes = StreamController<DateTime>.broadcast(
       onListen: () => _arm(_minuteTimer, true),
       onCancel: () => _disarm(true),
@@ -23,6 +24,9 @@ class TaskTicker {
   Timer? _minuteTimer;
   Timer? _dayTimer;
   bool _disposed = false;
+  String _lastDay;
+
+  static String _ymd(DateTime d) => '${d.year}-${d.month}-${d.day}';
 
   /// Time left until the next minute boundary after [now] (always more than zero).
   static Duration untilNextMinute(DateTime now) =>
@@ -38,6 +42,19 @@ class TaskTicker {
   /// Emits the current UTC time when the local calendar day changes.
   Stream<DateTime> get days => _days.stream;
 
+  /// Emits a minute tick now, and a day tick too when the local date differs from the last one
+  /// this ticker has seen. Use it after moving a shifted clock, or on app resume.
+  void tick() {
+    if (_disposed) return;
+    final now = _clock.nowUtc();
+    if (_minutes.hasListener) _minutes.add(now);
+    final day = _ymd(_clock.nowLocal());
+    if (day != _lastDay) {
+      _lastDay = day;
+      if (_days.hasListener) _days.add(now);
+    }
+  }
+
   void _arm(Timer? existing, bool minute) {
     if (_disposed) return;
     existing?.cancel();
@@ -47,7 +64,16 @@ class TaskTicker {
       if (_disposed) return;
       final c = minute ? _minutes : _days;
       if (!c.hasListener) return;
-      c.add(_clock.nowUtc());
+      if (minute) {
+        c.add(_clock.nowUtc());
+      } else {
+        // tick() may already have announced this day: one day event per date.
+        final day = _ymd(_clock.nowLocal());
+        if (day != _lastDay) {
+          _lastDay = day;
+          c.add(_clock.nowUtc());
+        }
+      }
       _arm(null, minute);
     });
     if (minute) {

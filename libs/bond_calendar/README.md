@@ -21,7 +21,10 @@ provider.update_event(made.id, {"subject": "Call (moved)"}, etag=made.etag)  # E
 - `GoogleCalendarProvider(token, http, *, refresh=...)` takes no zone: it always sends the all-day date itself.
 - `refresh=lambda: new_token()`: on a 401 the provider calls it once and retries once; a second 401 raises.
   A refresh that raises becomes `ReconnectRequired` (the original is `__cause__`).
-- Errors: `NotFound`, `EtagMismatch` (412), `ReconnectRequired` (401), `Unavailable` (5xx, 429, timeout).
+- Errors: `NotFound`, `EtagMismatch` (412), `ReconnectRequired` (401), `Forbidden` (403, provider code in `.code`; a throttle 403 is `Unavailable`),
+  `Unavailable` (5xx, 429, timeout).
+- `CalendarEventDraft(..., reminder_off=True)` creates an event with no reminder (Graph `isReminderOn: false`, Google
+  `useDefault: false`, no overrides). `reminder_minutes` wins if both are set. On update, patch `reminder_minutes` to `None`.
 - `FakeCalendarProvider` is an in-memory stand-in with etags and `fail_next(exc)` for tests and demos.
 - Google writes need the `calendar.events` scope. Google has no categories, so they are ignored there.
 - Contract notes and the migration plan: `docs/migration/bond_calendar.md`.

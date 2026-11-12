@@ -69,7 +69,7 @@ the notice stages read this value (`notices.md`).
 
 ## Settings
 
-`GET /tasks/settings` and `PUT /tasks/settings`. No row means the defaults.
+`GET /tasks/settings` and `PUT /tasks/settings`. No row means the app's defaults.
 
 | Field | Type | Default | Rule |
 |---|---|---|---|
@@ -78,7 +78,25 @@ the notice stages read this value (`notices.md`).
 | `end_of_day` | `HH:MM` | `17:00` | a work day across midnight is allowed |
 | `lead_minutes` | integer 0 to 10080 | 60 | |
 
-A PUT changes only the fields it sends. Answer: the four fields plus `warnings`. Changing `end_of_day` or
+The defaults in the table are the library's. An app may set its own (`defaults=` of `get_settings`, `update_settings`
+and `StoredPreferences`, one `UserPrefs`). A column that is NULL means "follow the app default"; a stored value is the
+person's own choice.
+
+Answer: the four EFFECTIVE values (what the person stored, else the app default), `warnings`, and
+`"overridden": [names]`, the fields the person has stored, in the order `time_zone`, `start_of_day`, `end_of_day`,
+`lead_minutes`. A settings screen shows "default" for the rest and offers a reset.
+
+```json
+{"time_zone": "America/Los_Angeles", "start_of_day": "08:00", "end_of_day": "17:00", "lead_minutes": 60,
+ "warnings": [], "overridden": []}
+```
+
+A PUT changes only the fields it sends: a field that is absent is unchanged, and a field that is present and `null`
+resets it to the app default (NULL is stored). A reset that changes the effective end of day or zone recomputes due
+instants like any other change, and a reset can be refused with `invalid_work_day` when the default equals the other
+stored bound. In the Dart client `TaskSettings.overridden` is null when the server did not send the list (an older server): the
+settings form then shows no default hints and sends every field on Save, as before. `toJson` writes `overridden`
+whenever it is not null. Changing `end_of_day` or
 `time_zone` recomputes `due_at` of the user's open date-only tasks only, in the same transaction. A timed task keeps its instant: its `due_time` is the wall time in the zone it was written in. `update_settings(..., on_recomputed=)`
 calls `on_recomputed(task, old_due_at)` once per task whose `due_at` really changed: the host calls `dismiss_stale` there. Warnings never block:
 
@@ -96,7 +114,9 @@ Quiet hours are not a setting. They are derived: after `end_of_day` until `start
 `completed_at`, `mirror_enabled`, `mirror_status`, `external_provider`, `external_event_id`, `source`, `created_at`,
 `updated_at`, `overdue`. `priority` is 1 low, 2 normal, 3 high or null. `status` is `open`, `done` or `cancelled`.
 `checklist` is `[{id, text, done_at}]`, `links` is `[{kind, id, label}]` (a repeated kind and id keeps the first).
-`overdue` is computed per response and never stored. The single-reminder keys `remind_at` and `reminded_at` are gone.
+`overdue` is computed per response and never stored. A link's `label` is read at response time when the app passes a
+`LinkResolver.labels` callable to `task_items(labels=)`: the current label replaces the stored one, so a renamed contact
+shows its new name. A link the resolver does not know keeps its stored label. The single-reminder keys `remind_at` and `reminded_at` are gone.
 Fixture: `fixtures/tasks/task.json`. `libs/bond_tasks_py` pins the list as `ITEM_KEYS`.
 
 ## Routes
@@ -117,8 +137,10 @@ The query `time_zone` tells the server the viewer's zone. The example ignores th
 | `POST /tasks/parse` | `{text (1 to 500), today?, time_zone?}` | `{items, degraded, reason}`; creates nothing |
 | `GET /tasks/links/search` | `kind`, `q` | `{items: [{kind, id, label}]}` |
 
-List filters: `scope` (`mine` or `all`), `status` (`open`, `done`, `all`), `on_or_before`, `due_from`, `due_to`,
+List filters: `scope` (`mine` or `all`), `status` (`open`, `done`, `cancelled`, `active` (open and done), `all`), `on_or_before`, `due_from`, `due_to`,
 `include_undated`, `no_date`, `owner_user_id`, `assigned_user_id`, `assigned_to_me`, `link_kind`, `link_id`.
+An app with older clients that cannot tell a cancelled task apart filters cancelled rows out of its sync stream.
+`list_tasks(extra_where=)` takes SQLAlchemy criteria on the app's own columns, applied before the count and the paging.
 Complete and reopen need `can_complete`. Cancel, reassign and delete need `can_own`. Undoing a cancel (reopen or
 complete of a cancelled task) also needs `can_own`. In the default `DefaultPermissions` the owner owns and
 the owner or assignee completes. An omitted field in a write is unchanged and an explicit `null` clears `notes`,
@@ -157,3 +179,12 @@ Bond ships no stream rules. The app's stream file names every column.
 Device lifecycle writes carry `_metadata` `{"action": "complete" | "reopen" | "cancel"}` so the upload picks the route.
 Owner, `created_by`, `completed_*`, `mirror_*` and `external_*` are server-owned. A lone `due_at` patch changes nothing.
 The notices and push device tables are in `notices.md`.
+
+Client extras. The Dart `Task` keeps every key outside the 24 item keys in `Task.extras` (`Map<String, Object?>`,
+default empty). `Task.toJson` does not write them, so the fixtures stay exact. `TaskDraft.extras` and `TaskPatch.extras`
+are merged into the write body after the known keys and never override them. With `bond_tasks_powersync`, extra
+columns declared with `tasksTables(extraColumns:)` round-trip through the same map.
+
+An app may refuse a write with a rule of its own through `prepare(session, task or None, actor, extras)` on `create`,
+`update` and `sync_routes`. It runs after the permission check and before anything is written, on the REST and the sync
+path alike, and a `TaskError` it raises (a 403 becomes the sync verdict `forbidden`) writes nothing.

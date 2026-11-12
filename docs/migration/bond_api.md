@@ -67,6 +67,26 @@ String? networkFailureText(AvL10n l, Object error, {required String baseUrl}) {
 }
 ```
 
+## 2a. Session-end predicate, bytes and per-call timeouts
+
+An app that answers 401 with a business code (for example "mail account not connected") must not sign the user out. Tell the client which 401s end the session:
+
+```dart
+ApiClient(
+  baseUrl: base,
+  http: client,
+  tokens: tokens,
+  // Only a 401 without a business code is a dead session.
+  endsSession: (e) => !const {'mail_not_connected'}.contains(e.code),
+);
+```
+
+The predicate runs on every 401 of a signed-in call, before and after a renewal. A throwing predicate is logged and counts as true. False means no renewal, no hook, and `Unauthorized` with the code kept. Without it every 401 ends the session, as before.
+
+- `requestBytes('POST', path, body: {...}, accept: 'application/pdf')` sends JSON and returns the bytes. `getBytes` is unchanged.
+- `timeout: Duration(...)` on `request`, the JSON helpers, `getBytes`, `requestBytes` and `openStream` sets the overall limit for that call (a long SSE turn needs it); the same methods take `headerTimeout:` for the header wait. `timeout` is the overall limit of a call. For a JSON or bytes call it covers the wait for the headers and the whole body read. `headerTimeout` is only the wait for the response headers, and it is never longer than `timeout`. For `openStream` (and `sse`) both bound the wait for the headers, and `timeout` also bounds reading an error body; once a 2xx answer has started, neither limits the stream (the SSE idle timeout does). Null for either uses the client's value.
+- A 401 or 403 `{"detail": "text", "code": "x"}` now gives code `x` (before it gave `text`). A bare `{"detail": "not_invited"}` still gives `not_invited`.
+
 ## 3. Call-site changes
 
 | Old | New | Find |

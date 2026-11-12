@@ -3,6 +3,7 @@ Role: database-backed job queue and worker loop (SQLAlchemy 2.0 only). Contract:
 
 ## Key files
 - `models.py` mixins; `engine.py` registry + enqueue/claim/finish/reclaim/run/tick; `maintenance.py` cancel/prune; `loop.py` Loop/main
+- `interval.py` timer-only runner (`Every`, `run_schedule`, `run_every`, `run_cli`); no jobs table, no SQLAlchemy
 - `clock.py` Clock Protocol (scheduling `now()` vs wall `real_now()`); `constants.py` tuning + `backoff`
 
 ## Commands

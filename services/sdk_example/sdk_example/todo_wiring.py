@@ -2,7 +2,9 @@
 
 `install(app)` is idempotent and puts these on `app.state`:
 
-    todo_prefs     `StoredPreferences` over the settings table (the default `Preferences`)
+    default_prefs  the app's default work day (`SDK_EXAMPLE_START_OF_DAY`, `_END_OF_DAY`, `_LEAD_MINUTES`): one `UserPrefs`
+                   given to every place preferences are built, so a person with nothing stored gets it
+    todo_prefs     `StoredPreferences` over the settings table and `default_prefs`
     contacts       `FakeContacts`: the `LinkResolver` and the capture `EntityResolver`
     link_hook      the `after_write` hook that keeps the link index in step
     push_sender    `MockSender` in fake mode (read back by `GET /fake/push/sent`); in real mode an `ApnsSender`
@@ -16,13 +18,13 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 from typing import Any
 
 from bond_notify_py import dismiss_for_source, dismiss_stale
 from bond_push_py import ApnsSender, MockSender
-from bond_tasks_py import StoredPreferences, make_link_hook, notice_recipients
+from bond_tasks_py import StoredPreferences, TaskError, UserPrefs, make_link_hook, notice_recipients
 from bond_tasks_py.models import TaskStatus
 from fastapi import FastAPI
 
@@ -32,6 +34,32 @@ from .models.notices import Notice
 from .models.task_links import TaskLinkIndex
 from .models.task_settings import TaskUserSettings
 from .models.tasks import Task
+from .settings import Settings
+
+
+def default_prefs(settings: Settings) -> UserPrefs:
+    """The app's default work day as one `UserPrefs`. Pass it as `defaults` wherever preferences are read or built."""
+
+    def at(value: str) -> time:
+        hours, minutes = value.split(":")
+        return time(int(hours), int(minutes))
+
+    return UserPrefs(start_of_day=at(settings.start_of_day), end_of_day=at(settings.end_of_day),
+                     lead_minutes=settings.lead_minutes)
+
+
+def stored_prefs(settings: Settings) -> StoredPreferences:
+    """`Preferences` over the settings table that falls back to the app's default work day."""
+    return StoredPreferences(TaskUserSettings, default_prefs(settings))
+
+
+def owner_edits_closed(session: Any, task: Any, actor_user_id: str, extras: dict) -> dict:
+    """The `prepare` rule of the example: a done or cancelled task is changed only by its owner (an assignee reopens
+    it first). Runs on REST create and update and on the sync put and patch, after the permission check and before
+    anything is written. A real app puts its own rule here (for example "relinking needs owner rights")."""
+    if task is not None and task.status != TaskStatus.OPEN.value and task.owner_user_id != actor_user_id:
+        raise TaskError("task_closed", "Only the owner can change a task that is done or cancelled.", 403)
+    return extras
 
 
 def apns_sender() -> ApnsSender | None:
@@ -47,7 +75,8 @@ def install(app: FastAPI) -> None:
     if getattr(app.state, "todo_prefs", None) is not None:
         return
     fake = app.state.settings.mode == "fake"
-    app.state.todo_prefs = StoredPreferences(TaskUserSettings)
+    app.state.default_prefs = default_prefs(app.state.settings)
+    app.state.todo_prefs = StoredPreferences(TaskUserSettings, app.state.default_prefs)
     app.state.contacts = FakeContacts()
     app.state.link_hook = make_link_hook(TaskLinkIndex)
     app.state.push_sender = MockSender() if fake else apns_sender()

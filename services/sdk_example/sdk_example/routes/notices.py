@@ -66,11 +66,7 @@ def register(app: FastAPI) -> None:
             time_zone: str | None = None, user_id: str = Depends(write)) -> dict:
         now = clock_now(request)
         with unit(request) as session:
-            notice = session.get(Notice, notice_id)
-            if notice is None:
-                raise inbox.NoticeError("notice_not_found")
-            if notice.user_id != user_id:
-                raise inbox.NoticeError("not_notice_owner")
+            notice = inbox.get_owned(session, Notice, user_id, notice_id)  # first: the action never sees the notice
             task = tasks.get(session, Task, notice.source_id or (notice.data or {}).get("task_id"))
             tasks.apply_notice_action(session, task=task, action=body.action, actor_user_id=user_id, now=now)
             row = inbox.mark_read(session, Notice, user_id, notice_id, now)

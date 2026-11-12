@@ -16,8 +16,6 @@ void main() {
     expect(await taps.initialTap(), isNull);
     expect(await taps.taps.isEmpty, isTrue);
     expect(const PushTap(route: '/r', noticeId: 'n', action: 'done'), const PushTap(route: '/r', noticeId: 'n', action: 'done'));
-    expect(PluginPushTokenSource().token, isA<Function>());
-    expect(PluginPushTaps().initialTap, isA<Function>());
     final registrar = PushRegistrar(source, _Devices(), deviceId: 'd');
     registrar.dispose();
   });

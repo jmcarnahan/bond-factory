@@ -14,7 +14,7 @@ import bond_tasks_py as tasks
 from bond_notify_py import NoticeError
 from bond_push_py import PushError
 from bond_service_kit import ApiError
-from bond_tasks_py import TaskError
+from bond_tasks_py import TaskError, UserPrefs
 from fastapi import BackgroundTasks, Request
 from sqlalchemy.orm import Session
 
@@ -56,33 +56,39 @@ def clock_now(request: Request) -> datetime:
     return request.app.state.clock.utcnow_naive()
 
 
+def prefs_of(request: Request, session: Session, user_id: str) -> UserPrefs:
+    """The person's effective preferences: what they stored over the app's default work day."""
+    return tasks.get_settings(session, TaskUserSettings, user_id, request.app.state.default_prefs)
+
+
 def viewer_zone(request: Request, session: Session, user_id: str, asked: str | None = None) -> str:
     if asked:
         if not tasks.valid_zone(asked):
             raise ApiError("invalid_time_zone", "That is not a time zone name.", status=422)
         return asked
-    return tasks.effective_zone(tasks.get_settings(session, TaskUserSettings, user_id), request.app.state.settings.tz)
+    return tasks.effective_zone(prefs_of(request, session, user_id), request.app.state.settings.tz)
 
 
 def item(request: Request, session: Session, task: Task, zone: str) -> dict:
-    now = clock_now(request)
-    return tasks.task_item(task, today=tasks.viewer_today(now, zone), now=now,
-                           names=tasks_wiring.user_names(session)(
-                               [i for i in {task.owner_user_id, task.assigned_user_id} if i]))
+    return items(request, session, [task], zone)[0]
 
 
 def items(request: Request, session: Session, rows: list[Task], zone: str) -> list[dict]:
+    """Wire items. Link labels are read now, from the contact directory, so a renamed contact shows its new name."""
     now = clock_now(request)
+    contacts = request.app.state.contacts
     return tasks.task_items(rows, today=tasks.viewer_today(now, zone), now=now,
-                            names=tasks_wiring.user_names(session))
+                            names=tasks_wiring.user_names(session),
+                            labels=lambda links: contacts.labels(session, links))
 
 
 def write_kwargs(request: Request, session: Session, user_id: str) -> dict:
     """The keyword arguments `create` and `update` take beyond the data: zone, preferences, link hook."""
     state = request.app.state
-    stored = tasks.get_settings(session, TaskUserSettings, user_id).time_zone
+    stored = prefs_of(request, session, user_id).time_zone
     return {"now": clock_now(request), "tz": state.settings.tz, "user_exists": tasks_wiring.user_exists(session),
-            "writer_zone": stored, "prefs": state.todo_prefs, "after_write": state.link_hook}
+            "writer_zone": stored, "prefs": state.todo_prefs, "after_write": state.link_hook,
+            "prepare": todo_wiring.owner_edits_closed}
 
 
 def after_write(request: Request, background: BackgroundTasks, session: Session, task: Task) -> None:
@@ -90,4 +96,5 @@ def after_write(request: Request, background: BackgroundTasks, session: Session,
     todo_wiring.after_task_write(session, task, clock_now(request))
     if task.mirror_status == "pending":
         background.add_task(tasks.sync_mirror, request.app.state.session_factory, Task, task.id,
-                            request.app.state.mirror_providers, tz=request.app.state.settings.tz)
+                            request.app.state.mirror_providers, tz=request.app.state.settings.tz,
+                            draft_for=request.app.state.mirror_draft_for)

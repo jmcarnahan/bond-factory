@@ -40,7 +40,9 @@ Always 200 with one result per op, even when every op was refused. A refused op 
 
 - `status`: `ok`, `rejected` or `skipped`. `code`, `message` and `resolved_id` are omitted when unset.
 - `resolved_id` (on `ok`): the server row that replaces the id the device chose.
-- `server_now`: ISO 8601 UTC with milliseconds and `Z`.
+- `server_now`: ISO 8601 UTC with milliseconds and `Z`. It is the server's clock at the end of the batch. A host may
+  inject a clock (`upload(..., now=callable)`), and `server_now` then follows it, so a walk can pin the server time and
+  a phone's server clock follows the pin.
 
 Fixtures: `upload_response_mixed.json` (the exact answer to the mixed request, see below),
 `upload_response_all_codes.json` (one example per verdict, for client parsers).

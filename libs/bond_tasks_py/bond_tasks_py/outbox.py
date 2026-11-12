@@ -1,8 +1,8 @@
 """Notice outbox: one row per (ledger row, external channel), inserted in the claim's transaction. The inbox has no
 outbox row: its notice is written in the claim itself. Delivery is at-least-once; every channel must be
-idempotent on ``notice_id``."""
+idempotent on ``notice_id``, or listed in ``at_most_once``."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -64,7 +64,8 @@ class DeliverResult:
 
 def deliver_pending(session: Any, *, ledger_model: Any, outbox_model: Any, notifiers: Mapping[str, Notifier],
                     now: datetime, commit: Callable[[], None], task_model: Any, limit: int = 100,
-                    lease_seconds: int = 300, max_attempts: int = 5) -> DeliverResult:
+                    lease_seconds: int = 300, max_attempts: int = 5,
+                    at_most_once: Collection[str] = ()) -> DeliverResult:
     """Send the pending outbox rows, at least once.
 
     Pending means ``delivered_at IS NULL AND failed_at IS NULL AND (lease_until IS NULL OR lease_until < now)``.
@@ -75,7 +76,13 @@ def deliver_pending(session: Any, *, ledger_model: Any, outbox_model: Any, notif
     row in flight. A notifier returns "ok" (stamp ``delivered_at``), "retryable" (keep the row for a later
     lease; after ``max_attempts`` it counts as failed), "unregistered" (stamp ``failed_at``: the target is gone)
     or "failed" (permanent: stamp ``failed_at`` at once). A crash between a send and its stamp sends again after
-    the lease ends, so every channel must be idempotent on ``notice_id``.
+    the lease ends, so every channel must be idempotent on ``notice_id``. ``Notice.attempt`` is the row's lease
+    count: 1 on the first send, 2 after one expired lease, so a channel with no idempotency key can look for a
+    duplicate only when ``attempt > 1``. A channel named in ``at_most_once`` gets ``delivered_at`` stamped and
+    committed BEFORE the send: a crash loses that notice instead of repeating it. When the send then fails or
+    raises ("retryable" counts as failed, the row is never leased again), the row keeps ``delivered_at`` and also
+    gets ``failed_at`` and ``last_error``, so a monitor on ``failed_at`` sees it. A row that fails before the
+    stamp (ledger row gone, attempts used up) gets ``failed_at`` like any channel.
 
     ``task_model`` is required: a row whose task is gone, no longer open, or has a different deadline token than
     the ledger row (it was postponed) is stamped failed with last_error "superseded" and not sent. An app that
@@ -86,6 +93,7 @@ def deliver_pending(session: Any, *, ledger_model: Any, outbox_model: Any, notif
     out, led = table_of(outbox_model), table_of(ledger_model)
     c = out.c
     known = list(notifiers)
+    once_channels = set(at_most_once)
     pending = and_(c.delivered_at.is_(None), c.failed_at.is_(None), or_(c.lease_until.is_(None), c.lease_until < now))
     pick = (select(c.ledger_id, c.channel).where(pending, c.channel.in_(known))
             .order_by(c.created_at, c.ledger_id, c.channel).limit(limit))
@@ -114,14 +122,26 @@ def deliver_pending(session: Any, *, ledger_model: Any, outbox_model: Any, notif
         select(led).where(led.c.id.in_([row.ledger_id for row in leased]))).all()}
     for row in sorted(leased, key=lambda r: (r.ledger_id, r.channel)):
         ledger_row = ledger_rows.get(row.ledger_id)
+        once = row.channel in once_channels
+
+        def stamp_first(row=row) -> None:
+            session.execute(update(out).where(c.ledger_id == row.ledger_id, c.channel == row.channel)
+                            .values(delivered_at=now))
+            commit()
+
         verdict, error = _send_one(session, notifiers[row.channel], ledger_row, row.attempts, max_attempts,
-                                   task_model)
+                                   task_model, stamp_first if once else None)
+        if once and verdict == "retryable":
+            verdict = "failed"  # the row is not leased again: record it as failed
         if verdict == "ok":
             values, key = {"delivered_at": now, "last_error": None}, "sent"
         elif verdict == "superseded":
             values, key = {"failed_at": now, "last_error": "superseded"}, "superseded"
         elif verdict == "unregistered":
             values, key = {"failed_at": now, "last_error": "unregistered"}, "unregistered"
+        elif once and verdict == "failed":
+            # delivered_at stays when the stamp ran (no retry); failed_at tells a monitor the send did not succeed
+            values, key = {"failed_at": now, "last_error": error or verdict}, "failed"
         elif verdict == "failed" or row.attempts >= max_attempts:
             values, key = {"failed_at": now, "last_error": error or verdict}, "failed"
         else:
@@ -140,7 +160,7 @@ def _superseded(session: Any, task_model: Any, ledger_row: dict) -> bool:
 
 
 def _send_one(session: Any, notifier: Notifier, ledger_row: dict | None, attempts: int, max_attempts: int,
-              task_model: Any) -> tuple[str, str | None]:
+              task_model: Any, before_send: Callable[[], None] | None = None) -> tuple[str, str | None]:
     """The verdict of one send. A missing ledger row (pruned) and a row leased again after its attempts ran out
     (a crash every time) are permanent failures; a row whose task moved on is "superseded". A notifier that
     raises, or says something unknown, is retryable."""
@@ -150,9 +170,11 @@ def _send_one(session: Any, notifier: Notifier, ledger_row: dict | None, attempt
         return "failed", "gave up after repeated crashes"
     if task_model is not None and _superseded(session, task_model, ledger_row):
         return "superseded", None
+    if before_send is not None:
+        before_send()
     try:
         with session.begin_nested():
-            verdict = notifier.send(session, make_notice(ledger_row))
+            verdict = notifier.send(session, make_notice(ledger_row, attempts))
     except Exception as exc:  # noqa: BLE001 - any failure of a channel means try again later
         return "retryable", f"{type(exc).__name__}: {exc}"[:500]
     if verdict not in ("ok", "retryable", "unregistered", "failed"):

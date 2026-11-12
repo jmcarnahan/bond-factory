@@ -230,3 +230,33 @@ def test_cors_logs_a_rejected_origin_once(caplog):
     assert len(lines) == 1
     ok = c.options("/", headers={**headers, "Origin": "http://ok.test"})
     assert ok.headers["access-control-allow-origin"] == "http://ok.test"
+
+
+def test_flagged_exception_answers_503_db_unavailable_and_plain_error_stays_500():
+    class Flagged(Exception):
+        db_unavailable = True
+
+    class NotFlagged(Exception):
+        db_unavailable = False
+
+    app = FastAPI()
+    app.add_middleware(UnhandledErrorMiddleware)
+
+    @app.get("/flagged")
+    def flagged():
+        raise Flagged("down")
+
+    @app.get("/not-flagged")
+    def not_flagged():
+        raise NotFlagged("bug")
+
+    @app.get("/plain")
+    def plain():
+        raise RuntimeError("bug")
+
+    c = TestClient(app, raise_server_exceptions=False)
+    r = c.get("/flagged")
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "db_unavailable" and r.headers["retry-after"] == "5"
+    for path in ("/not-flagged", "/plain"):
+        r = c.get(path)
+        assert r.status_code == 500 and r.json()["detail"]["code"] == "internal_error"

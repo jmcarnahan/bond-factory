@@ -3,6 +3,8 @@ library;
 
 import 'package:powersync/powersync.dart';
 
+import 'extra_names.dart';
+
 /// The name of the synced tasks table.
 const kTasksTable = 'tasks';
 
@@ -40,17 +42,27 @@ const Set<String> kTaskIntColumns = {'priority', 'remind_minutes_before', 'mirro
 
 /// The tables this package reads; add them to the app schema. The table tracks write metadata so
 /// a complete, reopen or cancel can name its sync action (`{"action": "complete"}`).
-List<Table> tasksTables() => [
-      Table(
-        kTasksTable,
-        [
-          for (final c in kTaskColumns) kTaskIntColumns.contains(c) ? Column.integer(c) : Column.text(c),
-        ],
-        indexes: [
-          const Index('owner_status', [IndexedColumn('owner_user_id'), IndexedColumn('status')]),
-          const Index('assignee_status', [IndexedColumn('assigned_user_id'), IndexedColumn('status')]),
-          const Index('status_due', [IndexedColumn('status'), IndexedColumn('due_at')]),
-        ],
-        trackMetadata: true,
-      ),
-    ];
+///
+/// [extraColumns] are an adopting app's own columns and [extraIndexes] its own indexes. A column
+/// name must match `^[a-z_][a-z0-9_]*$` and not be a built-in column, `id`, `_metadata` or a
+/// `TaskItem` key; an index name must not repeat a built-in one. Otherwise [ArgumentError].
+List<Table> tasksTables({List<Column> extraColumns = const [], List<Index> extraIndexes = const []}) {
+  checkExtraColumnNames([for (final c in extraColumns) c.name]);
+  checkExtraIndexNames([for (final i in extraIndexes) i.name]);
+  return [
+    Table(
+      kTasksTable,
+      [
+        for (final c in kTaskColumns) kTaskIntColumns.contains(c) ? Column.integer(c) : Column.text(c),
+        ...extraColumns,
+      ],
+      indexes: [
+        const Index('owner_status', [IndexedColumn('owner_user_id'), IndexedColumn('status')]),
+        const Index('assignee_status', [IndexedColumn('assigned_user_id'), IndexedColumn('status')]),
+        const Index('status_due', [IndexedColumn('status'), IndexedColumn('due_at')]),
+        ...extraIndexes,
+      ],
+      trackMetadata: true,
+    ),
+  ];
+}

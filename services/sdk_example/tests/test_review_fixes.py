@@ -109,7 +109,8 @@ def test_every_below_one_second_is_refused(script, every):
     assert stop.value.code == 2
 
 
-def test_the_first_pass_prunes_and_then_once_an_hour(script):
-    assert script.prune_due(None, 5.0) is True  # a small monotonic clock must not hide the first prune
-    assert script.prune_due(5.0, 100.0) is False
-    assert script.prune_due(5.0, 5.0 + script.PRUNE_EVERY) is True
+def test_the_first_pass_prunes_and_then_once_an_hour(script, app):
+    """The hand-rolled `prune_due` timer is gone: the prune is a `bond_jobs.Every` that runs first, then hourly."""
+    _, prune = script.entries(app.state.session_factory, app.state.settings, None, 60.0)
+    assert (prune.name, prune.seconds, prune.run_first) == ("prune", script.PRUNE_EVERY, True)
+    assert script.PRUNE_EVERY == 3600.0

@@ -92,6 +92,14 @@ user's end of day. The device uses its own zone and Python the user's stored zon
   `refreshDerived` moving a task from today to overdue when the clock passes `dueAt`.
 - In the app: its task tests pass against the adapter, then the full suite once before the PR.
 
+## 6a. Own columns, clock levers and settings reset (adoption gaps)
+- `Task.extras` holds every unknown key of a task; `TaskDraft.extras` / `TaskPatch.extras` carry yours out. `Task.toJson` is unchanged.
+  `Task.copyWith` also takes `ownerName`, `assigneeName` and `extras`.
+  `Task.extras` is read only. A known wire key in a draft's or patch's extras is dropped. A bool extra is stored as 0/1 and reads back as `int`. A standard server key this client does not know yet lands in `extras` (forward compatible).
+- `TaskClock.offsetBy(Duration)` and `TaskTicker.tick()` let a walk jump a day without waiting. Build one `now` and pass it to every clock seam. `offsetBy` returns a fixed clock; to change time live use `var offset = Duration.zero; final clock = TaskClock(() => DateTime.now().toUtc().add(offset));`, change `offset`, then call `ticker.tick()`.
+- `TaskSettings.overridden` and `isOverridden(field)` say which settings the user set; `TaskSettingsPatch(reset: {...})` returns a field to the app default.
+  The server answers the effective values plus `overridden`; an older server omits the list, so `overridden` is null, `overriddenKnown` is false and `isOverridden` is false.
+
 ## 7. Known gaps
 - No quick-add text parsing, no inline editor, no loan picker: they stay in the app.
 - A: all-day events with an end time lose the end. Multi-day events are not tasks.

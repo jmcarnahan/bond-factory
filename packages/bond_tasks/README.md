@@ -44,6 +44,23 @@ await repo.create(const TaskDraft(title: 'Send the estimate', dueDate: '2026-03-
   the last value the server accepted (seeded by one settings read); a failed send is retried on the next call.
   `TimeZoneSource` is the seam an app fills with its platform zone lookup.
 
+## Your own fields (`extras`)
+An app with extra task columns reads them from `Task.extras` (every key outside `kTaskItemKeys`). `toJson` does not write
+them, so the shared fixtures stay exact. To send them, put them in `TaskDraft.extras` or `TaskPatch.extras`: they join the
+body after the known keys and never replace one: a known wire key in `extras` (any `kTaskItemKeys` key, `time_zone`) is dropped. `Task.extras` is read only. A bool you store is kept as 0 or 1 by a SQL store and reads back as an `int`. A new standard server key this client does not know yet lands in `extras`, so an older client keeps working.
+
+## Moving the clock (walks and tests)
+Build ONE `now` and pass it to every clock seam: `final clock = const TaskClock().offsetBy(const Duration(days: 1));`, then hand
+`clock` to the ticker, the repository and the controller (`TaskTicker(clock: clock)`). `offsetBy` returns a fixed clock. To move
+time while the app runs, keep the offset in a variable:
+`var offset = Duration.zero; final clock = TaskClock(() => DateTime.now().toUtc().add(offset));`. Change `offset`, then call
+`ticker.tick()`: it emits a minute tick now, and a day tick if the local date differs from the last one it saw.
+
+## Settings that follow an app default
+`TaskSettings.overridden` lists the wire names (`time_zone`, `start_of_day`, `end_of_day`, `lead_minutes`) the user has set;
+`isOverridden(name)` asks one. `TaskSettingsPatch(reset: {'end_of_day'})` sends `"end_of_day": null`, which puts the field
+back to the app default. A field left out is unchanged. `overridden` is null when the server did not say (an older server): `isOverridden` is then false and `overriddenKnown` is false. `toJson` writes `overridden` whenever it is not null (possibly an empty list).
+
 ## Rules
 - Words: past its due instant a task is "overdue"; there is no other flag.
 - `remind_minutes_before`: `kRemindNone` (-2), `kRemindMorningOf` (-1), `kRemindUseDefault` (-3), or minutes.

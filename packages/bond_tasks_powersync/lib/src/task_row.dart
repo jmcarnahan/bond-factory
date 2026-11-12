@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'package:bond_sync_powersync/bond_sync_powersync.dart';
 import 'package:bond_tasks/bond_tasks.dart';
 
+import 'tasks_tables.dart';
+
 /// UTC ISO-8601 with milliseconds and a trailing Z, the form the server writes.
 String isoZ(DateTime t) => DateTime.fromMillisecondsSinceEpoch(t.millisecondsSinceEpoch, isUtc: true).toIso8601String();
 
@@ -56,8 +58,11 @@ bool _ok(Object? e, void Function(Object?) parse) {
   }
 }
 
+final Set<String> _known = {'id', '_metadata', ...kTaskColumns};
+
 /// Decodes a `tasks` row. Booleans are 0 or 1, JSON columns are text, `overdue` is derived from
-/// [nowUtc] and the names of the owner and assignee are null (they are not stored).
+/// [nowUtc] and the names of the owner and assignee are null (they are not stored). Every column
+/// outside the built-in set (an adopting app's own) lands in `Task.extras` as the row holds it.
 Task taskFromRow(SyncRow row, {required DateTime nowUtc}) {
   final m = <String, Object?>{
     'id': _str(row['id']),
@@ -82,6 +87,9 @@ Task taskFromRow(SyncRow row, {required DateTime nowUtc}) {
     'created_at': _time(row['created_at']),
     'updated_at': _time(row['updated_at']),
   };
+  for (final e in row.entries) {
+    if (!_known.contains(e.key) && !kTaskItemKeys.contains(e.key)) m[e.key] = e.value;
+  }
   final task = Task.fromJson(m);
   return task.copyWith(overdue: isOverdue(task, nowUtc));
 }

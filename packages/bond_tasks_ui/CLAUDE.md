@@ -7,7 +7,7 @@ Role: Flutter task widgets over `bond_tasks` and `bond_ui`: list, row, form, qui
   `bond_task_delete_control.dart`, `bond_check_row.dart`.
 - `lib/src/task_format.dart` (`dueDateString`, `parseDueDate`, `sectionOf`, `formatDue`).
 - Day and notice widgets: `bond_today_list.dart`, `bond_due_lane.dart`, `bond_due_marker.dart`, `bond_stage_banner.dart`.
-- Capture: `bond_capture_review.dart`, `bond_capture_item_card.dart`, `bond_capture_link_row.dart`; settings: `bond_task_settings_form.dart`.
+- Capture: `bond_capture_review.dart`, `bond_capture_item_card.dart`, `bond_capture_link_row.dart`; settings: `bond_task_settings_form.dart`, `bond_setting_reset.dart`.
 - `now` is a parameter (never the clock): with it, overdue follows `isOverdue`.
 - Tests: one `test/<widget file>_test.dart` each, plus `test/task_widgets_test.dart`, `test/task_form_test.dart`, `test/support.dart` (`pumpAt`, both widths).
 

@@ -23,15 +23,14 @@ def test_user_settings_table():
     assert {c.name: c.nullable for c in table.c} == TASK_USER_SETTINGS_COLUMNS
     assert [c.name for c in table.primary_key] == ["user_id"] and not table.foreign_keys
     assert table.c.time_zone.type.length == 64 and table.c.start_of_day.type.length == 5
-    assert table.c.start_of_day.default.arg == "08:00" and table.c.end_of_day.default.arg == "17:00"
-    assert table.c.lead_minutes.default.arg == 60
+    assert all(table.c[n].default is None and table.c[n].nullable for n in ("start_of_day", "end_of_day", "lead_minutes"))
 
 
-def test_user_settings_defaults_on_insert(session):
+def test_user_settings_nothing_is_stored_on_insert(session):
     row = UserSettings(user_id="u1")
     session.add(row)
     session.flush()
-    assert (row.time_zone, row.start_of_day, row.end_of_day, row.lead_minutes) == (None, "08:00", "17:00", 60)
+    assert (row.time_zone, row.start_of_day, row.end_of_day, row.lead_minutes) == (None, None, None, None)
     assert row.updated_at is not None
 
 

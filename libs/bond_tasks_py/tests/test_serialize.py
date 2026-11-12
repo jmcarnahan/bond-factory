@@ -87,7 +87,7 @@ def test_today_summary_and_settings_fixtures_have_their_shapes():
     assert set(summary) == {"open", "overdue", "due_today", "no_date"} and all(type(v) is int for v in summary.values())
     settings = json.loads((FIXTURE.parent / "settings.json").read_text())
     assert settings == {"time_zone": "America/Los_Angeles", "start_of_day": "08:00", "end_of_day": "17:00",
-                        "lead_minutes": 60, "warnings": []}
+                        "lead_minutes": 60, "warnings": [], "overridden": []}
 
 
 def test_overdue_by_the_instant_needs_open_and_a_past_due_at(session):

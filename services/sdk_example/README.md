@@ -48,12 +48,12 @@ Task reads take `time_zone` (else the stored setting, else `SDK_EXAMPLE_TZ`); `o
 
 Fake mode only: `POST /jobs/tick {now}` runs the sweep then the due jobs; `GET /fake/push/sent` shows what the mock
 Apple sender got; `PUT /fake/capture {down}` makes the pretend model unavailable (parse degrades);
-`PUT /fake/capture/limit {limit}` tightens the parse rate limit; `GET|PUT /fake/clock {now: iso Z | null}` pins
-the app clock until set to null (a tick with `now` then returns to the pin; with no pin it RELEASES the clock to real time afterwards). The model replays `fixtures/capture/model_output.json`.
+`PUT /fake/capture/limit {limit}` tightens the parse rate limit; `GET|PUT /fake/clock {now: iso Z | null}` (the kit's `fake_clock_router`, mounted in `routes/fake_todo.py`) pins
+the app clock until set to null; the sync upload and token report it as `server_now` (a tick with `now` then returns to the pin; with no pin it RELEASES the clock to real time afterwards). The model replays `fixtures/capture/model_output.json`.
 
 Running the sweep for real (both call `sweep_wiring.run_sweep`; the ledger makes two runners safe together):
 1. In a worker loop: `bond_jobs.tick(..., before=sweep_wiring.before_hook(app, schedule_prune), before_every=30)`.
-2. With no jobs table: `python scripts/sweep_interval.py --every 60` (`--once --now <iso>` for one pass; it also prunes).
+2. With no jobs table: `python scripts/sweep_interval.py --every 60` (`bond_jobs.run_schedule`: the sweep every N seconds and the prune hourly; `--once --now <iso>` for one pass that also prunes).
 
 Push goes out only with `SDK_EXAMPLE_APNS_KEY_FILE`, `_KEY_ID` and `_TEAM_ID` set (real mode); without them the
 inbox still fills. SQLite engines are prepared with `sqlite_savepoint_setup` in `db.py`; the sweep refuses otherwise.
@@ -73,6 +73,8 @@ wanted}` and the app sends the person through `GET /connections/{p}/start?set=<i
 | `SDK_EXAMPLE_SIGNIN_PREFIX`, `_PROBE`, `_CONNECTIONS` | Library route prefix (`/auth`); daily provider probe (off); `0` mounts sign-in only |
 | `SDK_EXAMPLE_REDIRECT_ALLOWLIST`, `_CORS_ORIGINS` | Defaults apply in fake mode only. Real mode must set the allowlist, and every CORS origin must be in it or the public base |
 | `SDK_EXAMPLE_BREAKGLASS`, `_ALLOW_FAKE_PUBLIC` | `1` turns on `POST /auth/firebase` for `allow_password` rows; `1` allows fake mode on an https base (disposable hosts) |
+| `SDK_EXAMPLE_START_OF_DAY`, `_END_OF_DAY`, `_LEAD_MINUTES` | The default work day (`HH:MM`, `HH:MM`, minutes; default 08:00, 17:00, 60). A person with nothing stored gets it; `GET /tasks/settings` lists what they set in `overridden`, and a `null` in a PUT resets a field |
+| `SDK_EXAMPLE_GRANDFATHER_BEFORE` | An ISO instant, default none. A task due before it sends no notice on any pass: set it to the activation time when the sweep is switched on over old tasks |
 | `BOND_APPLE_APP_IDS`, `BOND_ANDROID_APPS`, `BOND_GOOGLE_*`, `BOND_MS_*` | Universal-link files (empty answers 404); real provider credentials |
 
 Files an app copies as is: `signin_wiring.py`, `providers_wiring.py`, `routes/signin.py`, `session_answer.py`,

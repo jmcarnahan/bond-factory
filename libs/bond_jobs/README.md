@@ -94,3 +94,26 @@ prune(engine, older_than=cutoff, job_table=JobRecord)               # done/dead 
 
 `cancel` leaves a running job alone. `prune` takes `statuses=("done", "dead")` and `limit=10000`; pending and
 running rows are never deleted. Both are plain deletes on the engine and commit on their own.
+
+## Timers without a table
+
+`interval.py` runs plain functions on a timer. It needs no jobs table and imports no SQLAlchemy.
+
+```python
+from bond_jobs import Every, run_cli
+
+entries = [Every(60, sweep, name="sweep"), Every(3600, prune, name="prune", jitter=30, run_first=False)]
+raise SystemExit(run_cli(None, entries))   # --once | --watch | --interval N
+```
+
+- `run_schedule(entries, *, stop=None, install_signals=True, on_result=None, guard=None, clock=time.monotonic, wait=None)`
+  uses one thread and runs the earliest-due entry next. The rate is fixed: the next due time is the previous due time
+  plus `seconds`, never the finish time. If periods were missed, the entry runs once and realigns; there is no burst.
+- A raising entry is logged and the others carry on. `on_result(entry, result, error)` sees every run (`error` is None on success).
+- SIGINT and SIGTERM set `stop`; the previous handlers are put back at the first signal (so a second one interrupts a stuck job) and on exit. Signals are only installed on the main thread. `SystemExit` or `KeyboardInterrupt` from an entry ends the schedule (`on_result` is not called for it).
+- `guard(entry) -> bool` runs before each run; False skips that run. A cross-process lock belongs there. The lib ships none. `guard` is asked before each run and has no release hook, so it suits a lock held for the process lifetime (for example a session-level advisory lock taken once).
+- `jitter` delays each run by a random 0..jitter seconds. The grid does not move, so jitter does not add up.
+- `seconds` below `MIN_SECONDS` (0.01), or `seconds` / `jitter` that is not finite, raises `ValueError`. `wait` must block.
+- `run_every(fn, seconds, **kw)` is the one-function form. `run_cli(argv, entries, *, guard=None, on_result=None, stop=None, install_signals=True) -> int`: `--once` runs each entry once
+  (exit 0 if all succeeded, 1 if any raised; honours `guard`, a skipped entry is not a failure; calls `on_result`; ignores `--interval`); `--watch` (the default) runs until stopped; `--interval N` (finite) sets every period; the keywords go to `run_schedule`.
+- `clock` and `wait(seconds)` are injectable so tests never sleep.

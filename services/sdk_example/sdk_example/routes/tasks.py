@@ -1,6 +1,6 @@
 """Tasks: the reference wiring of bond_tasks_py (CRUD and the status changes; the rest are in `task_*.py`).
 
-    GET    /tasks                          list (scope, status, date window, owner/assignee, link filters)
+    GET    /tasks                          list (scope, status open|done|cancelled|active|all, date window, owner/assignee, link filters)
     GET    /tasks/summary                  {open, overdue, due_today, no_date} for the caller
     GET    /tasks/{id}                     one task
     POST   /tasks                          create (201); a client-chosen id replayed by its owner returns the row
@@ -57,7 +57,7 @@ def register(app: FastAPI) -> None:
     @app.get("/tasks")
     def list_tasks(
         request: Request, user_id: str = Depends(current_user_id), scope: str = Query("mine", pattern="^(mine|all)$"),
-        status: str = Query("open", pattern="^(open|done|all)$"), time_zone: str | None = None,
+        status: str = Query("open", pattern="^(open|done|cancelled|active|all)$"), time_zone: str | None = None,
         on_or_before: date | None = None, due_from: date | None = None, due_to: date | None = None,
         include_undated: bool = False, no_date: bool = False, owner_user_id: str | None = None,
         assigned_user_id: str | None = None, assigned_to_me: bool = False, link_kind: str | None = None,

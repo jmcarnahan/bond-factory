@@ -69,12 +69,15 @@ def wire_fields(values: dict[str, Any], zone: str | None = None) -> dict[str, An
         else:
             out["isReminderOn"] = True
             out["reminderMinutesBeforeStart"] = int(values["reminder_minutes"])
+    elif values.get("reminder_off"):  # create only: no mailbox default reminder
+        out["isReminderOn"] = False
     return out
 
 
 def _draft_fields(draft: CalendarEventDraft) -> dict[str, Any]:
-    """A new event never says anything about reminders unless the draft asks for one."""
-    return {k: v for k, v in vars(draft).items() if not (k == "reminder_minutes" and v is None)}
+    """A new event never says anything about reminders unless the draft asks for one (minutes or off)."""
+    return {k: v for k, v in vars(draft).items()
+            if not (k == "reminder_minutes" and v is None) and not (k == "reminder_off" and not v)}
 
 
 class MsGraphCalendarProvider:

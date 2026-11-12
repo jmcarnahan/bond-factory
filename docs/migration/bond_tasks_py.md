@@ -88,10 +88,27 @@ class ChatNotifier:
 # sweep_due(..., channels=["chat"]); deliver_pending(..., notifiers={"chat": ChatNotifier(post, seen)})
 ```
 
+### Switching the sweep on over old data
+- `since=` only skips stages that start before it. A task already overdue is still claimed on each following morning up to
+  `max_past`, so thousands of old tasks would send a notice per task per morning for up to five mornings.
+- Pass `grandfather_before=<activation time>` instead: a task whose `due_at` is before it is recorded `skipped` for every
+  stage (close, due, all past sequences), so no later pass claims it. A task due at or after it is untouched.
+- Rows with a NULL `due_at` are invisible to the sweep. The sweep's built-in backfill fills at most `limit` rows per
+  pass (default 500), so a large adopter runs `backfill_due_at(..., limit=..., open_only=True)` in a loop until it returns 0,
+  and only then activates with `grandfather_before=`.
+
+### The calendar event and delivery attempts
+- `sync_mirror(..., draft_for=hook)`: `hook(session, task, draft)` returns the draft to send, so the app adds a body with
+  a link, categories, its own reminder or event length. If it raises, or returns something that is not a `MirrorDraft`, the row ends `failed` before any provider call and the next write sets `pending` again. The hook must not write: a flush is rolled back, a commit would persist. If it fails during a reassignment the old event stays until the next good sync.
+- `Notice.attempt` is 1 on the first delivery and one more for each later lease. A notifier for a service with no
+  idempotency key checks for a duplicate only when `attempt > 1`. For a channel where a repeat is worse than a loss, pass
+  `deliver_pending(..., at_most_once=["chat"])`: `delivered_at` is stamped and committed before the send; if the send then fails or raises, `failed_at` is set too, so a monitor on `failed_at` sees it.
+
 ## 7. Call-site changes and checks
 
 - On done, cancel and delete call `dismiss_for_source`, and when `due_date`, `due_time` or the assignee changes call
   `dismiss_stale` (both are in `bond_notify_py`, not this lib). `apply_notice_action` is the one handler (done or cancel on a closed task does nothing). After a reassign use `notice_recipients(task)` and `bond_notify_py.dismiss_for_source(..., user_ids=)`.
+- Notes for adopters: a column you renamed works through a SQLAlchemy `synonym` named in `host_columns`; an app with one org zone passes `tz=` only; "drop `remind_at`" does not apply if you never had it; a custom act route must run the notice owner check first. Details: `bond_tasks_py_host.md`.
 - Settings: `update_settings(..., on_recomputed=)` returns `(prefs, warnings)`; in the hook call `bond_notify_py.dismiss_stale`. Pass `time_zone` with client writes.
 - Order: revision, backfill, wire the sweep, swap the router. Assert every `*_COLUMNS`, round-trip
   `fixtures/tasks/task.json` through `task_item`, run `make -C libs/bond_tasks_py test`.

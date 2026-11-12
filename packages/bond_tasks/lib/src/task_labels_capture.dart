@@ -96,6 +96,12 @@ class SettingsLabels {
     this.invalidLead = 'Enter a whole number of minutes from 0 to 10080.',
     this.zoneSearchHint = 'Search for a time zone',
     this.quietHoursTemplate = 'Reminders for dated tasks wait while you are off, from {end} to {start}.',
+    this.resetToDefault = 'Reset to default',
+    this.usingDefault = 'Default',
+    this.resetTimeZone = 'Reset time zone to default',
+    this.resetWorkDayStart = 'Reset work day start to default',
+    this.resetWorkDayEnd = 'Reset work day end to default',
+    this.resetLeadMinutes = 'Reset reminder lead time to default',
   });
 
   final String title;
@@ -112,6 +118,26 @@ class SettingsLabels {
   final String sameTimes;
   final String invalidLead;
   final String quietHoursTemplate;
+
+  /// The inline control next to a setting the person has changed.
+  final String resetToDefault;
+
+  /// The quiet hint next to a setting that follows the app default.
+  final String usingDefault;
+
+  /// The screen reader names of the four reset controls (the visible text is [resetToDefault]).
+  final String resetTimeZone;
+  final String resetWorkDayStart;
+  final String resetWorkDayEnd;
+  final String resetLeadMinutes;
+
+  /// The screen reader name of the reset control for the wire name [field] (`end_of_day`, say).
+  String resetNameFor(String field) => switch (field) {
+        'time_zone' => resetTimeZone,
+        'start_of_day' => resetWorkDayStart,
+        'end_of_day' => resetWorkDayEnd,
+        _ => resetLeadMinutes,
+      };
 
   /// The quiet hours sentence for a work day of [start] to [end] ("HH:MM" strings).
   String quietHoursText(String start, String end) =>

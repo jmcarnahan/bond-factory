@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 OUT_DIR = Path("out")
@@ -15,6 +17,29 @@ DEV_SECRET = "dev-secret-change-me-dev-secret-change-me"  # >= 32 bytes so PyJWT
 PUBLIC_BASE = "http://localhost:8012"  # fake mode only; real mode must name its own https address
 FAKE_PROVIDERS = "fake-google,fake-microsoft"
 DEFAULT_SCHEME = "org.example.sdkdemo"  # sign-in schemes are reverse-domain (the lib refuses `sdkdemo`)
+
+
+def _hhmm(name: str, value: str) -> str:
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", value):
+        raise RuntimeError(f"{name} must be a time as HH:MM")
+    return value
+
+
+def _lead(value: str) -> int:
+    if not value.isdigit() or int(value) > 10080:
+        raise RuntimeError("SDK_EXAMPLE_LEAD_MINUTES must be a whole number of minutes, at most 10080")
+    return int(value)
+
+
+def _instant(name: str, value: str) -> datetime | None:
+    """An optional ISO 8601 instant from the environment; naive UTC (a value with no offset is read as UTC)."""
+    if not value:
+        return None
+    try:
+        at = datetime.fromisoformat(value)
+    except ValueError:
+        raise RuntimeError(f"{name} must be an ISO 8601 date and time") from None
+    return (at.replace(tzinfo=UTC) if at.tzinfo is None else at).astimezone(UTC).replace(tzinfo=None)
 
 
 def _split(value: str) -> tuple[str, ...]:
@@ -71,6 +96,12 @@ class Settings:
     native_redirects: tuple[str, ...] = ("sdkdemo://connections",)  # where a phone app's OAuth flow may return (exact match)
     oauth_key: str = ""
     tz: str = "UTC"
+    # The default work day: what a person with nothing stored in their settings gets (they can override each value).
+    start_of_day: str = "08:00"
+    end_of_day: str = "17:00"
+    lead_minutes: int = 60
+    # Switching the notice sweep on over old tasks: a task due before this instant never sends a notice (None = off).
+    grandfather_before: datetime | None = None
     # Direct sign-in (bond_signin). Real mode: public_base is https and names this API; sign-in providers are
     # off in real mode unless named (`google`, `microsoft`), and a provider named fake* is refused at startup.
     public_base: str = PUBLIC_BASE
@@ -120,6 +151,10 @@ class Settings:
             native_redirects=_split(env("SDK_EXAMPLE_NATIVE_REDIRECTS", "sdkdemo://connections" if fake else "")),
             oauth_key=_oauth_key(mode, out_dir_for(database_url)),
             tz=env("SDK_EXAMPLE_TZ", "UTC"),
+            start_of_day=_hhmm("SDK_EXAMPLE_START_OF_DAY", env("SDK_EXAMPLE_START_OF_DAY", "08:00")),
+            end_of_day=_hhmm("SDK_EXAMPLE_END_OF_DAY", env("SDK_EXAMPLE_END_OF_DAY", "17:00")),
+            lead_minutes=_lead(env("SDK_EXAMPLE_LEAD_MINUTES", "60")),
+            grandfather_before=_instant("SDK_EXAMPLE_GRANDFATHER_BEFORE", env("SDK_EXAMPLE_GRANDFATHER_BEFORE", "")),
             public_base=public_base.rstrip("/"),
             signin_providers=_split(env("SDK_EXAMPLE_SIGNIN_PROVIDERS", FAKE_PROVIDERS if mode == "fake" else "")),
             native_return_base=env("SDK_EXAMPLE_NATIVE_RETURN_BASE", ""),

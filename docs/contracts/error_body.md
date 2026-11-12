@@ -30,7 +30,16 @@ one shape:
 | 409 | `conflict` | 502 | `bad_gateway` |
 | 500 | `internal_error` | 503 | `unavailable` |
 
-A database outage on 503 uses `db_unavailable` instead of `unavailable`.
+A database outage on 503 uses `db_unavailable` instead of `unavailable`. The server answers it for the library's own
+database-down errors and for any exception that carries a true `db_unavailable` attribute, so a lib error class can opt
+in without the kit importing it (the sync lib's `DbUnavailable` does).
+
+## Code aliases
+
+A host may pass `code_aliases` (a tuple of key names, for example `("error_code",)`) to `install_error_handlers` or
+`error_body`. A dict detail that has no `code` (or an empty one) takes its `code` from the first alias key present with
+a non-empty string value. The alias key stays in the body. `code` always wins over an alias. With no aliases (the
+default) such a body gets the status-derived code, as before.
 
 ## Validation errors
 
@@ -51,8 +60,10 @@ The server never echoes the rejected input. A host may map a framework validatio
 
 ## Legacy string form
 
-Older servers send `{"detail": "string"}`. `bond_api` parses it: the string is the message, and the code when
-the status is 401 or 403. `bond_service_kit` emits the object form; a compatibility flag
+Older servers send `{"detail": "string"}`. `bond_api` parses it: the string is the message. On a 401 or 403 whose
+`detail` is a string, the code is the top-level `code` if there is one, else the top-level `error_code`, else the detail
+text itself (the bare-reason form, for example `{"detail": "not_invited"}`). Other statuses and dict or list details are
+unchanged. `bond_service_kit` emits the object form; a compatibility flag
 (`legacy_detail_string`) leaves a string detail untouched for apps that still need it.
 
 ## Client parsing (`bond_api`)
@@ -65,3 +76,8 @@ the top level. Only a string value counts. `error` is taken as the code only whe
 `^[a-z][a-z0-9_]*$`, at most 64 characters), because servers also put human sentences there; it never replaces
 `message`. This tolerance exists for servers that predate this contract: servers should send `code`. Typed errors: `Unauthorized`, `Forbidden`,
 `NotFound`, `Conflict`, `BadRequest`, `ValidationError`, `ServerError`, `BadResponse`, `NetworkFailure`.
+
+Session end. By default a 401 on a non-auth path with a token triggers one renewal, and a second 401 ends the session.
+An app that answers 401 with a business code (for example "mail account not connected") passes
+`ApiClient(endsSession: (ErrorBody e) => ...)`. When it returns false for a first 401, the client does not renew, runs no
+session hooks and throws `Unauthorized` with the code kept. Null keeps the default.

@@ -55,6 +55,13 @@ one row. A malformed JSON cell gives an empty list.
   route. Asking for the status a task already has writes nothing. Delete: `DELETE ... WHERE id = ?`.
 - The server stays the authority: it replaces `completed_at` and `updated_at` and computes `due_at` of date-only tasks.
 
+## 4a. Own columns, names and extra tables (adoption gaps)
+- `tasksTables(extraColumns:, extraIndexes:)` adds the app's columns (and its indexes) to the same table; a name clash, an unsafe name (not `^[a-z_][a-z0-9_]*$`) or an index name that repeats a built-in one throws `ArgumentError`; the repository constructor checks `extraColumns` the same way. A bool extra is stored as 0/1 and reads back as `int`.
+- `PowerSyncTaskRepository(extraColumns: {...})` writes only those keys of `extras` on insert and patch, and `taskFromRow` returns the
+  rest of the row in `Task.extras`. Add the columns to the sync stream query and the upload route yourself.
+- `enricher:` (must return the same number of tasks, else `StateError`) fills owner and assignee names (null from the synced store) inside the read snapshot; `extraWatchTables:` re-emits
+  `watchOpen` when one of those tables changes.
+
 ## 5. Sign-out
 
 Local writes upload later. Wait for the queue before clearing: `waitForUploadDrain(db)`, then disconnect, then clear the

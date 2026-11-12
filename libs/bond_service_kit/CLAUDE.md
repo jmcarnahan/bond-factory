@@ -4,6 +4,7 @@ Role: FastAPI and SQLAlchemy plumbing shared by the bond services (errors, middl
 ## Key files
 - bond_service_kit/errors.py: `error_body`, `ApiError`, `install_error_handlers`, `UnhandledErrorMiddleware`
 - bond_service_kit/middleware.py + upload_limit.py: pure-ASGI middleware
+- bond_service_kit/fake_clock.py: `fake_clock_router`, `PinnableClock`
 - bond_service_kit/rate_limit.py, clock.py, db.py, health.py, mounts.py
 
 ## Commands

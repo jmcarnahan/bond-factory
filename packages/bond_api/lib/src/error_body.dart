@@ -42,7 +42,8 @@ class ErrorBody {
       if (detail is String) {
         message = detail;
         // The sign-in routes answer with a bare reason: `not_invited`, `invalid_token`.
-        if (status == 401 || status == 403) code = detail;
+        // A top-level `code` / `error_code` beats the detail text.
+        if (status == 401 || status == 403) code = _readExplicit(decoded) ?? detail;
       } else if (detail is Map) {
         message = (detail['message'] ?? detail['detail'] ?? message).toString();
         code = _readCode(detail);
@@ -63,11 +64,17 @@ class ErrorBody {
   /// The error code of [map]: `code`, then `error_code`, then `error`. Only a
   /// string counts. `error` is taken only when it looks like a code (servers
   /// also put human sentences there); it never touches the message.
-  static String? _readCode(Map<dynamic, dynamic> map) {
+  static String? _readExplicit(Map<dynamic, dynamic> map) {
     for (final key in const ['code', 'error_code']) {
       final v = map[key];
       if (v is String && v.trim().isNotEmpty) return v;
     }
+    return null;
+  }
+
+  static String? _readCode(Map<dynamic, dynamic> map) {
+    final explicit = _readExplicit(map);
+    if (explicit != null) return explicit;
     final e = map['error'];
     return e is String && e.length <= 64 && _codeShape.hasMatch(e) ? e : null;
   }

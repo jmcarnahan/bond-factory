@@ -46,6 +46,7 @@ class TaskDraft {
     this.priority,
     this.dueAt,
     this.timeZone,
+    this.extras = const {},
   });
 
   final String title;
@@ -69,6 +70,10 @@ class TaskDraft {
   /// The device's IANA zone name, sent with the write.
   final String? timeZone;
 
+  /// An adopting app's own fields, merged into the body after the known keys
+  /// (a known key is never overridden).
+  final Map<String, Object?> extras;
+
   /// Empty when the draft can be sent.
   List<TaskProblem> validate() => [
         if (title.trim().isEmpty) TaskProblem.titleRequired,
@@ -77,7 +82,7 @@ class TaskDraft {
       ];
 
   /// Absent values are omitted rather than sent as null.
-  Map<String, Object?> toJson() => {
+  Map<String, Object?> toJson() => _withExtras({
         if (id != null) 'id': id,
         'title': title.trim(),
         if (_has(notes)) 'notes': notes,
@@ -92,7 +97,7 @@ class TaskDraft {
         if (priority != null) 'priority': priority!.wire,
         if (dueAt != null) 'due_at': jiso(dueAt!),
         if (_has(timeZone)) 'time_zone': timeZone,
-      };
+      }, extras);
 }
 
 /// The body of `PUT /tasks/{id}`: omitted fields stay, `Present(null)` clears.
@@ -113,6 +118,7 @@ class TaskPatch {
     this.priority,
     this.dueAt,
     this.timeZone,
+    this.extras = const {},
   });
 
   /// A patch that sets every editable field from [d] (a form save): fields the
@@ -130,6 +136,7 @@ class TaskPatch {
         priority: Present(d.priority),
         dueAt: d.dueAt == null ? null : Present(d.dueAt),
         timeZone: d.timeZone,
+        extras: d.extras,
       );
 
   final String? title;
@@ -149,7 +156,10 @@ class TaskPatch {
   final Present<DateTime>? dueAt;
   final String? timeZone;
 
-  Map<String, Object?> toJson() => {
+  /// An adopting app's own fields, merged after the known keys. A known wire key in it is dropped.
+  final Map<String, Object?> extras;
+
+  Map<String, Object?> toJson() => _withExtras({
         if (title != null) 'title': title,
         if (notes != null) 'notes': notes!.value,
         if (dueDate != null) 'due_date': dueDate!.value,
@@ -162,7 +172,16 @@ class TaskPatch {
         if (priority != null) 'priority': priority!.value?.wire,
         if (dueAt != null) 'due_at': dueAt!.value == null ? null : jiso(dueAt!.value!),
         if (_has(timeZone)) 'time_zone': timeZone,
-      };
+      }, extras);
+}
+
+Map<String, Object?> _withExtras(Map<String, Object?> body, Map<String, Object?> extras) {
+  for (final e in extras.entries) {
+    // A known wire key (or one the draft can emit) is never injected through extras.
+    if (kTaskItemKeys.contains(e.key) || e.key == 'time_zone') continue;
+    body.putIfAbsent(e.key, () => e.value);
+  }
+  return body;
 }
 
 bool _has(String? s) => s != null && s.isNotEmpty;

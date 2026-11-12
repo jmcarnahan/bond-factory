@@ -23,8 +23,7 @@ from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..auth_dep import current_user_id
-from ..models.task_settings import TaskUserSettings
-from ..task_support import clock_now, unit, viewer_zone
+from ..task_support import clock_now, prefs_of, unit, viewer_zone
 from .fake_todo import fake_only
 
 DATE, TIME = r"^\d{4}-\d{2}-\d{2}$", r"^([01]\d|2[0-3]):[0-5]\d$"
@@ -55,7 +54,7 @@ def register(app: FastAPI) -> None:
         state = request.app.state
         with unit(request) as session:
             zone = viewer_zone(request, session, user_id, body.time_zone)
-            end_of_day = tasks.get_settings(session, TaskUserSettings, user_id).end_of_day
+            end_of_day = prefs_of(request, session, user_id).end_of_day
         day = body.today or tasks.viewer_today(clock_now(request), zone)
         try:
             result = parse_capture(body.text, user_id=user_id, today=day, time_zone=zone, end_of_day=end_of_day,

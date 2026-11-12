@@ -74,5 +74,9 @@ again sends nothing new.
 
 ## 7. Not proven
 
-Nothing here proves Apple accepts the requests. Real delivery needs an Apple key and a physical device. See
-`docs/test/MOBILE.md`.
+Default tests prove nothing about Apple. To prove a key, team id and app capability before wiring anything, set
+`BOND_PUSH_KEY_PATH`, `BOND_PUSH_KEY_ID`, `BOND_PUSH_TEAM_ID`, `BOND_PUSH_TOPIC` and `BOND_PUSH_DEVICE_TOKEN` (a token from a
+development build on a phone) and run `python -m bond_push_py.send_test`. It sends one alert to the sandbox host (`--environment production` for the other) and exits 0
+only when Apple accepts it. The verdict line names the host used. `BOND_PUSH_NETWORK=1 make -C libs/bond_push_py test T=tests/test_live_apns.py` runs the same
+as two checks (accepted, and a made-up token comes back `BadDeviceToken` or `Unregistered`). Use placeholders in any doc or script you commit; never
+commit the key, key id, team id or token. See `docs/test/MOBILE.md`.

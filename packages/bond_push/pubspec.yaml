@@ -13,7 +13,6 @@ dependencies:
     path: ../bond_api
   bond_json:
     path: ../bond_json
-  push: ^3.3.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -48,7 +48,7 @@ No database change. Config:
 The one-string `TokenStore` stays for apps without sessions. With sessions:
 - `RefreshTokenStore` (`load`, `save`, `clear`, `reload`, `loadRotation`, `saveRotation`) holds the refresh token: `InMemoryRefreshTokenStore`, `NoRefreshTokenStore`
   (web: the HttpOnly cookie carries it; delivery is decided by the injected store, never by `Platform`), and
-  `bond_signin_ui`'s `SecureRefreshTokenStore` over `flutter_secure_storage` on a phone, so the app writes no storage code.
+  `bond_auth_secure_storage`'s `SecureRefreshTokenStore` over `flutter_secure_storage` on a phone, so the app writes no storage code.
 - `AuthSession.refreshToken` is nullable. `GatewayBase` saves the NEW refresh token before the access token (write-ahead) and
   `LiveTokenForgetter.forget` clears both slots. `reload()` runs before every rotate so two isolates share one token.
 - Renewal is single-flight (five concurrent 401s make one `POST /auth/refresh`). 401 `refresh_reused`, `refresh_expired` or

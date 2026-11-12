@@ -20,6 +20,12 @@
 - contracts/tasks.md — tasks contract: due instant rules, overdue, settings, TaskItem, task routes, error codes, sync fields
 - contracts/notices.md — notices contract: stages, ids, ledger, quiet hours, actions, routes, phone payload, devices
 - decisions/2026-11-11-licence-mit.md — repository is MIT; roof service stays GPL-3.0-or-later
+- decisions/2026-11-12-grant-delivery-seams.md — download grants: redirect delivery, same-transaction hook, extra columns
+- decisions/2026-11-12-interval-runner.md — bond_jobs interval runner: fixed-rate schedules with no jobs table
+- decisions/2026-11-12-fake-clock-router.md — one fake-clock router in bond_service_kit, closed by the app's own switch
+- decisions/2026-11-12-push-and-secure-storage-splits.md — bond_push_apple and bond_auth_secure_storage split out
+- decisions/2026-11-12-task-extras.md — app columns on tasks (Dart extras, extra columns, enricher) and the prepare hook
+- decisions/2026-11-12-app-set-work-day-defaults.md — the app sets the default work day; NULL follows it
 - ../libs/bond_notify_py/README.md — stored inbox (notices table, list, read, dismiss, sync handlers); the ledger, stages and sweep live in bond_tasks_py (no sibling bond_* imports)
 - ../libs/bond_push_py/README.md — Apple push sender and device tokens (no sibling bond_* imports)
 - ../libs/bond_capture_py/README.md — natural-language capture: a phrase becomes task and event candidates through a model-client Protocol (no sibling bond_* imports)

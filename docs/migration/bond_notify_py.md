@@ -66,6 +66,7 @@ read_at, dismissed_at` `WHERE user_id = auth.user_id()`. `source_id` stays serve
 
 - Assert `NOTICE_COLUMNS` against the engine and round-trip `fixtures/notify/notice.json` through `notice_item`.
 - A claim batch whose notifier raises leaves no notice. A replayed sweep inserts nothing and keeps a read notice read.
+- A host-written act route calls `get_owned(session, Notice, user_id, notice_id)` FIRST. `apply_notice_action` never sees the notice, so without the check any user could complete or cancel a task through another user's notice id. Test: another user's id answers 403, a missing id 404.
 - `act` with done puts away the task's other notices for every recipient. A cancel by an assignee answers 403.
 - A postponed task: the old notices are dismissed and a new one is written for the new time.
 - Paging: two pages through `before` give every row once.

@@ -11,8 +11,9 @@ MAX_OPS = 100
 
 
 def server_now_iso(now: datetime | None = None) -> str:
-    """ISO 8601 UTC with milliseconds and a trailing Z."""
-    moment = (now or datetime.now(UTC)).astimezone(UTC)
+    """ISO 8601 UTC with milliseconds and a trailing Z. A naive ``now`` is taken as UTC; an aware one is converted."""
+    moment = now or datetime.now(UTC)
+    moment = moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment.astimezone(UTC)
     return moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 

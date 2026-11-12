@@ -53,12 +53,15 @@ def wire_fields(values: dict[str, Any], *, all_day: bool | None = None) -> dict[
         minutes = values["reminder_minutes"]
         out["reminders"] = {"useDefault": False, "overrides": (
             [] if minutes is None else [{"method": "popup", "minutes": int(minutes)}])}
+    elif values.get("reminder_off"):  # create only: no calendar default reminder, no overrides
+        out["reminders"] = {"useDefault": False}
     return out
 
 
 def _draft_fields(draft: CalendarEventDraft) -> dict[str, Any]:
-    """A new event never says anything about reminders unless the draft asks for one."""
-    return {k: v for k, v in vars(draft).items() if not (k == "reminder_minutes" and v is None)}
+    """A new event never says anything about reminders unless the draft asks for one (minutes or off)."""
+    return {k: v for k, v in vars(draft).items()
+            if not (k == "reminder_minutes" and v is None) and not (k == "reminder_off" and not v)}
 
 
 class GoogleCalendarProvider:

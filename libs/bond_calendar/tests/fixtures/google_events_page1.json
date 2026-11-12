@@ -1,0 +1,26 @@
+{
+  "nextPageToken": "page-two-token",
+  "items": [
+    {
+      "id": "gevent1",
+      "etag": "\"3181161784712000\"",
+      "status": "confirmed",
+      "summary": "Site visit",
+      "start": {"dateTime": "2026-07-02T14:00:00Z", "timeZone": "UTC"},
+      "end": {"dateTime": "2026-07-02T15:00:00Z", "timeZone": "UTC"},
+      "location": "Front gate",
+      "htmlLink": "https://calendar.example.com/event?eid=gevent1",
+      "description": "Bring the checklist.",
+      "organizer": {"email": "sam@example.com", "displayName": "Sam Example", "self": true},
+      "attendees": [{"email": "pat@example.com", "displayName": "Pat Example", "responseStatus": "accepted"}]
+    },
+    {
+      "id": "gevent2",
+      "etag": "\"3181161784713000\"",
+      "status": "cancelled",
+      "summary": "Cancelled review",
+      "start": {"dateTime": "2026-07-03T09:00:00Z"},
+      "end": {"dateTime": "2026-07-03T09:30:00Z"}
+    }
+  ]
+}

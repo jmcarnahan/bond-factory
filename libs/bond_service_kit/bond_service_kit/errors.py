@@ -69,16 +69,22 @@ class RateLimited(Exception):
         self.detail = detail
 
 
-def error_body(status: int, detail: Any) -> dict[str, Any]:
+def error_body(status: int, detail: Any, *, code_aliases: tuple[str, ...] | str = ()) -> dict[str, Any]:
     """``detail`` as ``{code, message, ...}``.
 
-    A dict keeps its fields and gains a missing ``code`` / ``message``. A string that already is a code
+    A dict keeps its fields and gains a missing ``code`` / ``message``. A dict with no ``code`` but one of
+    ``code_aliases`` (first present, non-empty string wins) takes its ``code`` from it; the alias key stays. A string that already is a code
     (``invalid_token``) becomes the code, with underscores turned into spaces for the message. Any other string is the
     message and the code falls back by status.
     """
     fallback = _BY_STATUS.get(status, "error")
+    if isinstance(code_aliases, str):
+        code_aliases = (code_aliases,)
     if isinstance(detail, dict):
-        code = str(detail.get("code") or fallback)
+        code = detail.get("code")
+        if not code:
+            code = next((detail[a] for a in code_aliases if detail.get(a) and isinstance(detail[a], str)), None)
+        code = str(code or fallback)
         return {**detail, "code": code, "message": str(detail.get("message") or code.replace("_", " "))}
     text = str(detail)
     if _CODE_WORD.match(text):
@@ -86,11 +92,11 @@ def error_body(status: int, detail: Any) -> dict[str, Any]:
     return {"code": fallback, "message": text}
 
 
-def _detail(status: int, detail: Any, legacy: bool) -> Any:
+def _detail(status: int, detail: Any, legacy: bool, aliases: tuple[str, ...] = ()) -> Any:
     """The ``detail`` member: the object form, or (legacy flag) a string detail left as the string it was."""
     if legacy and not isinstance(detail, dict):
         return str(detail)
-    return error_body(status, detail)
+    return error_body(status, detail, code_aliases=aliases)
 
 
 def _validation_body(exc: RequestValidationError) -> dict[str, Any]:
@@ -107,15 +113,20 @@ def _validation_body(exc: RequestValidationError) -> dict[str, Any]:
     return {"code": "validation_error", "message": message, "errors": errors}
 
 
-def install_error_handlers(app: FastAPI, *, legacy_detail_string: bool = False) -> None:
-    """Register the handlers. ``legacy_detail_string=True`` keeps ``{"detail": "<string>"}`` for string details."""
+def install_error_handlers(app: FastAPI, *, legacy_detail_string: bool = False,
+                           code_aliases: tuple[str, ...] | str = ()) -> None:
+    """Register the handlers. ``legacy_detail_string=True`` keeps ``{"detail": "<string>"}`` for string details.
+    ``code_aliases`` (for example ``("error_code",)``) names keys a dict detail may carry its code under; a plain
+    string is one alias."""
+    if isinstance(code_aliases, str):
+        code_aliases = (code_aliases,)
 
     async def api_error(request: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse(status_code=exc.status, content={"detail": exc.detail()})
 
     async def http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code,
-                            content={"detail": _detail(exc.status_code, exc.detail, legacy_detail_string)},
+                            content={"detail": _detail(exc.status_code, exc.detail, legacy_detail_string, code_aliases)},
                             headers=getattr(exc, "headers", None))
 
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -145,7 +156,10 @@ def _internal_error(legacy: bool) -> JSONResponse:
 
 
 class UnhandledErrorMiddleware:
-    """Catch-all 500 (and pool-timeout 503) placed INSIDE CORS.
+    """Catch-all 500 (and 503 ``db_unavailable``) placed INSIDE CORS.
+
+    An exception is answered 503 when ``is_db_unavailable`` says so or when it carries a truthy ``db_unavailable``
+    attribute (a lib or app error class can opt in without this kit importing it).
 
     Starlette runs the ``Exception`` handler in ``ServerErrorMiddleware``, outside every user middleware, so its answer
     carries no CORS headers and a browser reports a network error instead of the 500. Add this middleware first (innermost)
@@ -170,7 +184,7 @@ class UnhandledErrorMiddleware:
         try:
             await self.app(scope, receive, tracking_send)
         except Exception as exc:
-            unavailable = is_db_unavailable(exc)
+            unavailable = is_db_unavailable(exc) or bool(getattr(exc, "db_unavailable", False))
             if unavailable:
                 LOGGER.error("database unavailable on %s %s: %s", scope.get("method"), scope.get("path"), exc)
             else:

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
+from datetime import datetime
 
 from sqlalchemy.exc import DataError, IntegrityError
 
@@ -69,8 +71,10 @@ def reject_for(host: Host, session, user, op: UploadOp, exc: Exception) -> OpRes
     return rejected(op.seq, SERVER_ERROR)
 
 
-def apply(session_factory, host: Host, ctx: Ctx, op: UploadOp) -> OpResult:
-    """Run one op in its own transaction and say what happened. Raises ``DbUnavailable`` when the database is down."""
+def apply(session_factory, host: Host, ctx: Ctx, op: UploadOp, *, close_sessions: bool = True) -> OpResult:
+    """Run one op in its own transaction and say what happened. Raises ``DbUnavailable`` when the database is down.
+    ``close_sessions=False`` leaves the session open (the op is still committed or rolled back), for a factory that hands
+    out a request-scoped session its owner closes."""
     session = session_factory()
     try:
         try:
@@ -99,10 +103,11 @@ def apply(session_factory, host: Host, ctx: Ctx, op: UploadOp) -> OpResult:
                 raise DbUnavailable(str(exc)) from exc
             return result
     finally:
-        try:
-            session.close()
-        except Exception:
-            LOGGER.warning("sync upload: closing the session failed on %s %s", op.table, op.id, exc_info=True)
+        if close_sessions:
+            try:
+                session.close()
+            except Exception:
+                LOGGER.warning("sync upload: closing the session failed on %s %s", op.table, op.id, exc_info=True)
 
 
 def _log_handler_bug(op: UploadOp, exc: Exception) -> None:
@@ -127,7 +132,12 @@ def _verdict_for(host: Host, session, ctx: Ctx, op: UploadOp, exc: Exception) ->
         return rejected(op.seq, SERVER_ERROR)
 
 
-def upload(session_factory, host: Host, ctx: Ctx, body: UploadRequest) -> UploadResponse:
-    """Apply the ops in ``seq`` order. One result per op; a refused op never stops the next."""
-    results = [apply(session_factory, host, ctx, op) for op in sorted(body.ops, key=lambda o: o.seq)]
-    return UploadResponse(results=results, server_now=server_now_iso())
+def upload(
+    session_factory, host: Host, ctx: Ctx, body: UploadRequest, *,
+    close_sessions: bool = True, now: Callable[[], datetime] | None = None,
+) -> UploadResponse:
+    """Apply the ops in ``seq`` order. One result per op; a refused op never stops the next.
+    ``now`` is the clock behind ``server_now`` (default: the real time); ``close_sessions`` is passed to ``apply``."""
+    ops = sorted(body.ops, key=lambda o: o.seq)
+    results = [apply(session_factory, host, ctx, op, close_sessions=close_sessions) for op in ops]
+    return UploadResponse(results=results, server_now=server_now_iso(now() if now is not None else None))

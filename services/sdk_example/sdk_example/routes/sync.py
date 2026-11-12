@@ -20,7 +20,6 @@ from pathlib import Path
 from bond_service_kit import ApiError
 from bond_sync_py import (
     Ctx,
-    DbUnavailable,
     Host,
     Rejected,
     Route,
@@ -150,12 +149,11 @@ def register(app: FastAPI) -> None:
     @router.post("/upload")
     def upload_route(body: UploadRequest, request: Request, background: BackgroundTasks,
                      user_id: str = Depends(current_user_id)):
-        """Always 200 with one verdict per op; only an unavailable database answers 503 so the client retries."""
-        try:
-            return upload(request.app.state.session_factory, host, Ctx(user=user_id, background=background), body).wire()
-        except DbUnavailable:
-            error = ApiError("db_unavailable", "The database is not answering. Try again in a few seconds", status=503)
-            return JSONResponse({"detail": error.detail()}, status_code=503, headers={"Retry-After": "5"})
+        """Always 200 with one verdict per op, and `server_now` from the app clock (a pinned clock shows). An unavailable
+        database raises `DbUnavailable`, which carries `db_unavailable = True`: the kit's `UnhandledErrorMiddleware`
+        answers 503 `db_unavailable` with `Retry-After: 5`, so the client retries."""
+        return upload(request.app.state.session_factory, host, Ctx(user=user_id, background=background), body,
+                      now=request.app.state.clock.now).wire()
 
     @router.post("/token")
     def token_route(request: Request, user_id: str = Depends(current_user_id)) -> dict:
@@ -170,7 +168,7 @@ def register(app: FastAPI) -> None:
             "token": token,
             "expires_at": expires.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "endpoint": cfg.url,
-            "server_now": server_now_iso(),
+            "server_now": server_now_iso(request.app.state.clock.now()),  # the app clock, like the upload
         }
 
     @router.get("/jwks.json")

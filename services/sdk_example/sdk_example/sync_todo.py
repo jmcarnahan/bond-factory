@@ -1,6 +1,7 @@
 """The TODO tables on the sync host: tasks, notices and push_devices (the libs ship the handlers).
 
-    todo_routes(app)   {(table, action): route} for `routes/sync.py` to wrap as `Route(r.ops, r.handler, r.reads)`
+    todo_routes(app)   {(table, action): route} for `routes/sync.py` to wrap as `Route(r.ops, r.handler, r.reads)`;
+                       task writes pass the same `prepare` rule as the REST routes (`todo_wiring.owner_edits_closed`)
     reject_for         a lib error (`TaskError`, `NoticeError`, `PushError`) becomes a sync verdict
     already_written    a replayed `put` of a row the user already owns is a success
 
@@ -53,7 +54,7 @@ def todo_routes(app: FastAPI) -> dict:
         return state.clock.utcnow_naive()  # the app clock, so a pinned clock stamps REST and sync alike
 
     def zone_of(ctx, session, user_id: str) -> str | None:
-        return tasks.get_settings(session, TaskUserSettings, user_id).time_zone
+        return tasks.get_settings(session, TaskUserSettings, user_id, state.default_prefs).time_zone
 
     def after_write(ctx, session, task) -> None:
         """Put away notices that no longer apply, then queue the calendar mirror for after the response (the ops have
@@ -61,7 +62,7 @@ def todo_routes(app: FastAPI) -> dict:
         todo_wiring.after_task_write(session, task, _now())
         if task.mirror_status == "pending" and ctx.background is not None:
             ctx.background.add_task(tasks.sync_mirror, state.session_factory, Task, task.id, state.mirror_providers,
-                                    tz=tz)
+                                    tz=tz, draft_for=state.mirror_draft_for)
 
     def after_delete(ctx, session, pointer) -> None:
         if pointer is not None and ctx.background is not None:
@@ -77,7 +78,8 @@ def todo_routes(app: FastAPI) -> dict:
 
     routes = sync_routes(Task, now=_now, tz=tz, user_exists=user_exists, after_write=after_write, after_delete=after_delete,
                          zone_of=zone_of, prefs=state.todo_prefs, link_hook=state.link_hook,
-                         link_index_model=TaskLinkIndex, on_deleted=on_deleted)
+                         link_index_model=TaskLinkIndex, on_deleted=on_deleted,
+                         prepare=todo_wiring.owner_edits_closed)
     base = routes[("tasks", None)]
 
     def handler(session, ctx, op, data) -> None:

@@ -1,4 +1,4 @@
-import 'package:bond_signin_ui/bond_signin_ui.dart';
+import 'package:bond_auth_secure_storage/bond_auth_secure_storage.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 

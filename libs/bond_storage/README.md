@@ -13,7 +13,7 @@ S3-compatible object storage, recipient download links and image helpers. Depend
 | `StorageSettings.from_env(bucket_env=, prefix=)`, `build_storage` | settings from the environment, backend factory |
 | `company_key(company_id, *parts, private=False)` | `c/<company>/[private/]a/b` |
 | `GrantsMixin`, `mint`, `resolve`, `claim`, `revoke...` | opaque-token download links, only the sha256 stored |
-| `make_download_router(...)` | `GET /d/{token}`, one identical 410 for every failure |
+| `make_download_router(...)` | `GET /d/{token}`, one identical 410 for every failure. Options: `delivery="redirect"` (302 to a signed URL for `presign_seconds`), `on_claim`, `gone_body`, `enabled`, `client_ip`, `enforce_cap` |
 | `images` | `sniff`, `image_from_bytes`, `guard_bomb`, `strip_metadata`, `thumbnail`, `exif_transpose`, `encode` |
 
 ## Environment

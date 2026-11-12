@@ -4,6 +4,7 @@ Role: calendar provider clients (Microsoft Graph, Google) behind one protocol, p
 ## Key files
 - `protocol.py` the contract; `models.py` event, draft, page, patch; `errors.py` typed failures
 - `graph.py`, `google.py` providers; `normalize.py` payload to event; `times.py` UTC helpers; `transport.py` HTTP + error map
+- `tests/fixtures/*.json` hand-written recorded shapes; `tests/test_live_optional.py` runs only with `BOND_CALENDAR_NETWORK=1` + `BOND_CALENDAR_TOKEN`
 - `fake.py` `FakeCalendarProvider` (etag `W/"n"`, `fail_next`, `events`, `calls`)
 
 ## Commands

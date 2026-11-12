@@ -78,6 +78,15 @@ use it inside the block that loaded the connection. Read-only paths may pass `ma
 
 ## 7. Known gaps
 
+- `reminder_off` is create-only. To switch a reminder off on an existing event, patch `reminder_minutes` to `None`
+  (Graph `isReminderOn: false`; Google `useDefault: false` with empty overrides).
+- A 403 now raises `Forbidden` (a `CalendarError` subclass). Catch it for "missing scope or read-only calendar";
+  `.code` is the provider's reason.
+  Google throttle 403s (`rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded`, `dailyLimitExceeded`,
+  `calendarUsageLimitsExceeded`) raise `Unavailable` (retry), not `Forbidden`; before this change they were a plain `CalendarError`.
+- Recorded-shape fixtures and an opt-in live test now exist (`libs/bond_calendar/tests/`). Run the live one with
+  `BOND_CALENDAR_NETWORK=1 BOND_CALENDAR_TOKEN=<short-lived token for a test calendar>` (and
+  `BOND_CALENDAR_PROVIDER=google` for Google). It covers acceptance step 4 (write, edit, stale etag, delete).
 - Both real providers have run only against `httpx.MockTransport`. `MsGraphCalendarProvider` is lifted from app S's
   working client; `GoogleCalendarProvider` reads are lifted from app A, but its writes (`create_event`, `update_event`,
   `delete_event`) are new code never sent to Google. Acceptance steps 3 and 4 above are the first live run; do them in a

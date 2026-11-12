@@ -9,9 +9,16 @@ as a background task. It reloads the task, never raises and records the outcome 
 
 The mailbox is the assignee, else the owner. A reassign deletes the event in the old mailbox, then creates one in the
 new. Updates send ``If-Match`` with the stored etag; a stale etag re-reads the event and updates once more.
+
+``draft_for(session, task, draft)`` lets the app reshape the event (body, length, categories, reminder) while the
+snapshot session is open. If it raises, returns something that is not a ``MirrorDraft``, or the task's date or time
+is malformed, the row finishes ``failed`` before any provider call. ``draft_for`` must not write: a flush is rolled
+back, a commit would persist. If it fails during a reassignment the old event stays until the next good sync.
+``failed`` is not terminal: the next write to the task sets ``pending`` again.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC as _UTC
 from datetime import date, datetime, time, timedelta
@@ -89,11 +96,18 @@ class _Snap:
     draft: MirrorDraft | None
 
 
-def _snapshot(task: Any, tz: str) -> _Snap:
+DraftFor = Callable[[Any, Any, MirrorDraft], MirrorDraft]
+
+
+def _snapshot(session: Any, task: Any, tz: str, draft_for: DraftFor | None = None) -> _Snap:
     eligible = mirror_eligible(task)
     draft = None
     if eligible:
         draft = build_draft(task.title, task.notes, task.due_date, task.due_time, task.remind_minutes_before, tz)
+        if draft_for is not None:
+            draft = draft_for(session, task, draft)
+            if not isinstance(draft, MirrorDraft):
+                raise TypeError(f"draft_for must return a MirrorDraft, not {type(draft).__name__}")
     return _Snap(mailbox_of(task), eligible, task.external_event_id, task.external_account_user_id, task.external_etag, draft)
 
 
@@ -156,21 +170,32 @@ def _upsert(mirror: Any, draft: MirrorDraft, event_id: str | None, etag: str | N
         raise
 
 
-def sync_mirror(session_factory: Any, task_model: Any, task_id: str, providers: MirrorProviders, *, tz: str = "UTC") -> None:
-    """Reconcile the task's external event with its row. Never raises."""
+def sync_mirror(session_factory: Any, task_model: Any, task_id: str, providers: MirrorProviders, *, tz: str = "UTC",
+                draft_for: DraftFor | None = None) -> None:
+    """Reconcile the task's external event with its row. Never raises.
+
+    ``draft_for(session, task, draft)`` returns the draft to send (its return value is the draft used)."""
     try:
-        _sync(session_factory, task_model, task_id, providers, tz)
+        _sync(session_factory, task_model, task_id, providers, tz, draft_for)
     except Exception:
         LOGGER.warning("task-mirror-degraded: sync of task %s failed", task_id, exc_info=True)
 
 
-def _sync(session_factory: Any, task_model: Any, task_id: str, providers: MirrorProviders, tz: str) -> None:
+def _sync(session_factory: Any, task_model: Any, task_id: str, providers: MirrorProviders, tz: str,
+          draft_for: DraftFor | None = None) -> None:
     with session_factory() as session:
         task = session.get(task_model, task_id)
         if task is None:
             return
-        snap = _snapshot(task, tz)
+        try:  # only a draft that cannot be built ends the row as failed; a database fault propagates as before
+            snap = _snapshot(session, task, tz, draft_for)
+        except Exception:
+            LOGGER.warning("task-mirror-degraded: no event could be built for task %s", task_id, exc_info=True)
+            snap = None
         session.rollback()  # no transaction is held while the provider answers
+    if snap is None:
+        _finish(session_factory, task_model, task_id, mirror_status=MirrorStatus.FAILED.value)
+        return
 
     old_event, old_user = snap.event_id, snap.event_user or snap.mailbox
     if old_event and (not snap.eligible or old_user != snap.mailbox):

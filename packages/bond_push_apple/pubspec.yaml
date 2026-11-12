@@ -1,0 +1,18 @@
+name: bond_push_apple
+description: 'The pub.dev push plugin behind the bond_push seams: Apple token source and taps.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  bond_push:
+    path: ../bond_push
+  push: ^3.3.3
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

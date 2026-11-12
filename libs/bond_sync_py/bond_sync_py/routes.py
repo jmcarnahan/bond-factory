@@ -13,7 +13,9 @@ from .verdicts import NOT_SUPPORTED_MESSAGE, UNSUPPORTED, Rejected
 @dataclass(frozen=True)
 class Route:
     """``handler(session, ctx, op, data)`` returns None (ok) or ``Resolved``; it raises ``Rejected``, ``Skipped`` or a
-    host error that ``Host.reject_for`` maps. ``reads`` lists the data keys the handler uses: the only ones coerced."""
+    host error that ``Host.reject_for`` maps. ``reads`` lists the data keys the handler uses: the only ones coerced.
+    An empty ``reads`` (the default) is NOT "coerce nothing": it means "no list given", so every key in the op's data is
+    coerced. List the keys to restrict coercion, so a malformed column the handler ignores cannot reject the op."""
 
     ops: frozenset
     handler: Callable

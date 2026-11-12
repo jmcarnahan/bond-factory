@@ -5,7 +5,7 @@ Role: sign-in widgets and the system-browser port, built on bond_signin, bond_ui
 - `lib/src/sign_in_screen.dart` BondSignInScreen; `sign_in_buttons.dart` BondSignInButtons
 - `lib/src/scope_ask_card.dart` BondScopeAskCard (ungranted sets inline, one button each)
 - `lib/src/browser/browser_auth.dart` BrowserAuth port; `browser_auth_web.dart` (dart:js_interop); `browser_auth_native.dart` (flutter_web_auth_2); `native_return.dart`
-- `lib/src/secure_refresh_token_store.dart` SecureRefreshTokenStore over flutter_secure_storage
+- SecureRefreshTokenStore moved to the `bond_auth_secure_storage` package (this package must not depend on flutter_secure_storage)
 
 ## Commands
 - `make test T=test/widgets_test.dart`
