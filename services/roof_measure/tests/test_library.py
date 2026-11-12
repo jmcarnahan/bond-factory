@@ -309,3 +309,12 @@ def test_purge_cache(tmp_path):
     os.utime(stale, (past, past))
     assert purge_cache(d, days=30) == 2
     assert not old.exists() and not stale.exists() and fresh.exists()
+
+
+@pytest.mark.parametrize("which", ["work_dir", "cache_dir"])
+def test_a_directory_argument_that_is_a_file_is_a_value_error(tmp_path, which):
+    f = tmp_path / "afile"
+    f.write_text("x")
+    kw = {"cache_dir": tmp_path / "c", "work_dir": tmp_path / "w"} | {which: f}
+    with pytest.raises(ValueError, match="must be a directory"):
+        measure(ADDR, method="lidar_skeleton", verify=False, blocks_path=BLOCKS, isolate=False, **kw)

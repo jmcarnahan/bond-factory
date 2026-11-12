@@ -269,6 +269,7 @@ def test_render_false_skips_the_picture_without_a_warning(tmp_path):
 def test_render_true_writes_the_picture(tmp_path):
     res = pipeline.run_pipeline("x", tmp_path / "on", "lidar_skeleton", blocks_path=BLOCKS)
     assert res.paths["png"].is_file() and res.model["debug"]["png"] == res.paths["png"].name
+    assert json.loads(res.paths["model"].read_text())["debug"]["png"] == res.paths["png"].name  # written after render
 
 
 def test_a_missing_matplotlib_skips_the_picture_without_a_warning(tmp_path, monkeypatch):
@@ -284,3 +285,5 @@ def test_a_missing_matplotlib_skips_the_picture_without_a_warning(tmp_path, monk
     res = pipeline.run_pipeline("x", tmp_path, "lidar_skeleton", blocks_path=BLOCKS)
     assert "png" not in res.paths and not list(tmp_path.glob("*.png"))
     assert not any("debug picture" in w for w in res.envelope["warnings"])
+    written = json.loads(next(tmp_path.glob("*_model.json")).read_text())
+    assert "png" not in written["debug"] and "png" not in res.model["debug"]

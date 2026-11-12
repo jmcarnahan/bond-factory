@@ -641,14 +641,18 @@ The return value is the envelope of §2. The library also exports `MeasureError`
 `MeasureError(code, message, retryable)` carries the error object of §1.1 as attributes. `to_dict()` returns
 `{"code", "message", "retryable"}` and `str()` gives `code: message`. The codes are the job codes of the §1.1 table
 except `interrupted`, with the same retryable flags. `interrupted` is never raised by the library: it means a service restart, and
-there is no service.
+there is no service. `message` is for logs and support, never for end users (it can carry a stderr tail or a
+library message).
 
 Programmer errors are `ValueError`, not `MeasureError`:
 
 - an unknown `method`
 - `lat` without `lng`, or the reverse
-- `deadline_s` of 0 or less
-- an empty `address` with no coordinates
+- out-of-range or non-numeric coordinates
+- `deadline_s` of 0 or less, or not finite
+- an empty `address` with no coordinates, or an `address` that is not a string
+- an `overpass_urls` that is a string instead of a sequence
+- a `work_dir` or `cache_dir` that is a file
 - a missing fixture file passed as `blocks_path` or `solar_fixture`
 
 A request whose network timeout was capped by the deadline is reported as `upstream_unavailable`. A deadline already
@@ -669,6 +673,9 @@ anyway (the stage marks the output step).
 
 With `isolate=True` the library starts a fresh interpreter, `python -P -m roof_measure._child`, sends it one JSON
 request on stdin and reads stage and result lines from its stdout. It does not re-import the caller's `__main__`.
+The child imports `roof_measure` from the interpreter's installed packages (`python -P -m roof_measure._child`); a
+source checkout reachable only through `sys.path` edits or the working directory gives `measurement_failed` with a
+ModuleNotFoundError tail: install the package or use `isolate=False`.
 
 - **Environment.** The child gets a whitelist, not the caller's environment: `PATH`, `HOME`, `TMPDIR`, `TMP`,
   `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE`, `PYTHONPATH`, `PYTHONHOME`, `VIRTUAL_ENV`, `LD_LIBRARY_PATH`, `SYSTEMROOT`, the
@@ -689,7 +696,8 @@ request on stdin and reads stage and result lines from its stdout. It does not r
 ### 3.6 Caching and storage
 
 - **No result cache.** The library returns a fresh result each call; the caller stores results.
-- **Fetch cache.** HTTP bodies (LiDAR tiles, geocoder answers) are cached under `cache_dir`. It grows without
+- **Fetch cache.** HTTP bodies (LiDAR tiles, geocoder answers) are cached under `cache_dir`, which is created if
+  missing. It grows without
   bound unless the caller schedules `roof_measure.purge_cache(cache_dir, days=30)`, which deletes stale entries and
   returns a count. `measure()` never purges. `force=True` bypasses the cache for that call.
 - **`work_dir`.** `None` creates a temp dir that is removed afterwards, also after a kill. A directory you pass is

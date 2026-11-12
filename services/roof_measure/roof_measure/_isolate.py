@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import queue
@@ -61,13 +62,17 @@ def run_isolated(req: dict[str, Any], on_stage: Callable[[str], None] | None, gr
     proc = None
     reader = None
     try:
-        proc = subprocess.Popen(_child_argv(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errfile,
-                                env=_child_env(), text=True, bufsize=1)
+        try:
+            proc = subprocess.Popen(_child_argv(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errfile,
+                                    env=_child_env(), text=True, bufsize=1)
+        except OSError as exc:
+            raise MeasureError("measurement_failed", f"could not start the measurement process: {exc}") from exc
         try:
             proc.stdin.write(json.dumps(req) + "\n")  # type: ignore[union-attr]
             proc.stdin.close()  # type: ignore[union-attr]
         except OSError:
-            pass  # the child died early; the eof branch reports it
+            with contextlib.suppress(OSError):  # the child died early; the eof branch reports it
+                proc.stdin.close()  # type: ignore[union-attr]
         q: queue.Queue = queue.Queue()
         reader = threading.Thread(target=_read, args=(proc, q), daemon=True)
         reader.start()
@@ -112,7 +117,10 @@ def run_isolated(req: dict[str, Any], on_stage: Callable[[str], None] | None, gr
             proc.kill()
             proc.wait()
         errfile.close()
+        if proc is not None and proc.stdin is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.close()
         if reader is not None:
             reader.join(timeout=5)
-        if proc is not None and proc.stdout is not None:
+        if proc is not None and proc.stdout is not None and not (reader is not None and reader.is_alive()):
             proc.stdout.close()

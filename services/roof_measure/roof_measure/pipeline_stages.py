@@ -106,5 +106,6 @@ def _solar_key() -> str:
     key = config.solar_key()
     if key:
         return key
-    raise PipelineError("The live Solar API needs a key in GOOGLE_SOLAR_API_KEY (and the API enabled on the "
-                        "project). Use --solar-fixture for the synthetic fixture.")
+    raise PipelineError("The live Solar API needs a Google Solar key (the google_solar_api_key argument or "
+                        "GOOGLE_SOLAR_API_KEY) and the API enabled on the project. Use --solar-fixture for the "
+                        "synthetic fixture.")

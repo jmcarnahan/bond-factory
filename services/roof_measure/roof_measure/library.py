@@ -60,8 +60,8 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
     ``address`` is geocoded unless ``lat`` and ``lng`` are both given (then it may be ""). ``method`` is "auto"
     (LiDAR, falling back to ``solar_agent`` when both keys are given), "lidar_skeleton", "lidar_agent" or
     "solar_agent". ``verify=True`` without an Anthropic key yields verdict "unverified", not an error. ``force``
-    bypasses the on-disk fetch cache for this call. ``cache_dir`` (required) holds fetched bodies; see
-    ``purge_cache``. ``work_dir`` keeps the files the pipeline writes (``<slug>_blocks.json``, ``<slug>_model.json``,
+    bypasses the on-disk fetch cache for this call. ``cache_dir`` (required, created if missing) holds fetched
+    bodies; see ``purge_cache``. ``work_dir`` keeps the files the pipeline writes (``<slug>_blocks.json``, ``<slug>_model.json``,
     transcripts); None uses a temporary directory removed afterwards. ``isolate=True`` runs the pipeline in a
     child process killed at ``deadline_s + KILL_GRACE_S``; ``isolate=False`` runs it in this thread (no kill
     possible, fine for tests and scripts).
@@ -72,14 +72,15 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
 
     Raises ``ValueError`` for bad arguments (unknown method, only one of lat/lng, out-of-range coordinates,
     ``deadline_s`` <= 0 or not finite, blank address without coordinates, a missing ``blocks_path`` or
-    ``solar_fixture`` file). Raises ``MeasureError`` for the job codes: address_not_found, no_footprint,
+    ``solar_fixture`` file, a ``work_dir`` or ``cache_dir`` that is a file). Raises ``MeasureError`` for the job codes: address_not_found, no_footprint,
     ambiguous_building, no_lidar_coverage, lidar_too_sparse, measurement_failed (also a crashed child),
     upstream_unavailable, timeout (also a killed child). ``interrupted`` is never raised here.
 
     ``blocks_path`` and ``solar_fixture`` are test hooks: they replace LiDAR/Solar with a fixture file, so the
     call needs no network (verify=False) and no real address.
     """
-    lat_lng = _check(address, lat, lng, method, deadline_s, blocks_path, solar_fixture, overpass_urls)
+    lat_lng = _check(address, lat, lng, method, deadline_s, blocks_path, solar_fixture, overpass_urls,
+                     work_dir, cache_dir)
     cache_path = Path(cache_dir).resolve()  # absolute: the child must not depend on its working directory
     cache_path.mkdir(parents=True, exist_ok=True)
     own_dir = work_dir is None
@@ -117,7 +118,8 @@ def purge_cache(cache_dir: str | Path, days: float = 30.0) -> int:
 
 def _check(address: str | None, lat: float | None, lng: float | None, method: str, deadline_s: float,
            blocks_path: str | Path | None, solar_fixture: str | Path | None,
-           overpass_urls: Sequence[str] | None = None) -> list[float] | None:
+           overpass_urls: Sequence[str] | None = None, work_dir: str | Path | None = None,
+           cache_dir: str | Path | None = None) -> list[float] | None:
     if method not in METHODS:
         raise ValueError(f"method must be one of {METHODS}, got {method!r}")
     if address is not None and not isinstance(address, str):
@@ -145,6 +147,9 @@ def _check(address: str | None, lat: float | None, lng: float | None, method: st
     for name, p in (("blocks_path", blocks_path), ("solar_fixture", solar_fixture)):
         if p is not None and not Path(p).is_file():
             raise ValueError(f"{name} is not an existing file: {p}")
+    for name, d in (("work_dir", work_dir), ("cache_dir", cache_dir)):
+        if d is not None and Path(d).is_file():
+            raise ValueError(f"{name} must be a directory, not a file: {d}")
     return lat_lng
 
 

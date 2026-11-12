@@ -205,3 +205,116 @@ def test_the_child_exits_when_its_parent_dies(tmp_path):
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+
+
+STUB_PIPELINE = textwrap.dedent("""
+    import sys
+    from types import SimpleNamespace
+    import roof_measure.pipeline as p
+    from roof_measure import cache, config
+    from roof_measure.blocks import BlocksError
+    from roof_measure.footprint_types import FootprintError
+
+    def fake(address, out_dir, method, **k):
+        if address == "no-outline":
+            raise FootprintError("no outline")
+        if address == "no-blocks":
+            raise BlocksError("no blocks")
+        rt = config.current()
+        return SimpleNamespace(envelope={
+            "address": address, "method": method, "anthropic": rt.anthropic_api_key,
+            "solar": rt.google_solar_api_key, "overpass": list(rt.overpass_urls or []), "cache_dir": str(rt.cache_dir),
+            "force": cache._FORCE.get(), "lat_lng": list(k["lat_lng"]) if k["lat_lng"] else None,
+            "blocks_path": k["blocks_path"], "solar_fixture": k["solar_fixture"], "verify": k["verify"]})
+    p.run_pipeline = fake
+    from roof_measure import _child
+    sys.exit(_child.main())
+""")
+
+
+@pytest.fixture
+def stub_child(monkeypatch):
+    monkeypatch.setattr(roof_measure._isolate, "_child_argv", lambda: [sys.executable, "-P", "-c", STUB_PIPELINE])
+
+
+def test_the_real_child_receives_every_request_field(tmp_path, stub_child):
+    fixture = tmp_path / "solar.json"
+    fixture.write_text("{}")
+    env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True, anthropic_api_key="k-a",
+                  google_solar_api_key="k-s", overpass_urls=["https://m1.example/api"], force=True, lat=1.0, lng=2.0,
+                  method="lidar_skeleton", solar_fixture=fixture, blocks_path=BLOCKS, verify=False)
+    assert env == {
+        "address": "x", "method": "lidar_skeleton", "anthropic": "k-a", "solar": "k-s",
+        "overpass": ["https://m1.example/api"], "cache_dir": str((tmp_path / "cache").resolve()), "force": True,
+        "lat_lng": [1.0, 2.0], "blocks_path": str(BLOCKS.resolve()), "solar_fixture": str(fixture.resolve()),
+        "verify": False}
+
+
+def test_the_real_child_defaults_are_off_and_none(tmp_path, stub_child):
+    env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True, method="solar_agent")
+    assert (env["method"], env["anthropic"], env["solar"], env["overpass"], env["force"], env["lat_lng"],
+            env["blocks_path"], env["solar_fixture"], env["verify"]) == (
+        "solar_agent", None, None, [], False, None, None, None, True)
+
+
+@pytest.mark.parametrize(("addr", "code", "retryable", "message"), [
+    ("no-outline", "no_footprint", False, "no outline"),
+    ("no-blocks", "measurement_failed", False, None),
+])
+def test_the_real_child_relays_the_error_code(tmp_path, stub_child, addr, code, retryable, message):
+    with pytest.raises(MeasureError) as e:
+        measure(addr, cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True, method="lidar_skeleton")
+    assert e.value.code == code and e.value.retryable is retryable
+    if message:
+        assert e.value.message == message
+
+
+def test_a_raising_on_stage_kills_the_child_and_propagates(tmp_path, fake_child, monkeypatch):
+    made, real, pids = [], tempfile.mkdtemp, []
+    monkeypatch.setattr(tempfile, "mkdtemp", lambda *a, **k: made.append(real(*a, **k)) or made[-1])
+
+    def cb(name):
+        pids.append(pid_of(Path(made[0])))
+        raise RuntimeError("boom")
+    with pytest.raises(RuntimeError, match="boom") as e:
+        call(tmp_path, "hang", on_stage=cb)
+    assert not isinstance(e.value, MeasureError)
+    assert gone(pids[0]) and not Path(made[0]).exists()
+
+
+def test_the_in_process_deadline_is_enforced(tmp_path):
+    with pytest.raises(MeasureError) as e:
+        call(tmp_path, deadline_s=0.001, isolate=False)
+    assert e.value.code == "timeout" and e.value.retryable is True
+
+
+def test_a_child_that_cannot_start_is_measurement_failed(tmp_path, monkeypatch):
+    monkeypatch.setattr(roof_measure._isolate, "_child_argv", lambda: [str(tmp_path / "no-such-python")])
+    with pytest.raises(MeasureError) as e:
+        call(tmp_path)
+    assert e.value.code == "measurement_failed" and "could not start the measurement process" in e.value.message
+
+
+def test_the_child_stdin_is_closed_when_the_request_write_fails(tmp_path, fake_child, monkeypatch):
+    closed = []
+    real_popen = subprocess.Popen
+
+    class BrokenStdin:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def write(self, _data):
+            raise BrokenPipeError("gone")
+
+        def close(self):
+            closed.append(True)
+            self.inner.close()
+
+    def popen(*a, **k):
+        proc = real_popen(*a, **k)
+        proc.stdin = BrokenStdin(proc.stdin)
+        return proc
+    monkeypatch.setattr(roof_measure._isolate.subprocess, "Popen", popen)
+    with pytest.raises(MeasureError) as e:
+        call(tmp_path, "echo-key", work_dir=tmp_path / "w")
+    assert e.value.code == "measurement_failed" and closed

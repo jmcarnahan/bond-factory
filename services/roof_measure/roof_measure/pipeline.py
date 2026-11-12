@@ -212,21 +212,20 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
              "png": out / f"{tag}_model.png"}
     base.extra.pop("_geo", None)
     base.save(paths["blocks"])
-    if render:
-        model["debug"]["png"] = paths["png"].name
-    else:
+    if not render:
         paths.pop("png")
-    write_model(model, paths["model"])
-    if render:
+    else:
         try:
             render_png(model, paths["png"])
+            model["debug"]["png"] = paths["png"].name
         except ImportError:  # the `render` extra (matplotlib) is not installed: skip the picture, no warning
-            log.info("render skipped: matplotlib is not installed")
+            log.warning("render skipped: matplotlib is not installed (install the render extra)")
             paths.pop("png", None)
         except Exception as exc:  # the debug picture never fails a finished measurement
             log.warning("render failed: %s", type(exc).__name__, exc_info=True)
             paths.pop("png", None)
             extra_warnings.append(("other", "The debug picture could not be rendered."))
+    write_model(model, paths["model"])
     if verify:  # empty list when only the deterministic merge ran
         paths["verifier_transcript"] = out / "verifier_transcript.json"
         paths["verifier_transcript"].write_text(json.dumps(verifier_transcript, indent=1, default=str))
