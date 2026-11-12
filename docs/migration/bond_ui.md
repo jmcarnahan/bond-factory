@@ -1,7 +1,7 @@
 # Migrating to bond_ui
 
 Tokens, theme, labels and 37 widgets (`packages/bond_ui`, Flutter): 19 primitives, 5 shell, 13 components. Colours and
-fonts live in a `BondTokens` theme extension; spacing, radius and type scale are constants. Legend: `docs/migration/README.md`.
+fonts live in a `BondTokens` theme extension, and so do corner radii (`BondTokens.shape`, a `BondShape`); spacing and type scale are constants. Legend: `docs/migration/README.md`.
 
 ## 1. What it replaces
 Paths are under `flutterui/packages/<ui>/lib/src/` (A `avalon_ui`, P `pt_ui`).
@@ -90,7 +90,10 @@ None. Add the git dependency; keep the Figtree font in the UI package. Delete th
 - `BondDateField` never reads the clock. `BondLabels` has no `==`: its scope notifies on every rebuild.
 - `staleSince` is a prefix; A's `stale_since` takes the time as a parameter: keep a thin `AvStaleBanner`.
 - `BondStartupFailed` is a whole `MaterialApp`. `Semantics(identifier)` is untested in a browser until the walk.
-- S: its radii (6, 10, 16) become 8, 12, 16 under `BondRadius`; `ui/components/overlays/sbel_snackbar.dart` has no bond equivalent.
+- S: its radii (6, 10, 16) become 8, 12, 16 by default; set `BondTokens(shape: BondShape(r8: 6, r12: 10, r16: 16))` to keep them; `ui/components/overlays/sbel_snackbar.dart` has no bond equivalent.
+
+- `BondPressable.borderRadius`, `BondPhoto.radius` and `BondDashedBorder.radius` are now nullable. Null means the shape token
+  (`r8`, `r12`, `r12`), the same value as before. Code that reads those fields must handle null.
 
 ## 7. Added for the task widgets
 - `BondMonthGrid` is exported with `dayBuilder` (a widget under each day number, hidden from screen readers), `daySemantics`

@@ -65,3 +65,7 @@ None. Wire format is unchanged. `jiso` now writes milliseconds (`2026-11-08T10:3
 - `jtime` throws on an integer (epoch) and on a string that is not a timestamp; P returned null (its shim keeps that).
 - `jiso` writes 3 fractional digits; P printed microseconds when present.
 - Not lifted: `JsonEquatable`, `jmaps`, `jstrings`, `jints`, the `unknown` argument of `enumByWire`.
+
+## 7. Adoption-gaps changes
+- `jtimeOrNull(m, k)` reads like `jtime` but never throws: a missing, null, empty, non-String or malformed value is null. Use it where a bad timestamp should read as "unknown".
+- Bug fix: `jtime` and `jtimeOrNull` now reject impossible calendar dates and times. Before, Dart rolled them over to the next valid date. Rejected now: a month outside 1-12, a day past the month's end (leap years respected), an hour above 23 (so `24:00` is out), a minute above 59 and a second above 59 (so the leap second `23:59:60` is out; it used to read as the next minute). The check covers the extended form (`2026-02-30T10:00Z`), the basic form (`20260230T101010Z`) and an hour-only time (`2026-11-08T25`). A year with a sign or more than four digits (`-2026-...`, `10000-...`) is not checked. `jtime` throws `JsonShapeError` for them. A leap day (2028-02-29) still reads. If an adopter's data carried such values, expect the new throw (or null with `jtimeOrNull`).

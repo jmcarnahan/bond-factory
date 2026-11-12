@@ -128,6 +128,7 @@ def install(app: FastAPI) -> None:
     app.state.storage = LocalStorageService(out / "uploads")
     app.state.job_registry = HandlerRegistry(BackgroundJob)
     app.state.clock = Clock()
+    app.state.clock_pin = None  # set only by PUT /fake/clock (clock_pin.py)
     app.state.limiters = {"auth": RateLimiter("20/minute"), "download_token": RateLimiter("30/minute"),
                           "download_ip": RateLimiter("120/minute")}
     install_error_handlers(app)

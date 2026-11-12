@@ -44,7 +44,10 @@ class Skipped(Exception):
 
 
 class DbUnavailable(Exception):
-    """The database, not the op, is the problem. The route must answer HTTP 503 so the client retries the whole batch."""
+    """The database, not the op, is the problem. The route must answer HTTP 503 so the client retries the whole batch.
+    ``db_unavailable`` is a marker a host's error middleware can read (``getattr(exc, "db_unavailable", False)``) to answer 503."""
+
+    db_unavailable = True
 
 
 @dataclass(frozen=True)

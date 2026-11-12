@@ -44,8 +44,16 @@ notice already read or dismissed stays so). Notices are read by attribute (`Noti
 ## Routes an app mounts
 
 `GET /notices` (`unread`, `limit`, `before`), `POST /notices/{id}/read`, `POST /notices/{id}/dismiss`,
-`POST /notices/read-all`. `POST /notices/{id}/act` (done, snooze, cancel) is the app's own route: it applies the
-action through the tasks lib, marks the notice read and calls `dismiss_for_source` on done or cancel.
+`POST /notices/read-all`. `POST /notices/{id}/act` (done, snooze, cancel) is served by `make_notices_router` when the host gives `on_act`: the
+host's `on_act` applies the action through the tasks lib and calls `dismiss_for_source` on done or cancel; the router
+checks ownership first and marks the notice read.
+
+## Routes
+
+Install with the `http` extra (git form in `docs/sdk/README.md`, "Python": add `extras = ["http"]` to the Poetry line, or pip
+`pip install "bond_notify_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_notify_py"`), then `from bond_notify_py.routes import make_notices_router` (the package never
+imports it). It serves list, read, dismiss and read-all; with `on_act(session, notice, action, user_id, now)` it also
+serves `act`, which checks ownership first. A result key `notice` never replaces the notice. A coded exception (str `code`, str `message`, int `status`) escaping a route is answered as `status` with `{"detail": {"code", "message"}}`; `error_map(exc) -> (status, body) | None` replaces that rule. `session_scope()` is a context manager factory that commits on exit.
 
 ## Device sync
 

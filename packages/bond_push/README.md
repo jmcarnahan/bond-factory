@@ -1,9 +1,13 @@
 # bond_push
 
 Apple push for the bond apps: the device token, registering it with the service, and taps on a push.
-A Flutter package over the pub.dev `push` plugin (no Firebase). iOS only; Android is not supported.
+The seams and the plain classes. The pub.dev `push` plugin is in `bond_push_apple`, so an app with push off
+links no plugin. iOS only; Android is not supported.
 
 ```dart
+import 'package:bond_push/bond_push.dart';
+import 'package:bond_push_apple/bond_push_apple.dart'; // PluginPushTokenSource, PluginPushTaps
+
 final source = PluginPushTokenSource(environment: kReleaseMode ? 'production' : 'sandbox');
 final registrar = PushRegistrar(source, PushDevicesApi(apiClient), deviceId: installId);
 
@@ -19,7 +23,7 @@ taps.taps.listen((t) => open(t.route));       // taps while the app runs
 
 ## The pieces
 
-- `PushTokenSource`: `token()`, `onRefresh`, `requestPermission()`. `PluginPushTokenSource` is the real one,
+- `PushTokenSource`: `token()`, `onRefresh`, `requestPermission()`. `PluginPushTokenSource` (in `bond_push_apple`) is the real one,
   `NoPushTokenSource` is inert (tests, web).
 - `PushDevices`: `register` and `unregister`; `PushDevicesApi` calls `POST /push/devices` and
   `DELETE /push/devices/{device_id}`.
@@ -51,4 +55,4 @@ taps.taps.listen((t) => open(t.route));       // taps while the app runs
 ## Tests
 
 `PluginPushTokenSource` and `PluginPushTaps` take an optional `plugin` (a `PushPlugin`, from
-`package:bond_push/testing.dart`) so tests inject a fake and never touch a platform channel.
+`package:bond_push_apple/bond_push_apple.dart`) so tests inject a fake and never touch a platform channel.

@@ -1,6 +1,6 @@
 # bond_signin_ui
 
-Sign-in screen, buttons, scope-ask card, the system-browser port and a secure refresh-token store for the bond
+Sign-in screen, buttons, scope-ask card, and the system-browser port for the bond
 apps. Built on `bond_signin`, `bond_ui` and `bond_connections`. No dialogs, sheets or snack bars: errors and the
 break-glass form show inline. No embedded web views (Google refuses them); the sign-in sheet that appears on a
 phone is the operating system's, an RFC 8252 requirement.
@@ -13,7 +13,6 @@ phone is the operating system's, an RFC 8252 requirement.
 | `BrowserAuth`, `defaultBrowserAuth()` | The system-browser port; the implementation is chosen at compile time |
 | `replaceAddress(Uri)` | Web: clean the return query out of the address bar; elsewhere a no-op |
 | `NativeReturn.choose(...)` | dev builds below iOS 17.4 only: https where supported, else the custom scheme. Production (floor 17.4) passes the https return |
-| `SecureRefreshTokenStore` | `RefreshTokenStore` over `flutter_secure_storage`, key `<appKey>.bond_refresh_token` |
 
 Semantics ids: `sdk.signin.<provider>`, `sdk.signin.error`, `sdk.signin.break-glass`, `sdk.scopes.ask-<set id>`
 (each prefix is a constructor argument).
@@ -27,7 +26,7 @@ Semantics ids: `sdk.signin.<provider>`, `sdk.signin.error`, `sdk.signin.break-gl
    `SignInReturnKind.ok` calls `auth.completeWeb()`; `error` shows `BondSignInScreen(errorCode: r.reason)`.
 
 ## Phone recipe
-1. Inject `SecureRefreshTokenStore(appKey: 'app-x')` as `refreshTokens` of `OidcAuthGateway`; this is the only
+1. Inject `SecureRefreshTokenStore(appKey: 'app-x')` (from `bond_auth_secure_storage`) as `refreshTokens` of `OidcAuthGateway`; this is the only
    storage code the app has. Delivery (cookie or body) follows the store, never `Platform`.
 2. Choose the return, then start with that same URL:
    ```dart
@@ -47,8 +46,8 @@ Semantics ids: `sdk.signin.<provider>`, `sdk.signin.error`, `sdk.signin.break-gl
 - `flutter_web_auth_2` 5.1.0 builds for iOS 11, but an https (universal link) return works only at runtime on iOS
   17.4 and later. The apps' floor is 17.4, so production uses the https return; the scheme return is for dev builds below it.
   Android: https returns need App Links.
-- `flutter_secure_storage` 11.2 needs iOS 13.
-- An identity-only app still pulls `bond_connections` and both plugins; that is by design.
+- `flutter_secure_storage` 11.2 (in `bond_auth_secure_storage`) needs iOS 13.
+- An identity-only app still pulls `bond_connections` and the browser plugin; that is by design.
 
 ## iOS and Android setup in the app
 - iOS, Associated Domains entitlement (`Runner.entitlements`):

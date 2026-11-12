@@ -73,10 +73,20 @@ notifiers = {"push": PushNotifier(PushDevice, sender)}  # passed to deliver_pend
 - REST: call `register_device` and `unregister_device` from your own routes (`POST /push/devices`,
   `DELETE /push/devices/{device_id}`); `PushError.status` and `.code` give the response.
 
-## Not testable here
+## Proving it against Apple (opt-in)
 
-Tests use `httpx.MockTransport` and a key generated in the test. Real delivery needs an Apple key and a device;
-nothing here proves Apple accepts the requests.
+Default tests use `httpx.MockTransport` and a key generated in the test. To prove a real key, team and app
+capability, set `BOND_PUSH_KEY_PATH` (the .p8 file), `BOND_PUSH_KEY_ID`, `BOND_PUSH_TEAM_ID`, `BOND_PUSH_TOPIC` (the
+bundle id) and `BOND_PUSH_DEVICE_TOKEN` (a token from a development build on a phone), then either:
+
+```
+python -m bond_push_py.send_test              # prints accepted / unregistered / retryable / rejected; exit 0 only if accepted
+BOND_PUSH_NETWORK=1 make test T=tests/test_live_apns.py   # two live cases, skipped unless every variable is set
+```
+
+Both go to the sandbox host unless you pass `--environment production`; the verdict line names the host used. The live tests send one alert to the real device and send one to a made-up token, which
+must come back `BadDeviceToken` or `Unregistered`. `BadDeviceToken` and `DeviceTokenNotForTopic` print with a hint (wrong host or wrong bundle id). Flags on `send_test` override the variables (`--help` lists them). Nothing reads a key in
+a default run, and the key id, team id and token are never printed or stored in the repo.
 
 ## Boundary
 

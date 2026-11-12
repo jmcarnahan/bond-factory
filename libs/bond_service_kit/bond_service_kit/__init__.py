@@ -9,6 +9,7 @@ from .errors import (
     error_body,
     install_error_handlers,
 )
+from .fake_clock import PinnableClock, fake_clock_router
 from .health import HealthBusy, HealthSlot, health_router
 from .middleware import (
     DBSessionMiddleware,
@@ -34,9 +35,9 @@ __version__ = "0.1.0"
 
 __all__ = [
     "ApiError", "Clock", "DBSessionMiddleware", "HealthBusy", "HealthSlot", "LimiterRegistry",
-    "LoggingCORSMiddleware", "RateLimited", "RateLimiter", "SchemaContract", "SecurityHeadersMiddleware",
+    "LoggingCORSMiddleware", "PinnableClock", "RateLimited", "RateLimiter", "SchemaContract", "SecurityHeadersMiddleware",
     "ThreadLimiter", "UnhandledErrorMiddleware", "UploadLimit", "clock", "db_session_middleware",
-    "error_body", "health_router", "install_error_handlers", "limiters", "make_session_factory", "mount_uploads",
+    "error_body", "fake_clock_router", "health_router", "install_error_handlers", "limiters", "make_session_factory", "mount_uploads",
     "mount_web", "parse_rate", "rate_limit_dependency", "schema_contract", "security_headers_middleware",
     "session_scope", "thread_limiter", "well_known_router",
 ]

@@ -4,7 +4,7 @@ Shared Flutter design tokens, theme and widgets for the bond app family. Nothing
 
 ## Tokens model
 - `BondTokens` is a `ThemeExtension` holding colours and the font: `ink body muted line lineStrong ground surface onFill shadow`, five tones (`accent danger positive caution info`, each a `BondTone` with `base press wash soft`), `fontFamily`, `fontPackage` and `personPalette`.
-- `BondSpace`, `BondRadius`, `BondText` (sizes and weights) and `BondLayout` (breakpoints and fixed sizes) are plain constants, because spacing is not brand specific.
+- `BondSpace`, `BondText` (sizes and weights) and `BondLayout` (breakpoints and fixed sizes) are plain constants, because spacing is not brand specific. Corner radii are themable: `BondTokens.shape` (a `BondShape` with `r4` to `r20`) sets them. `BondRadius` keeps only `pill` and deprecated aliases.
 - Widgets read `BondTokens.of(context)`. With no extension installed it returns `BondTokens.fallback` (neutral greys, one blue), so a widget renders anywhere.
 
 ## Filling the tokens once

@@ -13,7 +13,7 @@ What the lib holds:
 | `verdicts` | codes, `Rejected`, `Skipped`, `Resolved`, `DbUnavailable`, `is_database_down`, `ok/rejected/skipped` |
 | `coerce` | client bools, JSON text, numbers, ISO datetimes; NUL byte check |
 | `routes` | `Route`, `Ctx`, `Host`, `route_for` |
-| `dispatcher` | `apply`, `upload` (one transaction per op, seq order) |
+| `dispatcher` | `apply`, `upload` (one transaction per op, seq order; `close_sessions=`, and `now=` on `upload`) |
 | `replay` | `LoggedBugs`, `written_by` |
 | `tokens` | `SyncTokenSettings` (+ `from_env`), `mint_sync_token`, `jwks`, `load_private_key`, `is_configured`, `key_reason` |
 | `publication`, `source_sql` | `add_table(op, name, publication=, role=)`, `render_source_sql(tables, publication, role, app_name=)` |
@@ -33,6 +33,12 @@ upload path; `bond_service_kit.UploadLimit` can replace it), the rate limits, an
 | | `TIME_TABLES` escalation, `MAX_SENDS`, thread/message handlers, `State` |
 
 ## 2. The adapter
+
+- Request-scoped session: pass `close_sessions=False` to `upload` or `apply` when the factory returns the session your request
+  already owns. Each op still commits or rolls back (an accepted op commits the caller's pending work, a rejected op rolls it back); the app closes the session at the end of the request.
+- Pinned clock: `upload(..., now=lambda: pinned)` sets `server_now` (a naive value is taken as UTC, an aware one is converted), so a phone's server clock follows a pinned server clock.
+- `Route.reads=()` coerces every key in the op's data. List the keys to coerce only those.
+- `DbUnavailable.db_unavailable` is `True`, so error middleware can answer 503 from `getattr(exc, "db_unavailable", False)`.
 
 - S: `sbelcrm/sync/app/settings.py` becomes a function that builds `SyncTokenSettings(url=..., private_key=...,
   private_key_file=..., kid=..., previous_*=..., audience=..., minutes=...)` from the `POWERSYNC_*` config. Keep the

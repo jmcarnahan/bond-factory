@@ -33,7 +33,7 @@ final (attempt, url) = await SignInApi(api).startNative('google', returnUrl: ret
 // system browser returns; ignore it unless SignInReturn.parse(back).matches(attempt)
 final session = await gateway.completeNative(attempt, ret.code!); // redeem, refresh token saved first
 ```
-Give the gateway a real `RefreshTokenStore` (`SecureRefreshTokenStore` in `bond_signin_ui`). A store that holds a
+Give the gateway a real `RefreshTokenStore` (`SecureRefreshTokenStore` in `bond_auth_secure_storage`). A store that holds a
 token means body delivery; renewal posts `{refresh_token, rotation_id, delivery: "body"}`. A lost answer retries
 with the same rotation id. A final refusal (`refresh_reused`, `refresh_expired`, `refresh_revoked`) clears both
 tokens, sets `lastEndReason` and calls `onSessionEnded(code)`.

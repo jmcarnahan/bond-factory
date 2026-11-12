@@ -7,13 +7,13 @@ S3-compatible object storage, recipient download links and image helpers. Depend
 
 | Piece | What it is |
 | --- | --- |
-| `StorageService` | ABC: `upload`, `download`, `get_url`, `delete`; concrete `list_keys`, `supports_presigned`, `upload_bytes`, `download_bytes` (missing -> `FileNotFoundError`), `exists` |
+| `StorageService` | ABC: `upload`, `download`, `get_url`, `delete`; concrete `list_keys`, `supports_presigned`, `upload_bytes(content: bytes, key: str, *, content_type: str | None = None) -> str` (content first), `download_bytes` (missing -> `FileNotFoundError`), `exists` |
 | `LocalStorageService(base_dir)` | disk backend, traversal guard, URLs are `/uploads/<key>`, `list_keys` implemented |
 | `S3StorageService(bucket, region=, endpoint_url=, addressing_style=)` | boto3 s3v4, presigned `get_object` with disposition and type, paginated `list_keys`, clients cached by (region, endpoint, style) |
 | `StorageSettings.from_env(bucket_env=, prefix=)`, `build_storage` | settings from the environment, backend factory |
 | `company_key(company_id, *parts, private=False)` | `c/<company>/[private/]a/b` |
 | `GrantsMixin`, `mint`, `resolve`, `claim`, `revoke...` | opaque-token download links, only the sha256 stored |
-| `make_download_router(...)` | `GET /d/{token}`, one identical 410 for every failure |
+| `make_download_router(...)` | `GET /d/{token}`, one identical 410 for every failure. Options: `delivery="redirect"` (302 to a signed URL for `presign_seconds`), `on_claim`, `gone_body`, `enabled`, `client_ip`, `enforce_cap` |
 | `images` | `sniff`, `image_from_bytes`, `guard_bomb`, `strip_metadata`, `thumbnail`, `exif_transpose`, `encode` |
 
 ## Environment

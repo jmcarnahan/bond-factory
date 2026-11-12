@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.0 - unreleased
+- Corner radii now come from `BondTokens.of(context).shape` (bond_ui `BondShape`) instead of `BondRadius`; defaults are unchanged.
 - `BondConnectionCard`: state chip, e-mail, formatted date, buttons by state, inline two-step disconnect.
 - `BondConnectionsList` and `BondConnectionReturnBanner`.
 - `semanticsId` is a prefix: `<prefix>.card-<provider>`, `.state-<provider>`, `.connect-`, `.reconnect-`, `.disconnect-`.

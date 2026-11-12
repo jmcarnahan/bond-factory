@@ -145,3 +145,62 @@ def test_unknown_limiter_name_is_a_clear_error():
     limiters.clear()
     with pytest.raises(KeyError, match="register"):
         limiters.get("nope")
+
+
+def test_callable_rate_is_reread_per_call_and_cached():
+    seen = []
+    rates = {"v": "2/minute"}
+    parsed = []
+    import bond_service_kit.rate_limit as rl
+
+    real = rl.parse_rate
+
+    def counting(rate):
+        parsed.append(rate)
+        return real(rate)
+
+    rl.parse_rate = counting
+    try:
+        def source():
+            seen.append(1)
+            return rates["v"]
+
+        lim = RateLimiter(source, clock=Clock())
+        assert lim.allow("k") and lim.allow("k") and not lim.allow("k")
+        assert len(seen) >= 3  # asked every call
+        assert parsed == ["2/minute"]  # parsed once for a stable value
+        rates["v"] = "3/minute"  # an env change takes effect on the next call
+        assert lim.allow("k") and not lim.allow("k")
+        assert lim.limit == 3 and lim.rate == "3/minute"
+        assert parsed == ["2/minute", "3/minute"]
+    finally:
+        rl.parse_rate = real
+
+
+def test_callable_rate_with_a_bad_value_fails_on_first_use_and_a_bad_change_keeps_the_last_good_rate():
+    # Changed by the infra fix round (was: a callable failed at construction and on every bad change).
+    with pytest.raises(ValueError):
+        RateLimiter(lambda: "nope").allow("k")
+    box = {"v": "1/minute"}
+    lim = RateLimiter(lambda: box["v"], clock=Clock())
+    assert lim.allow("k")
+    box["v"] = "nope"
+    assert not lim.allow("k")  # still the last good 1/minute
+
+
+def test_registry_and_dependency_take_a_callable_rate():
+    limiters.clear()
+    app = FastAPI()
+    install_error_handlers(app)
+    box = {"v": "1/minute"}
+
+    @app.get("/x", dependencies=[Depends(rate_limit_dependency("cb", rate=lambda: box["v"]))])
+    def x():
+        return {}
+
+    c = TestClient(app)
+    assert c.get("/x").status_code == 200 and c.get("/x").status_code == 429
+    limiters.reset()
+    box["v"] = "5/minute"
+    assert all(c.get("/x").status_code == 200 for _ in range(5))
+    limiters.clear()

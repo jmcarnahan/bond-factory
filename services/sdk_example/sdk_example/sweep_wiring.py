@@ -2,11 +2,16 @@
 
     POST /jobs/tick (fake mode)     routes/jobs.py runs `sweep_app` at the pinned time, then the due jobs
     worker loop                     `before_hook(app)` as `bond_jobs.tick(..., before=..., before_every=BEFORE_EVERY)`
-    scripts/sweep_interval.py       a loop that needs no jobs table: `run_sweep` plus `run_prune` every N seconds
+    scripts/sweep_interval.py       a loop that needs no jobs table: `bond_jobs.run_schedule` with `run_sweep` every N
+                                    seconds and `run_prune` every hour
 
 `run_sweep` is two steps in two transactions: claim (`sweep_due` writes the ledger, the outbox rows and the inbox
 notices together, then commits) and deliver (`deliver_pending` leases, sends and stamps, committing per row). The push
 channel exists only when a sender is given; without one the sweep still fills the inbox.
+
+`grandfather_before` (`SDK_EXAMPLE_GRANDFATHER_BEFORE`, an ISO instant, default none) is for switching the sweep on over
+old tasks: a task due before that instant is recorded as skipped for every stage, so no notice tail follows. Set it to
+the activation time before the first sweep.
 """
 
 from __future__ import annotations
@@ -30,13 +35,16 @@ CHANNEL = "push"
 BEFORE_EVERY = 30.0  # seconds: the real loop's hook runs at most this often
 
 
-def run_sweep(factory: Callable[[], Any], *, prefs: Any, tz: str, sender: Any, now: datetime) -> dict:
+def run_sweep(factory: Callable[[], Any], *, prefs: Any, tz: str, sender: Any, now: datetime,
+              grandfather_before: datetime | None = None) -> dict:
     """Claim what is due as of `now` (naive UTC), then deliver the queued pushes. `factory` opens sessions on an engine
-    prepared with `sqlite_savepoint_setup` when it is SQLite. Returns both result records as dicts."""
+    prepared with `sqlite_savepoint_setup` when it is SQLite. Tasks due before `grandfather_before` send nothing.
+    Returns both result records as dicts."""
     with factory() as session:
         claimed = sweep_due(
             session, task_model=Task, ledger_model=TaskNoticeLedger, outbox_model=TaskNoticeOutbox, now=now,
-            prefs=prefs, tz=tz, transactional=[InboxNotifier(Notice)], channels=[CHANNEL] if sender else [])
+            prefs=prefs, tz=tz, transactional=[InboxNotifier(Notice)], channels=[CHANNEL] if sender else [],
+            grandfather_before=grandfather_before)
         session.commit()
     delivered: dict = {}
     if sender is not None:
@@ -60,7 +68,7 @@ def run_prune(factory: Callable[[], Any], *, now: datetime) -> dict:
 def sweep_app(app: FastAPI, now: datetime) -> dict:
     state = app.state
     return run_sweep(state.session_factory, prefs=state.todo_prefs, tz=state.settings.tz, sender=state.push_sender,
-                     now=now)
+                     now=now, grandfather_before=state.settings.grandfather_before)
 
 
 def before_hook(app: FastAPI, then: Callable[[Any, datetime], None] | None = None) -> Callable[[Any, datetime], None]:

@@ -1,0 +1,37 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#Collection(microsoft.graph.event)",
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=2026-07-01T00:00:00Z&endDateTime=2026-08-01T00:00:00Z&$skip=2",
+  "value": [
+    {
+      "id": "AAMkAGI2example1",
+      "subject": "Site visit",
+      "start": {"dateTime": "2026-07-02T14:00:00.0000000", "timeZone": "UTC"},
+      "end": {"dateTime": "2026-07-02T15:00:00.0000000", "timeZone": "UTC"},
+      "isAllDay": false,
+      "location": {"displayName": "Front gate"},
+      "attendees": [
+        {"type": "required", "status": {"response": "accepted"}, "emailAddress": {"name": "Pat Example", "address": "pat@example.com"}}
+      ],
+      "organizer": {"emailAddress": {"name": "Sam Example", "address": "sam@example.com"}},
+      "isOrganizer": true,
+      "isOnlineMeeting": false,
+      "showAs": "busy",
+      "isCancelled": false,
+      "type": "singleInstance",
+      "bodyPreview": "Bring the checklist.",
+      "webLink": "https://outlook.example.com/calendar/item/1",
+      "responseStatus": {"response": "organizer"},
+      "sensitivity": "normal",
+      "categories": ["Blue category"]
+    },
+    {
+      "id": "AAMkAGI2example2",
+      "subject": "Cancelled review",
+      "start": {"dateTime": "2026-07-03T09:00:00.0000000", "timeZone": "UTC"},
+      "end": {"dateTime": "2026-07-03T09:30:00.0000000", "timeZone": "UTC"},
+      "isAllDay": false,
+      "isCancelled": true,
+      "type": "singleInstance"
+    }
+  ]
+}

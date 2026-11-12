@@ -1,0 +1,10 @@
+{
+  "today": "2026-11-11",
+  "time_zone": "America/Denver",
+  "end_of_day": "17:00",
+  "cases": [
+    {"phrase": "Site meeting with Dana and Lee at the Example Plaza office tomorrow at 2pm for 90 minutes, bring the permit drawings and call Sam tomorrow, ask about the invoice",
+     "model_output": "model_output_rich.json", "expected": "expected_candidates_rich.json"},
+    {"phrase": "Call Sam tomorrow", "llm": null, "expected": "expected_degraded_rich.json"}
+  ]
+}

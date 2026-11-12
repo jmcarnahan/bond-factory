@@ -134,7 +134,7 @@ def test_start_of_day_change_without_a_stored_zone_also_warns(session):
 
 def test_wire_item_matches_the_fixture(session):
     prefs, warnings = update(session, time_zone=LA)
-    assert settings_item(prefs, warnings) == load_fixture("settings.json")
+    assert settings_item(prefs, warnings, overridden=[]) == load_fixture("settings.json")
     assert settings_item(UserPrefs(), ["lead_longer_than_work_day"]) == {
         "time_zone": None, "start_of_day": "08:00", "end_of_day": "17:00", "lead_minutes": 60,
         "warnings": ["lead_longer_than_work_day"]}

@@ -98,3 +98,15 @@ None. Set `legacy_detail_string=True` now; P already sends object bodies and can
 - `health_router` answers `{"status": "ok"|"degraded", "checks": {...}}` with 503 when degraded; A's `{"status": "healthy", "db": "ok"}`
   body differs, so keep the app route until nothing reads `healthy`.
 - Legacy mode keeps only string details: 422 and 429 bodies are always the object form. The limiter is in memory per process.
+
+## 7. Added after the first release
+- `install_error_handlers(app, code_aliases=("error_code",))`: a dict detail with no `code` takes it from the alias key (kept). Use it
+  while old clients still read `error_code`.
+- `fake_clock_router(clock, enabled=lambda: settings.mode == "fake", dependencies=[Depends(auth)])` replaces a hand-written
+  `/fake/clock`. `clock` is the kit `Clock` or anything with `frozen`, `now()`, `freeze(at)`, `unfreeze()`. Decide `enabled` in the app. While `enabled()` is false the path behaves as if it were not mounted (404, same body, any verb).
+  Only `null` or an absent `now` releases the pin.
+- `RateLimiter(rate=callable)`, `limiters.register(name, callable)`, `rate_limit_dependency(name, rate=callable)`: an app that reads
+  its limits from the environment per request passes `lambda: os.environ.get("LOGIN_RATE", "10/minute")`. This replaces
+  the "per-request env rates" gap in section 6. A callable is first called on first use, so it may read settings that load after
+  import. A bad later value keeps the last good rate and logs a warning.
+- A lib error class can set `db_unavailable = True` and `UnhandledErrorMiddleware` answers it 503 `db_unavailable`.

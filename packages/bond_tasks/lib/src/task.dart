@@ -56,6 +56,14 @@ class TaskLink {
   int get hashCode => Object.hash(kind, id, label);
 }
 
+/// The keys of the `TaskItem` wire shape; every other key lands in [Task.extras].
+const Set<String> kTaskItemKeys = {
+  'id', 'title', 'notes', 'due_date', 'due_time', 'priority', 'due_at', 'status', 'owner_user_id', 'owner_name',
+  'assigned_user_id', 'assignee_name', 'checklist', 'remind_minutes_before', 'links', 'completed_at',
+  'mirror_enabled', 'mirror_status', 'external_provider', 'external_event_id', 'source', 'created_at',
+  'updated_at', 'overdue', //
+};
+
 /// A task. [dueDate] is `YYYY-MM-DD` and [dueTime] `HH:MM`, both local wall
 /// clock and kept as the wire strings so no time zone can shift them.
 class Task {
@@ -84,6 +92,7 @@ class Task {
     this.createdAt,
     this.updatedAt,
     this.overdue = false,
+    this.extras = const {},
   });
 
   factory Task.fromJson(Map<String, Object?> m) => Task(
@@ -111,6 +120,10 @@ class Task {
         createdAt: jtime(m, 'created_at'),
         updatedAt: jtime(m, 'updated_at'),
         overdue: jbool(m, 'overdue') ?? false,
+        extras: Map.unmodifiable({
+          for (final e in m.entries)
+            if (!kTaskItemKeys.contains(e.key)) e.key: e.value,
+        }),
       );
 
   final String id;
@@ -144,12 +157,26 @@ class Task {
   /// Open and due before the client's today, as the server computed it.
   final bool overdue;
 
+  /// Every key outside the known `TaskItem` keys (an adopting app's own
+  /// columns). Never written by [toJson].
+  final Map<String, Object?> extras;
+
   bool get isOpen => status == TaskStatus.open;
   bool get isDone => status == TaskStatus.done;
   int get checklistDone => checklist.where((c) => c.done).length;
 
-  /// A copy with the fields the controller changes optimistically.
-  Task copyWith({TaskStatus? status, DateTime? completedAt, bool? overdue, bool clearCompleted = false}) => Task(
+  /// A copy with the fields the controller changes optimistically, plus the display names and
+  /// [extras] (what a `TaskEnricher` fills in).
+  Task copyWith({
+    TaskStatus? status,
+    DateTime? completedAt,
+    bool? overdue,
+    bool clearCompleted = false,
+    String? ownerName,
+    String? assigneeName,
+    Map<String, Object?>? extras,
+  }) =>
+      Task(
         id: id,
         title: title,
         notes: notes,
@@ -159,9 +186,9 @@ class Task {
         dueAt: dueAt,
         status: status ?? this.status,
         ownerUserId: ownerUserId,
-        ownerName: ownerName,
+        ownerName: ownerName ?? this.ownerName,
         assignedUserId: assignedUserId,
-        assigneeName: assigneeName,
+        assigneeName: assigneeName ?? this.assigneeName,
         checklist: checklist,
         remindMinutesBefore: remindMinutesBefore,
         links: links,
@@ -174,6 +201,7 @@ class Task {
         createdAt: createdAt,
         updatedAt: updatedAt,
         overdue: overdue ?? this.overdue,
+        extras: extras ?? this.extras,
       );
 
   /// Exactly the `TaskItem` keys.

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.1.0 - unreleased
+- `upload` and `apply` take `close_sessions: bool = True`; `False` leaves the session open for a request-scoped factory.
+- `upload` takes `now: Callable[[], datetime] | None = None`, the clock behind `server_now` (a naive value is taken as UTC). With `close_sessions=False` on a shared session an accepted op commits the caller's pending work, a rejected op rolls it back.
+- `Route.reads` empty means every key is coerced (documented, tested). `DbUnavailable.db_unavailable = True` class attribute.
 - Upload envelope (`UploadRequest`, `UploadOp`, `OpResult`, `UploadResponse`), verdict codes and `DbUnavailable`.
 - `Route`, `Ctx`, `Host`, `route_for`; `apply` and `upload` (one transaction per op, in seq order).
 - Value coercion for device data (bools, JSON text, numbers, ISO datetimes) and the NUL byte check.

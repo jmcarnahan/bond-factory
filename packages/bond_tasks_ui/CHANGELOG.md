@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+- Fix: `BondCaptureItemCard` (and so `BondCaptureReview`) keeps every field of the item it does not edit. The stated length (`durationMinutes`) is dropped once the start or end is edited or the event becomes all day; switching an event to a task and back keeps its place and guests. Editing the title, date, time, priority or all-day no longer drops an event's `location`, `notes`, `durationMinutes` and `attendees` or a task's `notes`. Changing the kind carries `notes` across. Split out `capture_item_build.dart` and `capture_link_state.dart` (internal).
+- Corner radii now come from `BondTokens.of(context).shape` (bond_ui `BondShape`) instead of `BondRadius`; defaults are unchanged.
+- `BondTaskSettingsForm`: a quiet "Default" hint under each setting, and an inline "Reset to default" control (key
+  `task-settings-reset-<wire field>`, semantics `<prefix>.settings-reset-zone|start|end|lead`) once the setting is in `TaskSettings.overridden`. Neither shows when `overridden` is null (older server). The control is 48 high and each is named by `SettingsLabels.resetNameFor`. Save sends only fields that changed or are already overridden, and nothing when none (against an older server, which does not send `overridden`, Save sends every field as before); a reset that fails (busy ends, field still overridden) is forgotten, and an edit of a field forgets its pending reset.
 - `BondTaskFormDue.onTimeValid` (internal); `BondTaskForm` disables Save while the time box holds an invalid time.
 - `BondTaskRow` shows up to 3 link chips and "+N"; `onLinkTap` on the row, `BondTaskList`, `BondTodayList`.
 - `BondTaskSettingsForm.zoneOptions` (`List<String>?`): choose the zone inline; capture cards carry `<prefix>.review-item-<n>`.

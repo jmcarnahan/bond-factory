@@ -17,7 +17,7 @@ The app writes ONLY a `UserDirectory`, a `ScopePolicy`, settings and a mount. Or
 | Settings and policy | ~70 | ~60 | ~40 |
 | Models and revisions | `identity_provider`, `identity_subject` (unique pair, nullable); `SessionsMixin`, `HandoffsMixin`; two revisions | same plus `sessions_valid_after` (S has none) and the connections table; three revisions | same minus connections; one revision |
 | Router and deps | keeps `/me`, `PATCH /me`, `/demo`, `/providers`, `/firebase` (break-glass); mounts the SDK router | same; first moves to the SDK auth contract | same |
-| Flutter | `OidcAuthGateway`, `SecureRefreshTokenStore`, login screens on `BondSignInScreen`, return handling | same; the connect web view is replaced, not patched | admin web and crew phone screens |
+| Flutter | `OidcAuthGateway`, `SecureRefreshTokenStore` (package `bond_auth_secure_storage`, phones only), login screens on `BondSignInScreen`, return handling | same; the connect web view is replaced, not patched | admin web and crew phone screens |
 
 `UserDirectory` methods (the app writes all): `find_by_identity`, `find_by_id`, `find_invite(session, emails,
 provider)`, `link_identity` (raises `IdentityTaken`), `check_allowed`, `capabilities`, `session_spec`, `public`,
@@ -112,3 +112,14 @@ as the shape; keep `break_glass.py` and `routes/connect_native.py` only if the a
 - The dev scheme fallback can be claimed by another app: denial of service, not takeover (the secret binds).
 - Register placeholder PyPI names `bond-oauth`, `bond-auth-py`, `bond-signin`; an app that omits a sibling declaration would
   otherwise pull a squatter. Not done in this build.
+
+## Secure refresh-token store moved (2026-11-12)
+
+`SecureRefreshTokenStore` is no longer in `bond_signin_ui`. It is in the new package `bond_auth_secure_storage`
+(`bond_auth_secure_storage.md`). `bond_signin_ui` no longer depends on `flutter_secure_storage`.
+
+- Old: `import 'package:bond_signin_ui/bond_signin_ui.dart';`
+- New: `import 'package:bond_auth_secure_storage/bond_auth_secure_storage.dart';`
+- `bond_signin_ui` no longer exports `SecureRefreshTokenStore`, so an old import of it fails to compile.
+- Pubspec: a phone app adds `bond_auth_secure_storage`. A web app adds nothing and uses `NoRefreshTokenStore`
+  (`import 'package:bond_auth/bond_auth.dart';`) or a cookie session.

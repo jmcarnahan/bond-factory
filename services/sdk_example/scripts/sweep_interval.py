@@ -1,14 +1,17 @@
 """Run the notice sweep on a timer. No jobs table, no web app: this is the whole worker for an app that has none.
 
-    python scripts/sweep_interval.py --every 60            # forever: sweep, deliver, and prune once an hour
+    python scripts/sweep_interval.py --every 60            # forever: sweep and deliver every 60 s, prune once an hour
     python scripts/sweep_interval.py --once                # one pass now, then exit (cron, or a test)
     python scripts/sweep_interval.py --once --now 2026-11-08T10:30:00Z   # as of a given instant
 
-Each pass opens its own session, claims what is due (`sweep_due`, which commits), delivers queued pushes
-(`deliver_pending`, which commits per row) and, once an hour, prunes the ledger, the outbox and the inbox. The
-database comes from SDK_EXAMPLE_DATABASE_URL like the service; run `make migrate` first. Pushes go out only when
-SDK_EXAMPLE_APNS_KEY_FILE, _KEY_ID and _TEAM_ID are set; otherwise the inbox is still filled. Two copies running at once
-are safe: the ledger claim is exactly-once and delivery leases its rows. It prints one JSON line per pass.
+The loop is `bond_jobs.run_schedule` with two entries: the sweep every `--every` seconds, and the prune (the ledger,
+the outbox and the inbox) every hour. A pass that raises is logged and the next one runs; SIGINT and SIGTERM stop the
+loop cleanly. Each sweep claims what is due (`sweep_due`, which commits) and delivers queued pushes (`deliver_pending`,
+which commits per row). The database comes from SDK_EXAMPLE_DATABASE_URL like the service; run `make migrate` first.
+Pushes go out only when SDK_EXAMPLE_APNS_KEY_FILE, _KEY_ID and _TEAM_ID are set; otherwise the inbox is still filled.
+SDK_EXAMPLE_GRANDFATHER_BEFORE (an ISO instant) makes tasks due before it send nothing: set it when switching the sweep
+on over old tasks. SDK_EXAMPLE_START_OF_DAY, _END_OF_DAY and _LEAD_MINUTES are the default work day. Two copies running
+at once are safe: the ledger claim is exactly-once and delivery leases its rows. It prints one JSON line per pass.
 """
 
 from __future__ import annotations
@@ -16,17 +19,17 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import time
+import math
+from collections.abc import Callable
 from datetime import UTC, datetime
 
-from bond_tasks_py import StoredPreferences
+from bond_jobs import Every, run_schedule
 
 from sdk_example import models  # noqa: F401  (attaches every mixin to Base)
 from sdk_example.db import make_engine, make_session_factory
-from sdk_example.models.task_settings import TaskUserSettings
 from sdk_example.settings import Settings
 from sdk_example.sweep_wiring import run_prune, run_sweep
-from sdk_example.todo_wiring import apns_sender
+from sdk_example.todo_wiring import apns_sender, stored_prefs
 
 log = logging.getLogger("sweep_interval")
 PRUNE_EVERY = 3600.0
@@ -41,48 +44,52 @@ def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def one_pass(factory, settings: Settings, sender, now: datetime, *, prune: bool) -> dict:
-    result = run_sweep(factory, prefs=StoredPreferences(TaskUserSettings), tz=settings.tz, sender=sender, now=now)
-    if prune:
-        result["prune"] = run_prune(factory, now=now)
+def sweep_pass(factory, settings: Settings, sender, now: datetime) -> dict:
+    result = run_sweep(factory, prefs=stored_prefs(settings), tz=settings.tz, sender=sender, now=now,
+                       grandfather_before=settings.grandfather_before)
     return {"at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), **result}
 
 
-def prune_due(last_prune: float | None, now: float) -> bool:
-    """The first pass prunes; after that once an hour (monotonic seconds)."""
-    return last_prune is None or now - last_prune >= PRUNE_EVERY
+def prune_pass(factory, now: datetime) -> dict:
+    return {"at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "prune": run_prune(factory, now=now)}
 
 
-def main(argv: list[str] | None = None) -> int:
+def one_pass(factory, settings: Settings, sender, now: datetime) -> dict:
+    """What `--once` prints: the sweep and the prune as of `now`, in one record."""
+    return {**sweep_pass(factory, settings, sender, now), "prune": prune_pass(factory, now)["prune"]}
+
+
+def entries(factory, settings: Settings, sender, every: float) -> list[Every]:
+    """The two schedules: the sweep every `every` seconds and the prune hourly (each reads the clock when it runs)."""
+    return [Every(every, lambda: sweep_pass(factory, settings, sender, utcnow()), name="sweep"),
+            Every(PRUNE_EVERY, lambda: prune_pass(factory, utcnow()), name="prune")]
+
+
+def print_result(entry: Every, result: dict | None, error: BaseException | None) -> None:
+    """One JSON line per successful pass (a failed one is already logged by the runner)."""
+    if error is None and result is not None:
+        print(json.dumps(result), flush=True)
+
+
+def main(argv: list[str] | None = None, *, run: Callable[..., None] = run_schedule) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--every", type=float, default=60.0, help="seconds between passes, at least 1 (default 60)")
+    parser.add_argument("--every", type=float, default=60.0, help="seconds between sweeps, at least 1 (default 60)")
     parser.add_argument("--once", action="store_true", help="one pass, then exit (prunes too)")
     parser.add_argument("--now", help="with --once: the instant to sweep as of (ISO 8601; default the real time)")
     args = parser.parse_args(argv)
-    if args.every < 1:
+    if not (math.isfinite(args.every) and args.every >= 1):
         parser.error("--every must be at least 1 second")
     if args.now and not args.once:
         parser.error("--now needs --once")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings.from_env()
     factory = make_session_factory(make_engine(settings))
     sender = apns_sender()
     if args.once:
-        print(json.dumps(one_pass(factory, settings, sender, parse_now(args.now) if args.now else utcnow(),
-                                  prune=True)))
+        print(json.dumps(one_pass(factory, settings, sender, parse_now(args.now) if args.now else utcnow())))
         return 0
-    last_prune: float | None = None
-    try:
-        while True:
-            started = time.monotonic()
-            prune = prune_due(last_prune, started)
-            try:
-                print(json.dumps(one_pass(factory, settings, sender, utcnow(), prune=prune)), flush=True)
-                last_prune = started if prune else last_prune
-            except Exception:
-                log.exception("sweep pass failed")
-            time.sleep(max(0.0, args.every - (time.monotonic() - started)))
-    except KeyboardInterrupt:
-        return 0
+    run(entries(factory, settings, sender, args.every), on_result=print_result)
+    return 0
 
 
 if __name__ == "__main__":

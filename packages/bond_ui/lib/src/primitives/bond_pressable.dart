@@ -10,7 +10,7 @@ class BondPressable extends StatelessWidget {
     super.key,
     required this.child,
     required this.onTap,
-    this.borderRadius = BondRadius.r8All,
+    this.borderRadius,
     this.semanticLabel,
     this.semanticsId,
     this.semanticToggled,
@@ -22,7 +22,8 @@ class BondPressable extends StatelessWidget {
 
   final Widget child;
   final VoidCallback? onTap;
-  final BorderRadius borderRadius;
+  /// Corner radius; defaults to the shape token `r8`.
+  final BorderRadius? borderRadius;
 
   /// Names the region as one button for screen readers.
   final String? semanticLabel;
@@ -45,12 +46,13 @@ class BondPressable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = borderRadius ?? BondTokens.of(context).shape.r8All;
     final body = Material(
       color: color ?? BondTokens.transparent,
-      borderRadius: borderRadius,
+      borderRadius: radius,
       child: InkWell(
         onTap: onTap,
-        borderRadius: borderRadius,
+        borderRadius: radius,
         focusNode: focusNode,
         child: minSize > 0
             ? ConstrainedBox(

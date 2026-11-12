@@ -1,4 +1,6 @@
 import logging
+import threading
+from datetime import UTC, datetime
 
 import pytest
 from conftest import Item, make_host, op
@@ -291,3 +293,105 @@ def test_mid_batch_db_down_keeps_earlier_ops_and_skips_later(factory, ctx):
     with factory() as s:
         assert s.get(Item, "a") is not None
         assert s.get(Item, "c") is None
+
+
+class _Spy:
+    """A session wrapper that counts close() calls."""
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.closed = 0
+
+    def close(self):
+        self.closed += 1
+        self._inner.close()
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def _spy_factory(factory):
+    made = []
+
+    def make():
+        spy = _Spy(factory())
+        made.append(spy)
+        return spy
+
+    return make, made
+
+
+def test_apply_closes_the_session_by_default(factory, host, ctx):
+    make, made = _spy_factory(factory)
+    assert apply(make, host, ctx, op(title="A")).status == "ok"
+    assert [s.closed for s in made] == [1]
+
+
+def test_apply_keeps_session_open_when_asked(factory, host, ctx):
+    make, made = _spy_factory(factory)
+    assert apply(make, host, ctx, op(title="A"), close_sessions=False).status == "ok"
+    assert apply(make, host, ctx, op(seq=1, id_="i-2", title=""), close_sessions=False).status == "rejected"
+    assert [s.closed for s in made] == [0, 0]
+    with factory() as s:
+        assert s.get(Item, "i-1") is not None  # committed even though not closed
+
+
+def test_upload_passes_close_sessions_through(factory, host, ctx):
+    make, made = _spy_factory(factory)
+    upload(make, host, ctx, UploadRequest(ops=[op(title="A"), op(seq=1, id_="i-2", title="B")]), close_sessions=False)
+    assert [s.closed for s in made] == [0, 0]
+
+
+def test_upload_server_now_follows_injected_clock(factory, host, ctx):
+    pinned = datetime(2030, 1, 2, 3, 4, 5, 678000, tzinfo=UTC)
+    resp = upload(factory, host, ctx, UploadRequest(ops=[op(title="A")]), now=lambda: pinned)
+    assert resp.server_now == "2030-01-02T03:04:05.678Z"
+    assert upload(factory, host, ctx, UploadRequest(ops=[])).server_now != resp.server_now  # default is the real clock
+
+
+def test_empty_reads_coerces_every_key(factory, ctx):
+    from conftest import _put
+
+    from bond_sync_py import Route
+
+    host = make_host(routes={("items", None): Route(frozenset({"put"}), _put)})  # reads left empty
+    assert apply(factory, host, ctx, op(title="A", count="not a number")).wire() == {
+        "seq": 0, "status": "rejected", "code": "invalid", "message": "invalid"}
+    restricted = make_host(routes={("items", None): Route(frozenset({"put"}), _put, ("title",))})
+    assert apply(factory, restricted, ctx, op(id_="i-2", title="A", count="not a number")).status == "ok"
+
+
+def test_logged_bugs_logs_once_across_threads():
+    from bond_sync_py import LoggedBugs
+
+    bugs = LoggedBugs()
+    firsts = []
+    barrier = threading.Barrier(8)
+
+    def worker():
+        barrier.wait()
+        firsts.append(bugs.first_time("items", "i-1"))
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert firsts.count(True) == 1
+    assert bugs.first_time("items", "i-2") is True
+
+
+def test_logged_bugs_evicts_the_oldest():
+    from bond_sync_py import LoggedBugs
+
+    bugs = LoggedBugs(maximum=2)
+    assert bugs.first_time("t", "a") and bugs.first_time("t", "b")
+    assert bugs.first_time("t", "c")  # evicts a
+    assert bugs.first_time("t", "a")  # a was forgotten, so it is new again (evicts b)
+    assert not bugs.first_time("t", "c")  # c is still remembered
+
+
+def test_db_unavailable_flag():
+    assert DbUnavailable.db_unavailable is True
+    assert getattr(DbUnavailable("down"), "db_unavailable", False) is True
+    assert getattr(ValueError("x"), "db_unavailable", False) is False

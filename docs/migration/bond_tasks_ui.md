@@ -53,7 +53,7 @@ Route the banner's action through the same handler as notices (`NoticeActionHand
 - A task past its due instant shows "Overdue". An event in the past shows "Missed". Never "Overdue" on an event.
 - A banner exists for `close`, `due` and `past` only. `upcoming` and none show nothing.
 - Capture: a link set to "No match" is dropped from its item. The chosen match is first among its alternatives.
-  `BondCaptureReview.onAccept` gives the edited items. The app creates each one through the normal create call.
+  `BondCaptureReview.onAccept` gives the edited items. An edit keeps every field the card does not show (an event's location, notes, duration and attendees; a task's notes); changing the kind carries the notes across. The app creates each one through the normal create call.
 - Semantics ids: single widgets take `semanticsId`. Composite ones take `semanticsPrefix` and derive
   `<prefix>.row-<id>`, `<prefix>.complete-<id>`, `<prefix>.form-<part>`.
 
@@ -64,6 +64,12 @@ Route the banner's action through the same handler as notices (`NoticeActionHand
 | S `taskDateString(DateTime)` | `dueDateString(DateTime)` |
 | a date-only overdue badge | `BondTaskRow(now: ...)`: overdue follows `isOverdue` |
 | A reminder pick list | `BondTaskForm` reminder with "Use my default" (-3) |
+
+## 5a. Settings reset (adoption gaps)
+`BondTaskSettingsForm` shows a quiet "Default" under a setting that follows the app default. Once the setting is in
+`TaskSettings.overridden` it shows an inline "Reset to default" control instead. Tapping it calls `onSubmit` with a
+`TaskSettingsPatch(reset: {field})`; the app sends it as the usual save. Keys: `task-settings-reset-<wire field>`; with a
+`semanticsPrefix`, `<prefix>.settings-reset-zone`, `-start`, `-end`, `-lead`. Words: `SettingsLabels.resetToDefault`, `usingDefault`; screen reader names `resetTimeZone`, `resetWorkDayStart`, `resetWorkDayEnd`, `resetLeadMinutes`. The control is 48 high. An older server (no `overridden`) shows neither hint nor control. Save sends only the fields that changed or are already set, and does nothing when none changed (against an older server, which does not send `overridden`, Save sends every field as before). Keep `busy` true while a save or reset runs; when it ends with the field still overridden the reset counts as failed.
 
 ## 6. What to test
 

@@ -44,9 +44,18 @@ def actor_of(ctx: Any) -> str:
     return getattr(user, "user_id", None) or user.id
 
 
-def _fields(data: dict) -> dict:
+def _allowed(fields: Collection[str] | None) -> tuple[str, ...]:
+    if fields is None:
+        return FIELDS
+    unknown = sorted(set(fields) - set(FIELDS))
+    if unknown:
+        raise ValueError(f"not device-writable task fields: {', '.join(unknown)}")
+    return tuple(k for k in FIELDS if k in set(fields))
+
+
+def _fields(data: dict, allowed: Collection[str] = FIELDS) -> dict:
     out = {}
-    for key in FIELDS:
+    for key in allowed:
         if key in data:
             value = data[key]
             out[key] = None if key in BLANK_IS_NONE and value == "" else value
@@ -88,16 +97,22 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
                 zone_of: Callable[[Any, Any, str], str | None] | None = None, prefs: Any = None,
                 permissions: Permissions | None = None, host_columns: Collection[str] = (),
                 link_hook: AfterWrite | None = None, link_index_model: Any = None,
-                on_deleted: Callable[[Any, Any, str, str], None] | None = None) -> dict:
+                on_deleted: Callable[[Any, Any, str, str], None] | None = None,
+                prepare: Callable[[Any, Any | None, str, dict], dict] | None = None,
+                fields: Collection[str] | None = None) -> dict:
     """Routes bound to ``task_model``. ``after_write(ctx, session,
     task)`` and ``after_delete(ctx, session, pointer)`` let the app start the mirror after the op commits (for
     example ``ctx.background.add_task``). ``zone_of(ctx, session, user_id)`` supplies the writer's stored zone (sync
     carries none per write), ``prefs`` and ``permissions`` are passed to the service, ``host_columns`` names the app
     columns a device may write and read, and ``link_hook(session, task)`` runs inside the service after each write.
     ``link_index_model`` (optional) has a deleted task's link index rows removed with it. ``on_deleted(ctx, session,
-    task_id, owner_user_id)`` runs after each real delete, mirrored or not (for example to put away its notices)."""
+    task_id, owner_user_id)`` runs after each real delete, mirrored or not (for example to put away its notices). ``prepare(session, task or None, actor, extras)`` is passed to the
+    service on put and patch (see ``service.create``). ``fields`` narrows what a device may write to those names
+    of ``FIELDS``; a write of any other field is dropped, as an unknown field is today (None = all of ``FIELDS``);
+    a name outside ``FIELDS`` raises ``ValueError``."""
     host = tuple(host_columns)
-    reads = READS + host
+    allowed = _allowed(fields)
+    reads = tuple(k for k in FIELDS if k in allowed) + ("status",) + host
 
     def changed(ctx: Any, session: Any, task: Any) -> None:
         if after_write is not None:
@@ -111,14 +126,14 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
 
     def write_kwargs(ctx: Any, session: Any, actor: str, data: dict) -> dict:
         return {"now": now(), "tz": tz, "user_exists": user_exists, "writer_zone": writer_zone(ctx, session, actor),
-                "prefs": prefs, "extras": extras_of(data), "host_columns": host, "after_write": link_hook}
+                "prefs": prefs, "extras": extras_of(data), "host_columns": host, "after_write": link_hook, "prepare": prepare}
 
     def put(session: Any, ctx: Any, op: Any, data: dict) -> None:
         owner = actor_of(ctx)
         existing = session.get(task_model, op.id)
         if existing is not None and existing.owner_user_id == owner:
             return  # a replay of a create the server already has
-        body = {k: v for k, v in _fields(data).items() if v is not None}
+        body = {k: v for k, v in _fields(data, allowed).items() if v is not None}
         task = service.create(session, task_model=task_model, owner_user_id=owner, actor_user_id=owner,
                               data=_checked(TaskCreate, id=op.id, **body), **write_kwargs(ctx, session, owner, data))
         changed(ctx, session, task)
@@ -129,7 +144,7 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
         status = data.get("status")
         if status not in (None, "open", "done"):  # before any write
             raise ValueError("status must be open or done")
-        fields, extras = _fields(data), extras_of(data)
+        fields, extras = _fields(data, allowed), extras_of(data)
         fields.pop("source", None)  # set when the task is created, never changed by a patch
         if set(fields) == {"due_at"}:
             fields = {}  # a lone hint changes nothing: no write, no resync

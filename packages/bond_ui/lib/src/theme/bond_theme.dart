@@ -26,7 +26,7 @@ abstract final class BondTheme {
     final text = BondText(tokens);
 
     OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-          borderRadius: BondRadius.r12All,
+          borderRadius: tokens.shape.r12All,
           borderSide: BorderSide(color: color, width: width),
         );
 

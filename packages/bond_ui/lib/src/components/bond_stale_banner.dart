@@ -38,7 +38,7 @@ class BondStaleBanner extends StatelessWidget {
         padding: BondSpace.all12,
         decoration: BoxDecoration(
           color: t.caution.wash,
-          borderRadius: BondRadius.r12All,
+          borderRadius: t.shape.r12All,
           border: Border.all(color: t.caution.soft),
         ),
         child: Column(

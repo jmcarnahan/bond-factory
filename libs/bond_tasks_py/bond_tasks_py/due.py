@@ -112,8 +112,9 @@ def recompute_day_due(session: Any, *, task_model: Any, user_id: str, prefs: Pre
 
 
 def backfill_due_at(session: Any, *, task_model: Any, prefs: Preferences, tz: str, now: datetime,
-                    limit: int = 1000) -> int:
-    """Fill ``due_at`` for dated tasks that have none (the sweep repairs them). Returns the number filled."""
+                    limit: int = 1000, open_only: bool = False) -> int:
+    """Fill ``due_at`` for dated tasks that have none (the sweep repairs them). Returns the number filled.
+    ``open_only`` leaves done and cancelled tasks alone (the sweep never looks at them)."""
     memo: dict[str, UserPrefs] = {}
 
     def prefs_of(user_id: str) -> UserPrefs:
@@ -121,8 +122,10 @@ def backfill_due_at(session: Any, *, task_model: Any, prefs: Preferences, tz: st
             memo[user_id] = prefs.for_user(session, user_id)
         return memo[user_id]
 
-    tasks = session.execute(select(task_model).where(task_model.due_date.is_not(None), task_model.due_at.is_(None))
-                            .order_by(task_model.created_at, task_model.id).limit(limit)).scalars().all()
+    query = select(task_model).where(task_model.due_date.is_not(None), task_model.due_at.is_(None))
+    if open_only:
+        query = query.where(task_model.status == TaskStatus.OPEN.value)
+    tasks = session.execute(query.order_by(task_model.created_at, task_model.id).limit(limit)).scalars().all()
     for task in tasks:
         responsible = prefs_of(task.assigned_user_id or task.owner_user_id)
         writer = prefs_of(task.created_by).time_zone if task.due_time else None

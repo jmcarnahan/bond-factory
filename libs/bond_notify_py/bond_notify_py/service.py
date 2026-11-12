@@ -67,13 +67,19 @@ def list_notices(session: Any, notice_model: Any, user_id: str, *, unread: bool 
     return rows, int(count), notice_cursor(rows[-1]) if more else None
 
 
-def _owned(session: Any, notice_model: Any, user_id: str, notice_id: str) -> Any:
+def get_owned(session: Any, notice_model: Any, user_id: str, notice_id: str) -> Any:
+    """The user's own notice. Missing: ``NoticeError("notice_not_found")`` (404); another user's:
+    ``NoticeError("not_notice_owner")`` (403). A host route that acts on a notice (for example completes its
+    task) must call this FIRST, because the action itself never sees the notice."""
     row = session.get(notice_model, notice_id)
     if row is None:
         raise NoticeError("notice_not_found")
     if row.user_id != user_id:
         raise NoticeError("not_notice_owner")
     return row
+
+
+_owned = get_owned  # the old private name, kept as an alias
 
 
 def mark_read(session: Any, notice_model: Any, user_id: str, notice_id: str, now: datetime) -> Any:

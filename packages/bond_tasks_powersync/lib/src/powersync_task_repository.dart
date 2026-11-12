@@ -4,6 +4,7 @@ library;
 import 'package:bond_sync_powersync/bond_sync_powersync.dart';
 import 'package:bond_tasks/bond_tasks.dart';
 
+import 'extra_names.dart';
 import 'task_row.dart';
 import 'task_views.dart';
 import 'task_writes.dart';
@@ -12,17 +13,60 @@ import 'tasks_tables.dart';
 const String _mine = '(owner_user_id = ? OR assigned_user_id = ?)';
 const String _order = 'ORDER BY due_at IS NULL, due_at, created_at DESC, id';
 
+/// Fills in what the store does not hold (owner and assignee names, say). It runs inside the same
+/// read snapshot as the query, gets the decoded tasks in order, and returns them (same length).
+typedef TaskEnricher = Future<List<Task>> Function(SyncSql sql, List<Task> tasks);
+
 /// Reads and writes the user's tasks in the local store. Reads are computed on the device with
 /// the server's rules; writes are local SQL that the sync upload carries (see `task_writes.dart`
 /// for the column values). [refresh] does nothing: the store is kept current by sync.
 class PowerSyncTaskRepository implements TaskRepository {
-  PowerSyncTaskRepository(this.db, {required this.userId, this.clock = const TaskClock()});
+  PowerSyncTaskRepository(
+    this.db, {
+    required this.userId,
+    this.clock = const TaskClock(),
+    this.extraColumns = const {},
+    this.enricher,
+    this.extraWatchTables = const [],
+    this.mirrorStatusFor,
+  }) {
+    checkExtraColumnNames(extraColumns);
+  }
 
   final SyncDb db;
   final String userId;
   final TaskClock clock;
 
-  List<Task> _decode(List<SyncRow> rows, DateTime now) => [for (final r in rows) taskFromRow(r, nowUtc: now)];
+  /// The app's own columns (see `tasksTables`): inserts and patches write these keys of the draft's
+  /// or patch's `extras` and ignore the others.
+  final Set<String> extraColumns;
+
+  /// Runs on every decoded read, inside the read snapshot (and inside the write transaction for a
+  /// write's result).
+  final TaskEnricher? enricher;
+
+  /// Other tables [enricher] reads: a change in one re-emits [watchOpen].
+  final List<String> extraWatchTables;
+
+  /// Lets the app show the right mirror state while a row is offline (the server sets
+  /// `mirror_status` and a row that has not synced still says `pending`). Called with each stored
+  /// row, synchronously, on every read and on a write's result. Return a `MirrorStatus` wire value
+  /// (`pending`, `mirrored`, `skipped`, `failed`) to show it instead of the stored one, or null to
+  /// keep the stored one. Null (the default) uses the stored value for every row. The hook only
+  /// changes what is read: nothing is written back.
+  final MirrorStatusFor? mirrorStatusFor;
+
+  Future<List<Task>> _enrich(SyncSql sql, List<Task> tasks) async {
+    final e = enricher;
+    if (e == null || tasks.isEmpty) return tasks;
+    final out = await e(sql, tasks);
+    if (out.length != tasks.length) {
+      throw StateError('TaskEnricher returned ${out.length} tasks for ${tasks.length}; it must return the same number, in order');
+    }
+    return out;
+  }
+
+  List<Task> _decode(List<SyncRow> rows, DateTime now) => [for (final r in rows) taskFromRow(r, nowUtc: now, mirrorStatusFor: mirrorStatusFor)];
 
   Future<List<Task>> _open(SyncSql sql, DateTime now) async => _decode(
         await sql.getAll("SELECT * FROM $kTasksTable WHERE status = 'open' AND $_mine $_order", [userId, userId]),
@@ -30,7 +74,11 @@ class PowerSyncTaskRepository implements TaskRepository {
       );
 
   @override
-  Stream<List<Task>> watchOpen() => watchSnapshot(db, [kTasksTable], (sql) => _open(sql, clock.nowUtc()));
+  Stream<List<Task>> watchOpen() => watchSnapshot(
+        db,
+        [kTasksTable, ...extraWatchTables],
+        (sql) async => _enrich(sql, await _open(sql, clock.nowUtc())),
+      );
 
   @override
   Future<TaskToday> today() => readSnapshot(db, (sql) async {
@@ -41,7 +89,10 @@ class PowerSyncTaskRepository implements TaskRepository {
           "SELECT * FROM $kTasksTable WHERE status = 'done' AND $_mine AND completed_at >= ? AND completed_at < ? $_order",
           [userId, userId, isoZ(start).substring(0, 10), isoZ(end.add(const Duration(days: 1))).substring(0, 10)],
         );
-        return computeToday(await _open(sql, now), _decode(done, now), now);
+        final open = await _open(sql, now);
+        final doneTasks = _decode(done, now);
+        final all = await _enrich(sql, [...open, ...doneTasks]);
+        return computeToday(all.sublist(0, open.length), all.sublist(open.length), now);
       });
 
   @override
@@ -87,7 +138,8 @@ class PowerSyncTaskRepository implements TaskRepository {
           ];
         }
         final offset = f.offset ?? 0, limit = f.limit ?? 25;
-        return TaskPage(items: tasks.skip(offset).take(limit).toList(), total: tasks.length, limit: limit, offset: offset);
+        final page = await _enrich(sql, tasks.skip(offset).take(limit).toList());
+        return TaskPage(items: page, total: tasks.length, limit: limit, offset: offset);
       });
 
   List<Task> _inRange(List<Task> tasks, TaskFilters f) {
@@ -108,12 +160,13 @@ class PowerSyncTaskRepository implements TaskRepository {
   Future<Task> _read(SyncSql sql, String id) async {
     final row = await sql.getOptional('SELECT * FROM $kTasksTable WHERE id = ?', [id]);
     if (row == null) throw StateError('task_not_found: $id');
-    return taskFromRow(row, nowUtc: clock.nowUtc());
+    final task = taskFromRow(row, nowUtc: clock.nowUtc(), mirrorStatusFor: mirrorStatusFor);
+    return (await _enrich(sql, [task])).single;
   }
 
   @override
   Future<Task> create(TaskDraft d) => db.writeTransaction((tx) async {
-        final id = await insertTask(tx, d, userId: userId, nowUtc: clock.nowUtc());
+        final id = await insertTask(tx, d, userId: userId, nowUtc: clock.nowUtc(), extraColumns: extraColumns);
         return _read(tx, id);
       });
 
@@ -121,7 +174,7 @@ class PowerSyncTaskRepository implements TaskRepository {
   Future<Task> update(String id, TaskPatch p) => db.writeTransaction((tx) async {
         final row = await tx.getOptional('SELECT * FROM $kTasksTable WHERE id = ?', [id]);
         if (row == null) throw StateError('task_not_found: $id');
-        await updateColumns(tx, id, patchColumns(row, p), clock.nowUtc());
+        await updateColumns(tx, id, patchColumns(row, p, extraColumns: extraColumns), clock.nowUtc());
         return _read(tx, id);
       });
 

@@ -79,6 +79,7 @@ class TaskCandidate extends CaptureItem {
     this.dueTime,
     this.dueDefaulted = false,
     this.priority,
+    this.notes,
   });
 
   factory TaskCandidate.fromJson(Map<String, Object?> m) => TaskCandidate(
@@ -91,6 +92,7 @@ class TaskCandidate extends CaptureItem {
         dueTime: jstr(m, 'due_time'),
         dueDefaulted: jbool(m, 'due_defaulted') ?? false,
         priority: TaskPriority.fromWire(jint(m, 'priority')),
+        notes: _optString(m['notes']),
       );
 
   final String? dueDate;
@@ -100,6 +102,9 @@ class TaskCandidate extends CaptureItem {
   final bool dueDefaulted;
   final TaskPriority? priority;
 
+  /// Free text the capture found (rich mode); null when the key is absent or null.
+  final String? notes;
+
   /// An edited copy for the review screen. A `clear*` flag sets that field to null (it wins over the
   /// value). Confidence, flags and `degraded` are kept.
   TaskCandidate copyWith({
@@ -108,7 +113,9 @@ class TaskCandidate extends CaptureItem {
     String? dueTime,
     bool? dueDefaulted,
     TaskPriority? priority,
+    String? notes,
     List<LinkCandidate>? links,
+    bool clearNotes = false,
     bool clearDueDate = false,
     bool clearDueTime = false,
     bool clearPriority = false,
@@ -123,6 +130,7 @@ class TaskCandidate extends CaptureItem {
         dueTime: clearDueTime ? null : (dueTime ?? this.dueTime),
         dueDefaulted: dueDefaulted ?? this.dueDefaulted,
         priority: clearPriority ? null : (priority ?? this.priority),
+        notes: clearNotes ? null : (notes ?? this.notes),
       );
 
   /// The create body; [links] are the matches the user confirmed.
@@ -131,6 +139,7 @@ class TaskCandidate extends CaptureItem {
         dueDate: dueDate,
         dueTime: dueTime,
         priority: priority,
+        notes: notes,
         remindMinutesBefore: kRemindUseDefault,
         links: links,
         source: 'capture',
@@ -149,6 +158,10 @@ class EventCandidate extends CaptureItem {
     this.allDay = false,
     this.endDate,
     this.endTime,
+    this.location,
+    this.notes,
+    this.durationMinutes,
+    this.attendees = const [],
   });
 
   factory EventCandidate.fromJson(Map<String, Object?> m) => EventCandidate(
@@ -162,6 +175,10 @@ class EventCandidate extends CaptureItem {
         allDay: jbool(m, 'all_day') ?? false,
         endDate: jstr(m, 'end_date'),
         endTime: jstr(m, 'end_time'),
+        location: _optString(m['location']),
+        notes: _optString(m['notes']),
+        durationMinutes: _optDuration(m['duration_minutes']),
+        attendees: _optNames(m['attendees']),
       );
 
   final String? startDate;
@@ -169,6 +186,14 @@ class EventCandidate extends CaptureItem {
   final bool allDay;
   final String? endDate;
   final String? endTime;
+
+  /// Rich mode fields; null (or an empty list) when the keys are absent.
+  final String? location;
+  final String? notes;
+  final int? durationMinutes;
+
+  /// Attendee names as the text gave them. They are not matched to people.
+  final List<String> attendees;
 
   /// An edited copy for the review screen. A `clear*` flag sets that field to null (it wins over the
   /// value). Confidence, flags and `degraded` are kept.
@@ -179,7 +204,14 @@ class EventCandidate extends CaptureItem {
     bool? allDay,
     String? endDate,
     String? endTime,
+    String? location,
+    String? notes,
+    int? durationMinutes,
+    List<String>? attendees,
     List<LinkCandidate>? links,
+    bool clearLocation = false,
+    bool clearNotes = false,
+    bool clearDurationMinutes = false,
     bool clearStartDate = false,
     bool clearStartTime = false,
     bool clearEndDate = false,
@@ -196,6 +228,10 @@ class EventCandidate extends CaptureItem {
         allDay: allDay ?? this.allDay,
         endDate: clearEndDate ? null : (endDate ?? this.endDate),
         endTime: clearEndTime ? null : (endTime ?? this.endTime),
+        location: clearLocation ? null : (location ?? this.location),
+        notes: clearNotes ? null : (notes ?? this.notes),
+        durationMinutes: clearDurationMinutes ? null : (durationMinutes ?? this.durationMinutes),
+        attendees: attendees ?? this.attendees,
       );
 }
 
@@ -221,5 +257,23 @@ class ParseResult {
   /// Null, `model_unavailable` or `invalid_output`.
   final String? reason;
 }
+
+// The rich keys are optional extras: a value of the wrong type reads as null (or an empty list)
+// instead of failing the whole parse. The v1 keys above stay strict.
+String? _optString(Object? v) => v is String ? v : null;
+
+/// A positive whole number; anything else (a bool, 1.5, 0, text that is not a number) is null.
+int? _optDuration(Object? v) {
+  final n = switch (v) {
+    int() => v,
+    double() when v.isFinite && v == v.truncateToDouble() => v.toInt(),
+    String() => int.tryParse(v.trim()),
+    _ => null,
+  };
+  return n != null && n > 0 ? n : null;
+}
+
+/// Only the non-blank String entries; anything else in the list, or a non-list, is dropped.
+List<String> _optNames(Object? v) => v is List ? [for (final e in v) if (e is String && e.trim().isNotEmpty) e] : const [];
 
 int _nonNegative(int? v) => v == null || v < 0 ? 0 : v;

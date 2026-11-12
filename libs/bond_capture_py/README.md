@@ -36,7 +36,7 @@ class MyLlm:                                   # LlmClient: any vendor, any SDK
             raise LlmUnavailable()             # draft with reason "model_unavailable"
 
 class MyResolver:                              # EntityResolver: the user's own contacts only
-    def resolve(self, user_id, name, kind):    # kind is always "contact"
+    def resolve(self, user_id, name, kind):    # kind is "contact" unless you pass resolver_kinds
         return [{"id": row.id, "label": row.name} for row in search(user_id, name)]  # best first
 
 class MyGuard:                                 # CaptureGuard: your rate or spend policy
@@ -69,7 +69,24 @@ and the result's `dropped` count (wire key `dropped`, present only when above ze
 answer is `invalid_output` only when the top level is wrong or no item survives. A task dated in the past
 becomes today, `due_defaulted`, with its time cleared; an event with no date becomes a task due today
 (`due_defaulted`); a date with no time on an event is all-day; an event end before its start is dropped and an
-end time alone ends on the start day; link kind is forced to `contact`.
+end time alone ends on the start day; with several `resolver_kinds` a link of an unlisted kind is dropped (with one kind, the default, every link is that kind).
+
+## Rich mode and more link kinds
+
+`parse_capture(..., rich=True)` uses `prompt_v2.md` (marker `CAPTURE-PROMPT-V2`) and `RICH_MODEL_SCHEMA`
+(`fixtures/capture/schema_rich.json`). An event candidate gains `location`, `notes`, `duration_minutes` (1 to 10080,
+else null) and `attendees` (up to 10 names as written, never resolved, never ids; one with `@` or `://` is dropped).
+A wrong type in an optional rich field becomes null (empty for attendees) and the item stays; an explicit end sets `duration_minutes` from start and end.
+`location`, `notes` and `attendees` are untrusted model text: never turn them into an address, a link or an id without the user's review. Its end is start plus the length
+when the note stated a length and no end, and the event is timed. A task candidate gains `notes`. The wire carries
+those keys only for a rich parse (`CaptureResult.to_dict()` follows `result.rich`); the default wire is unchanged
+(`expected_candidates.json` still matches byte for byte). Resolver rows keep extra scalar keys (a rank, a type) in
+rich mode only. With the model off, a rich parse still answers one plain draft with `notes: null`.
+Fixtures: `expected_candidates_rich.json`, `expected_degraded_rich.json`, `model_output_rich.json`, `rich_phrases.json`. The `expected_*_rich.json` fixtures assume a resolver that returns no candidates.
+
+`resolver_kinds=("contact", "place")` lets a link point at more than contacts: the schema enum and one extra prompt
+paragraph name the kinds (rule and examples too), and each link's name goes to `resolver.resolve(user_id, name, kind)` with its own kind.
+Names are checked (`[a-z][a-z0-9_]*`, at most 24 characters). The default is today's behaviour.
 
 ## The degraded fallback
 
@@ -101,4 +118,5 @@ python tools/score.py RESULTS_DIR --misses        # the prompt's regression tabl
 python tools/score.py --run-fallback --misses     # the rule fallback on the single-task phrases
 ```
 
-Prompt changes keep the marker line `CAPTURE-PROMPT-V1` and the six required examples; re-score before shipping.
+Prompt changes keep the marker line (`CAPTURE-PROMPT-V1`, or `CAPTURE-PROMPT-V2` for rich mode) and the six required
+examples; re-score before shipping. For rich mode pass `--schema ../../fixtures/capture/schema_rich.json`.

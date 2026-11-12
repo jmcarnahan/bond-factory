@@ -2,6 +2,7 @@
 
 ## 0.1.0 - unreleased
 - Scaffold.
+- Tasks and inbox routes are the libs' router factories (`routes/task_routers.py`); `routes/tasks.py`, `task_today.py` and `notices.py` are gone, the wire is unchanged. `POST /tasks/parse` takes `rich` (default false).
 - Connections: native-app flow (`start?mode=native`, cookie-less `/go` and callback for native states, `POST
   /connections/{provider}/redeem`); `SDK_EXAMPLE_NATIVE_REDIRECTS` (default `sdkdemo://connections`).
 - Direct sign-in: `signin_wiring.py` (library objects, cookies, router and well-known mounts), `directory.py` (the
@@ -31,5 +32,16 @@
   helpers: `GET /fake/push/sent`, `PUT /fake/capture`, `PUT /fake/capture/limit`. The sync host gains `notices` and
   `push_devices`, and task writes over sync keep the inbox in step. `scripts/sweep_interval.py` runs the sweep with
   no jobs table. SQLite engines are prepared with `sqlite_savepoint_setup`.
+- Adoption-gap seams (2026-11-12). Migration `0006_settings_follow_default`: `task_user_settings.start_of_day`, `end_of_day`
+  and `lead_minutes` are nullable (NULL = follow the app default); the upgrade sets stored values equal to 08:00, 17:00 and 60 to NULL, and the downgrade fills them back first. The default
+  work day is `SDK_EXAMPLE_START_OF_DAY`, `_END_OF_DAY`, `_LEAD_MINUTES`, one `UserPrefs` on `app.state.default_prefs` passed to
+  every place preferences are built; `GET|PUT /tasks/settings` answer `overridden`, and a null field resets. `/fake/clock` is
+  the kit's `fake_clock_router` (`clock_pin.py`); the sync upload and the token report the app clock; the 503 for a database
+  outage comes from the kit middleware, not the route. `GET /tasks` takes `status=cancelled|active`; link labels are read from
+  the contact directory at response time; task writes pass a `prepare` rule on REST and sync (`todo_wiring.owner_edits_closed`);
+  the notice `act` route calls `get_owned` first; the calendar mirror's `draft_for` adds the first link to the event body;
+  `scripts/sweep_interval.py` runs `bond_jobs.run_schedule` (sweep and prune as two entries) and
+  `SDK_EXAMPLE_GRANDFATHER_BEFORE` reaches `sweep_due`. Existing tests changed: the settings route tests expect
+  `overridden`, the two head-revision checks expect `0006`, and the old `prune_due` test checks the prune entry instead.
 - Breaking: the in-memory notices list, `GET /tasks/notices`, the `task_reminder` job and `AppScheduler` are gone; the
   `today` query parameter no longer decides `overdue` (the clock and the viewer zone do).

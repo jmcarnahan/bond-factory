@@ -1,7 +1,8 @@
 """Natural-language capture and the link search.
 
-    POST /tasks/parse           {text, today?, time_zone?} -> {items: [TaskCandidate | EventCandidate], degraded, reason}
-                                creates nothing; 429 `capture_denied` when the guard refuses; 422 `text_required` or
+    POST /tasks/parse           {text, today?, time_zone?, rich?} -> {items: [TaskCandidate | EventCandidate], degraded, reason}
+                                `rich: true` also asks for location, notes, duration and attendees (default false: the
+                                answer is unchanged); creates nothing; 429 `capture_denied` when the guard refuses; 422 `text_required` or
                                 `text_too_long`. No model (real mode without a vendor client, or the fake switch)
                                 gives one degraded task draft, never an error.
     GET  /tasks/links/search    ?kind=contact&q=sam -> {items: [{kind, id, label}]}
@@ -23,8 +24,7 @@ from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..auth_dep import current_user_id
-from ..models.task_settings import TaskUserSettings
-from ..task_support import clock_now, unit, viewer_zone
+from ..task_support import clock_now, prefs_of, unit, viewer_zone
 from .fake_todo import fake_only
 
 DATE, TIME = r"^\d{4}-\d{2}-\d{2}$", r"^([01]\d|2[0-3]):[0-5]\d$"
@@ -36,6 +36,7 @@ class ParseBody(BaseModel):
     text: str  # the library checks it (422 text_required / text_too_long), so the codes are its own
     today: date | None = None
     time_zone: str | None = None
+    rich: bool = False  # opt in to location, notes, duration_minutes and attendees; false keeps the answer as it was
 
 
 class EventBody(BaseModel):
@@ -55,11 +56,12 @@ def register(app: FastAPI) -> None:
         state = request.app.state
         with unit(request) as session:
             zone = viewer_zone(request, session, user_id, body.time_zone)
-            end_of_day = tasks.get_settings(session, TaskUserSettings, user_id).end_of_day
+            end_of_day = prefs_of(request, session, user_id).end_of_day
         day = body.today or tasks.viewer_today(clock_now(request), zone)
         try:
             result = parse_capture(body.text, user_id=user_id, today=day, time_zone=zone, end_of_day=end_of_day,
-                                   llm=state.capture_llm, resolver=state.contacts, guard=state.capture_guard)
+                                   llm=state.capture_llm, resolver=state.contacts, guard=state.capture_guard,
+                                   rich=body.rich)
         except CaptureError as exc:
             raise ApiError(exc.code, exc.message, status=exc.status) from None
         return result.to_dict()

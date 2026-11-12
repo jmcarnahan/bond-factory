@@ -3,7 +3,7 @@ Role: null-safe JSON readers (`jstr`, `jint`, `jlist`, ...) and UTC timestamp he
 
 ## Key files
 - `lib/src/json.dart`: scalar, map and list readers, `JsonShapeError`.
-- `lib/src/time.dart`: `jtime`, `jiso`. `lib/src/enums.dart`: `enumByWire`.
+- `lib/src/time.dart`: `jtime`, `jtimeOrNull`, `jiso`. `lib/src/enums.dart`: `enumByWire`.
 - `test/json_test.dart`: every helper.
 
 ## Commands

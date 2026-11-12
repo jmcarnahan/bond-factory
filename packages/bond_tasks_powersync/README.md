@@ -55,6 +55,21 @@ range (by the task's local day) and link filters; paging is local. `refresh()` d
 
 `taskFromRow(row, nowUtc: now)` decodes one row; a malformed JSON cell gives an empty list, never a throw.
 
+## Your own columns, names and tables
+```dart
+tasksTables(extraColumns: [Column.text('loan_id')], extraIndexes: [Index('loan', [IndexedColumn('loan_id')])]);
+PowerSyncTaskRepository(db, userId: id, extraColumns: {'loan_id'}, enricher: fillNames, extraWatchTables: ['people']);
+```
+- A column that clashes with a built-in name throws `ArgumentError`.
+- Column names must match `^[a-z_][a-z0-9_]*$` and must not be a built-in column, `id`, `_metadata` or a `TaskItem` key (any case); an extra index name must not repeat a built-in one. Both `tasksTables` and the repository constructor throw `ArgumentError`.
+- A bool extra is stored as 0/1 and reads back as `int`.
+- Inserts and patches write only the names in `extraColumns`, taken from `TaskDraft.extras` / `TaskPatch.extras`; other keys are ignored.
+- `mirrorStatusFor: (SyncRow row) => 'mirrored'` (or null for "keep the stored value") shows the right mirror state for a row that has not synced yet. It only changes what is read; nothing is written. An unknown string shows as `pending`. A hook that throws keeps the stored value for that row, and the list still shows. Default null: the stored `mirror_status` shows. `taskFromRow` takes the same `mirrorStatusFor:`.
+- `taskFromRow` puts every column outside the built-in set into `Task.extras`.
+- `TaskEnricher = Future<List<Task>> Function(SyncSql sql, List<Task> tasks)` runs inside the same read snapshot, must return the same number of tasks in the same order (else `StateError`), (and the write
+  transaction for a write's result). Use `task.copyWith(ownerName:, assigneeName:)`. A change in a table named in
+  `extraWatchTables` re-runs `watchOpen`.
+
 ## Sign-out
 
 Local writes upload later. Before signing out, wait for the queue (`waitForUploadDrain(db)` from

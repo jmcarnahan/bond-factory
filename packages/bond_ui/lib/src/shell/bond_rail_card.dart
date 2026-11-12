@@ -18,7 +18,7 @@ class BondRailCard extends StatelessWidget {
       padding: BondSpace.all20,
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: BondRadius.r16All,
+        borderRadius: t.shape.r16All,
         border: Border.all(color: t.line),
       ),
       child: Column(

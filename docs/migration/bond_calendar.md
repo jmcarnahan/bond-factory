@@ -51,7 +51,7 @@ use it inside the block that loaded the connection. Read-only paths may pass `ma
 ## 4. Call-site changes
 
 - Names: `start/end/is_all_day/...` are unchanged; `crm_*` keys are gone; people are `Person` and `Attendee`
-  dataclasses; `attendees` in a draft are e-mail addresses.
+  dataclasses; `attendees` in a draft are e-mail addresses, or `Person(name, email)` to write a display name too. Duplicates merge by lower-cased address (a named entry wins); a `Person` with no address raises `InvalidAttendee` (a `CalendarError`, 422 `invalid_attendee`).
 - Reads drop cancelled events unless `include_cancelled=True`. Google also drops events the signed-in person declined.
 - `delete_event` is idempotent: 204, 404 and 410 all succeed.
 - A patch holds only the changed draft keys. When moving a Google all-day event, include `is_all_day` with the new
@@ -78,6 +78,15 @@ use it inside the block that loaded the connection. Read-only paths may pass `ma
 
 ## 7. Known gaps
 
+- `reminder_off` is create-only. To switch a reminder off on an existing event, patch `reminder_minutes` to `None`
+  (Graph `isReminderOn: false`; Google `useDefault: false` with empty overrides).
+- A 403 now raises `Forbidden` (a `CalendarError` subclass). Catch it for "missing scope or read-only calendar";
+  `.code` is the provider's reason.
+  Google throttle 403s (`rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded`, `dailyLimitExceeded`,
+  `calendarUsageLimitsExceeded`) raise `Unavailable` (retry), not `Forbidden`; before this change they were a plain `CalendarError`.
+- Recorded-shape fixtures and an opt-in live test now exist (`libs/bond_calendar/tests/`). Run the live one with
+  `BOND_CALENDAR_NETWORK=1 BOND_CALENDAR_TOKEN=<short-lived token for a test calendar>` (and
+  `BOND_CALENDAR_PROVIDER=google` for Google). It covers acceptance step 4 (write, edit, stale etag, delete).
 - Both real providers have run only against `httpx.MockTransport`. `MsGraphCalendarProvider` is lifted from app S's
   working client; `GoogleCalendarProvider` reads are lifted from app A, but its writes (`create_event`, `update_event`,
   `delete_event`) are new code never sent to Google. Acceptance steps 3 and 4 above are the first live run; do them in a

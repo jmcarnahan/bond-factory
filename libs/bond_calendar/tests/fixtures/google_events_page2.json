@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "id": "gevent3",
+      "etag": "\"3181161784714000\"",
+      "status": "confirmed",
+      "summary": "Holiday",
+      "start": {"date": "2026-07-04"},
+      "end": {"date": "2026-07-05"},
+      "transparency": "transparent"
+    }
+  ]
+}

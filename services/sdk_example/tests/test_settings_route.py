@@ -4,7 +4,8 @@ import pytest
 from connections_util import headers
 from fastapi.testclient import TestClient
 
-DEFAULTS = {"time_zone": None, "start_of_day": "08:00", "end_of_day": "17:00", "lead_minutes": 60, "warnings": []}
+DEFAULTS = {"time_zone": None, "start_of_day": "08:00", "end_of_day": "17:00", "lead_minutes": 60, "warnings": [],
+            "overridden": []}
 
 
 @pytest.fixture
@@ -22,10 +23,12 @@ def test_defaults_when_nothing_is_stored(client, h):
 
 def test_put_changes_only_the_fields_sent_and_get_reads_them_back(client, h):
     body = client.put("/tasks/settings", json={"time_zone": "America/Denver", "lead_minutes": 30}, headers=h).json()
-    assert body == {**DEFAULTS, "time_zone": "America/Denver", "lead_minutes": 30}
+    assert body == {**DEFAULTS, "time_zone": "America/Denver", "lead_minutes": 30,
+                    "overridden": ["time_zone", "lead_minutes"]}
     client.put("/tasks/settings", json={"end_of_day": "18:30"}, headers=h)
     assert client.get("/tasks/settings", headers=h).json() == {
-        **DEFAULTS, "time_zone": "America/Denver", "lead_minutes": 30, "end_of_day": "18:30"}
+        **DEFAULTS, "time_zone": "America/Denver", "lead_minutes": 30, "end_of_day": "18:30",
+        "overridden": ["time_zone", "end_of_day", "lead_minutes"]}
 
 
 def test_settings_are_per_person(client, h):

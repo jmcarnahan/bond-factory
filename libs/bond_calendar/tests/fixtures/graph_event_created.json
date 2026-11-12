@@ -1,0 +1,10 @@
+{
+  "id": "AAMkAGI2created1",
+  "subject": "Call",
+  "start": {"dateTime": "2026-07-06T10:00:00.0000000", "timeZone": "UTC"},
+  "end": {"dateTime": "2026-07-06T10:30:00.0000000", "timeZone": "UTC"},
+  "isAllDay": false,
+  "isCancelled": false,
+  "type": "singleInstance",
+  "isReminderOn": false
+}

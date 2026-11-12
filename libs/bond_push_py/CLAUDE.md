@@ -1,11 +1,12 @@
 # bond_push_py
 Role: Apple push delivery (iOS only; no FCM sender). `tests/test_schema.py` pins the table.
-State: implemented; real delivery is untested (no Apple key or device here).
+State: implemented; real delivery is proven only by the opt-in live test / `send_test` (needs an Apple key and a device token).
 
 ## Key files
 - `models.py` `PushDevicesMixin` + `PUSH_DEVICE_COLUMNS`; `messages.py` `PushMessage`, `PushResult`
 - `protocols.py` `PushSender`; `senders.py` Null and Mock; `apns.py` `ApnsSender` (ES256 token cache, mock-transport tests)
 - `devices.py` register/unregister/devices_for; `notifier.py` `PushNotifier`
+- `send_test.py` `python -m` live check (BOND_PUSH_* variables); `tests/test_live_apns.py` opt-in, skipped by default
 - `sync_routes.py` `DeviceRoute`, `device_routes`, `verdict_for`; `errors.py` coded `PushError`
 
 ## Commands

@@ -20,6 +20,7 @@ workspace:
   - packages/bond_notify
   - packages/bond_notify_ui
   - packages/bond_push
+  - packages/bond_push_apple
   - packages/bond_tasks_notifications
   - packages/bond_tasks_powersync
   - packages/bond_notify_powersync
@@ -27,4 +28,5 @@ workspace:
   - packages/bond_connections_ui
   - packages/bond_signin
   - packages/bond_signin_ui
+  - packages/bond_auth_secure_storage
   - demos/sdk_demo

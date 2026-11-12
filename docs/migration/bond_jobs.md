@@ -39,7 +39,7 @@ def _before(session, now):  # was inside tick()
         LOGGER.warning("demo clock anchor refresh failed", exc_info=True)
     schedule_jobs(session, now)
 
-def tick(now=None, engine=None):
+def tick(now=None, engine=None):  # session_factory: see the note below
     return _tick(engine or get_engine(), session_scope, registry, AppClock(now), before=_before)
 
 registry.on_dead("crew_day_notice")(lambda job: _tell_office_not_sent(job, utcnow_naive()))  # was in run_due
@@ -49,6 +49,10 @@ def start_inline(): return _start(tick, name="avalon-worker")
 def main(argv=None) -> int:  # keep the startup lines (schema check, demo_clock.prime, pool size), then:
     return _main(argv, step=tick)
 ```
+
+`session_factory` (here the app's `session_scope`) is a callable with no arguments that returns a context manager yielding a
+SQLAlchemy `Session`. The lib uses it as `with session_factory() as session:` and calls `session.commit()` itself after the
+handler, so a plain `sessionmaker` works. The factory does not need to commit.
 
 The model (`db/models.py`); the table already matches. P keeps its foreign key on a `JobsMixin` subclass:
 
@@ -98,3 +102,18 @@ Env and pool settings stay in the app. `POLL_SECONDS`, `STALE_AFTER`, `BACKOFF_B
 - `cancel(engine, idempotency_key=..., job_table=...)` deletes pending jobs by key. `prune(engine, older_than=...,
   statuses=..., job_table=..., limit=...)` deletes old done and dead jobs. The sweep needs neither.
 - `run_due` takes the clock: `now()` once per pass and `real_now()` at every claim, so a long pass does not strand a job.
+
+## 8. Timer-only workers (no jobs table)
+An app whose worker scripts are only "call this every N seconds" can drop the loop code and keep the function:
+
+```python
+from bond_jobs import Every, run_cli
+
+raise SystemExit(run_cli(None, [Every(60, sweep, name="sweep"), Every(3600, prune, run_first=False)]))
+```
+
+- It replaces the `while True / try / sleep` loop, the signal handlers and the `--once` flag. The rate is fixed, so a slow
+  pass does not push the next one later. A failing function is logged and the others carry on.
+- `--once` exits 1 if any entry raised, so cron and tests see failures. `--watch --interval N` overrides every period.
+- Two copies at once: pass `guard=` to `run_cli` or `run_schedule`. It is asked before each run and has no release hook, so use a lock held for the process lifetime (a session-level Postgres advisory lock taken once), not one taken and dropped per run. The lib ships no lock. `--once` honours `guard` and ignores `--interval`.
+- `run_schedule(..., clock=, wait=)` lets a test run a schedule without sleeping.

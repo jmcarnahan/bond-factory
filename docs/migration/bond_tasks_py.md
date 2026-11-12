@@ -2,7 +2,7 @@
 
 Task table, due instant, per-user settings, link index, three-stage notice ledger and sweep, calendar mirror
 (`libs/bond_tasks_py`). The wire is `docs/contracts/tasks.md` and `docs/contracts/notices.md`. Wired in
-`services/sdk_example` (`tasks_wiring.py`, `routes/tasks.py`, `routes/jobs.py`). Legend: `docs/migration/README.md`.
+`services/sdk_example` (`tasks_wiring.py`, `routes/task_routers.py`, `routes/jobs.py`). Legend: `docs/migration/README.md`.
 Dart side: `bond_tasks.md`. Adoption order: `todo-checklist.md`.
 
 ## 1. What it replaces
@@ -29,7 +29,7 @@ revision and assert each `*_COLUMNS` constant in a test (`schema_contract` from 
 | `NoticeLedgerMixin`, `NoticeOutboxMixin` | `task_notice_ledger`, `task_notice_outbox` |
 | `NoticesMixin`, `PushDevicesMixin` (sibling libs) | `notices`, `push_devices` |
 
-Routes: copy `routes/tasks.py` and `routes/task_today.py`. `bond_tasks_py_host.md` lists every route, its service call, the
+Routes: mount `make_tasks_router` and `make_notices_router`; `services/sdk_example/sdk_example/routes/task_routers.py` shows the wiring. `bond_tasks_py_host.md` lists every route, its service call, the
 signatures and the models block. Notice and device routes: `bond_notify_py.md`, `bond_push_py.md`. `now` is required in `task_item`, `list_tasks` and `summary` (no `today`). Pass the link index model to `delete`.
 Wire `after_write=make_link_hook(LinkIndex)`. `sync_routes(on_deleted=)` is called `(ctx, session, task_id, owner_user_id)`: dismiss notices there.
 
@@ -88,10 +88,55 @@ class ChatNotifier:
 # sweep_due(..., channels=["chat"]); deliver_pending(..., notifiers={"chat": ChatNotifier(post, seen)})
 ```
 
+### Switching the sweep on over old data
+- `since=` only skips stages that start before it. A task already overdue is still claimed on each following morning up to
+  `max_past`, so thousands of old tasks would send a notice per task per morning for up to five mornings.
+- Pass `grandfather_before=<activation time>` instead: a task whose `due_at` is before it is recorded `skipped` for every
+  stage (close, due, all past sequences), so no later pass claims it. A task due at or after it is untouched.
+- Rows with a NULL `due_at` are invisible to the sweep. The sweep's built-in backfill fills at most `limit` rows per
+  pass (default 500), so a large adopter runs `backfill_due_at(..., limit=..., open_only=True)` in a loop until it returns 0,
+  and only then activates with `grandfather_before=`.
+
+### The calendar event and delivery attempts
+- `sync_mirror(..., draft_for=hook)`: `hook(session, task, draft)` returns the draft to send, so the app adds a body with
+  a link, categories, its own reminder or event length. If it raises, or returns something that is not a `MirrorDraft`, the row ends `failed` before any provider call and the next write sets `pending` again. The hook must not write: a flush is rolled back, a commit would persist. If it fails during a reassignment the old event stays until the next good sync.
+- `Notice.attempt` is 1 on the first delivery and one more for each later lease. A notifier for a service with no
+  idempotency key checks for a duplicate only when `attempt > 1`. For a channel where a repeat is worse than a loss, pass
+  `deliver_pending(..., at_most_once=["chat"])`: `delivered_at` is stamped and committed before the send; if the send then fails or raises, `failed_at` is set too, so a monitor on `failed_at` sees it.
+
+## 6b. Mount the routes instead of copying them
+
+Install with the `http` extra (the lib is not on a package index; the git form is in `docs/sdk/README.md`, "Python"):
+Poetry `bond_tasks_py = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "<sha>", subdirectory = "libs/bond_tasks_py", extras = ["http"] }`,
+pip `pip install "bond_tasks_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_tasks_py"`.
+Then (module `bond_tasks_py.routes`; the package never imports fastapi):
+
+```python
+from bond_service_kit import make_session_factory, session_scope   # or your own equivalent
+from bond_tasks_py.routes import make_tasks_router
+app.include_router(make_tasks_router(
+    task_model=Task, settings_model=TaskUserSettings, link_index_model=TaskLinkIndex,
+    session_scope=lambda: session_scope(app.state.session_factory),  # a context manager factory: commit on exit
+    user_dep=current_user_id, write_dep=require_capability("tasks.write"), read_all_dep=require_read_all,
+    now=clock.utcnow_naive, tz=settings.tz, defaults=default_prefs, prefs=todo_prefs, link_hook=link_hook,
+    prepare=owner_edits_closed, names=lambda s, ids: ..., labels=contacts.labels, user_exists=lambda s, uid: ...,
+    after_write=lambda s, task, now, before: ..., after_commit=queue_mirror))
+```
+
+`session_scope` must return a context manager that commits on exit and rolls back on an error; `bond_service_kit.session_scope(factory)` does, and `make_session_factory(url)` returns `(engine, sessionmaker)` for `app.state.session_factory`.
+
+Include it AFTER the app's own static `/tasks/<name>` routes (such as `/tasks/export`): routes match in registration order, and `/{id}` would swallow them with 404 `task_not_found` if the factory came first. `scope=all` and other people's tasks
+are refused with 403 `forbidden` unless `read_all_dep(request)` is given. `error_map(TaskError) -> (status, body)` keeps
+a legacy error body; `item_extras(task)` adds keys after the 24 (never replaces one); `extra_where_for(request,
+user_id)` narrows the LIST route and its count only (not `/summary`, `/today` or `/{id}`); it is not a visibility rule, use `permissions` and `read_all_dep` for that. `error_map` must return `(status, body)`; anything else raises a `TypeError` naming it. `after_write(session, task, now, before)` runs in the transaction after every
+write (`before` = `snapshot(session, task_id)` taken before an update, else None); `after_commit(background, task)`
+queues work for after the response; `after_delete` and `after_delete_commit(background, pointer)` do the same for delete.
+
 ## 7. Call-site changes and checks
 
 - On done, cancel and delete call `dismiss_for_source`, and when `due_date`, `due_time` or the assignee changes call
   `dismiss_stale` (both are in `bond_notify_py`, not this lib). `apply_notice_action` is the one handler (done or cancel on a closed task does nothing). After a reassign use `notice_recipients(task)` and `bond_notify_py.dismiss_for_source(..., user_ids=)`.
+- Notes for adopters: a column you renamed works through a SQLAlchemy `synonym` named in `host_columns`; an app with one org zone passes `tz=` only; "drop `remind_at`" does not apply if you never had it; a custom act route must run the notice owner check first. Details: `bond_tasks_py_host.md`.
 - Settings: `update_settings(..., on_recomputed=)` returns `(prefs, warnings)`; in the hook call `bond_notify_py.dismiss_stale`. Pass `time_zone` with client writes.
 - Order: revision, backfill, wire the sweep, swap the router. Assert every `*_COLUMNS`, round-trip
   `fixtures/tasks/task.json` through `task_item`, run `make -C libs/bond_tasks_py test`.

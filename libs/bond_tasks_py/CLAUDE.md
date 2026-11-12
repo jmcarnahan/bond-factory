@@ -1,5 +1,5 @@
 # bond_tasks_py
-Role: tasks table, services, due instants, notice stages, sweep, outbox, calendar mirror. Imports only sqlalchemy, pydantic, stdlib.
+Role: tasks table, services, due instants, notice stages, sweep, outbox, calendar mirror. Imports only sqlalchemy, pydantic, stdlib; fastapi only in `routes.py` (extra `http`).
 
 ## Key files
 - `models.py` mixin + `TASK_COLUMNS`; `schema.py` input; `service.py` writes; `queries.py` list/summary; `serialize.py` TaskItem
@@ -7,7 +7,8 @@ Role: tasks table, services, due instants, notice stages, sweep, outbox, calenda
 - Mixins + `*_COLUMNS`: `usersettings.py`, `link_index.py`, `ledger.py`, `outbox.py` (`settings_schema.py` input)
 - `stages.py` notice_id/fnv1a31/stages; `quiet.py`; `sweep.py` + `sweep_claim.py` claim; `outbox.py` deliver; `retention.py`; `compose.py`
 - Seams: `protocols.py` (prefs, permissions, links, mirror); `notify_protocols.py` (Notice, notifiers)
-- `mirror.py`; `sync_routes.py`; `dialect.py` ON CONFLICT insert, `sqlite_savepoint_setup`, `ensure_savepoint_safe`
+- `routes.py` `make_tasks_router` (fastapi), `routes_core.py` its fastapi-free rules
+- `mirror.py` (`draft_for` hook); `sync_routes.py`; `dialect.py` ON CONFLICT insert, `sqlite_savepoint_setup`, `ensure_savepoint_safe`
 - Fixtures in `../../fixtures/tasks/` (task*.json, stage_times.json, notice_ids.json) pin Dart parity
 - Rules: `docs/decisions/2026-11-11-due-instant.md`, `-notify-ledger.md`, `-links.md`
 

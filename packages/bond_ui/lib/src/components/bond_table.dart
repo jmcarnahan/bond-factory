@@ -66,7 +66,7 @@ class BondTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: BondRadius.r16All,
+        borderRadius: t.shape.r16All,
         border: Border.all(color: t.line),
       ),
       clipBehavior: Clip.antiAlias,

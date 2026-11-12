@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "kind": "task",
+      "title": "Call Sam tomorrow",
+      "due_date": "2026-11-12",
+      "due_time": null,
+      "due_defaulted": false,
+      "priority": null,
+      "links": [],
+      "confidence": 0.2,
+      "flags": ["low_confidence"],
+      "degraded": true,
+      "notes": null
+    }
+  ],
+  "degraded": true,
+  "reason": "model_unavailable"
+}

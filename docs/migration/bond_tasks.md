@@ -92,7 +92,18 @@ user's end of day. The device uses its own zone and Python the user's stored zon
   `refreshDerived` moving a task from today to overdue when the clock passes `dueAt`.
 - In the app: its task tests pass against the adapter, then the full suite once before the PR.
 
+## 6a. Own columns, clock levers and settings reset (adoption gaps)
+- `Task.extras` holds every unknown key of a task; `TaskDraft.extras` / `TaskPatch.extras` carry yours out. `Task.toJson` is unchanged.
+  `Task.copyWith` also takes `ownerName`, `assigneeName` and `extras`.
+  `Task.extras` is read only. A known wire key in a draft's or patch's extras is dropped. A bool extra is stored as 0/1 and reads back as `int`. A standard server key this client does not know yet lands in `extras` (forward compatible).
+- `TaskClock.offsetBy(Duration)` and `TaskTicker.tick()` let a walk jump a day without waiting. Build one `now` and pass it to every clock seam. `offsetBy` returns a fixed clock; to change time live use `var offset = Duration.zero; final clock = TaskClock(() => DateTime.now().toUtc().add(offset));`, change `offset`, then call `ticker.tick()`.
+- `TaskSettings.overridden` and `isOverridden(field)` say which settings the user set; `TaskSettingsPatch(reset: {...})` returns a field to the app default.
+  The server answers the effective values plus `overridden`; an older server omits the list, so `overridden` is null, `overriddenKnown` is false and `isOverridden` is false.
+
 ## 7. Known gaps
 - No quick-add text parsing, no inline editor, no loan picker: they stay in the app.
 - A: all-day events with an end time lose the end. Multi-day events are not tasks.
 - `TaskStatus.cancelled` is on the wire. The widgets show it as a done-style row.
+
+## Capture rich mode (read side)
+When the server runs capture with rich mode on, an event candidate carries `location`, `notes`, `duration_minutes` and `attendees` (a list of names as written, not matched to people) and a task candidate carries `notes`. `EventCandidate` has `location`, `notes`, `durationMinutes` and `attendees`; `TaskCandidate` has `notes`, and `toDraft()` puts it in `TaskDraft.notes`. The end time of an event is already worked out by the server (start plus duration), so `endDate` and `endTime` hold it. The rich keys are read tolerantly: a value of the wrong type reads as null (an empty list for `attendees`) and never fails the parse; `attendees` keeps only non-blank strings; `duration_minutes` must be a whole number above zero. The required keys (title, dates, priority) stay strict. Without rich mode the keys are absent and every field reads null (or an empty list). The client has no event draft: the app turns an `EventCandidate` into its own calendar write.

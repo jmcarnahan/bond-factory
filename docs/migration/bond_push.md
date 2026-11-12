@@ -1,8 +1,21 @@
 # Migrating to bond_push
 
-Apple push for the apps (`packages/bond_push`, a Flutter package over the pub.dev `push` plugin, no Firebase): the device
-token, registering it with the service, and taps on a push. iOS only. Android is not supported. Server half:
+Apple push for the apps: the device token, registering it with the service, and taps on a push. iOS only. Android is not
+supported. Two packages: `packages/bond_push` holds the seams and plain classes and has no plugin; `packages/bond_push_apple`
+(`bond_push_apple.md`) holds the pub.dev `push` plugin classes. No Firebase. Server half:
 `bond_push_py.md`. Wire: `docs/contracts/notices.md`. Legend: `docs/migration/README.md`. Order: `todo-checklist.md`.
+
+## Moved names (split of 2026-11-12)
+
+Old import, new import. No re-export is kept in `bond_push`.
+
+| Names | Was | Now |
+|---|---|---|
+| `PluginPushTokenSource`, `PluginPushTaps` | `package:bond_push/bond_push.dart` | `package:bond_push_apple/bond_push_apple.dart` |
+| `PushPlugin` | `package:bond_push/testing.dart` | `package:bond_push_apple/bond_push_apple.dart` |
+| `DefaultPushPlugin` | not exported | `package:bond_push_apple/bond_push_apple.dart` |
+
+Pubspec: add `bond_push_apple` (git ref, `path: packages/bond_push_apple`). `bond_push` no longer depends on `push`.
 
 ## 1. What it replaces
 
@@ -11,6 +24,10 @@ still serves something else. This package never reads an FCM token. The plugin i
 each app.
 
 ## 2. What the app adds
+
+- An app with push on adds `bond_push_apple` next to `bond_push`. An app with push off adds neither the plugin nor
+  `bond_push_apple`: `bond_tasks_notifications` and `bond_notify_powersync` pull in `bond_push` only, and `bond_push` does
+  not link the plugin.
 
 - On iOS: the Push Notifications capability on the app target.
 - The environment, from the build configuration: `'sandbox'` for debug builds, `'production'` for release builds. The
@@ -26,6 +43,9 @@ each app.
 ## 3. Smallest working example
 
 ```dart
+import 'package:bond_push/bond_push.dart';
+import 'package:bond_push_apple/bond_push_apple.dart';
+
 final source = PluginPushTokenSource(environment: kReleaseMode ? 'production' : 'sandbox');
 final registrar = PushRegistrar(source, PushDevicesApi(apiClient), deviceId: installId, topic: bundleId);
 
@@ -43,7 +63,7 @@ Most apps do not write this by hand: `TaskAlertsCoordinator` takes the registrar
 
 ## 4. The pieces
 
-- `PushTokenSource`: `token()`, `onRefresh`, `requestPermission()`. `PluginPushTokenSource` is the real one, `NoPushTokenSource`
+- `PushTokenSource`: `token()`, `onRefresh`, `requestPermission()`. `PluginPushTokenSource` (in `bond_push_apple`) is the real one, `NoPushTokenSource`
   does nothing (tests, web).
 - `PushDevices`: `register(token, deviceId:, topic:)` and `unregister(deviceId)`. `PushDevicesApi` calls the two REST routes.
 - `PushRegistrar`: the Apple token arrives late, so it reads up to six times (the first read and 5 retries, 2 seconds apart),
@@ -60,8 +80,9 @@ Most apps do not write this by hand: `TaskAlertsCoordinator` takes the registrar
 
 ## 6. What to test
 
-- `make -C packages/bond_push test` and `analyze`. Tests inject a fake plugin: `PluginPushTokenSource(plugin: ...)` and
-  `PluginPushTaps(plugin: ...)` take a `PushPlugin` from `package:bond_push/testing.dart`, so no platform channel is touched.
+- `make -C packages/bond_push test` and `analyze` (registrar, over a fake `PushTokenSource`), and the same in `packages/bond_push_apple`.
+  Tests inject a fake plugin: `PluginPushTokenSource(plugin: ...)` and `PluginPushTaps(plugin: ...)` take a `PushPlugin` from
+  `package:bond_push_apple/bond_push_apple.dart`, so no platform channel is touched.
 - A late token: `start()` registers once the token appears. A refresh registers again. `unregister()` stops listening.
 - A payload missing `notice_id` is ignored.
 - Not provable here: a real Apple push. It needs an Apple key and a physical device (`docs/test/MOBILE.md`).

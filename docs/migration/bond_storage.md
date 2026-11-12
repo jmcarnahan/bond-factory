@@ -56,6 +56,20 @@ The route (`rest/routers/downloads.py` becomes): `router = make_download_router(
 grant_model=DownloadGrantRecord, document_loader=load_document, session_factory=<callable returning a Session>,
 rate_limit=allow_hit)`. `allow_hit(token_hash, ip) -> bool`, `attachment_kinds` and `after_download` are optional.
 
+Optional route seams (all default to the behaviour above):
+
+- `delivery="redirect"`, `presign_seconds=60`: the route checks the object exists, signs the URL, claims, then answers 302. A signing fault answers 503 and does not burn a single-use link.
+  Use it when links should hand the bytes to the storage service. The local backend cannot presign, so it streams.
+  Do not combine it with `after_download` (the bytes never reach the process; construction raises `ValueError`): do the
+  work in `on_claim` instead. The stream path still loads the whole object, because no backend offers a chunked read.
+- `on_claim(session, grant, ip)`: runs in the claim's transaction. Write an audit row there. If it raises, the claim rolls back and
+  the request fails (an unhandled error, not the 410).
+- `mint(..., extra={"my_column": value})` sets the app's own columns. A key naming a lib column raises `ValueError`.
+- `resolve(..., enforce_cap=False)` and `claim(..., enforce_cap=False)` ignore `max_downloads`; the router takes
+  `enforce_cap=False` too.
+- `gone_body` (HTML string, or a callable taking the request; it must not vary by failure reason), `enabled` (callable,
+  checked per request; false answers 404), `client_ip` (callable taking the request).
+
 ## 3. Call-site changes
 
 | Old | New | Find |
@@ -91,4 +105,4 @@ rate_limit=allow_hit)`. `allow_hit(token_hash, ip) -> bool`, `attachment_kinds` 
 - Not lifted: the `Config` singleton, brand names, the photo service beyond image helpers, `export_grants.discard`
   (use `after_download`), S3 reads at client-build time (now `StorageSettings`).
 - The S3 client cache is keyed by region, endpoint and style; timeouts are fixed when a client is first built.
-- `mint` and `claim` use naive UTC and accept `now=`; `claim` commits and refreshes the grant.
+- `mint` and `claim` use naive UTC and accept `now=`; `claim` commits (unless `commit=False`) and refreshes the grant.

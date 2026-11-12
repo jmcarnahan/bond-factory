@@ -9,6 +9,8 @@ Notices are not made here: the sweep (`sweep_wiring.py`) claims them and the inb
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import bond_calendar as cal
@@ -73,12 +75,31 @@ class MirrorProviders:
         return None
 
 
+def link_note_draft_for(contacts: Any) -> Callable[[Any, Any, MirrorDraft], MirrorDraft]:
+    """`draft_for` of the calendar mirror: the event body also names the task's first link, by its current label
+    (`contacts.labels`), else the label stored with the link. A task with no link keeps the lib's draft."""
+
+    def draft_for(session: Any, task: Any, draft: MirrorDraft) -> MirrorDraft:
+        links = [dict(link) for link in task.links or []]
+        if not links:
+            return draft
+        first = links[0]
+        label = contacts.labels(session, [first]).get((first.get("kind"), first.get("id"))) or first.get("label")
+        if not label:
+            return draft
+        note = f"Linked: {label}"
+        return replace(draft, body=f"{draft.body}\n{note}" if draft.body else note)
+
+    return draft_for
+
+
 def install(app: FastAPI) -> None:
     """Idempotent. Builds the calendar-mirror providers and the TODO wiring (preferences, inbox, push, capture)."""
     if getattr(app.state, "mirror_providers", None) is not None:
         return
     app.state.mirror_providers = MirrorProviders(app)
     todo_wiring.install(app)
+    app.state.mirror_draft_for = link_note_draft_for(app.state.contacts)
 
 
 def user_names(session: Any):

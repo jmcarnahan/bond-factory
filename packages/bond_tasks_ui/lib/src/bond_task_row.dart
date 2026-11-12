@@ -86,7 +86,7 @@ class BondTaskRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: BondSpace.s4),
       decoration: BoxDecoration(
         color: late ? t.danger.wash : t.surface,
-        borderRadius: BondRadius.r12All,
+        borderRadius: t.shape.r12All,
         border: Border.all(color: late ? t.danger.soft : t.line),
       ),
       child: Row(

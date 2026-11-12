@@ -1,6 +1,7 @@
 """List and summary queries."""
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
@@ -15,7 +16,9 @@ from bond_tasks_py.timeutil import to_naive_utc
 
 @dataclass(frozen=True)
 class TaskFilters:
-    """The route query. ``scope="mine"`` = owner or assignee; ``status`` open|done|all (``all`` includes cancelled)."""
+    """The route query. ``scope="mine"`` = owner or assignee; ``status`` open|done|cancelled|active|all
+    (``active`` is open and done; ``all`` includes cancelled). An app whose older clients cannot tell a cancelled task
+    apart should filter cancelled rows out of its sync stream."""
 
     scope: str = "mine"
     status: str = "open"
@@ -80,18 +83,23 @@ def _link_matches(task: Any, kind: str | None, link_id: str) -> bool:
 
 def list_tasks(session: Any, *, task_model: Any, user_id: str, filters: TaskFilters | None = None, limit: int = 25,
                offset: int = 0, link_index_model: Any = None, viewer_zone: str | None = None,
-               now: datetime) -> tuple[list[Any], int]:
+               now: datetime, extra_where: Sequence = ()) -> tuple[list[Any], int]:
     """Soonest due first, undated last. ``scope="all"`` lists everything on a record whoever owns it; the app decides who may ask for it.
 
     ``link_index_model`` turns the contact filter into an indexed lookup with SQL paging. ``viewer_zone`` orders by
     the due instant and reads date ranges as the viewer's local days (see ``day_in_range``). With a ``viewer_zone``, a range that
-    holds the viewer's today also holds the not-overdue tasks of earlier days (the TODAY section of ``today``)."""
+    holds the viewer's today also holds the not-overdue tasks of earlier days (the TODAY section of ``today``).
+    ``extra_where`` is a sequence of SQLAlchemy criteria on the app's own columns, applied before the count and the paging."""
     f, m = filters or TaskFilters(), task_model
     stmt = select(m)
     if f.scope == "mine":
         stmt = stmt.where(mine(m, user_id))
-    if f.status in (TaskStatus.OPEN.value, TaskStatus.DONE.value):
+    if f.status in (TaskStatus.OPEN.value, TaskStatus.DONE.value, TaskStatus.CANCELLED.value):
         stmt = stmt.where(m.status == f.status)
+    elif f.status == "active":
+        stmt = stmt.where(m.status.in_((TaskStatus.OPEN.value, TaskStatus.DONE.value)))
+    if extra_where:
+        stmt = stmt.where(*extra_where)
     if f.owner_user_id:
         stmt = stmt.where(m.owner_user_id == f.owner_user_id)
     if f.assigned_user_id:

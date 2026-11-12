@@ -5,7 +5,7 @@ test: export TZ := America/Los_Angeles
 
 .PHONY: test analyze
 test:
-	$(FLUTTER) test $(T)
+	$(FLUTTER) test --exclude-tags real_service $(T)
 
 analyze:
 	$(FLUTTER) analyze

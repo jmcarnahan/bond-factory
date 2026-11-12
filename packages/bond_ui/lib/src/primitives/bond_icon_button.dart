@@ -33,7 +33,7 @@ class BondIconButton extends StatelessWidget {
       onTap: onPressed,
       semanticLabel: label,
       semanticsId: semanticsId,
-      borderRadius: BondRadius.r12All,
+      borderRadius: t.shape.r12All,
       minSize: BondLayout.minTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(

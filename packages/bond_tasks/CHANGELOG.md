@@ -1,6 +1,13 @@
 # Changelog
 
 ## 0.2.0 - unreleased
+- Capture rich mode (read side): `EventCandidate.location`, `notes`, `durationMinutes`, `attendees` (names, never matched to people; default empty) and `TaskCandidate.notes`, read from the keys `location`, `notes`, `duration_minutes`, `attendees` and `notes` when the server sends them. Absent keys read as null (empty list), so every existing candidate is unchanged. The rich keys are read tolerantly: a wrong type (`location: 5`, `notes: {}`, `attendees: "Dana"`, `duration_minutes: true`) reads as null or empty and does not fail the parse; `attendees` keeps only non-blank strings; `duration_minutes` must be a whole number above zero. The required v1 keys stay strict. `copyWith` keeps them and has `clearLocation`, `clearNotes`, `clearDurationMinutes`, `attendees:`; `TaskCandidate.toDraft` carries `notes` into `TaskDraft.notes` (null when absent).
+- `Task.extras` (`Map<String, Object?>`, default empty): every key outside `kTaskItemKeys`; kept by `copyWith`, never written by `toJson`. `Task.copyWith` also takes `ownerName`, `assigneeName`, `extras`.
+  `TaskDraft.extras` and `TaskPatch.extras` are merged into `toJson` after the known keys and never override one: a known wire key (`kTaskItemKeys`, `time_zone`) in them is dropped. `Task.fromJson` gives an unmodifiable `extras`. A bool extra is stored as 0/1 by a SQL store and reads back as `int`. A new standard server key the client does not know lands in `extras`.
+- `TaskTicker.tick()` (minute tick now, day tick if the local date changed); `TaskClock.offsetBy(Duration)`.
+- `TaskSettings.overridden` (`Set<String>?`, null when the server did not say), `overriddenKnown`, `isOverridden(field)` (false when unknown), `kTaskSettingFields`; `TaskSettingsPatch.reset` sends an
+  explicit null per name; `SettingsLabels.resetToDefault`, `usingDefault`, `resetTimeZone`, `resetWorkDayStart`, `resetWorkDayEnd`, `resetLeadMinutes`, `resetNameFor(field)`. `toJson` writes `overridden` only when it is not null.
+- Fix: `TaskTicker` takes its first day from the clock at construction, so the first `tick()` after a jump over midnight emits a day tick.
 - `TaskLabels.moreLinks` / `moreLinksText(n)`; `CaptureLabels.captureDenied` now reads "Too many notes in a short time. Try again in a minute."
 Removed
 - `Task.remindAt` and `Task.remindedAt` (and the `remind_at`, `reminded_at` wire keys); the queued reminder is gone.

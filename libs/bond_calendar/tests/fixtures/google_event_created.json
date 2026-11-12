@@ -1,0 +1,8 @@
+{
+  "id": "gcreated1",
+  "etag": "\"3181161784715000\"",
+  "status": "confirmed",
+  "summary": "Call",
+  "start": {"dateTime": "2026-07-06T10:00:00Z", "timeZone": "UTC"},
+  "end": {"dateTime": "2026-07-06T10:30:00Z", "timeZone": "UTC"}
+}

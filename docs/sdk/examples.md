@@ -46,17 +46,17 @@ The `*Labels` objects (`ApiLabels`, `BondLabels`, `TaskLabels`, `ConnectionLabel
 | `bond_api`, `bond_json` | `routes/health.py` | `api_page.dart`: health, a 404, a validation error | `/api` |
 | `bond_ui` | none | `ui_page.dart` and `ui/`: every widget once | `/ui` |
 | `bond_test_support` | none | every `test/<page>_test.dart` (`pumpApp`, `expectNoOverlays`) | none |
-| `bond_service_kit` | `wiring.py`: error handlers, middleware, clock, limiters; `db.py` | none | none |
+| `bond_service_kit` | `wiring.py`: error handlers, middleware, clock, limiters; `db.py`; `routes/fake_todo.py` mounts `fake_clock_router` (with `clock_pin.py`) | none | none |
 | `bond_auth_py`, `bond_auth`, `bond_auth_firebase` | `routes/auth.py` (`/auth/firebase` break-glass, `/auth/demo`, `/auth/me`), `auth_dep.py`, `models/auth.py`, `models/sessions.py` | `auth_page.dart`: sign in, refresh, forced 401, simulate reuse, sign out | `/auth` |
 | `bond_signin` (lib), `bond_signin`, `bond_signin_ui` | `signin_wiring.py` (`UserDirectory`, `ScopePolicy`, `SignInFlow`, the mount of `make_signin_router` and `well_known_router`), `models/handoffs.py`, `models/sessions.py`; routes `POST /auth/signin/{p}/start`, `GET /auth/signin/{p}/callback`, `POST /auth/signin/redeem`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/sessions/revoke-all`, `POST /auth/simulate-reuse` (fake mode); `routes/signin.py`, `connect_helpers.py`, `fake_routes.py` (consent page `GET /connections/fake/consent`, ids `sdk-consent-identity`, `-email`, `-set-<id>`, `-allow`, `-deny`, then `/consent/submit`), `routes/connect_native.py`, `break_glass.py`, `directory.py` (with the optional `apply_profile` hook, which fills an e-mail-only invitee's name at first sign-in), `scope_policy.py`, `providers_wiring.py` (providers and the providers payload), `origin_rule.py`, `signin_prune.py` | `auth_page.dart` on `BondSignInScreen`; `connections_page.dart` with `BondScopeAskCard` | `/auth`, `/connections` |
 | `bond_storage` | `routes/storage.py` (upload, share, `GET /d/{token}`), `models/grants.py` | none; see `tests/test_storage.py` | none |
-| `bond_jobs` | `models/jobs.py`, the registry in `wiring.py` | none | none (the sweep row below) |
+| `bond_jobs` | `models/jobs.py`, the registry in `wiring.py`; `scripts/sweep_interval.py` runs `run_schedule` | none | none (the sweep row below) |
 | `bond_sync_py`, `bond_sync`, `bond_sync_powersync` | `routes/sync.py`, `models/sync.py` | `sync_page.dart`: rows, upload verdicts, token | `/sync` |
 | `bond_oauth` | `routes/connections.py`, `oauth_wiring.py`, `models/connections.py`; routes: `GET /connections`, `GET /connections/{provider}/start`, `GET /connections/{provider}/go?state=` (sets the nonce cookie, then redirects to the provider), `GET /connections/{provider}/callback`, `POST /connections/{provider}/redeem` (device secret), `DELETE /connections/{provider}`, `GET /connections/fake/consent`, `POST /connections/{provider}/simulate-expiry` | `connections_page.dart` | `/connections` |
-| `bond_tasks_py`, `bond_tasks`, `bond_tasks_ui` | `tasks_wiring.py` (mirror providers, name lookups), `todo_wiring.py` (preferences, link resolver, inbox, push sender, capture model and guard), `task_support.py` (one transaction, the viewer's zone, the wire item, the write hook), `routes/tasks.py` (CRUD, lifecycle, `/tasks/summary`), `routes/task_today.py` (`/tasks/today`, `/tasks/settings`), `routes/jobs.py` (`POST /jobs/tick`), `models/tasks.py`, `models/task_settings.py`, `models/task_links.py`, `models/task_ledger.py` | `tasks_page.dart`: quick add, list, mirror, summary; `today_page.dart`, `todo_calendar_page.dart`, `todo_settings_page.dart` | `/tasks`, `/today`, `/calendar`, `/todo-settings` |
+| `bond_tasks_py`, `bond_tasks`, `bond_tasks_ui` | `tasks_wiring.py` (mirror providers, name lookups), `todo_wiring.py` (preferences, link resolver, inbox, push sender, capture model and guard), `task_support.py` (one transaction and the viewer's zone for the capture and push routes), `routes/task_routers.py` (mounts `make_tasks_router`: CRUD, lifecycle, summary, today, settings, and `make_notices_router`), `routes/jobs.py` (`POST /jobs/tick`), `models/tasks.py`, `models/task_settings.py`, `models/task_links.py`, `models/task_ledger.py` | `tasks_page.dart`: quick add, list, mirror, summary; `today_page.dart`, `todo_calendar_page.dart`, `todo_settings_page.dart` | `/tasks`, `/today`, `/calendar`, `/todo-settings` |
 | `bond_jobs` with the notice sweep | `sweep_wiring.py` (`run_sweep` claims then delivers, `before_hook` for `bond_jobs.tick(..., before=, before_every=)`, `sweep_app`), `routes/jobs.py` (fake-mode `POST /jobs/tick {now}` runs the sweep, then the due jobs), `scripts/sweep_interval.py` (the same sweep from a plain timer, no jobs table; `--every` must be at least 1) | the fake-clock strip on `/today` and `/inbox` | `/today`, `/inbox` |
-| `bond_notify_py`, `bond_notify`, `bond_notify_ui` | `models/notices.py`, `routes/notices.py` (`GET /notices`, read, dismiss, read-all, `POST /notices/{id}/act`), `InboxNotifier` in the sweep | `inbox_page.dart`: badge, polling and watch feeds, rows with the three actions, undo | `/inbox` |
-| `bond_push_py`, `bond_push`, `bond_tasks_notifications` | `models/push.py`, `routes/push.py` (`POST /push/devices`, `DELETE /push/devices/{id}`), the mock sender and `GET /fake/push/sent` in `routes/fake_todo.py`; real mode builds an `ApnsSender` only when `SDK_EXAMPLE_APNS_KEY_FILE`, `_KEY_ID` and `_TEAM_ID` are set | `lib/src/todo/todo_alerts.dart` (the coordinator, the only alert wiring), the iOS simulator lane | `docs/test/MOBILE.md` |
+| `bond_notify_py`, `bond_notify`, `bond_notify_ui` | `models/notices.py`, `routes/task_routers.py` (`make_notices_router`: `GET /notices`, read, dismiss, read-all, `POST /notices/{id}/act`), `InboxNotifier` in the sweep | `inbox_page.dart`: badge, polling and watch feeds, rows with the three actions, undo | `/inbox` |
+| `bond_push_py`, `bond_push`, `bond_tasks_notifications` | `models/push.py`, `routes/push.py` (`POST /push/devices`, `DELETE /push/devices/{id}`), the mock sender and `GET /fake/push/sent` in `routes/fake_todo.py`; real mode builds an `ApnsSender` only when `SDK_EXAMPLE_APNS_KEY_FILE`, `_KEY_ID` and `_TEAM_ID` are set | `lib/src/todo/todo_alerts.dart` (the coordinator, the only alert wiring; the plugin classes `PushPlugin`, `DefaultPushPlugin`, `PluginPushTokenSource` and `PluginPushTaps` come from `package:bond_push_apple/bond_push_apple.dart`, the rest from `bond_push`), the iOS simulator lane | `docs/test/MOBILE.md` |
 | `bond_capture_py` | `capture_wiring.py` (the replay model, the rate guard, the accepted-event log), `routes/task_capture.py` (`POST /tasks/parse`, `GET /tasks/links/search`, the event stub), `contacts.py` (the link resolver and entity resolver over invented contacts) | `capture_page.dart`: note field, review, events sent | `/capture` |
 | `bond_sync_powersync` and the two TODO sync adapters | `sync_todo.py` (the sync upload hosts `notes`, `tasks`, `notices` (patch `read_at`, `dismissed_at`) and `push_devices` (put, patch, delete), through the libs' handlers), `routes/sync.py` | `lib/src/todo/sync_mirror_notice_feed.dart` (the demo's stand-in for the watch feed) | `/inbox` (Watch feed) |
 | `bond_calendar` | `calendar_wiring.py` (one provider per OAuth connection, fake calendars in fake mode), `routes/calendar.py` (`GET /calendar/events`) | none; the task mirror shows the external id | none |
@@ -113,12 +113,15 @@ The identifier is the DOM attribute `flt-semantics-identifier`, so a walk select
 
 ## Riverpod wiring
 
-Names come from the barrels of `bond_api`, `bond_auth`, `bond_signin` and `bond_signin_ui`; the shape is `DemoSession` in
+Names come from the barrels of `bond_api`, `bond_auth`, `bond_signin`, `bond_signin_ui` and (for the keychain store)
+`bond_auth_secure_storage`; the shape is `DemoSession` in
 `lib/src/example_api.dart`. One `ApiClient`, one `TokenStore`, one `RefreshTokenStore`, and two gateways over them:
 `OidcAuthGateway` (direct sign-in) and `FirebaseAuthGateway` (break-glass). An `AuthGateway` provider names the gateway that
 made the session, so renewal goes through it; gateway and client each keep one single flight, so parallel 401s renew once.
 
 ```dart
+import 'package:bond_auth_secure_storage/bond_auth_secure_storage.dart'; // SecureRefreshTokenStore moved here from bond_signin_ui
+
 final tokensProvider = Provider<TokenStore>((_) => InMemoryTokenStore());
 final refreshStoreProvider = Provider<RefreshTokenStore>((_) =>
     kIsWeb ? const NoRefreshTokenStore() : SecureRefreshTokenStore(appKey: 'app'));
@@ -133,6 +136,63 @@ final gatewayProvider = StateProvider<AuthGateway>((r) => r.watch(oidcProvider))
 ```
 
 Also set the client's `onSessionExpired`, `onSessionRevoked`, `onDeactivated` to clear the state; `AuthFailure.code` is the server code.
+
+## Adoption-gap seams in three snippets
+
+A phone client whose server answers 401 with a business code. The default treats every 401 as a lost session; this keeps
+the session when the code is the app's own:
+
+```dart
+final api = ApiClient(
+  baseUrl: base, http: client, tokens: tokens,
+  endsSession: (ErrorBody e) => e.code != 'mail_account_not_connected', // false: no renewal, no hooks, Unauthorized with the code
+);
+```
+
+A worker with no jobs table: two schedules on one thread, fixed rate, stopped cleanly by SIGTERM
+(`services/sdk_example/scripts/sweep_interval.py`):
+
+```python
+from bond_jobs import Every, run_schedule
+
+run_schedule([Every(60, sweep, name="sweep"), Every(3600, prune, name="prune")],
+             on_result=lambda entry, result, error: print(entry.name, error or "ok"))
+```
+
+A clock the walk can pin, closed unless the app says otherwise (`routes/fake_todo.py`):
+
+```python
+from bond_service_kit import fake_clock_router
+
+app.include_router(fake_clock_router(clock, enabled=lambda: settings.mode == "fake",
+                                     dependencies=[Depends(current_user_id)]))
+```
+
+Both Python router factories, mounted (`services/sdk_example/sdk_example/routes/task_routers.py`, 113 lines in place of
+about 290 of hand-written routes; install the extra `http` of each lib):
+
+```python
+from bond_notify_py.routes import make_notices_router
+from bond_tasks_py.routes import make_tasks_router
+
+app.include_router(make_tasks_router(task_model=Task, settings_model=TaskUserSettings, link_index_model=TaskLinkIndex,
+                                     session_scope=scope, user_dep=current_user_id, now=now, write_dep=write,
+                                     read_all_dep=require_read_all, defaults=default_prefs, after_write=after_write))
+app.include_router(make_notices_router(notice_model=Notice, session_scope=scope, user_dep=current_user_id, now=now,
+                                       on_act=on_act, act_dep=write))
+```
+
+Corner shape is a token. A squarer app sets it once; widgets follow (`BondRadius.rN` is deprecated):
+
+```dart
+BondTokens.fallback.copyWith(shape: const BondShape(r8: 2))
+```
+
+A server time that may be missing or malformed reads as null instead of throwing:
+
+```dart
+final seen = jtimeOrNull(json, 'last_seen_at'); // null for absent, empty or impossible dates (2026-02-30)
+```
 
 ## Web token delivery
 

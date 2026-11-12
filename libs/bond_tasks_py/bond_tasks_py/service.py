@@ -8,7 +8,10 @@ from collections.abc import Callable, Collection, Mapping
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import IntegrityError, NoInspectionAvailable
+from sqlalchemy.orm import ColumnProperty
+from sqlalchemy.orm.properties import SynonymProperty
 
 from bond_tasks_py.due import compute_due_at, valid_zone
 from bond_tasks_py.errors import TaskError
@@ -24,12 +27,55 @@ from bond_tasks_py.lifecycle import (
     set_checklist_item,
 )
 from bond_tasks_py.mirror import mark_mirror
-from bond_tasks_py.models import TaskStatus
+from bond_tasks_py.models import TASK_COLUMNS, TaskStatus
 from bond_tasks_py.protocols import AfterWrite, Permissions, UserPrefs
 from bond_tasks_py.schema import TaskCreate, TaskUpdate, checklist_item, normalize_checklist, normalize_links
 from bond_tasks_py.timeutil import parse_iso, to_naive_utc
 
 UserExists = Callable[[str], bool]
+#: ``prepare(session, stored task or None on create, actor user id, extras) -> the extras to apply``
+Prepare = Callable[[Any, Any | None, str, dict], dict]
+
+
+def _is_column(model: Any, name: str) -> bool:
+    """True when ``name`` is a mapped column (or a synonym of one) of ``model``: not a method, relationship or
+    class attribute."""
+    try:
+        prop = sa_inspect(model).attrs.get(name)
+    except NoInspectionAvailable:
+        return False
+    return isinstance(prop, ColumnProperty | SynonymProperty)
+
+
+def _prepared(prepare: Prepare | None, session: Any, task: Any | None, actor_user_id: str,
+              extras: Mapping[str, Any] | None, host_columns: Collection[str], model: Any) -> Mapping[str, Any] | None:
+    """The extras to apply. With no ``prepare`` they are ``extras`` as they are (``apply_extras`` filters them).
+    Otherwise ``prepare`` gets only the keys of ``extras`` that ``host_columns`` names, and what it returns is
+    trusted server code: it must be a Mapping (``TypeError`` otherwise) and each key must be a column of ``model``
+    that is not one of the lib's ``TASK_COLUMNS`` (``ValueError`` otherwise). It may raise ``TaskError``."""
+    if prepare is None:
+        return extras
+    allowed = set(host_columns)
+    returned = prepare(session, task, actor_user_id, {k: v for k, v in (extras or {}).items() if k in allowed})
+    if not isinstance(returned, Mapping):
+        raise TypeError(f"prepare must return a mapping of extras, not {type(returned).__name__}")
+    for name in returned:
+        if name in TASK_COLUMNS:
+            raise ValueError(f"prepare returned {name!r}, a column the lib owns")
+        if not _is_column(model, name):
+            raise ValueError(f"prepare returned {name!r}, which is not a column of {model.__name__}")
+    return returned
+
+
+def _apply(task: Any, prepare: Prepare | None, extras: Mapping[str, Any] | None, host_columns: Collection[str]) -> None:
+    """Store the extras. With ``prepare`` the result is trusted, so every key it returned is set; the host
+    column names are still checked against the model."""
+    if prepare is None:
+        apply_extras(task, extras, host_columns)
+        return
+    apply_extras(task, None, host_columns)
+    for name, value in (extras or {}).items():
+        setattr(task, name, value)
 
 
 def get(session: Any, task_model: Any, task_id: str) -> Any:
@@ -102,14 +148,20 @@ def _due_at(task: Any, data: TaskCreate | TaskUpdate, *, writer_zone: str | None
 def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: str, data: TaskCreate,
            now: datetime, tz: str = "UTC", user_exists: UserExists | None = None,
            writer_zone: str | None = None, prefs: Any = None, extras: Mapping[str, Any] | None = None,
-           host_columns: Collection[str] = (), after_write: AfterWrite | None = None) -> Any:
+           host_columns: Collection[str] = (), after_write: AfterWrite | None = None,
+           prepare: Prepare | None = None) -> Any:
     """Insert a task. A client-chosen id replayed by the same owner returns the existing row; another owner's
     id is ``id_taken``.
 
     ``writer_zone`` is the writer's stored zone. When it is None and ``prefs`` (a ``Preferences``; None means
     the defaults for everyone) is given, a task that has a due date reads the actor's stored zone from
     ``prefs``; an error that ``prefs.for_user`` raises then propagates. ``extras`` are app columns named in
-    ``host_columns``; ``after_write(session, task)`` runs after the flush."""
+    ``host_columns``; ``after_write(session, task)`` runs after the flush. ``prepare(session, None, actor_user_id,
+    extras)`` runs before the extras are applied (create, update and sync put/patch only; not complete, reopen,
+    cancel, delete or a status-only patch). It sees only the extras, filtered to ``host_columns``, not the other new
+    values. What it returns is trusted: every returned key is stored if it is a model column the lib does not own
+    (a lib column or unknown name raises ``ValueError``; a non-Mapping raises ``TypeError``). It may raise
+    ``TaskError``, in which case nothing is written."""
     if data.id:
         existing = session.get(task_model, data.id)
         if existing is not None:
@@ -129,7 +181,8 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
     if data.id:
         task.id = data.id
     _check_time(task)
-    apply_extras(task, extras, host_columns)
+    _apply(task, prepare, _prepared(prepare, session, None, actor_user_id, extras, host_columns, task_model),
+           host_columns)
     if task.due_date is not None:
         task.due_at = _due_at(task, data, writer_zone=writer_zone, actor_user_id=actor_user_id, tz=tz,
                               session=session, prefs=prefs)
@@ -153,11 +206,14 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
 def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now: datetime, tz: str = "UTC",
            user_exists: UserExists | None = None, writer_zone: str | None = None, prefs: Any = None,
            permissions: Permissions | None = None, extras: Mapping[str, Any] | None = None,
-           host_columns: Collection[str] = (), after_write: AfterWrite | None = None) -> Any:
+           host_columns: Collection[str] = (), after_write: AfterWrite | None = None,
+           prepare: Prepare | None = None) -> Any:
     """Apply the fields in ``data.model_fields_set``. Omitted = unchanged; ``None`` clears ``due_date`` (and so the
     time and ``due_at``), ``due_time``, ``priority``, ``assigned_user_id`` and ``notes``; ``title`` and
     ``mirror_enabled`` cannot be cleared. ``due_at`` is recomputed only when the date, the time or the assignee
-    actually differs from what is stored (a timed task is not recomputed by a reassignment)."""
+    actually differs from what is stored (a timed task is not recomputed by a reassignment). ``prepare(session,
+    task, actor_user_id, extras)`` runs right after the permission check, before any field changes, so it sees the
+    stored task; the dict it returns is the extras applied, and a ``TaskError`` it raises leaves the task untouched."""
     sent, now = data.model_fields_set, to_naive_utc(now)
     _sent_zone(data)  # an unknown zone name is refused even when no due instant is computed
     reassigning = "assigned_user_id" in sent and (data.assigned_user_id or None) != task.assigned_user_id
@@ -165,6 +221,7 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
         require_owner(task, actor_user_id, permissions)
     else:
         require_editor(task, actor_user_id, permissions)
+    extras = _prepared(prepare, session, task, actor_user_id, extras, host_columns, type(task))
     before = (task.due_date, task.due_time)
     if "title" in sent:
         task.title = _title(data.title)
@@ -189,7 +246,7 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
     if "mirror_enabled" in sent:
         task.mirror_enabled = data.mirror_enabled
     _check_time(task)
-    apply_extras(task, extras, host_columns)
+    _apply(task, prepare, extras, host_columns)
     if task.due_date is None:
         task.due_at = None
     elif before != (task.due_date, task.due_time) or (reassigning and not task.due_time):

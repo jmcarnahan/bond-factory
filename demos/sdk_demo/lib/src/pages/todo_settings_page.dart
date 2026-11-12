@@ -29,7 +29,9 @@ const List<String> kDemoZones = [
 
 /// `GET` and `PUT /tasks/settings`: the work day, the lead and the zone. The form states the quiet
 /// hours in words; warnings the server returns show inline. After a save the alerts are planned again.
-/// Ids are `sdk.todo.<element>`: `settings-start`, `-end`, `-lead`, `-quiet`, `-save`, `settings-zone`, `zone-state`, `saved` (warnings are shown by the form as plain text), `error`, `alerts-permission`.
+/// The loaded [TaskSettings] carries `overridden` (the fields the person set); the form shows an inline
+/// "Reset to default" control for each, a reset sends that field as null, and the page then reads the settings again.
+/// Ids are `sdk.todo.<element>`: `settings-start`, `-end`, `-lead`, `-quiet`, `-save`, `settings-reset-zone`, `settings-reset-start`, `settings-reset-end`, `settings-reset-lead`, `settings-zone`, `zone-state`, `saved` (warnings are shown by the form as plain text), `error`, `alerts-permission`.
 class TodoSettingsPage extends StatefulWidget {
   const TodoSettingsPage({super.key, this.services});
 
@@ -77,7 +79,10 @@ class _TodoSettingsPageState extends State<TodoSettingsPage> {
       _saved = null;
     });
     try {
-      final next = await _s.settings.update(patch);
+      var next = await _s.settings.update(patch);
+      // A reset returns a field to the app default: read the settings again, so the page shows what the server holds
+      // (the default value, and `overridden` without that field).
+      if (patch.reset.isNotEmpty) next = await _s.settings.get();
       if (patch.timeZone != null) _s.zone = next.timeZone ?? patch.timeZone;
       TodoAlerts.updatePrefs(next);
       if (mounted) {

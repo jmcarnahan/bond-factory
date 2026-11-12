@@ -4,6 +4,7 @@ import 'package:bond_api/bond_api.dart';
 import 'package:test/test.dart';
 
 void main() {
+  _gapsMain();
   group('dict detail', () {
     for (final (status, type) in <(int, Matcher)>[
       (400, isA<BadRequest>()),
@@ -208,6 +209,25 @@ void main() {
       for (final s in [405, 413, 429, 501]) {
         expect(ErrorBody.parse(s, null), isA<ServerError>().having((e) => e.statusCode, 'status', s));
       }
+    });
+  });
+}
+
+void _gapsMain() {
+  group('401/403 string detail with a top-level code', () {
+    test('error_body_flat_string_detail_with_top_level_code', () {
+      final e = ErrorBody.parse(401, jsonEncode({'detail': 'Connect your mail', 'code': 'mail_not_connected'}));
+      expect(e, isA<Unauthorized>().having((x) => x.code, 'code', 'mail_not_connected'));
+      expect(e.message, 'Connect your mail');
+      final f = ErrorBody.parse(403, jsonEncode({'detail': 'No', 'code': 'plan_limit'}));
+      expect(f, isA<Forbidden>().having((x) => x.code, 'code', 'plan_limit'));
+    });
+    test('error_body_error_code_alias', () {
+      final e = ErrorBody.parse(401, jsonEncode({'detail': 'Nope', 'error_code': 'alias_code'}));
+      expect((e as Unauthorized).code, 'alias_code');
+    });
+    test('bare reason still becomes the code', () {
+      expect((ErrorBody.parse(401, jsonEncode({'detail': 'not_invited'})) as Unauthorized).code, 'not_invited');
     });
   });
 }

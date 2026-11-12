@@ -20,7 +20,7 @@ tests can pin it. ``claim`` commits, so a second request sees the count at once.
 import hashlib
 import secrets
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
@@ -81,20 +81,30 @@ def hash_token(raw: str) -> str:
     return hashlib.sha256((raw or "").encode("utf-8")).hexdigest()
 
 
-def _live(model: Any, now: datetime) -> list[Any]:
+#: The columns this lib owns. ``mint(extra=...)`` may not set any of them.
+LIB_COLUMNS = frozenset(GrantsMixin.__annotations__)
+
+
+def _live(model: Any, now: datetime, enforce_cap: bool = True) -> list[Any]:
     """Filters that match a grant that can still be used."""
-    return [model.revoked_at.is_(None), model.expires_at > now,
-            sa.or_(model.max_downloads.is_(None), model.download_count < model.max_downloads)]
+    filters = [model.revoked_at.is_(None), model.expires_at > now]
+    if enforce_cap:
+        filters.append(sa.or_(model.max_downloads.is_(None), model.download_count < model.max_downloads))
+    return filters
 
 
 def mint(session: Session, document: DocumentLike, *, grant_model: Any, user_id: str | None, purpose: str = SHARE,
          owner_type: str | None = None, owner_id: str | None = None, ttl_days: int = DEFAULT_TTL_DAYS,
          max_downloads: int | None = DEFAULT_MAX_DOWNLOADS, ttl_seconds: int | None = None,
-         now: Now = utcnow_naive) -> tuple[Any, str]:
+         extra: Mapping[str, Any] | None = None, now: Now = utcnow_naive) -> tuple[Any, str]:
     """Create a grant for ``document``; returns ``(row, raw_token)``. The raw token is never stored.
 
     ``owner_type`` / ``owner_id`` default to the document's own, when it has them. ``ttl_seconds`` wins over ``ttl_days``.
+    ``extra`` sets the app's own columns on the row; a key that names one of this lib's columns raises ``ValueError``.
     """
+    clash = sorted(LIB_COLUMNS & set(extra or ()))
+    if clash:
+        raise ValueError(f"extra cannot set the grant's own columns: {clash}")
     raw = secrets.token_urlsafe(TOKEN_BYTES)
     stamp = now()
     ttl = timedelta(seconds=max(1, int(ttl_seconds))) if ttl_seconds else timedelta(days=max(1, int(ttl_days)))
@@ -103,7 +113,7 @@ def mint(session: Session, document: DocumentLike, *, grant_model: Any, user_id:
         owner_type=owner_type or getattr(document, "owner_type", None),
         owner_id=owner_id or getattr(document, "owner_id", None),
         expires_at=stamp + ttl, max_downloads=max_downloads, download_count=0, created_by=user_id,
-        created_at=stamp, updated_at=stamp)
+        created_at=stamp, updated_at=stamp, **(extra or {}))
     session.add(grant)
     session.flush()
     return grant, raw
@@ -111,8 +121,11 @@ def mint(session: Session, document: DocumentLike, *, grant_model: Any, user_id:
 
 def resolve(session: Session, raw_token: str, *, grant_model: Any,
             document_loader: Callable[[Session, str], DocumentLike | None],
-            now: Now = utcnow_naive) -> tuple[Any, DocumentLike]:
-    """The grant and its document, or ``GrantUnavailable``. Cheapest checks first."""
+            enforce_cap: bool = True, now: Now = utcnow_naive) -> tuple[Any, DocumentLike]:
+    """The grant and its document, or ``GrantUnavailable``. Cheapest checks first.
+
+    ``enforce_cap=False`` ignores ``max_downloads`` (for an app that counts downloads but never limits them). Pass the
+    same value to ``claim``, which applies the same guard."""
     token = (raw_token or "").strip()
     if not token or len(token) > MAX_TOKEN_LEN:
         raise GrantUnavailable
@@ -121,7 +134,7 @@ def resolve(session: Session, raw_token: str, *, grant_model: Any,
         raise GrantUnavailable
     if grant.expires_at is None or grant.expires_at <= now():
         raise GrantUnavailable
-    if grant.max_downloads is not None and (grant.download_count or 0) >= grant.max_downloads:
+    if enforce_cap and grant.max_downloads is not None and (grant.download_count or 0) >= grant.max_downloads:
         raise GrantUnavailable
     document = document_loader(session, grant.document_id)
     if document is None:
@@ -129,18 +142,21 @@ def resolve(session: Session, raw_token: str, *, grant_model: Any,
     return grant, document
 
 
-def claim(session: Session, grant: Any, ip: str | None = None, *, now: Now = utcnow_naive) -> bool:
+def claim(session: Session, grant: Any, ip: str | None = None, *, enforce_cap: bool = True, commit: bool = True,
+          now: Now = utcnow_naive) -> bool:
     """Use one download, atomically: ONE guarded UPDATE that only matches while the link is live, so two simultaneous
-    downloads of a single-use link cannot both win. True when this call got it. Commits."""
+    downloads of a single-use link cannot both win. True when this call got it. Commits, unless ``commit=False``
+    (the caller then commits or rolls back, so its own writes and the claim land together)."""
     model = type(grant)
     stamp = now()
     values: dict[str, Any] = {"download_count": model.download_count + 1, "last_downloaded_at": stamp,
                               "updated_at": stamp}
     if ip:
         values["last_ip"] = ip[:MAX_IP_LEN]
-    result = session.execute(sa.update(model).where(model.id == grant.id, *_live(model, stamp)).values(**values)
-                             .execution_options(synchronize_session=False))
-    session.commit()
+    result = session.execute(sa.update(model).where(model.id == grant.id, *_live(model, stamp, enforce_cap))
+                             .values(**values).execution_options(synchronize_session=False))
+    if commit:
+        session.commit()
     session.refresh(grant)
     return result.rowcount == 1
 

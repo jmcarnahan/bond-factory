@@ -11,7 +11,7 @@ from bond_tasks_py.compose import default_compose
 from bond_tasks_py.dialect import ensure_savepoint_safe
 from bond_tasks_py.due import backfill_due_at
 from bond_tasks_py.models import TaskStatus
-from bond_tasks_py.notify_protocols import Compose, Recipients, TransactionalNotifier
+from bond_tasks_py.notify_protocols import STAGES, Compose, Recipients, TransactionalNotifier
 from bond_tasks_py.permissions import DefaultPermissions
 from bond_tasks_py.protocols import Permissions, Preferences, UserPrefs
 from bond_tasks_py.quiet import sendable
@@ -22,6 +22,7 @@ from bond_tasks_py.stages import (
     deadline_token,
     effective_zone,
     notice_id,
+    stage_times,
 )
 from bond_tasks_py.sweep_claim import claim_rows, existing_ids, payload_of, table_of
 from bond_tasks_py.timeutil import to_naive_utc
@@ -104,6 +105,26 @@ def _pending_for_task(session: Any, task: Any, *, now: datetime, tz: str, max_pa
     return found
 
 
+def _grandfather_rows(session: Any, task: Any, *, now: datetime, tz: str, max_past: int,
+                      recipients: Recipients | None, prefs_of: Any) -> list[dict]:
+    """A skipped ledger row for every stage (close, due, past up to ``max_past``) of every user who could be sent
+    one, so no later pass claims any of them."""
+    users: set[str] = set()
+    for stage_name in STAGES:
+        users.update(default_recipients(task, stage_name) if recipients is None
+                     else recipients.for_stage(session, task, stage_name))
+    token = deadline_token(task)
+    rows = []
+    for user in sorted(users):
+        for stage in stage_times(task, prefs_of(user), tz, now, max_past=max_past, past_days=36500):
+            payload = payload_of(title=task.title, body="", due_at=task.due_at, priority=task.priority,
+                                 route=f"/tasks/{task.id}", actions=(), last=stage.last)
+            rows.append({"id": notice_id(task.id, user, stage.stage, stage.seq, token), "task_id": task.id,
+                         "user_id": user, "stage": stage.stage, "seq": stage.seq, "deadline_token": token,
+                         "status": "skipped", "stage_at": stage.at, "payload": payload, "claimed_at": now})
+    return rows
+
+
 def _row_of(item: _Pending, *, now: datetime, since: datetime | None, compose: Compose | None,
             permissions: Permissions) -> dict:
     task, stage = item.task, item.stage
@@ -123,7 +144,7 @@ def sweep_due(session: Any, *, task_model: Any, ledger_model: Any, outbox_model:
               prefs: Preferences, tz: str = "UTC", transactional: Sequence[TransactionalNotifier] = (),
               channels: Sequence[str] = (), recipients: Recipients | None = None, compose: Compose | None = None,
               permissions: Permissions | None = None, since: datetime | None = None, max_past: int = 5,
-              limit: int = 500) -> SweepResult:
+              limit: int = 500, grandfather_before: datetime | None = None) -> SweepResult:
     """Claim and queue the current stage per (task, recipient). Flushes, never commits.
 
     ``Preferences.for_user`` is called once per user within one call. When a claim batch fails because a
@@ -131,6 +152,12 @@ def sweep_due(session: Any, *, task_model: Any, ledger_model: Any, outbox_model:
     fails writes nothing (it is logged with its notice id and counted in ``errors``), so a transient failure
     loses no notice: the next sweep retries it while its stage is current, and one bad row never blocks the
     others. Ledger statuses: "claimed" and "skipped" (before ``since``).
+
+    ``grandfather_before`` is for switching the sweep on over old data: a task whose ``due_at`` is before it gets a
+    "skipped" ledger row for EVERY stage (close, due, and the past series up to ``max_past``), so no later pass
+    claims it and no notice tail follows. A task due at or after it is untouched. Rows with a NULL ``due_at`` are
+    invisible to the sweep, and the built-in ``backfill_due_at`` fills at most ``limit`` rows per call, so a large
+    adopter backfills to completion first and only then passes the activation time here.
 
     Recipients are asked only for the stage that is current for the responsible user or the owner. An idle
     sweep (everything already claimed) issues no INSERT and composes nothing: the ledger is asked which notice
@@ -150,6 +177,7 @@ def sweep_due(session: Any, *, task_model: Any, ledger_model: Any, outbox_model:
     ensure_savepoint_safe(session)
     now = to_naive_utc(now)
     since = to_naive_utc(since) if since is not None else None
+    grandfather_before = to_naive_utc(grandfather_before) if grandfather_before is not None else None
     permissions = permissions or DefaultPermissions()
     memo: dict[str, UserPrefs] = {}
 
@@ -175,12 +203,18 @@ def sweep_due(session: Any, *, task_model: Any, ledger_model: Any, outbox_model:
             break
         last_id = tasks[-1].id
         found: list[_Pending] = []
+        old_rows: list[dict] = []
         for task in tasks:
+            if grandfather_before is not None and task.due_at < grandfather_before:
+                old_rows += _grandfather_rows(session, task, now=now, tz=tz, max_past=max_past,
+                                              recipients=recipients, prefs_of=prefs_of)
+                continue
             found += _pending_for_task(session, task, now=now, tz=tz, max_past=max_past, recipients=recipients,
                                        prefs_of=prefs_of)
-        have = existing_ids(session, ledger, [item.id for item in found])
+        have = existing_ids(session, ledger, [item.id for item in found] + [row["id"] for row in old_rows])
         rows = [_row_of(item, now=now, since=since, compose=compose, permissions=permissions)
                 for item in found if item.id not in have]  # compose only what will be inserted
+        rows += [row for row in old_rows if row["id"] not in have]
         got = claim_rows(session, ledger, outbox_model, rows, transactional, channels, now)
         claimed, skipped, queued, errors = claimed + got[0], skipped + got[1], queued + got[2], errors + got[3]
         if len(tasks) < limit:

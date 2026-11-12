@@ -34,9 +34,29 @@ class ReconnectRequired(CalendarError):
         super().__init__(status, code, message)
 
 
+class Forbidden(CalendarError):
+    """The provider refused the action (HTTP 403): missing scope, a read-only calendar or a policy block.
+
+    ``.code`` keeps the provider's own code (for example ``insufficientPermissions`` or ``ErrorAccessDenied``)."""
+
+    def __init__(self, message: str = "The calendar provider refused the request.", status: int = 403,
+                 code: str = "forbidden") -> None:
+        super().__init__(status, code, message)
+
+
 class Unavailable(CalendarError):
-    """A 5xx, 429, timeout or transport failure: transient, retry later."""
+    """A 5xx, 429, timeout or transport failure: transient, retry later. A Google 403 that is a throttle
+    (``rateLimitExceeded`` and the like) is this too: status 403, ``.code`` is the reason."""
 
     def __init__(self, message: str = "The calendar service is unavailable.", status: int = 503,
                  code: str = "unavailable") -> None:
+        super().__init__(status, code, message)
+
+
+class InvalidAttendee(CalendarError, ValueError):
+    """An attendee that cannot be written: a ``Person`` with no address (status 422, code ``invalid_attendee``).
+    Also a ``ValueError``, as the bare error it replaces was."""
+
+    def __init__(self, message: str = "An attendee given as a Person needs an email address.", status: int = 422,
+                 code: str = "invalid_attendee") -> None:
         super().__init__(status, code, message)

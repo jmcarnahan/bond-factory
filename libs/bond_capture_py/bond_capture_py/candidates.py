@@ -13,7 +13,8 @@ REASONS = ("model_unavailable", "invalid_output")
 
 @dataclass(frozen=True)
 class LinkCandidate:
-    """A name the note mentioned and the contacts it might mean: ``candidates`` is ``[{id, label}]``."""
+    """A name the note mentioned and the records it might mean: ``candidates`` is ``[{id, label}]`` (rich mode
+    keeps any extra scalar keys the resolver returned)."""
 
     text: str
     kind: str = "contact"
@@ -34,10 +35,11 @@ class TaskCandidate:
     confidence: float = 1.0
     flags: tuple[str, ...] = ()
     degraded: bool = False
+    notes: str | None = None  # rich mode only; the wire carries it only for ``parse_capture(..., rich=True)``
     kind: str = field(default="task", init=False)
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, rich: bool = False) -> dict:
+        wire = {
             "kind": "task",
             "title": self.title,
             "due_date": self.due_date,
@@ -49,6 +51,9 @@ class TaskCandidate:
             "flags": list(self.flags),
             "degraded": self.degraded,
         }
+        if rich:
+            wire["notes"] = self.notes
+        return wire
 
 
 @dataclass(frozen=True)
@@ -63,10 +68,14 @@ class EventCandidate:
     confidence: float = 1.0
     flags: tuple[str, ...] = ()
     degraded: bool = False
+    location: str | None = None  # the four rich fields: on the wire only for ``rich=True``
+    notes: str | None = None
+    duration_minutes: int | None = None
+    attendees: tuple[str, ...] = ()  # names as written; never resolved
     kind: str = field(default="event", init=False)
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, rich: bool = False) -> dict:
+        wire = {
             "kind": "event",
             "title": self.title,
             "start_date": self.start_date,
@@ -79,6 +88,10 @@ class EventCandidate:
             "flags": list(self.flags),
             "degraded": self.degraded,
         }
+        if rich:
+            wire.update(location=self.location, notes=self.notes, duration_minutes=self.duration_minutes,
+                        attendees=list(self.attendees))
+        return wire
 
 
 @dataclass(frozen=True)
@@ -86,15 +99,18 @@ class CaptureResult:
     """``items`` are task and event candidates; ``degraded`` is True when no model answered; ``reason`` is then
     ``model_unavailable`` or ``invalid_output``, else None. ``dropped`` counts model items that were skipped
     (invalid, empty title, too far out, or past the item limit); the wire key ``dropped`` appears only when it is
-    above zero, so a clean answer has the exact shape of ``expected_candidates.json``."""
+    above zero, so a clean answer has the exact shape of ``expected_candidates.json``. ``rich`` is True for a
+    ``parse_capture(..., rich=True)`` result: ``to_dict`` then adds the rich keys to every item (see
+    ``expected_candidates_rich.json``); otherwise the wire is unchanged."""
 
     items: tuple = ()
     degraded: bool = False
     reason: str | None = None
     dropped: int = 0
+    rich: bool = False
 
     def to_dict(self) -> dict:
-        wire = {"items": [item.to_dict() for item in self.items], "degraded": self.degraded, "reason": self.reason}
+        wire = {"items": [item.to_dict(self.rich) for item in self.items], "degraded": self.degraded, "reason": self.reason}
         if self.dropped:
             wire["dropped"] = self.dropped
         return wire

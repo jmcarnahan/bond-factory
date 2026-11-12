@@ -10,7 +10,16 @@ from typing import Any
 import httpx
 
 from .errors import CalendarError, NotFound
-from .models import PATCH_KEYS, CalendarEvent, CalendarEventDraft, EventPage, EventPatch, to_utc
+from .models import (
+    PATCH_KEYS,
+    CalendarEvent,
+    CalendarEventDraft,
+    EventPage,
+    EventPatch,
+    attendee_parts,
+    merged_attendees,
+    to_utc,
+)
 from .normalize import graph_body, graph_event
 from .times import all_day_dates, is_utc_zone, iso_z, wall_utc, windows_name
 from .transport import call, json_body
@@ -31,6 +40,12 @@ def _instant(value: datetime) -> dict[str, str]:
 
 def _local_day(value: date, zone: str) -> dict[str, str]:
     return {"dateTime": f"{value.isoformat()}T00:00:00", "timeZone": windows_name(zone)}
+
+
+def _attendee(value: Any) -> dict[str, Any]:
+    name, address = attendee_parts(value)
+    mail = {"address": address} if not name else {"address": address, "name": name}
+    return {"emailAddress": mail, "type": "required"}
 
 
 def wire_fields(values: dict[str, Any], zone: str | None = None) -> dict[str, Any]:
@@ -62,19 +77,22 @@ def wire_fields(values: dict[str, Any], zone: str | None = None) -> dict[str, An
     if "categories" in values:
         out["categories"] = list(values["categories"] or [])
     if "attendees" in values:
-        out["attendees"] = [{"emailAddress": {"address": a}, "type": "required"} for a in values["attendees"] or []]
+        out["attendees"] = [_attendee(a) for a in merged_attendees(values["attendees"])]
     if "reminder_minutes" in values:  # present and None clears the reminder
         if values["reminder_minutes"] is None:
             out["isReminderOn"] = False
         else:
             out["isReminderOn"] = True
             out["reminderMinutesBeforeStart"] = int(values["reminder_minutes"])
+    elif values.get("reminder_off"):  # create only: no mailbox default reminder
+        out["isReminderOn"] = False
     return out
 
 
 def _draft_fields(draft: CalendarEventDraft) -> dict[str, Any]:
-    """A new event never says anything about reminders unless the draft asks for one."""
-    return {k: v for k, v in vars(draft).items() if not (k == "reminder_minutes" and v is None)}
+    """A new event never says anything about reminders unless the draft asks for one (minutes or off)."""
+    return {k: v for k, v in vars(draft).items()
+            if not (k == "reminder_minutes" and v is None) and not (k == "reminder_off" and not v)}
 
 
 class MsGraphCalendarProvider:

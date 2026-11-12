@@ -24,6 +24,7 @@ Service functions take a session, flush and never commit. Datetimes are naive UT
 - `Preferences.for_user(session, user_id) -> UserPrefs`: work day and zone; `StoredPreferences(Settings)` reads the table.
 - `Permissions` (`can_edit`, `can_own`, `can_complete`): who may do what; `DefaultPermissions` is owner or assignee.
 - `LinkResolver` (`labels`, `search`): current labels and picker search; the lib owns no contact data.
+- `prepare` `(session, task or None, actor, extras) -> extras` on create, update and sync put/patch only. It sees the `host_columns` extras; what it returns is trusted and may set any non-lib model column.
 - `AfterWrite` `(session, task)`: runs after the flush in create and update; `make_link_hook(Index)` is one.
 - `TransactionalNotifier.write(session, notices)`: the inbox; runs inside the claim, a raise cancels the batch.
 - `Notifier.send(session, notice) -> "ok" | "retryable" | "unregistered" | "failed"`: push, chat, email; after commit.
@@ -115,5 +116,5 @@ notifier stay pending (`unrouted`) and fail after 7 days. `prune_ledger` also re
   `isolation_level=None` on connect plus a `BEGIN` in the engine `begin` event: call `sqlite_savepoint_setup(engine)`
   once per engine, which does exactly that. Postgres is unaffected.
 
-Refusals raise `TaskError(code, message, status)`; `CODES` lists them (`not_task_editor`, `invalid_time_zone`, ...).
-The calendar mirror (`sync_mirror`, `remove_event`) is unchanged: see its docstrings and the CHANGELOG.
+Refusals raise `TaskError(code, message, status)`; `CODES` lists them. The calendar mirror takes `draft_for=` to reshape the event (it must not write; `failed` is retried on the next write).
+Routes: install with the `http` extra (git form in `docs/sdk/README.md`, "Python": add `extras = ["http"]` to the Poetry line, or pip `pip install "bond_tasks_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_tasks_py"`), then `from bond_tasks_py.routes import make_tasks_router` (never imported by the package; see its docstring). Include the router AFTER your own static `/tasks/<name>` routes, or `/{id}` answers them. `extra_where_for` narrows the list route only; it is not a visibility rule (use `permissions`, `read_all_dep`).

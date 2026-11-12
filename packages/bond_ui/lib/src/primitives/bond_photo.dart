@@ -11,7 +11,7 @@ class BondPhoto extends StatelessWidget {
     required this.url,
     this.width,
     this.height,
-    this.radius = BondRadius.r12All,
+    this.radius,
     this.icon = Icons.image_outlined,
     this.semanticLabel,
     this.headers,
@@ -20,7 +20,8 @@ class BondPhoto extends StatelessWidget {
   final String? url;
   final double? width;
   final double? height;
-  final BorderRadius radius;
+  /// Corner radius; defaults to the shape token `r12`.
+  final BorderRadius? radius;
   final IconData icon;
   final String? semanticLabel;
 
@@ -51,6 +52,6 @@ class BondPhoto extends StatelessWidget {
                 progress == null ? child : placeholder(),
             errorBuilder: (context, error, stack) => placeholder(),
           );
-    return ClipRRect(borderRadius: radius, child: body);
+    return ClipRRect(borderRadius: radius ?? t.shape.r12All, child: body);
   }
 }

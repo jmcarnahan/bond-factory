@@ -107,6 +107,7 @@ from bond_tasks_py.usersettings import (
     StoredPreferences,
     TaskUserSettingsMixin,
     get_settings,
+    settings_overridden,
     update_settings,
 )
 
@@ -127,7 +128,7 @@ __all__ = [
     "effective_zone", "end_of_day_due", "ensure_savepoint_safe", "fnv1a31", "get", "get_settings", "in_quiet_hours", "is_overdue",
     "list_tasks", "local_day_bounds", "make_link_hook", "mark_mirror", "mirror_eligible", "next_local_time",
     "next_work_start", "notice_id", "notice_recipients", "prune_ledger", "recompute_day_due", "reindex_links", "remove_event",
-    "remove_links", "reopen", "retarget_links", "sendable", "service", "set_checklist_item", "settings_item", "sqlite_savepoint_setup",
+    "remove_links", "reopen", "retarget_links", "sendable", "service", "set_checklist_item", "settings_item", "settings_overridden", "sqlite_savepoint_setup",
     "stage_times", "summary", "sweep_due", "sync_mirror", "sync_routes", "task_item", "task_items", "today",
     "update", "update_settings", "valid_zone", "verdict_for", "viewer_today",
 ]

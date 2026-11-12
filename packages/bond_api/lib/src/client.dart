@@ -14,6 +14,8 @@ import 'multipart.dart';
 import 'token_source.dart';
 import 'uri_builder.dart';
 
+part 'client_session.dart';
+
 const Duration kHeaderTimeout = Duration(seconds: 20);
 const Duration kApiTimeout = Duration(seconds: 60);
 const Duration kUploadTimeout = Duration(seconds: 120);
@@ -42,6 +44,7 @@ class ApiClient {
     this.isWeb = false,
     this.log,
     this.streamClientFactory,
+    this.endsSession,
   }) : _http = http;
 
   /// The API root, including any prefix (`https://host/api/v1`).
@@ -66,6 +69,14 @@ class ApiClient {
   /// Gives each `sse` call its own client so cancelling closes the connection.
   /// Without it SSE uses the shared client.
   final h.Client Function()? streamClientFactory;
+
+  /// Decides whether a 401 ends the session. Null means every 401 does. It is
+  /// asked on every 401 of a signed-in call (not an auth path), before and after
+  /// a renewal. When it returns false (say a business 401 such as "mail account
+  /// not connected"), nothing is renewed and no session hook runs: the call
+  /// throws [Unauthorized] with the code kept. A throwing callback is logged
+  /// and counts as true.
+  final bool Function(ErrorBody)? endsSession;
 
   /// Renews the session after a 401 (see the class comment). Settable because
   /// the object that renews often needs this client first.
@@ -103,13 +114,18 @@ class ApiClient {
     try { log?.call(line); } catch (_) {}
   }
   /// One JSON call. The decoded body, or null for an empty one.
-  Future<Object?> request(String method, String path, {Object? body, Map<String, Object?>? query}) {
+  ///
+  /// [timeout] replaces the client's overall limit (headers plus the whole body)
+  /// for this call. [headerTimeout] replaces the wait for the response headers;
+  /// the header wait is never longer than the overall limit.
+  Future<Object?> request(String method, String path,
+      {Object? body, Map<String, Object?>? query, Duration? timeout, Duration? headerTimeout}) {
     final url = uri(path, query);
     return _decode(() {
       final r = h.Request(method, url)..headers.addAll(_headers());
       if (body != null) r.body = jsonEncode(body);
       return r;
-    }, headerLimit: headerTimeout, limit: timeout, path: path);
+    }, headerLimit: headerTimeout ?? this.headerTimeout, limit: timeout ?? this.timeout, path: path);
   }
 
   /// A multipart POST of text [fields] and in-memory [files]. Returns the
@@ -129,16 +145,30 @@ class ApiClient {
   }
 
   /// A GET whose body is returned as is (a photo, a PDF).
-  Future<Uint8List> getBytes(String path, {Map<String, Object?>? query}) async {
+  Future<Uint8List> getBytes(String path,
+          {Map<String, Object?>? query, Duration? timeout, Duration? headerTimeout}) =>
+      requestBytes('GET', path, query: query, timeout: timeout, headerTimeout: headerTimeout);
+
+  /// Like [request] (same token, renewal and errors) but the answer body is
+  /// returned as bytes: POST JSON, receive a PDF. [accept] is the Accept header.
+  Future<Uint8List> requestBytes(
+    String method,
+    String path, {
+    Object? body,
+    Map<String, Object?>? query,
+    String accept = '*/*',
+    Duration? timeout,
+    Duration? headerTimeout,
+  }) async {
     final url = uri(path, query);
+    final limit = timeout ?? this.timeout;
     final clock = Stopwatch()..start();
-    final streamed = await _open(
-      () => h.Request('GET', url)..headers.addAll(_headers(json: false, accept: '*/*')),
-      clock: clock,
-      headerLimit: headerTimeout,
-      limit: timeout,
-    );
-    return _readBytes(streamed, clock, timeout);
+    final streamed = await _open(() {
+      final r = h.Request(method, url)..headers.addAll(_headers(json: body != null, accept: accept));
+      if (body != null) r.body = jsonEncode(body);
+      return r;
+    }, clock: clock, headerLimit: headerTimeout ?? this.headerTimeout, limit: limit);
+    return _readBytes(streamed, clock, limit);
   }
 
   /// Sends a request and returns once the response headers say 2xx; every
@@ -149,13 +179,16 @@ class ApiClient {
     Object? body,
     Map<String, Object?>? query,
     h.Client? client,
+    Duration? timeout,
+    Duration? headerTimeout,
   }) {
     final url = uri(path, query);
     return _open(() {
       final r = h.Request(method, url)..headers.addAll(_headers(json: body != null, accept: 'text/event-stream'));
       if (body != null) r.body = jsonEncode(body);
       return r;
-    }, clock: Stopwatch()..start(), headerLimit: headerTimeout, limit: timeout, client: client);
+    }, clock: Stopwatch()..start(),
+        headerLimit: headerTimeout ?? this.headerTimeout, limit: timeout ?? this.timeout, client: client);
   }
 
   void close() => _http.close();
@@ -236,6 +269,13 @@ class ApiClient {
       }
       final text = utf8.decode(await _readBytes(streamed, clock, limit), allowMalformed: true);
       final path = request.url.path;
+      if (status == 401 && sentWith != null && !_isAuthPath(path)) {
+        // Asked on every 401 of the call, before and after a renewal.
+        if (endsSession != null) {
+          final body = _readBody(status, text);
+          if (!_endsSessionSafe(body)) throw body.toException();
+        }
+      }
       if (status == 401 && sentWith != null && !_isAuthPath(path) && !retried && onUnauthorized != null) {
         retried = true;
         // Another request may have renewed the session while this one was in flight.
@@ -253,48 +293,5 @@ class ApiClient {
       }
       throw await _fail(status, text, path, signedIn: sentWith != null, rejected: rejected);
     }
-  }
-
-  Future<SessionRefresh> _renewOnce() {
-    final running = _refreshing;
-    if (running != null) return running;
-    late final Future<SessionRefresh> f;
-    f = _renewGuarded(onUnauthorized!).whenComplete(() {
-      if (identical(_refreshing, f)) _refreshing = null;
-    });
-    _refreshing = f;
-    return f;
-  }
-
-  // A hook that throws counts as a refusal.
-  Future<SessionRefresh> _renewGuarded(Future<SessionRefresh> Function() hook) async {
-    try { return await hook(); } catch (e) { _log('session renewal failed: ${e.runtimeType}'); }
-    return SessionRefresh.rejected;
-  }
-
-  Future<void> _run(Future<void> Function()? hook) async {
-    try { await hook?.call(); } catch (e) { _log('session hook failed: ${e.runtimeType}'); }
-  }
-
-  Future<ApiException> _fail(
-    int status,
-    String text,
-    String path, {
-    required bool signedIn,
-    required bool rejected,
-  }) async {
-    var error = ErrorBody.parse(status, text);
-    if (error is Unauthorized && rejected) error = Unauthorized(error.message, error.code, true);
-    if (_isAuthPath(path) || !signedIn) return error;
-    if (error is Unauthorized && !_endedFired) {
-      _endedFired = true;
-      if (error.code == 'session_revoked') await _run(onSessionRevoked);
-      await _run(onSessionExpired);
-    }
-    if (error is Forbidden && error.code == 'deactivated' && !_deactivatedFired) {
-      _deactivatedFired = true;
-      await _run(onDeactivated);
-    }
-    return error;
   }
 }

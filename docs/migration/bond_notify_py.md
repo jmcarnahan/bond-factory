@@ -31,7 +31,14 @@ dismiss(session, Notice, user_id, notice_id, now)                            # P
 mark_all_read(session, Notice, user_id, now)                                 # POST /notices/read-all
 ```
 
-- `POST /notices/{id}/act` is the app's own. Load the notice, check it is the user's, call
+- Or mount all of it: install with the `http` extra (the lib is not on a package index; the git form is in `docs/sdk/README.md`, "Python": add
+`extras = ["http"]` to the Poetry line, or pip `pip install "bond_notify_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_notify_py"`), then
+  `app.include_router(make_notices_router(notice_model=Notice, session_scope=lambda: session_scope(app.state.session_factory), user_dep=current_user_id, now=clock.utcnow_naive, on_act=on_act, act_dep=write_capability))`
+  from `bond_notify_py.routes`. `on_act(session, notice, action, user_id, now)` runs after the owner check; it applies
+  the action and returns a mapping (for example `{"task": item}`) that is merged next to `notice`. `after_act(background,
+  notice, result)` queues post-response work. A result key named `notice` never replaces the notice. A coded error raised in `on_act` (an object with a str `code`, a str `message` and an int `status`, such as the tasks lib's `TaskError`) is answered as `status` with `{"detail": {"code", "message"}}`, the same body a `NoticeError` gets; an error with its own `detail` (an app error class with a handler) is left to the app. `error_map(exc) -> (status, body) | None` replaces that rule. Without `on_act` there is no act route. The act route does not read a
+  `time_zone` query value: the callback picks the zone itself.
+- `POST /notices/{id}/act` by hand (when you do not mount the factory): Load the notice, check it is the user's, call
   `apply_notice_action(session, task=task, action=action, actor_user_id=user_id, now=now)` from `bond_tasks_py`,
   mark the notice read, and on done or cancel call `dismiss_for_source(session, Notice, task.id, now)`. Snooze changes nothing on the server and only marks the notice read. Answer
   `{notice, task}`. A cancel by someone who may not is the tasks lib's 403 `not_task_owner`.
@@ -66,6 +73,7 @@ read_at, dismissed_at` `WHERE user_id = auth.user_id()`. `source_id` stays serve
 
 - Assert `NOTICE_COLUMNS` against the engine and round-trip `fixtures/notify/notice.json` through `notice_item`.
 - A claim batch whose notifier raises leaves no notice. A replayed sweep inserts nothing and keeps a read notice read.
+- A host-written act route calls `get_owned(session, Notice, user_id, notice_id)` FIRST. `apply_notice_action` never sees the notice, so without the check any user could complete or cancel a task through another user's notice id. Test: another user's id answers 403, a missing id 404.
 - `act` with done puts away the task's other notices for every recipient. A cancel by an assignee answers 403.
 - A postponed task: the old notices are dismissed and a new one is written for the new time.
 - Paging: two pages through `before` give every row once.

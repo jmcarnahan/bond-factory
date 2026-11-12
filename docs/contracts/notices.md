@@ -24,6 +24,11 @@ Per recipient R with settings P and zone Z (R's stored zone if it is a known nam
 - Sweep cadence: a tick claims only the stage current at that moment, and the `due` stage lasts 15 minutes (`DUE_WINDOW`). A sweep that runs less often than every 15 minutes can miss it (the next sweep claims the `past` stage). Run it every minute, never above 15.
 - Each tick claims only the current stage and seq, never earlier ones. A missed day makes seq jump. Two sweeps in a
   day make one row. `since` marks stage times before it as ledger status `skipped` (not sent) so a first run does not flood.
+  `since` does not stop a task that is already overdue at activation: it is claimed again on each following morning
+  up to `max_past`. To switch the sweep on over old tasks pass `grandfather_before=<activation time>`: a task whose
+  `due_at` is before it is recorded `skipped` for every stage, so it never sends. Rows with a NULL `due_at` are
+  invisible to the sweep and the sweep's own backfill fills 500 rows a pass, so a large adopter backfills to
+  completion first (`backfill_due_at(..., open_only=True)`).
 - Only open tasks with a non-null `due_at` have stages. A timed task whose `due_at` is null has no stages.
 - Recipients (`default_recipients(task, stage)`). The responsible user is the assignee, else the owner. An app may pass its own `Recipients`.
 
@@ -85,6 +90,15 @@ A crash between a send and its stamp sends again after the lease. An app must to
   local copy when the synced notice arrives, and skips one still shown in the notification centre.
 - A device registered a minute after a notice was sent does not receive that notice.
 
+### Attempts and at-most-once
+
+- `Notice.attempt` is 1 on the first delivery and one more for each redelivery after an expired lease (outbox
+  notices only; an inbox notice carries 1). A channel with no idempotency key checks for a duplicate only when
+  `attempt > 1`.
+- `deliver_pending(..., at_most_once=[channel, ...])`: for those channels `delivered_at` is stamped and committed
+  BEFORE the send, so a crash loses a notice instead of repeating it. A send that then fails or raises also sets
+  `failed_at`, and a later `retryable` verdict is counted failed and never retried.
+
 ## Notice wire shape
 
 `{id, user_id, kind, title, body, data, created_at, read_at, dismissed_at}`. `kind` is `task_due`. `data` is
@@ -117,8 +131,10 @@ is 403 `not_task_owner`. An action id other than the three is 422 `invalid_actio
 | `POST /push/devices` (201) | `{device_id, token, platform (ios), environment, topic?}` | `{device_id}` |
 | `DELETE /push/devices/{device_id}` (204) | none | none |
 
-`act` loads the notice and the app checks it is the caller's (404 `notice_not_found`, 403 `not_notice_owner`), loads its task, applies the action (`apply_notice_action`), marks the notice read, and on done or cancel puts away the task's other notices. The
-`act` route and the device routes are the app's own. In the example, `act` needs the `tasks.write` capability (read and dismiss need only a session). `GET /notices` shows the user's own, undismissed notices, newest
+`bond_notify_py.routes.make_notices_router` serves every notice route above; `act` is mounted only when the host passes `on_act` (which applies the action and may return a mapping merged beside `notice`). The act route does not read a `time_zone` query value.
+
+`act` loads the notice with `bond_notify_py.get_owned(session, Notice, user_id, notice_id)` FIRST (404 `notice_not_found`, 403 `not_notice_owner`), because `apply_notice_action` never sees the notice and a route that skips the check lets any user complete or cancel a task through another user's notice id. It then loads the task, applies the action (`apply_notice_action`), marks the notice read, and on done or cancel puts away the task's other notices. The
+device routes are the app's own. `bond_notify_py.routes.make_notices_router` serves `act` when the host gives `on_act` (the task action) and, if it wants one, a capability check (`act_dep`); a host may still write its own `act` route by the rule above. In the example, `act` needs the `tasks.write` capability (read and dismiss need only a session). `GET /notices` shows the user's own, undismissed notices, newest
 first by `(created_at, id)`. `list_notices` also returns the next cursor: an app that pages sends it as `before`. Errors: 404 `notice_not_found`, 403 `not_notice_owner`, 422 `invalid_cursor`. Device
 errors (`PushError`): 422 `invalid_platform`, `invalid_environment`, `token_required`, `device_id_required`,
 `token_too_long`, `device_id_too_long`, `invalid_topic`, `topic_too_long`; 404 `device_not_found`; 403

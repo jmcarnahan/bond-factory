@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from .errors import InvalidAttendee
+
 #: The keys an ``EventPatch`` may carry (same names as ``CalendarEventDraft``). Absent keys are left alone.
 PATCH_KEYS = (
     "subject", "start", "end", "is_all_day", "location", "body", "body_type", "categories", "attendees",
@@ -70,8 +72,13 @@ class CalendarEventDraft:
     body: str | None = None
     body_type: str = "text"  # "text" | "html"
     categories: list[str] = field(default_factory=list)
-    attendees: list[str] = field(default_factory=list)  # e-mail addresses
+    #: E-mail addresses, or a ``Person`` (display name plus address) so the name is written to the provider too.
+    attendees: list[str | Person] = field(default_factory=list)
     reminder_minutes: int | None = None
+    #: Create only. True switches the reminder off on a new event instead of leaving the mailbox default.
+    #: Ignored when ``reminder_minutes`` is set. Not a patch key: to clear a reminder later, patch
+    #: ``reminder_minutes`` to None.
+    reminder_off: bool = False
 
 
 @dataclass
@@ -83,3 +90,28 @@ class EventPage:
 def to_utc(value: datetime) -> datetime:
     """Aware UTC; a naive datetime is taken as already UTC."""
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def attendee_parts(value: str | Person) -> tuple[str | None, str]:
+    """``(display name, address)`` of a draft or patch attendee. A plain string is an address with no name."""
+    if isinstance(value, Person):
+        if not value.email:
+            raise InvalidAttendee()
+        return (value.name or None), value.email
+    return None, value
+
+
+def merged_attendees(values: list[str | Person] | None) -> list[str | Person]:
+    """The attendees with duplicates merged by lower-cased address, in first-seen order. When one address appears
+    twice, an entry with a display name wins over one without (the first named entry if both have one)."""
+    seen: dict[str, int] = {}
+    out: list[str | Person] = []
+    for value in values or []:
+        name, address = attendee_parts(value)  # raises InvalidAttendee for a Person with no address
+        key = address.lower()
+        if key not in seen:
+            seen[key] = len(out)
+            out.append(value)
+        elif name and not attendee_parts(out[seen[key]])[0]:
+            out[seen[key]] = value
+    return out

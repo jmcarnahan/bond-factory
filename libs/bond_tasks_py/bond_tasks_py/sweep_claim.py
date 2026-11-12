@@ -21,7 +21,7 @@ def table_of(model: Any) -> Any:
     return getattr(model, "__table__", model)
 
 
-def make_notice(row: dict) -> Notice:
+def make_notice(row: dict, attempt: int = 1) -> Notice:
     """The notice a ledger row stands for (the same shape from the claim and from the outbox)."""
     payload = row["payload"]
     return Notice(
@@ -29,7 +29,7 @@ def make_notice(row: dict) -> Notice:
         kind=payload["kind"], title=payload["title"], body=payload["body"],
         due_at=parse_iso(payload["due_at"]) if payload.get("due_at") else None, priority=payload.get("priority"),
         route=payload.get("route"), created_at=row["claimed_at"], actions=tuple(payload.get("actions", ())),
-        last=bool(payload.get("last", False)))
+        last=bool(payload.get("last", False)), attempt=attempt)
 
 
 def payload_of(*, title: str, body: str, due_at: datetime | None, priority: int | None, route: str,
