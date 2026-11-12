@@ -7,6 +7,13 @@ def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def to_naive_utc(value: datetime) -> datetime:
+    """An aware datetime converted to UTC and made naive; a naive one is taken to be UTC already."""
+    if value.tzinfo is not None:
+        return value.astimezone(UTC).replace(tzinfo=None)
+    return value
+
+
 def iso_z(value: datetime | None) -> str | None:
     """Naive UTC (or aware, converted) to ``2030-01-01T12:00:00Z``; None stays None."""
     if value is None:

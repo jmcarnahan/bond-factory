@@ -69,3 +69,12 @@ closed, changes since the last sync). All use the one id, so a second arrival re
   and records the row that still fails.
 - The lead for "close" is capped at 10080 minutes when it is used. A larger stored value is accepted on
   input, as before, and treated as 10080.
+- Amended during the build: a row whose notifier cannot write is NOT recorded. It is logged, counted in the
+  sweep's result, and tried again by the next sweep while its stage is current, so an outage of the inbox
+  loses nothing. (This replaces "records the row that still fails" above.)
+- Delivery stamps and commits one row at a time, leases an exact number of rows, and, when given the task
+  model, drops a queued notice whose task was finished, cancelled, deleted or postponed.
+- Retention, in full: rows of tasks closed for 30 days; for open tasks, close and due rows after 8 days, past
+  rows older than 2 days except the newest, and rows of an earlier deadline after 8 days.
+- The inbox puts away a task's older notices when a notice for a new due time is written; the app calls
+  `dismiss_for_source` when a task is finished and `dismiss_stale` when its due time changes.

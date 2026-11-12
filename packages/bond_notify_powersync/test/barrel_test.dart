@@ -4,16 +4,16 @@ import 'package:bond_sync_powersync/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('shell names exist', () {
+  test('public names exist and nothing is left unimplemented', () async {
     expect(kNoticesTable, 'notices');
     expect(kPushDevicesTable, 'push_devices');
-    expect(noticesTables, throwsUnimplementedError);
-    expect(pushDevicesTables, throwsUnimplementedError);
+    expect(noticesTables(), hasLength(1));
+    expect(pushDevicesTables(), hasLength(1));
     final feed = WatchNoticeFeed(FakeSyncDb(), userId: 'u');
-    expect(feed.refresh, throwsUnimplementedError);
+    await feed.refresh();
     feed.dispose();
     final devices = SyncPushDevices(FakeSyncDb(), userId: 'u');
-    expect(() => devices.unregister('d'), throwsUnimplementedError);
-    expect(() => devices.register(const PushToken(value: 'x'), deviceId: 'd'), throwsUnimplementedError);
+    await devices.unregister('d');
+    await devices.register(const PushToken(value: 'x'), deviceId: 'd');
   });
 }

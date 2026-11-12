@@ -11,6 +11,8 @@ CODES: dict[str, tuple[int, str]] = {
     "due_time_requires_date": (422, "A due time needs a due date."),
     "id_taken": (409, "That id is already in use."),
     "invalid_time_zone": (422, "That time zone is not known."),
+    "invalid_action": (422, "That notice action is not known."),
+    "invalid_work_day": (422, "The work day needs different start and end times."),
     "invalid_priority": (422, "Priority is 1 (low), 2 (normal) or 3 (high)."),
 }
 

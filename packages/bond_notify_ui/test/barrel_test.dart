@@ -4,19 +4,17 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shell widgets build as placeholders', (t) async {
-    await t.pumpWidget(
-      const Directionality(
-        textDirection: TextDirection.ltr,
-        child: Column(
-          children: [
-            BondNoticeList(notices: [Notice(id: 'a')], semanticsPrefix: 'p'),
-            BondNoticeRow(notice: Notice(id: 'a'), semanticsId: 'r'),
-            BondNoticeBadge(count: 2, semanticsId: 'b'),
-          ],
-        ),
-      ),
+  test('barrel exports every public name', () {
+    final now = DateTime(2026, 3, 12);
+    expect(
+      [
+        BondNoticeList(notices: const [], now: now),
+        BondNoticeRow(notice: const Notice(id: 'a'), now: now),
+        const BondNoticeBadge(unread: 1),
+      ],
+      everyElement(isA<Widget>()),
     );
-    expect(t.takeException(), isNull);
+    expect(noticeWhen(null, now, const NoticeLabels()), '');
+    expect(kNoticeActionOrder, ['done', 'snooze', 'cancel']);
   });
 }

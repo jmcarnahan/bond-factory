@@ -15,6 +15,7 @@ dependencies:
     path: ../bond_push
   bond_sync_powersync:
     path: ../bond_sync_powersync
+  crypto: ^3.0.0
   powersync: ^2.5.0
 dev_dependencies:
   flutter_test:

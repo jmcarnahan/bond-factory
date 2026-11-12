@@ -10,22 +10,47 @@ from functools import cache
 from typing import Any
 from zoneinfo import ZoneInfo, available_timezones
 
+from sqlalchemy import and_, or_, select
+
 from bond_tasks_py.models import TaskStatus
 from bond_tasks_py.protocols import Preferences, UserPrefs
-from bond_tasks_py.timeutil import local_to_utc, to_naive_utc
+from bond_tasks_py.timeutil import local_to_utc, parse_hhmm, to_naive_utc
 
 
 def compute_due_at(due_date: date | None, due_time: str | None, *, writer_zone: str | None,
-                   responsible_prefs: UserPrefs, app_tz: str, client_due_at: datetime | None = None
-                   ) -> datetime | None:
+                   responsible_prefs: UserPrefs, app_tz: str, client_due_at: datetime | None = None,
+                   sent_zone: str | None = None) -> datetime | None:
     """The due instant of a task, or None when undated: a timed task uses the writer's zone, a date-only task the
-    responsible user's end of day and zone. A client value is a hint for a timed task only.
+    responsible user's end of day and zone. A client value is a hint for a timed task only. ``writer_zone`` is the
+    zone to compute with when no hint is accepted (the zone sent, else the stored one); a hint is checked only
+    against ``sent_zone``, the zone name that came with the same write, and otherwise accepted when plausible.
 
     When ``due_at`` is recomputed: only when a write changes ``due_date``, ``due_time`` or ``assigned_user_id``
     to a value that DIFFERS from the stored one, so a form that resends unchanged values from another zone does
     not move a timed task's instant. Clearing ``due_date`` clears ``due_at``. A write that changes none of the
     three keeps ``due_at``."""
-    raise NotImplementedError("due.compute_due_at is not implemented yet")
+    if due_date is None:
+        return None
+    if due_time:
+        wall = datetime.combine(due_date, parse_hhmm(due_time))
+        zone = writer_zone if writer_zone and valid_zone(writer_zone) else app_tz
+        computed = local_to_utc(due_date, parse_hhmm(due_time), zone).replace(second=0, microsecond=0)
+        if client_due_at is not None and _hint_ok(wall, to_naive_utc(client_due_at), sent_zone):
+            return to_naive_utc(client_due_at).replace(second=0, microsecond=0)
+        return computed
+    zone = next((z for z in (responsible_prefs.time_zone, writer_zone) if z and valid_zone(z)), app_tz)
+    return local_to_utc(due_date, responsible_prefs.end_of_day, zone).replace(second=0, microsecond=0)
+
+
+def _hint_ok(wall: datetime, client: datetime, sent_zone: str | None) -> bool:
+    """A device's ``due_at`` for a timed task: a plausible whole-quarter-hour offset from the wall clock, and equal to
+    the zone's own result when a valid zone name came with it. Anything else is ignored, never an error."""
+    offset = wall - client
+    if offset % timedelta(minutes=15) != timedelta(0) or not timedelta(hours=-12) <= offset <= timedelta(hours=14):
+        return False
+    if sent_zone and valid_zone(sent_zone):
+        return local_to_utc(wall.date(), wall.time(), sent_zone) == client
+    return True
 
 
 def end_of_day_due(day: date, eod: time, zone: str) -> datetime:
@@ -65,13 +90,42 @@ def recompute_day_due(session: Any, *, task_model: Any, user_id: str, prefs: Pre
                       now: datetime) -> int:
     """Recompute ``due_at`` of the user's open date-only tasks after their end of day or zone changed. Returns the
     number changed."""
-    raise NotImplementedError("due.recompute_day_due is not implemented yet")
+    prefs_of = prefs.for_user(session, user_id)
+    tasks = session.execute(select(task_model).where(
+        task_model.status == TaskStatus.OPEN.value, task_model.due_date.is_not(None), task_model.due_time.is_(None),
+        or_(task_model.assigned_user_id == user_id,
+            and_(task_model.assigned_user_id.is_(None), task_model.owner_user_id == user_id)))).scalars().all()
+    changed = 0
+    for task in tasks:
+        new = compute_due_at(task.due_date, None, writer_zone=None, responsible_prefs=prefs_of, app_tz=tz)
+        if new != task.due_at:
+            task.due_at = new
+            changed += 1
+    if changed:
+        session.flush()
+    return changed
 
 
 def backfill_due_at(session: Any, *, task_model: Any, prefs: Preferences, tz: str, now: datetime,
                     limit: int = 1000) -> int:
     """Fill ``due_at`` for dated tasks that have none (the sweep repairs them). Returns the number filled."""
-    raise NotImplementedError("due.backfill_due_at is not implemented yet")
+    memo: dict[str, UserPrefs] = {}
+
+    def prefs_of(user_id: str) -> UserPrefs:
+        if user_id not in memo:
+            memo[user_id] = prefs.for_user(session, user_id)
+        return memo[user_id]
+
+    tasks = session.execute(select(task_model).where(task_model.due_date.is_not(None), task_model.due_at.is_(None))
+                            .order_by(task_model.created_at, task_model.id).limit(limit)).scalars().all()
+    for task in tasks:
+        responsible = prefs_of(task.assigned_user_id or task.owner_user_id)
+        writer = prefs_of(task.created_by).time_zone if task.due_time else None
+        task.due_at = compute_due_at(task.due_date, task.due_time, writer_zone=writer, responsible_prefs=responsible,
+                                     app_tz=tz)
+    if tasks:
+        session.flush()
+    return len(tasks)
 
 
 @cache

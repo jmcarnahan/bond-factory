@@ -2,6 +2,7 @@ import 'package:bond_tasks/bond_tasks.dart';
 import 'package:bond_ui/bond_ui.dart';
 import 'package:flutter/material.dart';
 
+import 'bond_priority_chip.dart';
 import 'task_format.dart';
 
 /// One task: complete button, title, due text, assignee, status and checklist
@@ -16,8 +17,12 @@ class BondTaskRow extends StatelessWidget {
     this.labels = const TaskLabels(),
     this.semanticsId,
     this.completeSemanticsId,
+    this.now,
   });
 
+  /// With a [now] the row judges overdue by the one rule (`isOverdue`); without
+  /// it the task's own `overdue` flag decides. A normal priority shows no chip.
+  final DateTime? now;
   final Task task;
   final VoidCallback? onTap;
   final VoidCallback? onComplete;
@@ -32,7 +37,8 @@ class BondTaskRow extends StatelessWidget {
     final bl = BondLabels.of(context);
     final done = task.status != TaskStatus.open;
     final due = formatDue(task, bl);
-    final late = task.overdue && !done;
+    final late = !done && (now != null ? isOverdue(task, now!) : task.overdue);
+    final p = task.priority;
     final progress = task.checklist.isEmpty
         ? null
         : labels.checklistProgress(task.checklistDone, task.checklist.length);
@@ -61,6 +67,7 @@ class BondTaskRow extends StatelessWidget {
             runSpacing: BondSpace.s4,
             children: [
               if (task.assignedUserId != null) BondPersonChip(label: task.assigneeName ?? labels.unassigned, slot: 0),
+              if (p != null && p != TaskPriority.normal && !done) BondPriorityChip(priority: p, labels: labels),
               if (late) BondStatusChip(BondStatus(labels.overdue, tone: BondToneRole.danger)),
               if (done) BondStatusChip(BondStatus(labels.statusText(task.status), tone: BondToneRole.positive)),
             ],

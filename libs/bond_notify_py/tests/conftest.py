@@ -1,7 +1,10 @@
 import json
+import os
 from pathlib import Path
 
-from sqlalchemy.orm import DeclarativeBase
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from bond_notify_py import NoticesMixin
 
@@ -18,3 +21,31 @@ class Notice(NoticesMixin, Base):
 
 def fixture(name: str):
     return json.loads((FIXTURES / name).read_text())
+
+
+@pytest.fixture
+def pg_engine():
+    """A PostgreSQL engine for tests marked ``postgres``; skipped unless BOND_TEST_POSTGRES_URL is set."""
+    url = os.environ.get("BOND_TEST_POSTGRES_URL")
+    if not url:
+        pytest.skip("BOND_TEST_POSTGRES_URL is not set")
+    engine = create_engine(url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    try:
+        yield engine
+    finally:
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+@pytest.fixture(params=["sqlite", pytest.param("postgres", marks=pytest.mark.postgres)])
+def session(request):
+    """The same service tests on in-memory SQLite and, when BOND_TEST_POSTGRES_URL is set, on PostgreSQL."""
+    if request.param == "postgres":
+        engine = request.getfixturevalue("pg_engine")
+    else:
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+    with Session(engine) as s:
+        yield s

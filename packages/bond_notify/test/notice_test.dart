@@ -84,7 +84,8 @@ void main() {
       final n = await api.act('n1', 'done');
       expect(seen.single.url.path, '/v1/notices/n1/act');
       expect(jsonDecode(seen.single.body), {'action': 'done'});
-      expect(n.taskId, 'task-0001');
+      expect(n.notice.taskId, 'task-0001');
+      expect(n.task, isEmpty);
     });
   });
 

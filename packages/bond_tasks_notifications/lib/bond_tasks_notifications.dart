@@ -1,6 +1,7 @@
 /// Local task alerts, notice actions and the alerts coordinator (Flutter, iOS only).
 library;
 
+export 'src/alert_labels.dart';
 export 'src/alert_plugin.dart';
 export 'src/flutter_local_alert_plugin.dart';
 export 'src/flutter_time_zone_source.dart';

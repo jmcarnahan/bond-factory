@@ -30,11 +30,15 @@ class FakeAlertPlugin implements AlertPlugin {
   }
 
   @override
-  Future<void> show(AlertRequest r) async => shown.add(r);
+  Future<void> show(AlertRequest r) async {
+    shown.add(r);
+    if (!activeIds.contains(r.id)) activeIds.add(r.id);
+  }
 
   @override
   Future<void> cancel(int id) async {
     cancelled.add(id);
+    activeIds.remove(id);
     scheduled.removeWhere((s) => s.id == id);
   }
 
@@ -46,6 +50,12 @@ class FakeAlertPlugin implements AlertPlugin {
             payload: AlertTap(noticeId: r.noticeId, taskId: r.taskId, route: r.route).toPayload(),
           ),
       ];
+
+  /// What [active] reports: set it to pretend notifications are on the lock screen.
+  List<int> activeIds = [];
+
+  @override
+  Future<List<int>> active() async => List.of(activeIds);
 
   @override
   Future<AlertTap?> launchTap() async => launch;

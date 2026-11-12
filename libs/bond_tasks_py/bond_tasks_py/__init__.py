@@ -1,12 +1,13 @@
-"""Task models, services and reminder scheduling.
+"""Task models and services: the due instant, the day view, links, per-user settings, the three-stage notice
+sweep with its ledger and outbox, and the calendar mirror.
 
-Imports only sqlalchemy, pydantic and the standard library. The queue and the calendar enter through the
-``Scheduler``, ``CalendarMirror`` and ``MirrorProviders`` Protocols.
+Imports only sqlalchemy, pydantic and the standard library. Everything the host supplies enters through the
+Protocols in ``protocols.py`` and ``notify_protocols.py``.
 """
 
 from bond_tasks_py import service
 from bond_tasks_py.compose import default_compose
-from bond_tasks_py.dialect import dialect_insert
+from bond_tasks_py.dialect import dialect_insert, ensure_savepoint_safe, sqlite_savepoint_setup
 from bond_tasks_py.due import (
     backfill_due_at,
     compute_due_at,
@@ -73,8 +74,8 @@ from bond_tasks_py.protocols import (
     Scheduler,
     UserPrefs,
 )
-from bond_tasks_py.queries import TaskFilters, list_tasks, summary
-from bond_tasks_py.quiet import in_quiet_hours, next_work_start
+from bond_tasks_py.queries import TaskFilters, list_tasks, summary, viewer_today
+from bond_tasks_py.quiet import in_quiet_hours, next_work_start, sendable
 from bond_tasks_py.reminders import (
     JOB_TYPE,
     cancel_reminder,
@@ -96,16 +97,18 @@ from bond_tasks_py.service import (
     set_checklist_item,
     update,
 )
-from bond_tasks_py.settings_schema import SettingsUpdate
+from bond_tasks_py.settings_schema import SettingsUpdate, settings_item
 from bond_tasks_py.stages import (
+    MAX_LEAD_MINUTES,
     StageTime,
     current_stage,
     deadline_token,
+    effective_zone,
     fnv1a31,
     notice_id,
     stage_times,
 )
-from bond_tasks_py.sweep import SweepResult, sweep_due
+from bond_tasks_py.sweep import SweepResult, default_recipients, sweep_due
 from bond_tasks_py.sync_routes import TaskRoute, sync_routes, verdict_for
 from bond_tasks_py.today import TodayResult, today
 from bond_tasks_py.usersettings import (
@@ -119,7 +122,7 @@ from bond_tasks_py.usersettings import (
 __version__ = "0.1.0"
 
 __all__ = [
-    "CODES", "ITEM_KEYS", "JOB_TYPE", "LINK_KIND_CONTACT", "NOTICE_ACTIONS", "NOTICE_CATEGORY", "STAGES",
+    "CODES", "ITEM_KEYS", "JOB_TYPE", "LINK_KIND_CONTACT", "MAX_LEAD_MINUTES", "NOTICE_ACTIONS", "NOTICE_CATEGORY", "STAGES",
     "TASK_COLUMNS", "TASK_LINK_INDEX_COLUMNS", "TASK_NOTICE_LEDGER_COLUMNS", "TASK_NOTICE_OUTBOX_COLUMNS",
     "TASK_USER_SETTINGS_COLUMNS", "USE_DEFAULT_REMINDER", "AfterWrite", "CalendarMirror", "ChecklistInput",
     "Compose", "DefaultPermissions", "DeliverResult", "LinkInput", "LinkResolver", "MirrorDraft", "MirrorPointer",
@@ -129,11 +132,11 @@ __all__ = [
     "TaskRoute", "TaskStatus", "TaskUpdate", "TaskUserSettingsMixin", "TasksMixin", "TodayResult",
     "TransactionalNotifier", "UserPrefs", "apply_extras", "apply_notice_action", "backfill_due_at", "cancel",
     "cancel_reminder", "classify", "complete", "compute_due_at", "compute_remind_at", "create", "current_stage",
-    "deadline_token", "dedupe_key", "default_compose", "delete", "deliver_pending", "dialect_insert",
-    "end_of_day_due", "fire_reminder", "fnv1a31", "get", "get_settings", "in_quiet_hours", "is_overdue",
+    "deadline_token", "dedupe_key", "default_compose", "default_recipients", "delete", "deliver_pending", "dialect_insert",
+    "effective_zone", "end_of_day_due", "ensure_savepoint_safe", "fire_reminder", "fnv1a31", "get", "get_settings", "in_quiet_hours", "is_overdue",
     "list_tasks", "local_day_bounds", "make_link_hook", "mark_mirror", "mirror_eligible", "next_local_time",
     "next_work_start", "notice_id", "prune_ledger", "recompute_day_due", "reindex_links", "remove_event",
-    "remove_links", "reopen", "retarget_links", "schedule_reminder", "service", "set_checklist_item",
+    "remove_links", "reopen", "retarget_links", "schedule_reminder", "sendable", "service", "set_checklist_item", "settings_item", "sqlite_savepoint_setup",
     "stage_times", "summary", "sweep_due", "sync_mirror", "sync_routes", "task_item", "task_items", "today",
-    "update", "update_settings", "valid_zone", "verdict_for",
+    "update", "update_settings", "valid_zone", "verdict_for", "viewer_today",
 ]

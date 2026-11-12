@@ -1,6 +1,5 @@
 import 'package:bond_tasks/bond_tasks.dart';
 import 'package:bond_tasks_ui/bond_tasks_ui.dart';
-import 'package:bond_test_support/bond_test_support.dart';
 import 'package:bond_ui/bond_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -205,6 +204,94 @@ void main() {
     expect(find.text('Gone'), findsNothing);
     await _tapText(t, 'Save task');
     expect(got.single.checklist, isEmpty);
+  });
+
+  testWidgets('priority: none by default, a choice lands in the draft and in the patch', (t) async {
+    final got = <TaskDraft>[];
+    await pumpAt(
+      t,
+      BondTaskForm(today: kToday, onSubmit: got.add, initial: const Task(id: 'x', title: 'T')),
+    );
+    await _tapText(t, 'Save task');
+    expect(got.last.priority, isNull);
+    await _tapText(t, 'High');
+    await _tapText(t, 'Save task');
+    expect(got.last.priority, TaskPriority.high);
+    expect(got.last.toJson()['priority'], 3);
+    expect(TaskPatch.fromDraft(got.last).priority, const Present(TaskPriority.high));
+    await _tapText(t, 'No priority');
+    await _tapText(t, 'Save task');
+    expect(got.last.priority, isNull);
+  });
+
+  testWidgets('an edit keeps the priority it started with', (t) async {
+    final got = <TaskDraft>[];
+    await pumpAt(
+      t,
+      BondTaskForm(today: kToday, onSubmit: got.add, initial: const Task(id: 'x', title: 'T', priority: TaskPriority.low)),
+    );
+    await _tapText(t, 'Save task');
+    expect(got.single.priority, TaskPriority.low);
+  });
+
+  testWidgets('"Use my default" lands as -3; an existing -3 is kept', (t) async {
+    final got = <TaskDraft>[];
+    await pumpAt(
+      t,
+      BondTaskForm(today: kToday, onSubmit: got.add, initial: const Task(id: 'x', title: 'T')),
+    );
+    await _tapText(t, 'Use my default');
+    await _tapText(t, 'Save task');
+    expect(got.single.remindMinutesBefore, kRemindUseDefault);
+    got.clear();
+    await pumpAt(
+      t,
+      BondTaskForm(
+        today: kToday,
+        onSubmit: got.add,
+        initial: const Task(id: 'x', title: 'T', remindMinutesBefore: kRemindUseDefault),
+      ),
+    );
+    await _tapText(t, 'Save task');
+    expect(got.single.remindMinutesBefore, kRemindUseDefault);
+  });
+
+  testWidgets('links: with onSearchLinks the picker shows, adds and removes; without it links are kept', (t) async {
+    final got = <TaskDraft>[];
+    const dana = TaskLink(kind: 'contact', id: 'c1', label: 'Dana Fox');
+    const eli = TaskLink(kind: 'contact', id: 'c2', label: 'Eli Stone');
+    await pumpAt(
+      t,
+      BondTaskForm(
+        today: kToday,
+        onSubmit: got.add,
+        initial: const Task(id: 'x', title: 'T', links: [dana]),
+      ),
+    );
+    expect(find.text('Search to link a record'), findsNothing);
+    await _tapText(t, 'Save task');
+    expect(got.single.links, [dana], reason: 'no picker, links stay as they were');
+    got.clear();
+
+    await pumpAt(
+      t,
+      BondTaskForm(
+        today: kToday,
+        onSubmit: got.add,
+        initial: const Task(id: 'x', title: 'T', links: [dana]),
+        onSearchLinks: (kind, q) async => [eli],
+      ),
+    );
+    final box = find.widgetWithText(TextField, 'Search to link a record');
+    await t.ensureVisible(box);
+    await t.enterText(box, 'el');
+    await t.pump(const Duration(milliseconds: 300));
+    await t.pump();
+    await _tapText(t, 'Eli Stone');
+    await _tapText(t, 'Dana Fox');
+    await _tapText(t, 'Save task');
+    expect(got.single.links, [eli]);
+    await expectNoOverlays(t);
   });
 
   testWidgets('semantics ids follow the prefix', (t) async {

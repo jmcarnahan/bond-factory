@@ -19,7 +19,6 @@ void main() {
     expect(PluginPushTokenSource().token, isA<Function>());
     expect(PluginPushTaps().initialTap, isA<Function>());
     final registrar = PushRegistrar(source, _Devices(), deviceId: 'd');
-    expect(registrar.start, throwsUnimplementedError);
     registrar.dispose();
   });
 

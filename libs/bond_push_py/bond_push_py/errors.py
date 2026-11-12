@@ -7,6 +7,13 @@ CODES: dict[str, tuple[int, str]] = {
     "token_required": (422, "A device token is required."),
     "device_id_required": (422, "A device id is required."),
     "push_not_configured": (503, "Push is not configured."),
+    "token_too_long": (422, "The device token is too long."),
+    "device_id_too_long": (422, "The device id is too long."),
+    "invalid_topic": (422, "The topic must be text."),
+    "topic_too_long": (422, "The topic is too long."),
+    "device_not_found": (404, "No such device."),
+    "not_device_owner": (403, "That device belongs to another user."),
+    "device_conflict": (409, "That device id is already in use."),
 }
 
 

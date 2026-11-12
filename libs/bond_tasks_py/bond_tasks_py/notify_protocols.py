@@ -14,7 +14,7 @@ from bond_tasks_py.protocols import UserPrefs
 
 STAGES = ("close", "due", "past")
 NOTICE_ACTIONS = ("done", "snooze", "cancel")
-NOTICE_CATEGORY = "bond.task"  # one category id on every path (local, Apple push)
+NOTICE_CATEGORY = "bond.task"  # the base notification category on the phone; "<this>.owner" also offers Cancel
 
 
 @dataclass(frozen=True)
@@ -50,4 +50,5 @@ class Recipients(Protocol):
     def for_stage(self, session: Any, task: Any, stage: str) -> list[str]: ...
 
 
-Compose = Callable[[Any, str, int, UserPrefs], tuple[str, str]]  # (task, stage, seq, prefs) -> (title, body)
+# (task, stage, seq, prefs) -> (title, body). `last` is not passed: compare seq with the max_past given to sweep_due.
+Compose = Callable[[Any, str, int, UserPrefs], tuple[str, str]]

@@ -1,0 +1,4 @@
+tags:
+  real_db:
+    # Opens a real PowerSync database; needs the core library that powersync's
+    # build hook downloads on first run (network once, then cached in build/).

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0 - unreleased
+- Not exported (internal splits): `BondTaskFormDue`, `BondTaskFormExtras`, `BondCaptureLinkRow`, `BondCaptureWhen`.
+- `sectionOf(..., now:)` is exactly `sectionTasks`; `BondStageBanner` draws nothing for `upcoming`; a time needs a
+  date in the capture card (no "Add a time" without a date, Accept refuses it); the capture card reads a UTC `now`
+  in the local zone; `BondTaskSettingsForm` follows settings that load later unless the person edited; rows in
+  the lists carry the task id as key. `make test` sets `TZ=America/Los_Angeles`.
+- New widgets: `BondPriorityChip`, `BondLinkChip`, `BondLinkPickerRow`, `BondTodayList` (Overdue, Today, No date,
+  Done today with counts), `BondDueLane` (one calendar day), `BondDueMarker` (a count for a `BondMonthGrid` cell),
+  `BondStageBanner` (inline, with Done, Snooze, Cancel task), `BondCaptureReview`, `BondCaptureItemCard`,
+  `BondCaptureLinkRow`, `BondDictationSlot`, `BondTaskSettingsForm`.
+- The capture card edits date, time and priority inline (`BondCaptureWhen`: the date field, the time field, "Add a
+  time" / "Remove time", and an all-day switch for an event that clears the time); a new date clears "date guessed".
+  `BondCaptureReview` and `BondCaptureItemCard` take an optional `today`.
+- `BondTaskForm` gains priority (none, low, normal, high), links (`onSearchLinks`) and the reminder choice "Use my
+  default" (-3); the due part and the priority and links part are now `BondTaskFormDue` and `BondTaskFormExtras`.
+- `BondTaskRow` and `BondTaskList` take an optional `now`: overdue then follows `isOverdue`, not the stale flag. A
+  row shows a chip for a high or low priority. `sectionOf(..., {now})`; `formatDue` shows a timed task's instant in
+  the device zone; new `formatTimeOfDay`.
+- Labels (in `bond_tasks`): `TaskLabels.remindDefault` now reads "Use my default"; new strings for priority, links,
+  the day views and markers; `CaptureLabels` and `SettingsLabels` gain a few strings.
+
 ## 0.1.0 - unreleased
 - `BondTaskRow`, `BondTaskList` (sections overdue, today, upcoming, no date, done; empty, loading and error
   states), `BondTaskForm` (title, notes, date, time, assignee, checklist, reminder, mirror; inline validation),

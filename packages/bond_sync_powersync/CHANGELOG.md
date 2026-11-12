@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- `waitForUploadDrain(db, {timeout, poll})`: true once the CRUD queue is empty, false on timeout. Call it between the last
+  local write and a sign-out clear.
+- `FakeSyncDb.tables(..., applySql: true, columns: {...})` evaluates SQL against `tables`: INSERT (also OR REPLACE),
+  UPDATE and DELETE change the rows and pulse `changes`; SELECT honours WHERE, ORDER BY and LIMIT; a column not
+  in `columns` throws. Off by default; `refineRows` still wins. A statement shape it cannot read throws.
 - `package:bond_sync_powersync/testing.dart` exports `FakeSyncDb`, `Stmt`, `CrudRig` for other packages' tests
   (`test/fake_sync_db.dart` re-exports it).
 - The fake gains a watch controller per SQL (`watchControllerFor`; `watchController` still reaches every

@@ -48,6 +48,6 @@ void main() {
     expect(NoticeActionHandler.new, isA<Function>());
     expect(TaskAlertsCoordinator.new, isA<Function>());
     expect(const PendingAlert(id: 1).payload, isNull);
-    expect(FlutterTimeZoneSource().currentZone, throwsUnimplementedError);
+    expect(const AlertLabels().titleFor('due'), 'Due now');
   });
 }

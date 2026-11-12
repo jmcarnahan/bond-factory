@@ -1,22 +1,9 @@
 import hashlib
 from datetime import UTC, datetime
 
-import pytest
 from conftest import Notice, fixture
 
-from bond_notify_py import (
-    NOTICE_KEYS,
-    InboxNotifier,
-    dismiss,
-    dismiss_for_source,
-    list_notices,
-    mark_all_read,
-    mark_read,
-    notice_cursor,
-    notice_item,
-    notice_routes,
-    prune_notices,
-)
+from bond_notify_py import NOTICE_KEYS, notice_cursor, notice_item
 
 NOW = datetime(2026, 11, 12, 15, 0, 0)
 
@@ -51,22 +38,6 @@ def test_notice_item_tolerates_sparse_data_and_does_not_mutate():
     assert item["data"]["actions"] == [] and item["data"]["last"] is False and item["data"]["due_at"] is None
     assert row.data == {}
     assert item["created_at"] == "2026-11-12T15:00:00Z" and item["read_at"] is None
-
-
-def test_stubs_raise_not_implemented():
-    calls = [
-        lambda: InboxNotifier(Notice).write(None, []),
-        lambda: list_notices(None, Notice, "u"),
-        lambda: mark_read(None, Notice, "u", "id", NOW),
-        lambda: mark_all_read(None, Notice, "u", NOW),
-        lambda: dismiss(None, Notice, "u", "id", NOW),
-        lambda: dismiss_for_source(None, Notice, "task", NOW),
-        lambda: prune_notices(None, Notice, NOW),
-        lambda: notice_routes(Notice),
-    ]
-    for call in calls:
-        with pytest.raises(NotImplementedError):
-            call()
 
 
 def recomputed_id(item: dict) -> str:

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../sync_db.dart';
+import 'fake_sql.dart' as sql_engine;
 
 /// One statement the adapter ran.
 class Stmt {
@@ -27,7 +28,23 @@ class FakeSyncDb implements SyncDb {
   /// A table-backed fake: `SELECT ... FROM <name>` reads answer from [tables]
   /// (rows are copied), unless [onGetAll] / [onGetOptional] answer first.
   /// [refineRows] narrows the rows for a given SQL (WHERE, ORDER) when a test needs it.
-  FakeSyncDb.tables(Map<String, List<SyncRow>> tables, {this.emitOnListen = false}) : tables = {...tables};
+  ///
+  /// With [applySql] the fake evaluates the SQL itself (see fake_sql.dart): INSERT / UPDATE / DELETE change
+  /// [tables] and pulse [changes]; SELECT honours WHERE, ORDER BY and LIMIT. [columns] (table -> names,
+  /// including `id`) makes an unknown column name in a statement throw. [refineRows] still wins when set.
+  FakeSyncDb.tables(
+    Map<String, List<SyncRow>> tables, {
+    this.emitOnListen = false,
+    this.applySql = false,
+    Map<String, Set<String>> columns = const {},
+  })  : tables = {for (final e in tables.entries) e.key: [for (final r in e.value) SyncRow.of(r)]},
+        columns = {...columns};
+
+  /// Evaluate SQL against [tables] (off by default: writes are only recorded).
+  bool applySql = false;
+
+  /// Known column names per table, checked only when [applySql] is on.
+  Map<String, Set<String>> columns = {};
 
   /// Rows by table name for the table-backed mode (empty otherwise).
   Map<String, List<SyncRow>> tables;
@@ -72,7 +89,9 @@ class FakeSyncDb implements SyncDb {
     final rows = name == null ? null : tables[name];
     if (rows == null) return scripted ?? const [];
     final copy = [for (final r in rows) SyncRow.of(r)];
-    return refineRows?.call(sql, params, copy) ?? copy;
+    final refined = refineRows?.call(sql, params, copy);
+    if (refined != null) return refined;
+    return applySql ? sql_engine.select(sql, params, copy, columns[name]) : copy;
   }
 
   SyncRow? _readOne(String sql, List<Object?> params) {
@@ -88,6 +107,7 @@ class FakeSyncDb implements SyncDb {
   Future<void> _exec(String sql, List<Object?> p, bool inTx) async {
     statements.add(Stmt(sql, p, inTx: inTx));
     if (failWhen?.call(sql) ?? false) throw StateError('scripted failure');
+    if (applySql && sql_engine.applyWrite(tables, columns, sql, p)) changes.add(null);
   }
 
   @override

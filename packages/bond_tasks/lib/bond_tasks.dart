@@ -15,6 +15,7 @@ export 'src/task_labels.dart';
 export 'src/task_labels_capture.dart';
 export 'src/task_priority.dart';
 export 'src/task_repository.dart';
+export 'src/task_sections.dart';
 export 'src/task_settings.dart';
 export 'src/task_settings_api.dart';
 export 'src/task_stage.dart';

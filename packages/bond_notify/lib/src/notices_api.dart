@@ -29,12 +29,22 @@ class NoticesApi {
   /// Marks every notice read; returns the new unread count.
   Future<int> readAll() async => jint(await client.postJson('$prefix/read-all'), 'unread_count') ?? 0;
 
-  /// Applies [action] (`done`, `snooze` or `cancel`) to the notice's task and
-  /// returns the updated notice (key `notice`).
-  Future<Notice> act(String id, String action) async {
+  /// Applies [action] (`done`, `snooze` or `cancel`) to the notice's task.
+  /// Returns the updated notice and the task as the server sent it.
+  Future<NoticeActResult> act(String id, String action) async {
     final m = await client.postJson('${_one(id)}/act', body: {'action': action});
     final n = jmap(m, 'notice');
     if (n == null) throw const JsonShapeError('notice', 'Map', 'null');
-    return Notice.fromJson(n);
+    return NoticeActResult(Notice.fromJson(n), jmap(m, 'task'));
   }
+}
+
+/// The answer to `POST /notices/{id}/act`: the notice and the task it changed.
+class NoticeActResult {
+  const NoticeActResult(this.notice, this.task);
+
+  final Notice notice;
+
+  /// The `TaskItem` wire map, or null when the server sent none.
+  final Map<String, Object?>? task;
 }

@@ -84,11 +84,17 @@ class EventCandidate:
 @dataclass(frozen=True)
 class CaptureResult:
     """``items`` are task and event candidates; ``degraded`` is True when no model answered; ``reason`` is then
-    ``model_unavailable`` or ``invalid_output``, else None."""
+    ``model_unavailable`` or ``invalid_output``, else None. ``dropped`` counts model items that were skipped
+    (invalid, empty title, too far out, or past the item limit); the wire key ``dropped`` appears only when it is
+    above zero, so a clean answer has the exact shape of ``expected_candidates.json``."""
 
     items: tuple = ()
     degraded: bool = False
     reason: str | None = None
+    dropped: int = 0
 
     def to_dict(self) -> dict:
-        return {"items": [item.to_dict() for item in self.items], "degraded": self.degraded, "reason": self.reason}
+        wire = {"items": [item.to_dict() for item in self.items], "degraded": self.degraded, "reason": self.reason}
+        if self.dropped:
+            wire["dropped"] = self.dropped
+        return wire

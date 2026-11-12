@@ -6,6 +6,16 @@ Graph and avalon-crm (app A) over Google. paga-time (app P) has no calendar and 
 `token: Callable[[], str]` and an `httpx.Client`. The working example is `services/sdk_example`
 (`calendar_wiring.py`, `routes/calendar.py`).
 
+## 0. What changed
+
+- Behaviour change to check first: Graph `update_event` now raises `ValueError` for a patch with `start` or `end` but no
+  `is_all_day` (it used to write UTC instants); add `is_all_day` to such patches, as Google already required.
+- All-day drafts: the date is the UTC date of `start` (the end: the UTC date of `end`, at least the day after), and
+  `MsGraphCalendarProvider(timezone=)` writes it as local midnight of that date in that zone, so the mailbox shows
+  the right day; Google is unchanged and takes no zone.
+  Create then read returns the same date. No zone, no change.
+- `refresh: Callable[[], str] | None` on both providers: one forced refresh and one retry on a 401.
+
 ## 1. What it replaces
 
 | App | Today | Becomes |
@@ -25,7 +35,7 @@ Graph and avalon-crm (app A) over Google. paga-time (app P) has no calendar and 
   `event.categories` in the app. `CalendarEvent.preview` is the raw Graph preview.
 - App A: the "needs scope / needs reconnect / unavailable" status dict. Map `ReconnectRequired` to needs reconnect,
   `Unavailable` to unavailable, and a 403 `CalendarError` with `code == "insufficientPermissions"` to needs scope.
-- Time zones: the lib is UTC end-to-end. A prose-derived "remind me Friday at 3" is converted to UTC by the app
+- Time zones: the lib is UTC end-to-end except all-day drafts (section 0). A prose-derived "remind me Friday at 3" is converted to UTC by the app
   before it builds the draft; the lib never interprets local wall-clock time. `MsGraphCalendarProvider(timezone=)`
   only chooses the `Prefer: outlook.timezone` header; responses are converted to UTC either way.
 

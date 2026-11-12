@@ -8,13 +8,14 @@ from bond_notify_py.serialize import NOTICE_KEYS, notice_item
 from bond_notify_py.service import (
     dismiss,
     dismiss_for_source,
+    dismiss_stale,
     list_notices,
     mark_all_read,
     mark_read,
     notice_cursor,
     prune_notices,
 )
-from bond_notify_py.sync_routes import NoticeRoute, notice_routes
+from bond_notify_py.sync_routes import NoticeRoute, notice_routes, verdict_for
 from bond_notify_py.timeutil import utcnow
 
 __version__ = "0.1.0"
@@ -30,6 +31,7 @@ __all__ = [
     "NoticesMixin",
     "dismiss",
     "dismiss_for_source",
+    "dismiss_stale",
     "list_notices",
     "mark_all_read",
     "mark_read",
@@ -38,4 +40,5 @@ __all__ = [
     "notice_routes",
     "prune_notices",
     "utcnow",
+    "verdict_for",
 ]

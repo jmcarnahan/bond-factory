@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "ruff>=0.6"]
+dev = ["pytest>=8.3", "ruff>=0.6", "psycopg[binary]>=3.2"]
 
 [build-system]
 requires = ["setuptools>=70", "wheel"]
@@ -29,3 +29,4 @@ target-version = "py312"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = ["postgres: needs a PostgreSQL database (BOND_TEST_POSTGRES_URL); skipped when unset"]

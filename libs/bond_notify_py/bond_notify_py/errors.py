@@ -4,6 +4,7 @@
 CODES: dict[str, tuple[int, str]] = {
     "notice_not_found": (404, "Notice not found."),
     "not_notice_owner": (403, "That notice belongs to someone else."),
+    "invalid_cursor": (422, "That page cursor is not valid."),
 }
 
 

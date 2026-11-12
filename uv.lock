@@ -131,6 +131,7 @@ version = "0.1.0"
 source = { editable = "libs/bond_calendar" }
 dependencies = [
     { name = "httpx" },
+    { name = "tzdata" },
 ]
 
 [package.optional-dependencies]
@@ -146,6 +147,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
+    { name = "tzdata", specifier = ">=2024.1" },
 ]
 provides-extras = ["dev"]
 
@@ -184,6 +186,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "httpx" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -191,6 +194,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'dev'", specifier = ">=3.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
@@ -207,12 +211,14 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'dev'", specifier = ">=3.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
@@ -260,6 +266,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -268,6 +275,7 @@ dev = [
 requires-dist = [
     { name = "cryptography", specifier = ">=42" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.27" },
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'dev'", specifier = ">=3.2" },
     { name = "pyjwt", specifier = ">=2.8" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },

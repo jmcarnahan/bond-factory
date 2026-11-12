@@ -106,6 +106,49 @@ void main() {
     expect(odd.items.length, 1);
   });
 
+  test('fnv1a31 matches a BigInt reference', () {
+    int reference(String s) {
+      var h = BigInt.from(0x811c9dc5);
+      final prime = BigInt.from(0x01000193);
+      final mask = BigInt.parse('FFFFFFFF', radix: 16);
+      for (final b in utf8.encode(s)) {
+        h = ((h ^ BigInt.from(b)) * prime) & mask;
+      }
+      return (h & BigInt.from(0x7FFFFFFF)).toInt();
+    }
+
+    final inputs = [
+      '',
+      'a',
+      'task|user|due|0|2026-03-12',
+      'x' * 2000,
+      List.generate(2000, (i) => String.fromCharCode(32 + i % 90)).join(),
+      'café über',
+      '日本語のタスク',
+      'emoji \u{1F600}\u{1F4CB}',
+      '\u0000ÿ',
+      'c97f90088051a722ab12c5581c641b57',
+    ];
+    for (final s in inputs) {
+      expect(fnv1a31(s), reference(s), reason: 'length ${s.length}');
+    }
+  });
+
+  test('the capture fixture parses and has no dropped key, so dropped is 0', () {
+    final m = _map('../capture/expected_candidates.json');
+    expect(m.containsKey('dropped'), isFalse);
+    expect(ParseResult.fromJson(m).dropped, m['dropped'] ?? 0);
+    expect(ParseResult.fromJson(m).items, isNotEmpty);
+  });
+
+  test('ParseResult.dropped is read when present and is 0 without the key', () {
+    expect(ParseResult.fromJson(_map('parse_response.json')).dropped, 0);
+    expect(ParseResult.fromJson({'items': []}).dropped, 0);
+    expect(ParseResult.fromJson({'items': [], 'dropped': 3}).dropped, 3);
+    expect(ParseResult.fromJson({'items': [], 'dropped': -2}).dropped, 0);
+    expect(const ParseResult().dropped, 0);
+  });
+
   test('notice ids match the shared fixture', () {
     for (final c in (_load('notice_ids.json') as List).cast<Map<String, Object?>>()) {
       final id = noticeId(c['task_id'] as String, c['user_id'] as String, c['stage'] as String, c['seq'] as int, c['token'] as String);

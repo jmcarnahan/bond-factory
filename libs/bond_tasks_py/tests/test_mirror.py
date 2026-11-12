@@ -313,3 +313,12 @@ def test_two_quick_syncs_leave_exactly_one_event(tmp_path):
     fresh = row(factory, task.id)
     assert len(shared.events) == 1 and list(shared.events) == [fresh.external_event_id]
     assert fresh.mirror_status == "mirrored"
+
+
+def test_negative_reminder_encodings_map_to_no_provider_reminder():
+    from bond_tasks_py.mirror import build_draft
+
+    for minutes in (-3, -2, -1):
+        assert build_draft("T", None, date(2026, 3, 12), "09:00", minutes, "UTC").reminder_minutes is None
+    assert build_draft("T", None, date(2026, 3, 12), "09:00", 0, "UTC").reminder_minutes == 0
+    assert build_draft("T", None, date(2026, 3, 12), None, 30, "UTC").reminder_minutes == 30

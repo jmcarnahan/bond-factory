@@ -5,6 +5,14 @@ import 'dart:convert';
 
 import 'package:bond_tasks/bond_tasks.dart';
 
+/// The iOS category with Done, Snooze and Cancel: for the owner of a task. `kNoticeCategory`
+/// (Done and Snooze only) is for everyone else. A push that wants the same buttons must use these ids.
+const kNoticeCategoryOwner = 'bond.task.owner';
+
+/// The category id a request is posted under: the owner one when it carries a cancel action.
+String categoryFor(AlertRequest r) =>
+    r.actions.contains(NoticeAction.cancel) ? kNoticeCategoryOwner : kNoticeCategory;
+
 /// One notification to schedule or show.
 class AlertRequest {
   const AlertRequest({
@@ -73,6 +81,9 @@ abstract interface class AlertPlugin {
   Future<void> show(AlertRequest r);
   Future<void> cancel(int id);
   Future<List<PendingAlert>> pending();
+
+  /// Ids of notifications delivered and still shown (the lock screen or the notification list).
+  Future<List<int>> active();
 
   /// The tap that launched the app, if any.
   Future<AlertTap?> launchTap();

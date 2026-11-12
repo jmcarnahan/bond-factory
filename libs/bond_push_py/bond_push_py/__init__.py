@@ -1,15 +1,15 @@
 """Apple push delivery. Imports only sqlalchemy, httpx, PyJWT, cryptography and the standard library."""
 
 from bond_push_py.apns import APNS_HOST_PRODUCTION, APNS_HOST_SANDBOX, ApnsSender
-from bond_push_py.devices import devices_for, register_device, unregister_device
+from bond_push_py.devices import device_row_id, devices_for, register_device, unregister_device
 from bond_push_py.errors import CODES, PushError
 from bond_push_py.messages import PushMessage, PushResult
 from bond_push_py.models import ENVIRONMENTS, PLATFORMS, PUSH_DEVICE_COLUMNS, PushDevicesMixin
 from bond_push_py.notifier import PushNotifier
 from bond_push_py.protocols import NoticeLike, PushSender
 from bond_push_py.senders import MockSender, NullSender
-from bond_push_py.sync_routes import DeviceRoute, device_routes
-from bond_push_py.timeutil import utcnow
+from bond_push_py.sync_routes import DeviceRoute, device_routes, verdict_for
+from bond_push_py.timeutil import to_naive_utc, utcnow
 
 __version__ = "0.1.0"
 
@@ -32,8 +32,11 @@ __all__ = [
     "PushResult",
     "PushSender",
     "device_routes",
+    "device_row_id",
     "devices_for",
     "register_device",
+    "to_naive_utc",
     "unregister_device",
     "utcnow",
+    "verdict_for",
 ]

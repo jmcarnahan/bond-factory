@@ -9,3 +9,4 @@ export 'src/store.dart';
 export 'src/store_open.dart';
 export 'src/store_reads.dart';
 export 'src/sync_db.dart';
+export 'src/upload_wait.dart';

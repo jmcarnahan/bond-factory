@@ -15,6 +15,12 @@ provider.update_event(made.id, {"subject": "Call (moved)"}, etag=made.etag)  # E
 ```
 
 - Every instant is an aware UTC `datetime`; all-day events sit at midnight UTC.
+- Graph `update_event` raises `ValueError` for a `start`/`end` patch without `is_all_day` (as Google does).
+- All-day drafts carry a calendar date at midnight UTC; the Graph provider's `timezone` (IANA or Windows name)
+  only decides how Graph writes it: local midnight of that date, with the zone's Windows name.
+- `GoogleCalendarProvider(token, http, *, refresh=...)` takes no zone: it always sends the all-day date itself.
+- `refresh=lambda: new_token()`: on a 401 the provider calls it once and retries once; a second 401 raises.
+  A refresh that raises becomes `ReconnectRequired` (the original is `__cause__`).
 - Errors: `NotFound`, `EtagMismatch` (412), `ReconnectRequired` (401), `Unavailable` (5xx, 429, timeout).
 - `FakeCalendarProvider` is an in-memory stand-in with etags and `fail_next(exc)` for tests and demos.
 - Google writes need the `calendar.events` scope. Google has no categories, so they are ignored there.

@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, datetime
 
-from conftest import NOW, Task
+from conftest import NOW, LinkIndex, Task
+from support_read import mk
 
 from bond_tasks_py import TaskCreate, TaskFilters, list_tasks, service, summary
 
@@ -114,3 +115,65 @@ def test_summary_ignores_other_users(session):
     seed(session)
     assert summary(session, task_model=Task, user_id="u3", today=TODAY) == {
         "open": 0, "overdue": 0, "due_today": 0, "no_date": 0}
+
+
+# --- viewer zone and the link index ---
+
+def viewer_rows(session, zone="America/Los_Angeles", **filters):
+    rows, total = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(**filters), viewer_zone=zone)
+    return [t.id for t in rows], total
+
+
+def seed_instants(session):
+    mk(session, Task, "none")
+    mk(session, Task, "eod", due=date(2026, 3, 11), due_at=datetime(2026, 3, 12, 0))  # date-only, 17:00 in LA
+    mk(session, Task, "late-night", due=date(2026, 3, 11), due_time="23:00", due_at=datetime(2026, 3, 12, 6))
+    mk(session, Task, "morning", due=date(2026, 3, 11), due_time="08:00", due_at=datetime(2026, 3, 11, 15))
+    mk(session, Task, "next", due=date(2026, 3, 12), due_time="08:00", due_at=datetime(2026, 3, 12, 15))
+    mk(session, Task, "stale", due=date(2026, 3, 10))  # dated, instant not computed yet
+
+
+def test_viewer_zone_orders_by_instant_nulls_last(session):
+    seed_instants(session)
+    ids, total = viewer_rows(session)
+    assert ids[:4] == ["morning", "eod", "late-night", "next"] and ids[-2:] == ["none", "stale"] and total == 6
+    # the two undated-instant rows tie on created_at, so they come by id
+
+
+def test_viewer_zone_ranges_use_the_viewers_day(session):
+    seed_instants(session)
+    # 23:00 on the 11th in LA is 06:00Z on the 12th: still the 11th for an LA viewer, the 12th for UTC
+    day = date(2026, 3, 11)
+    assert sorted(viewer_rows(session, due_from=day, due_to=day)[0]) == ["eod", "late-night", "morning"]
+    assert sorted(viewer_rows(session, "UTC", due_from=day, due_to=day)[0]) == ["eod", "morning"]  # eod: its date
+    assert sorted(viewer_rows(session, on_or_before=date(2026, 3, 10))[0]) == ["stale"]
+    assert viewer_rows(session, on_or_before=day, include_undated=True)[1] == 5
+
+
+def test_without_viewer_zone_the_old_ranges_hold(session):
+    seed_instants(session)
+    day = date(2026, 3, 11)
+    rows, _ = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(due_from=day, due_to=day))
+    assert sorted(t.id for t in rows) == ["eod", "late-night", "morning"]
+
+
+def test_summary_with_a_viewer_counts_by_instant(session):
+    seed_instants(session)
+    got = summary(session, task_model=Task, user_id="u1", today=date(2000, 1, 1), now=datetime(2026, 3, 11, 20, 0),
+                  viewer_zone="America/Los_Angeles")
+    assert got == {"open": 6, "overdue": 2, "due_today": 2, "no_date": 1}  # morning and stale are overdue
+
+
+def test_link_filter_through_the_index_pages_in_sql(session):
+    for n in range(7):
+        link = {"kind": "contact", "id": "c1" if n % 2 == 0 else "c2", "label": "L"}
+        mk(session, Task, f"t{n}", links=[link], index_model=LinkIndex)
+    mk(session, Task, "other-kind", links=[{"kind": "project", "id": "c1", "label": "P"}], index_model=LinkIndex)
+    filters = TaskFilters(link_kind="contact", link_id="c1")
+    old, old_total = list_tasks(session, task_model=Task, user_id="u1", filters=filters)
+    page, total = list_tasks(session, task_model=Task, user_id="u1", filters=filters, link_index_model=LinkIndex,
+                             limit=2, offset=2)
+    assert total == old_total == 4 and [t.id for t in page] == [t.id for t in old][2:4]
+    anykind, n = list_tasks(session, task_model=Task, user_id="u1", filters=TaskFilters(link_id="c1"),
+                            link_index_model=LinkIndex)
+    assert n == 5 and len(anykind) == 5

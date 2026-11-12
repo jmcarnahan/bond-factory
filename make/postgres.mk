@@ -1,6 +1,6 @@
 # Throwaway local Postgres for the `postgres`-marked tests (Homebrew binaries; never used in CI).
 PG_BIN ?= /opt/homebrew/bin
-PG_LIBS ?= libs/bond_jobs libs/bond_tasks_py
+PG_LIBS ?= libs/bond_jobs libs/bond_tasks_py libs/bond_notify_py libs/bond_push_py
 PG_URL = postgresql+psycopg://postgres@127.0.0.1:55432/bond_test
 
 .PHONY: pg-up pg-down test-pg

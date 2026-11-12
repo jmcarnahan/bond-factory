@@ -2,6 +2,7 @@
 
 ## 0.1.0 - unreleased
 - Scaffold.
+- `ErrorBody` reads the error code from `code`, then `error_code`, then `error` (detail map first, then top level). Only non-empty strings count (an empty `code` does not beat `error_code`); `error` counts only when it matches `^[a-z][a-z0-9_]*$` (at most 64 chars) and never overwrites `message`.
 - `ApiClient`: bearer token from a `TokenSource`, `getJson/postJson/putJson/patchJson/deleteJson` (maps), `getJsonList`, `postMultipart`, `getBytes`, `sse`. Header, overall and upload timeouts; timeouts and connection failures throw `NetworkFailure`; an unparsable 2xx body throws `BadResponse`.
 - 401 handling: `onUnauthorized` renews the session once (concurrent 401s share one call); `renewed` replays the request exactly once, `rejected` throws `Unauthorized(refreshRejected: true)`, `offline` throws `NetworkFailure(noAnswer)`. `onSessionRevoked` (code `session_revoked`) then `onSessionExpired` run once when the session is over. 403 `deactivated` runs `onDeactivated` once. All hooks are settable after construction. `authPathsExcludedFromRenewal` (`/auth/firebase`, `/auth/refresh`, `/auth/demo`) never renew and never fire hooks.
 - Exceptions: the superset of the consuming apps' families. `Unauthorized(message, code, refreshRejected)`, `Forbidden(message, code, hint)`, `NotFound(message, code, data)`, `Conflict`, `BadRequest(message, code)`, `ValidationError(message, fields, code, data)`, `ServerError(message, statusCode, code)`, `BadResponse`, `NetworkError`, `NetworkFailure`. `data` is `Map<String, Object?>`.

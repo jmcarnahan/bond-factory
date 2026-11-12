@@ -5,7 +5,7 @@ Rebuilt in the same write as the task: delete the task's rows, insert the new on
 
 from typing import Any
 
-from sqlalchemy import Column, Index, String
+from sqlalchemy import Column, Index, String, delete
 from sqlalchemy.orm import declared_attr
 
 from bond_tasks_py.protocols import AfterWrite
@@ -31,10 +31,18 @@ class TaskLinkIndexMixin:
 
 
 def reindex_links(session: Any, index_model: Any, task: Any) -> None:
-    """Replace the task's index rows with its current ``links``."""
-    raise NotImplementedError("link_index.reindex_links is not implemented yet")
+    """Replace the task's index rows with its current ``links``: one row per distinct (kind, id). Flushes."""
+    session.flush()  # a pending task or earlier index rows must be visible to the delete below
+    session.execute(delete(index_model).where(index_model.task_id == task.id))
+    pairs = {(str(link["kind"]), str(link["id"])) for link in task.links or [] if link.get("kind") and link.get("id")}
+    session.add_all(index_model(task_id=task.id, kind=kind, ref_id=ref) for kind, ref in sorted(pairs))
+    session.flush()
 
 
 def make_link_hook(index_model: Any) -> AfterWrite:
     """An ``after_write`` hook that calls ``reindex_links``."""
-    raise NotImplementedError("link_index.make_link_hook is not implemented yet")
+
+    def hook(session: Any, task: Any) -> None:
+        reindex_links(session, index_model, task)
+
+    return hook

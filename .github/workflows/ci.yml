@@ -61,11 +61,11 @@ jobs:
       - run: uv sync --locked --all-extras --package sdk_example
       - run: make test-libs
       - run: make lint-libs
-      - name: Postgres-marked tests (bond_jobs, bond_tasks_py)
+      - name: Postgres-marked tests (bond_jobs, bond_tasks_py, bond_notify_py, bond_push_py)
         env:
           BOND_TEST_POSTGRES_URL: postgresql+psycopg://postgres@localhost:5432/bond_test
         run: |
-          for lib in libs/bond_jobs libs/bond_tasks_py; do
+          for lib in libs/bond_jobs libs/bond_tasks_py libs/bond_notify_py libs/bond_push_py; do
             (cd "$lib" && ../../.venv/bin/python -m pytest -q -m postgres) || { rc=$?; [ "$rc" -eq 5 ] || exit "$rc"; }
           done
       - name: Dependency licence check (Python side; this job has no Dart package config)

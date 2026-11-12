@@ -10,6 +10,13 @@ NOTICE_KEYS = ("id", "user_id", "kind", "title", "body", "data", "created_at", "
 DATA_KEYS = ("task_id", "stage", "seq", "due_at", "priority", "route", "actions", "last")
 
 
+def due_key(value: Any) -> str | None:
+    """A ``due_at`` (datetime, ISO string or None) as the ISO Z string the inbox stores, for comparison."""
+    if value is None or value == "":
+        return None
+    return iso_z(value) if hasattr(value, "isoformat") else str(value)
+
+
 def notice_item(row: Any) -> dict:
     """One notice row as the JSON a client reads. ``data`` is rebuilt, so the row is never mutated; a key the
     row's ``data`` lacks comes out null (``actions`` as an empty list, ``last`` as false). A ``due_at`` stored as a

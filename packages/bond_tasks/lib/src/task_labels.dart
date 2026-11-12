@@ -58,7 +58,7 @@ class TaskLabels {
     this.summaryToday = 'Due today',
     this.summaryNoDate = 'No date',
     this.external = 'Calendar',
-    this.remindDefault = 'My default',
+    this.remindDefault = 'Use my default',
     this.priorityLow = 'Low',
     this.priorityNormal = 'Normal',
     this.priorityHigh = 'High',
@@ -74,6 +74,15 @@ class TaskLabels {
     this.missed = 'Missed',
     this.sectionUndated = 'No date',
     this.sectionDoneToday = 'Done today',
+    this.noPriority = 'No priority',
+    this.links = 'Links',
+    this.linkHint = 'Search to link a record',
+    this.removeLink = 'Remove link',
+    this.todayEmpty = 'Nothing due. Enjoy the day.',
+    this.laneEmpty = 'Nothing due this day.',
+    this.anytime = 'Any time',
+    this.dueMarker = 'due',
+    this.overdueMarker = 'overdue',
   });
 
   final String title;
@@ -146,6 +155,20 @@ class TaskLabels {
   final String missed;
   final String sectionUndated;
   final String sectionDoneToday;
+  final String noPriority;
+  final String links;
+  final String linkHint;
+  final String removeLink;
+  final String todayEmpty;
+  final String laneEmpty;
+
+  /// The time column of a date-only task in a day view.
+  final String anytime;
+  final String dueMarker;
+  final String overdueMarker;
+
+  /// Spoken name of a month cell marker: "3 due" or "2 overdue".
+  String markerText(int count, {required bool overdue}) => '$count ${overdue ? overdueMarker : dueMarker}';
 
   String priorityText(TaskPriority p) => switch (p) {
         TaskPriority.low => priorityLow,

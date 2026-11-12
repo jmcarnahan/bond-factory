@@ -25,8 +25,11 @@ class BondTaskList extends StatelessWidget {
     this.rowExtra,
     this.labels = const TaskLabels(),
     this.semanticsPrefix,
+    this.now,
   });
 
+  /// When given, sections and the overdue mark follow the one overdue rule.
+  final DateTime? now;
   final List<Task>? tasks;
   final DateTime today;
   final String? error;
@@ -68,7 +71,7 @@ class BondTaskList extends StatelessWidget {
     final text = BondText(t);
     final children = <Widget>[];
     for (final s in TaskSection.values) {
-      final inSection = [for (final k in list) if (sectionOf(k, todayText) == s) k];
+      final inSection = [for (final k in list) if (sectionOf(k, todayText, now: now) == s) k];
       if (inSection.isEmpty) continue;
       children.add(Padding(
         padding: const EdgeInsets.only(top: BondSpace.s16, bottom: BondSpace.s8),
@@ -76,12 +79,14 @@ class BondTaskList extends StatelessWidget {
       ));
       for (final k in inSection) {
         children.add(Padding(
+          key: ValueKey(k.id),
           padding: const EdgeInsets.only(bottom: BondSpace.s8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               BondTaskRow(
                 task: k,
+                now: now,
                 labels: labels,
                 semanticsId: _id('row', k.id),
                 completeSemanticsId: _id('complete', k.id),

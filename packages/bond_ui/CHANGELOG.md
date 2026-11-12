@@ -2,6 +2,13 @@
 
 ## 0.1.0 - unreleased
 
+### Added (task widgets support)
+- `BondMonthGrid` is exported (moved to `primitives/bond_month_grid.dart`) with `dayBuilder` (a widget under each day number) and `firstWeekday` (default Sunday). `BondDateField` is unchanged.
+- `BondMonthGrid.daySemantics`: text appended to a cell's spoken label (a `dayBuilder` marker is hidden from screen readers).
+- `BondSearchPicker<T>`: removable picked chips, a search field and an inline result list with busy, empty and error lines; a stale answer is dropped.
+- `BondPersonTile`: a person as a list row (avatar, name, subtitle, trailing).
+- `BondLabels`: `searching`, `searchFailed`, `remove`.
+
 Tokens, theme, labels, semantics helper and the primitive widgets, lifted from the two near-identical app UI packages.
 
 ### Added

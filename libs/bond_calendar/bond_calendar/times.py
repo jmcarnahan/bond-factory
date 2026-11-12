@@ -92,3 +92,24 @@ def iso_z(value: datetime) -> str:
 def wall_utc(value: datetime) -> str:
     """Graph's zone-less wall-clock form of a UTC instant (paired with ``timeZone: "UTC"``)."""
     return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def windows_name(zone: str) -> str:
+    """The Windows zone name Graph expects for a zone. Graph accepts both forms, so a name the lib cannot map
+    (a Windows name outside its small table, an IANA name it has no Windows twin for) is passed through unchanged."""
+    if zone in WINDOWS_ZONES:
+        return zone
+    return next((win for win, iana in WINDOWS_ZONES.items() if iana == zone), zone)
+
+
+def is_utc_zone(zone: object) -> bool:
+    return not isinstance(zone, str) or zone in UTC_NAMES
+
+
+def all_day_dates(start: datetime, end: datetime) -> tuple[date, date]:
+    """The start date and the exclusive end date of an all-day draft.
+
+    An all-day draft carries calendar dates at midnight UTC, so a date is the UTC date of ``start`` and of ``end``,
+    whatever the provider's zone; the end is never earlier than the day after the start."""
+    first = start.astimezone(UTC).date()
+    return first, max(end.astimezone(UTC).date(), first + timedelta(days=1))

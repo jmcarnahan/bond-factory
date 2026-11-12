@@ -6,6 +6,7 @@ Role: Pure Dart inbox notices: `Notice` model, `NoticesApi` (REST), `NoticeFeed`
 - `lib/src/notice_feed.dart` (`NoticeFeed`), `polling_notice_feed.dart` (`PollingNoticeFeed`).
 - `lib/src/notice_controller.dart` (`NoticeController`, `NoticeState`), `notice_labels.dart` (`NoticeLabels`).
 - `lib/src/notice_alert*.dart` (`NoticeAlert`; conditional import: `_stub` elsewhere, `_web` on `dart.library.js_interop`).
+- `lib/src/replay_stream.dart` (internal: broadcast stream that replays its last value).
 - Shared fixtures: `../../fixtures/notify/notice.json`, `notices_page.json`.
 
 ## Commands

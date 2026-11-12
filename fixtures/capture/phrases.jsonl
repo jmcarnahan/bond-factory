@@ -38,3 +38,23 @@
 {"id":38,"text":"Almuerzo con Dana al mediodía","lang":"es","cat":"event","expect":{"count":[1,1],"items":[{"kind":"event","date":"2026-11-11","time":"12:00"}]}}
 {"id":39,"text":"Enviar el informe a Priya el viernes a las 12","lang":"es","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-13","time":"12:00"}]}}
 {"id":40,"text":"Me tomo el día libre el martes","lang":"es","cat":"event","expect":{"count":[1,1],"items":[{"kind":"event","date":"2026-11-17","time":null,"all_day":true}]}}
+{"id":41,"text":"Dana's closing Friday","lang":"en","cat":"either","expect":{"count":[1,1],"items":[{"kind":["task","event"],"date":"2026-11-13"}]}}
+{"id":42,"text":"Review the contract Friday","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-13","time":null}]}}
+{"id":43,"text":"Dentist 3pm then call the bank","lang":"en","cat":"multi","expect":{"count":[2,2],"items":[{"kw":"dentist","kind":"event","date":"2026-11-11","time":"15:00"},{"kw":"bank","kind":"task","date":"2026-11-11"}]}}
+{"id":44,"text":"Call Dana on Friday, not Thursday","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-13","time":null}]}}
+{"id":45,"text":"Send the lease to Marcus next Friday","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-20","time":null}]}}
+{"id":46,"text":"Finish the market report by next Friday at 5pm","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-20","time":"17:00"}]}}
+{"id":47,"text":"Pay the invoice on Nov 25","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-25","time":null}]}}
+{"id":48,"text":"Property tax deadline December 1","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-12-01","time":null}]}}
+{"id":49,"text":"Conference in Austin March 9 to 11","lang":"en","cat":"event","expect":{"count":[1,1],"items":[{"kind":"event","date":"2027-03-09","time":null,"all_day":true,"end_date":"2027-03-11"}]}}
+{"id":50,"text":"Renew my license on the 15th","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-15","time":null}]}}
+{"id":51,"text":"Call the lender at 9 tomorrow morning and send the draft by end of day Friday","lang":"en","cat":"multi","expect":{"count":[2,2],"items":[{"kw":"lender","kind":"task","date":"2026-11-12","time":"09:00"},{"kw":"draft","kind":"task","date":"2026-11-13","time":null}]}}
+{"id":52,"text":"Remind Priya about the permit, book the crew for Monday morning, and tell Marcus I am out Wednesday","lang":"en","cat":"multi","expect":{"count":[3,3],"items":[{"kw":"permit","kind":"task","date":"2026-11-11","due_defaulted":true},{"kw":"crew","kind":"task","date":"2026-11-16"},{"kw":"out","kind":["event","task"],"date":"2026-11-18"}]}}
+{"id":53,"text":"Team offsite next Wednesday and Thursday","lang":"en","cat":"event","expect":{"count":[1,1],"items":[{"kind":"event","date":"2026-11-18","time":null,"all_day":true,"end_date":"2026-11-19"}]}}
+{"id":54,"text":"Walkthrough with the Lees Saturday at 10am, then email them the punch list by Monday","lang":"en","cat":"multi","expect":{"count":[2,2],"items":[{"kw":"walkthrough","kind":"event","date":"2026-11-14","time":"10:00"},{"kw":"punch","kind":"task","date":"2026-11-16"}]}}
+{"id":55,"text":"Out of office from Nov 23 to Nov 27","lang":"en","cat":"event","expect":{"count":[1,1],"items":[{"kind":"event","date":"2026-11-23","time":null,"all_day":true,"end_date":"2026-11-27"}]}}
+{"id":56,"text":"Send the Q4 numbers to Sam by 5pm today. If he is out, call Dana.","lang":"en","cat":"multi","expect":{"count":[1,2],"items":[{"kw":"numbers","kind":"task","date":"2026-11-11","time":"17:00"}]}}
+{"id":57,"text":"Llamar al banco el jueves a las 3 de la tarde","lang":"es","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-12","time":"15:00"}]}}
+{"id":58,"text":"Reunión con Priya pasado mañana a las 10","lang":"es","cat":"event","expect":{"count":[1,1],"items":[{"kind":"event","date":"2026-11-13","time":"10:00","all_day":false}]}}
+{"id":59,"text":"Tonight: pay the electric bill","lang":"en","cat":"task","expect":{"count":[1,1],"items":[{"kind":"task","date":"2026-11-11"}]}}
+{"id":60,"text":"Dinner with the Lees at 7","lang":"en","cat":"event","expect":{"count":[1,1],"items":[{"kind":"event","date":"2026-11-11","time":"19:00","all_day":false}]}}

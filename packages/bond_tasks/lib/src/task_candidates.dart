@@ -100,6 +100,31 @@ class TaskCandidate extends CaptureItem {
   final bool dueDefaulted;
   final TaskPriority? priority;
 
+  /// An edited copy for the review screen. A `clear*` flag sets that field to null (it wins over the
+  /// value). Confidence, flags and `degraded` are kept.
+  TaskCandidate copyWith({
+    String? title,
+    String? dueDate,
+    String? dueTime,
+    bool? dueDefaulted,
+    TaskPriority? priority,
+    List<LinkCandidate>? links,
+    bool clearDueDate = false,
+    bool clearDueTime = false,
+    bool clearPriority = false,
+  }) =>
+      TaskCandidate(
+        title: title ?? this.title,
+        links: links ?? this.links,
+        confidence: confidence,
+        flags: flags,
+        degraded: degraded,
+        dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+        dueTime: clearDueTime ? null : (dueTime ?? this.dueTime),
+        dueDefaulted: dueDefaulted ?? this.dueDefaulted,
+        priority: clearPriority ? null : (priority ?? this.priority),
+      );
+
   /// The create body; [links] are the matches the user confirmed.
   TaskDraft toDraft({List<TaskLink> links = const []}) => TaskDraft(
         title: title,
@@ -144,10 +169,38 @@ class EventCandidate extends CaptureItem {
   final bool allDay;
   final String? endDate;
   final String? endTime;
+
+  /// An edited copy for the review screen. A `clear*` flag sets that field to null (it wins over the
+  /// value). Confidence, flags and `degraded` are kept.
+  EventCandidate copyWith({
+    String? title,
+    String? startDate,
+    String? startTime,
+    bool? allDay,
+    String? endDate,
+    String? endTime,
+    List<LinkCandidate>? links,
+    bool clearStartDate = false,
+    bool clearStartTime = false,
+    bool clearEndDate = false,
+    bool clearEndTime = false,
+  }) =>
+      EventCandidate(
+        title: title ?? this.title,
+        links: links ?? this.links,
+        confidence: confidence,
+        flags: flags,
+        degraded: degraded,
+        startDate: clearStartDate ? null : (startDate ?? this.startDate),
+        startTime: clearStartTime ? null : (startTime ?? this.startTime),
+        allDay: allDay ?? this.allDay,
+        endDate: clearEndDate ? null : (endDate ?? this.endDate),
+        endTime: clearEndTime ? null : (endTime ?? this.endTime),
+      );
 }
 
 class ParseResult {
-  const ParseResult({this.items = const [], this.degraded = false, this.reason});
+  const ParseResult({this.items = const [], this.degraded = false, this.reason, this.dropped = 0});
 
   factory ParseResult.fromJson(Map<String, Object?> m) => ParseResult(
         items: [
@@ -156,11 +209,17 @@ class ParseResult {
         ],
         degraded: jbool(m, 'degraded') ?? false,
         reason: jstr(m, 'reason'),
+        dropped: _nonNegative(jint(m, 'dropped')),
       );
 
   final List<CaptureItem> items;
   final bool degraded;
 
+  /// How many items the model returned that the server discarded; the key is sent only above zero.
+  final int dropped;
+
   /// Null, `model_unavailable` or `invalid_output`.
   final String? reason;
 }
+
+int _nonNegative(int? v) => v == null || v < 0 ? 0 : v;

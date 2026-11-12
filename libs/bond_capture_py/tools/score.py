@@ -1,6 +1,7 @@
 """Score capture-prompt outputs against phrases.jsonl. Standard library only.
 
 usage: score.py RESULTS_DIR [--phrases F] [--schema F] [--misses]
+       score.py --run-fallback [--misses]   (the rule fallback against the single-task phrases)
 
 A results dir holds one file per phrase, "<id:02d>.txt", with the raw model output.
 A missing file counts as "no output" (a failure). Phrases with expect.pre_model are
@@ -10,6 +11,8 @@ import json
 import os
 import re
 import sys
+import tempfile
+from datetime import date
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -211,6 +214,30 @@ def score_dir(d, phrases, schema):
     return R
 
 
+FALLBACK_TODAY = date(2026, 11, 11)  # the day the phrase set was written for
+
+
+def run_fallback(phrases, dest):
+    """Write the rule fallback's answer for each single-task phrase as a model-shaped result file; return those
+    phrases. Events, multi-item, injection and empty phrases are not what the fallback is for."""
+    sys.path.insert(0, os.path.join(HERE, ".."))
+    from bond_capture_py import degraded_draft
+
+    chosen = []
+    for ph in phrases:
+        items = ph["expect"].get("items") or []
+        if ph["cat"] != "task" or len(items) != 1 or items[0]["kind"] != "task":
+            continue
+        d = degraded_draft(ph["text"], FALLBACK_TODAY)
+        out = {"items": [{"kind": "task", "title": d["title"], "date": d["due_date"], "time": d["due_time"],
+                          "due_defaulted": d["due_defaulted"], "priority": d["priority"], "all_day": False,
+                          "end_date": None, "end_time": None, "links": [], "confidence": d["confidence"]}]}
+        with open(os.path.join(dest, f"{ph['id']:02d}.txt"), "w", encoding="utf-8") as fh:
+            json.dump(out, fh)
+        chosen.append(ph)
+    return chosen
+
+
 def pct(a, b):
     return "n/a" if not b else f"{a}/{b} = {100.0 * a / b:.0f}%"
 
@@ -225,7 +252,7 @@ def main(argv):
             flags.add(a)
         else:
             args.append(a)
-    if not args:
+    if not args and "--run-fallback" not in flags:
         print(__doc__)
         return 2
     root = os.path.join(HERE, "..", "..", "..", "fixtures", "capture")
@@ -233,7 +260,12 @@ def main(argv):
         phrases = [json.loads(line) for line in fh if line.strip()]
     with open(opts.get("--schema", os.path.join(root, "schema.json")), encoding="utf-8") as fh:
         schema = json.load(fh)
-    runs = [(os.path.basename(os.path.normpath(args[0])), score_dir(args[0], phrases, schema))]
+    if "--run-fallback" in flags:
+        with tempfile.TemporaryDirectory() as tmp:
+            phrases = run_fallback(phrases, tmp)
+            runs = [("rule fallback", score_dir(tmp, phrases, schema))]
+    else:
+        runs = [(os.path.basename(os.path.normpath(args[0])), score_dir(args[0], phrases, schema))]
     rows = [
         ("scored phrases", lambda R: str(R["n"])),
         ("valid JSON + schema (raw)", lambda R: pct(R["valid_strict"], R["n"])),

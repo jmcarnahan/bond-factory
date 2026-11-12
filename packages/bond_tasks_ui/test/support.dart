@@ -3,6 +3,8 @@ import 'package:bond_ui/bond_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+export 'package:bond_test_support/bond_test_support.dart' show expectNoOverlays;
+
 final DateTime kToday = DateTime(2026, 3, 12);
 
 /// Pumps [child] in a scrolling page at the wide (1280) or phone (390) width.

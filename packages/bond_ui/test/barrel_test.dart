@@ -24,8 +24,8 @@ void main() {
       BondConfirm, BondDashedBorder, BondDateField, BondIconButton,
       BondInlineField, BondListRow, BondPhoto, BondPressable,
       BondSegmented<int>, BondSelect<int>, BondStatusChip, BondTextField,
-      BondTimeField,
+      BondTimeField, BondMonthGrid, BondSearchPicker<int>, BondPersonTile,
     ];
-    expect(types.toSet(), hasLength(19));
+    expect(types.toSet(), hasLength(22));
   });
 }

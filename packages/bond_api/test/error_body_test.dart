@@ -103,6 +103,65 @@ void main() {
     });
   });
 
+  group('error code keys', () {
+    String? codeOf(Object body) => ErrorBody.from(409, body).code;
+
+    test('each key alone, in the detail map and at the top level', () {
+      for (final key in ['code', 'error_code', 'error']) {
+        expect(codeOf({'detail': {key: 'slot_taken', 'message': 'm'}}), 'slot_taken', reason: 'detail $key');
+        expect(codeOf({key: 'slot_taken', 'detail': 'x'}), 'slot_taken', reason: 'top $key');
+      }
+    });
+
+    test('precedence is code, then error_code, then error', () {
+      expect(codeOf({'detail': {'error': 'c', 'error_code': 'b', 'code': 'a'}}), 'a');
+      expect(codeOf({'detail': {'error': 'c', 'error_code': 'b'}}), 'b');
+      expect(codeOf({'error': 'c', 'error_code': 'b', 'code': 'a', 'detail': 'x'}), 'a');
+      expect(codeOf({'error': 'c', 'error_code': 'b', 'detail': 'x'}), 'b');
+    });
+
+    test('the detail map wins over the top level', () {
+      expect(codeOf({'code': 'top', 'detail': {'error': 'inner'}}), 'inner');
+    });
+
+    test('a human sentence in error is not the code and never replaces the message', () {
+      final e = ErrorBody.from(409, {'detail': {'error': 'Slot is already taken', 'message': 'Taken'}});
+      expect(e.code, isNull);
+      expect(e.message, 'Taken');
+      expect(ErrorBody.from(409, {'error': 'Not a code!', 'detail': 'x'}).code, isNull);
+      expect(codeOf({'detail': {'error': 'a' * 65}}), isNull);
+      expect(codeOf({'detail': {'error': 'a' * 64}}), 'a' * 64);
+      expect(codeOf({'detail': {'error': 'Upper'}}), isNull);
+    });
+
+    test('a sentence in error does not hide a real code, and error is not the message', () {
+      final e = ErrorBody.from(409, {'detail': {'error': 'Some sentence', 'error_code': 'taken'}});
+      expect(e.code, 'taken');
+      expect(e.message, 'HTTP 409');
+    });
+
+    test('non-string values are ignored', () {
+      expect(codeOf({'detail': {'code': 42, 'error_code': 'b'}}), 'b');
+      expect(codeOf({'detail': {'code': 42, 'error_code': 7, 'error': true}}), isNull);
+      expect(codeOf({'code': 5, 'error': 'real_code', 'detail': 'x'}), 'real_code');
+    });
+
+    test('an empty or blank code does not beat a valid error_code or error', () {
+      expect(codeOf({'detail': {'code': '', 'error_code': 'b'}}), 'b');
+      expect(codeOf({'detail': {'code': '  ', 'error_code': '', 'error': 'c_d'}}), 'c_d');
+      expect(codeOf({'code': '', 'error': 'c_d', 'detail': 'x'}), 'c_d');
+      expect(codeOf({'detail': {'code': '', 'error_code': ''}}), isNull);
+    });
+
+    test('the legacy string detail is unchanged', () {
+      final e = ErrorBody.from(401, {'detail': 'invalid_token'});
+      expect(e.code, 'invalid_token');
+      expect(e.message, 'invalid_token');
+      expect(ErrorBody.from(409, {'detail': 'taken'}).code, isNull);
+      expect(ErrorBody.from(409, {'detail': 'taken', 'error': 'x_y'}).code, 'x_y');
+    });
+  });
+
   group('shapes', () {
     test('top-level code is the fallback', () {
       final e = ErrorBody.parse(500, {'code': 'db_unavailable', 'detail': 'x'}) as ServerError;

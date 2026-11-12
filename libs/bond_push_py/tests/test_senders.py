@@ -1,6 +1,5 @@
 import dataclasses
 import re
-from datetime import datetime
 
 import pytest
 from conftest import PushDevice, fixture
@@ -15,13 +14,7 @@ from bond_push_py import (
     PushMessage,
     PushNotifier,
     PushResult,
-    device_routes,
-    devices_for,
-    register_device,
-    unregister_device,
 )
-
-NOW = datetime(2026, 11, 12, 15, 0, 0)
 
 
 def message(token="t1", **kw) -> PushMessage:
@@ -71,21 +64,6 @@ def test_device_fixture_shape():
     assert re.fullmatch(r"[0-9a-f]{64}", item["token"])
     assert set(item) == {"token", "platform", "environment", "topic", "device_id"}
     assert item["platform"] == "ios" and item["environment"] == "sandbox"
-
-
-def test_stubs_raise_not_implemented():
-    calls = [
-        lambda: ApnsSender("pem", "k", "t").send([message()]),
-        lambda: PushNotifier(PushDevice, MockSender()).send(None, object()),
-        lambda: register_device(None, PushDevice, user_id="u", device_id="d", token="t", platform="ios",
-                                environment="sandbox", topic=None, now=NOW),
-        lambda: unregister_device(None, PushDevice, user_id="u", device_id="d"),
-        lambda: devices_for(None, PushDevice, "u"),
-        lambda: device_routes(PushDevice),
-    ]
-    for call in calls:
-        with pytest.raises(NotImplementedError):
-            call()
 
 
 def test_notifier_defaults_and_error_codes():

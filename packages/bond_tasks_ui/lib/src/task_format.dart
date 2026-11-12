@@ -38,18 +38,43 @@ String dueTimeString(BondTime t) => '${_two(t.hour24)}:${_two(t.minute)}';
 /// Which list section a task belongs to, judged against [today] (`YYYY-MM-DD`).
 enum TaskSection { overdue, today, upcoming, noDate, done }
 
-TaskSection sectionOf(Task t, String today) {
+///
+/// With [now] the answer is exactly `sectionTasks`' (`bond_tasks`): overdue by
+/// `isOverdue`, else today when the viewer's day (`dayFor`) is today or earlier,
+/// else upcoming; [today] is then taken from [now]. Without [now] the task's
+/// own `overdue` flag and a date before [today] decide.
+TaskSection sectionOf(Task t, String today, {DateTime? now}) {
   if (t.status != TaskStatus.open) return TaskSection.done;
   final d = t.dueDate;
   if (d == null || d.isEmpty) return TaskSection.noDate;
+  if (now != null) {
+    // The one rule: the same function the day view uses (`sectionTasks`).
+    final s = sectionTasks([t], now);
+    if (s.overdue.isNotEmpty) return TaskSection.overdue;
+    if (s.today.isNotEmpty) return TaskSection.today;
+    if (s.undated.isNotEmpty) return TaskSection.noDate;
+    return TaskSection.upcoming;
+  }
   if (t.overdue || d.compareTo(today) < 0) return TaskSection.overdue;
   return d == today ? TaskSection.today : TaskSection.upcoming;
 }
 
-/// "Mar 12, 9:30 AM", "Mar 12" or null for no date.
+/// "9:30 AM" for a local time.
+String formatTimeOfDay(DateTime local, BondLabels l) {
+  final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  return '$h:${_two(local.minute)} ${local.hour >= 12 ? l.pm : l.am}';
+}
+
+/// "Mar 12, 9:30 AM", "Mar 12" or null for no date. A timed task that has its
+/// due instant shows that instant in the device's zone.
 String? formatDue(Task t, BondLabels l) {
   final date = parseDueDate(t.dueDate);
   if (date == null) return null;
+  final at = t.dueAt;
+  if (at != null && parseDueTime(t.dueTime) != null) {
+    final local = at.toLocal();
+    return '${l.monthShort[local.month - 1]} ${local.day}, ${formatTimeOfDay(local, l)}';
+  }
   final day = '${l.monthShort[date.month - 1]} ${date.day}';
   final time = parseDueTime(t.dueTime);
   if (time == null) return day;

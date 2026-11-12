@@ -12,7 +12,7 @@ import httpx
 from .errors import CalendarError, NotFound
 from .models import PATCH_KEYS, CalendarEvent, CalendarEventDraft, EventPage, EventPatch, to_utc
 from .normalize import google_body, google_event, google_is_dropped
-from .times import iso_z
+from .times import all_day_dates, iso_z
 from .transport import call, json_body
 
 LOGGER = logging.getLogger("bond_calendar.google")
@@ -35,10 +35,14 @@ def wire_fields(values: dict[str, Any], *, all_day: bool | None = None) -> dict[
     out: dict[str, Any] = {}
     if "subject" in values:
         out["summary"] = values["subject"]
-    if values.get("start") is not None:
-        out["start"] = _time(values["start"], flag)
-    if values.get("end") is not None:
-        out["end"] = _time(values["end"], flag)
+    if flag and values.get("start") is not None and values.get("end") is not None:
+        first, last = all_day_dates(to_utc(values["start"]), to_utc(values["end"]))
+        out["start"], out["end"] = {"date": first.isoformat()}, {"date": last.isoformat()}
+    else:
+        if values.get("start") is not None:
+            out["start"] = _time(values["start"], flag)
+        if values.get("end") is not None:
+            out["end"] = _time(values["end"], flag)
     if "location" in values:
         out["location"] = values["location"] or ""
     if "body" in values:
@@ -58,11 +62,12 @@ def _draft_fields(draft: CalendarEventDraft) -> dict[str, Any]:
 
 
 class GoogleCalendarProvider:
-    def __init__(self, token: Callable[[], str], http: httpx.Client) -> None:
-        self._token, self._http = token, http
+    def __init__(self, token: Callable[[], str], http: httpx.Client, *,
+                 refresh: Callable[[], str] | None = None) -> None:
+        self._token, self._http, self._refresh = token, http, refresh
 
     def _call(self, method: str, url: str, **kw: Any) -> httpx.Response:
-        return call(self._http, self._token, method, url, **kw)
+        return call(self._http, self._token, method, url, refresh=self._refresh, **kw)
 
     def list_events(self, *, start: datetime, end: datetime, max_events: int = 500,
                     include_cancelled: bool = False) -> EventPage:

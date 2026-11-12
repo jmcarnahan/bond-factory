@@ -5,6 +5,7 @@ export 'bond_logo_mark.dart';
 export 'bond_message_preview.dart';
 export 'bond_page_header.dart';
 export 'bond_person_chip.dart';
+export 'bond_person_tile.dart';
 export 'bond_stale_banner.dart';
 export 'bond_startup_failed.dart';
 export 'bond_states.dart';
