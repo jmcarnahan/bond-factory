@@ -46,6 +46,9 @@ and :8012 (same host, different port), so the connect flow's top-level navigatio
 - Every `sdk.*` text node exposes its text as the semantics label, so read `getAttribute('aria-label')` or
   the accessible name instead of taking screenshots.
 - Elements below the fold are absent from the tree: wheel-scroll until they appear.
+- `sdk.ui.text-field` is a wrapper: the input is its child. Plain text fields put the caret at the end on a mouse click.
+- At 390 px the nav strip scrolls sideways: ids to the right of the visible part are absent from the tree until the strip is
+  wheel-scrolled horizontally.
 - Helpers in `demos/sdk_demo/e2e/lib.mjs`: `enableSemantics(page)`, `sid(page, id)`, `typeInto(locator,
   text)`, `collectErrors(page)`.
 - `locator.fill` empties Flutter fields. Click the field, wait 400 ms, `ControlOrMeta+a`, then
@@ -106,11 +109,12 @@ Zero `[role=dialog],[role=alertdialog]`; empty `pageerror` list; no console mess
    `sdk.connections.start-url`.
 7. **Tasks.** Quick add: `sdk.tasks.quick-add`, then `sdk.tasks.quick-add-add`. Form: `sdk.tasks.form-title`;
    checklist input `sdk.tasks.form-checklist-add` and `sdk.tasks.form-checklist-add-button` (twice). A due moment:
-   `sdk.tasks.form-due-date` (opens an inline calendar, pick a day), then `sdk.tasks.form-due-time-add` and
-   `sdk.tasks.form-due-time` (`-remove` clears it). Reminder choice `sdk.tasks.form-reminder` (the options include "Use my
+   `sdk.tasks.form-due-date` (opens an inline calendar, pick a day), then `sdk.tasks.form-due-time-add`, the time boxes
+   `sdk.tasks.form-due-time-hour`, `-minute`, `-meridiem-am` and `-meridiem-pm` (the boxes select their text on focus, so typing replaces it),
+   and `sdk.tasks.form-due-time-remove` to clear it. Reminder choice `sdk.tasks.form-reminder` (the options include "Use my
    default"), `sdk.tasks.form-mirror` for the calendar mirror, `sdk.tasks.form-save`. Row `sdk.tasks.row-<id>`; tick a
-   checklist item; `sdk.tasks.complete-<id>` completes and reopens. The mirror shows `sdk.tasks.external-<id>` (the external
-   id). Turn it off with the per-row toggle `sdk.tasks.mirror-<id>`: `sdk.tasks.external-<id>` is then absent. Click
+   checklist item; `sdk.tasks.complete-<id>` completes and reopens. With the mirror on, `sdk.tasks.external-<id>` reads "Calendar: <status>". In fake mode it reads "Calendar: skipped", with or
+   without a connected Google account, because it shows an external id ("Calendar: google <event id>") only when the task has an `external_provider`. Turn the mirror off with the per-row toggle `sdk.tasks.mirror-<id>`: `sdk.tasks.external-<id>` is then absent and the row reads "Calendar: off". Click
    `sdk.tasks.reload` after saving or toggling the mirror: the mirror runs after the response as a background task, so the
    first answer does not carry its result yet. Delete is two steps: `sdk.tasks.delete-<id>`, then `-confirm`. Messages:
    `sdk.tasks.info`, `sdk.tasks.error`. Notices for a due time are walked in "TODO checklist walk" below (the Tasks page keeps only `sdk.tasks.run-due-jobs`; the notice list and `show-notices` are gone).
@@ -147,8 +151,8 @@ click the semantics placeholder. The fake consent page (`:8012/connections/fake/
    (`sdk.scopes.ask-mail_send`) and "Calendar" (`sdk.scopes.ask-calendar`). Click the mail ask. First decline: untick
    `#sdk-consent-set-mail_send` (or click `#sdk-consent-deny`) and allow. The return is `/connections?connection=error&reason=
    consent_declined`, the banner reads "You did not allow that access. You can allow it later.", NO row was stored and the set is
-   still wanted. Ask again, leave both ticked, allow: the set is granted and the Google connection is connected. The ask stays
-   inline, no dialog.
+   still wanted. Ask again, leave both ticked, allow: the set is granted and the Google connection is connected. Each set is its own ask: if only the mail set was granted (calendar unticked), the calendar ask stays until it is granted too.
+   The ask stays inline, no dialog.
 7. **Break-glass.** Sign out. Stop the example and restart it with `SDK_EXAMPLE_BREAKGLASS=1 make serve-example`, then reload `/auth`:
    `sdk.signin.break-glass` is visible and opens the inline e-mail form (no dialog). `demo@example.com` signs in
    (`sdk.auth.sign-in`); `crew@example.com` answers 403 `provider_not_allowed` in `sdk.auth.error`. Restart without the flag afterwards.
@@ -190,7 +194,7 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
    Nothing is created by parsing alone.
 3. **Capture, model off.** Click `sdk.capture.model-off` (it calls `PUT /fake/capture {"down": true}`), parse again: one draft with the low-confidence mark and a degraded note, never an error. Switch it back.
    `PUT /fake/capture/limit {"limit": 0}` then parse: the inline error reads the capture label "Too many notes in a short time. Try again in a minute." (429 `capture_denied`; the text is `CaptureLabels.captureDenied` in the source). Starting a new parse clears the old review.
-4. **Calendar.** `/calendar`: the month cell of a day with TODOs has the id `sdk.calendar.grid-<YYYY-MM-DD>` and a label like "12, 2 due" or "12, 2 overdue"; the
+4. **Calendar.** `/calendar`: the month cell of a day with TODOs has the id `sdk.calendar.grid-<YYYY-MM-DD>` and a label like "12, 2 due" or "12, 2 overdue": click this cell to select a day and read the label from it. The count marker inside the cell is `sdk.calendar.marker-<YYYY-MM-DD>`, whose own label is the count text ("2 due"); the
    due lane of the selected day lists the day's TODOs with their local times. An accepted event shows as
    `sdk.calendar.event-<n>`. A past event reads "Missed", never "Overdue". The calendar follows the fake clock: `sdk.calendar.clock-state` reads "Clock: real time (today yyyy-mm-dd)" or "Clock: <iso> (today yyyy-mm-dd)", and today and the first selected day follow it unless you already picked a day. Set the clock on `/today` or `/inbox`, then open `/calendar` and check the state line.
 5. **Settings.** `/todo-settings`: change the end of the work day to 18:00 (`sdk.todo.settings-end`; also `settings-start`, `settings-lead`, `settings-quiet`), save
@@ -208,6 +212,7 @@ The fake clock: `/today` and `/inbox` show a strip with `<page>.clock-now` (an I
    away (the badge drops), and `sdk.today.undo` reopens the task.
 9. **Two paths, one stage.** Tick the same instant twice (or open the task from two tabs): the inbox still has one notice per
    stage and the web demo has no registered device, so `GET /fake/push/sent` is empty on web; the one-message-per-stage push half is covered by the example's tests.
+10. **Simulator.** The local notification, its permission and the three buttons: see `docs/test/MOBILE.md`.
 11. **No dialogs.** At 1280x800 and 390x844, on all five pages: zero `[role=dialog],[role=alertdialog]`, no console error, no
     `pageerror`, `sdk.errors` absent.
 12. **Three actions, two places.** On a notice row (`sdk.inbox.list.row-<id>-done`, `-snooze`, `-cancel`) and on the stage

@@ -71,3 +71,33 @@ about 2 minutes.
 | Dialogs, console errors, overflow | web and phone on web | PASS | 0 on the five pages |
 
 Open after the re-walk: W6 (minor; the error text has since been given the id `<fieldId>-hour-error`), P2 (minor), and every simulator step past launch (hand test).
+
+## Regression walk of the older demo pages (same day, commit b5f4d9d)
+
+Why: the branch reworked the demo's session handling and changed the shared text and time fields, and no
+browser had been on the older pages since. Same driver (Playwright from node scripts), one Sonnet walker.
+
+| Step | Lane | User | Result | Note |
+|---|---|---|---|---|
+| Home: all 12 routes listed | web | demo | PASS | |
+| UI gallery: every widget, inline select, two-step confirm, typing | web | demo | PASS | Typing replaces after select-all; fast typing keeps every character |
+| API probes | web | demo | PASS | |
+| Sync: queue, verdicts, fix and resend, clock, token | web | demo | PASS | |
+| Tasks: quick add, form, checklist, inline calendar, time, reminder options, mirror, complete, reopen, run due jobs, two-step delete | web | demo | PASS | Two recipe ids were wrong (time boxes, mirror text) |
+| Sign-in walk 1 to 8: signed out, sign in, refresh, reuse, uninvited, role asks, break-glass, Microsoft | web | several | PASS | Cookie session proven by behaviour; break-glass with the API restarted under its flag |
+| Connect round trip: expiry, reconnect, two-step disconnect | web | demo | PASS | |
+| A signed-in user stays that user on the TODO pages | web | second seeded user | PASS | |
+| Sign out, then a TODO page | web | none | PASS | Falls back to the demo user, as the recipe says |
+| Session reuse, then a TODO page | web | demo | PASS | No crash, no error strip |
+| A second identity gets its zone reported | web | two users | PASS | |
+| UI gallery and Tasks | phone on web 390x844 | demo | PASS | |
+| Sign-in walk step 9 | phone on web | demo | PASS | Consent page included |
+| All 12 routes: overflow, dialogs, error strip | phone on web | demo | PASS | Width 390 on every route |
+| Dialogs/popups on every page visited | | | 0 | No page error; console errors only the expected 401, 403, 404 and 422 of the steps |
+
+Observations, none judged a regression: at 390 the nav strip scrolls sideways and items to its right are
+not in the tree until scrolled; after a quick add the DOM input still holds the old text until refocused
+while the screen shows it empty; a mouse click on a plain text field puts the caret at the end (only the
+time boxes select on focus); body width reads 403 on /auth and 468 on the settings page at 390 with
+nothing visibly cut.
+Timing: web about 40 minutes, 12 script runs; phone on web about 8 minutes, 4 script runs.

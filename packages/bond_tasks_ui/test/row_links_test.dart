@@ -39,4 +39,16 @@ void main() {
     await pumpAt(t, BondTodayList(today: TaskToday(today: [_t(1)]), now: DateTime(2026, 3, 12, 8)));
     expect(find.text('Person 0'), findsOneWidget);
   });
+
+  for (final phone in [false, true]) {
+    for (final links in [0, 2]) {
+      testWidgets('a tap near the right edge of the body opens the task (links=$links, phone=$phone)', (t) async {
+        var taps = 0;
+        await pumpAt(t, BondTaskRow(task: _t(links), onTap: () => taps++), phone: phone);
+        final box = t.getRect(find.byType(BondTaskRow));
+        await t.tapAt(Offset(box.right - 8, t.getCenter(find.text('Call')).dy));
+        expect(taps, 1);
+      });
+    }
+  }
 }

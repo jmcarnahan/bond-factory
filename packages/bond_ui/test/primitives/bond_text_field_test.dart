@@ -87,4 +87,41 @@ void main() {
     await expectNoOverlays(t);
     sem.dispose();
   });
+
+  group('error message', () {
+    Future<void> show(WidgetTester t, {String? id, String? error}) =>
+        pumpBond(t, BondTextField(label: 'Name', errorText: error, semanticsId: id));
+
+    bool redBorder(WidgetTester t) {
+      final d = t.widget<InputDecorator>(find.byType(InputDecorator)).decoration;
+      return d.errorText != null || d.error != null;
+    }
+
+    testWidgets('with an id and an error: its own live-region node carrying the message', (t) async {
+      final sem = t.ensureSemantics();
+      await show(t, id: 'name', error: 'Required');
+      final node = t.getSemantics(find.bySemanticsIdentifier('name-error'));
+      expect(node.label, 'Required');
+      expect(node.flagsCollection.isLiveRegion, isTrue);
+      expect(find.text('Required'), findsOneWidget, reason: 'drawn once');
+      expect(redBorder(t), isTrue, reason: 'the field still shows the error state');
+      sem.dispose();
+    });
+
+    testWidgets('with an id and no error: no error node', (t) async {
+      final sem = t.ensureSemantics();
+      await show(t, id: 'name');
+      expect(find.bySemanticsIdentifier('name-error'), findsNothing);
+      expect(redBorder(t), isFalse);
+      sem.dispose();
+    });
+
+    testWidgets('without an id: Flutter\'s own error text is used, as before', (t) async {
+      await show(t, error: 'Required');
+      final d = t.widget<InputDecorator>(find.byType(InputDecorator)).decoration;
+      expect(d.errorText, 'Required');
+      expect(d.error, isNull);
+      expect(find.text('Required'), findsOneWidget);
+    });
+  });
 }

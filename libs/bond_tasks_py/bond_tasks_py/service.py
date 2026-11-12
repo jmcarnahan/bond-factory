@@ -70,11 +70,11 @@ def _sent_zone(data: TaskCreate | TaskUpdate) -> str | None:
     return name
 
 
-def _write_zone(data: TaskCreate | TaskUpdate, writer_zone: str | None, prefs: Any, session: Any,
+def _write_zone(sent: str | None, writer_zone: str | None, prefs: Any, session: Any,
                 actor_user_id: str) -> str | None:
-    """The zone of a write: the zone sent, else ``writer_zone``, else the actor's stored zone from ``prefs`` (empty
-    means not stored). None falls through to the app default."""
-    sent = _sent_zone(data)
+    """The zone of a write: the zone sent, else ``writer_zone``, else the actor's stored zone from ``prefs``
+    (empty means not stored). None falls through to the app default. Called only when ``due_at`` is computed,
+    so a write that never needs a zone never reads ``prefs``; an error from ``prefs.for_user`` propagates."""
     if sent:
         return sent
     if writer_zone:
@@ -84,27 +84,32 @@ def _write_zone(data: TaskCreate | TaskUpdate, writer_zone: str | None, prefs: A
     return None
 
 
-def _due_at(task: Any, data: TaskCreate | TaskUpdate, *, zone: str | None, actor_user_id: str, tz: str,
+def _due_at(task: Any, data: TaskCreate | TaskUpdate, *, writer_zone: str | None, actor_user_id: str, tz: str,
             session: Any, prefs: Any) -> datetime | None:
-    """The task's due instant under rules 3 and 4 of the due-instant decision. ``zone`` is the zone of this write
-    (sent, else the writer's stored zone); a date-only task uses it only when the writer is the responsible user."""
+    """The task's due instant under rules 3 and 4 of the due-instant decision. A timed task uses the zone of
+    the write (``_write_zone``); a date-only task uses it only when the writer is the responsible user."""
     responsible = task.assigned_user_id or task.owner_user_id
     if task.due_time:
+        zone = _write_zone(data.time_zone, writer_zone, prefs, session, actor_user_id)
         return compute_due_at(task.due_date, task.due_time, writer_zone=zone, responsible_prefs=UserPrefs(),
                               app_tz=tz, client_due_at=data.due_at, sent_zone=data.time_zone)
     found = prefs.for_user(session, responsible) if prefs is not None else UserPrefs()
-    return compute_due_at(task.due_date, None, writer_zone=zone if actor_user_id == responsible else None,
-                          responsible_prefs=found, app_tz=tz)
+    zone = (_write_zone(data.time_zone, writer_zone, prefs, session, actor_user_id)
+            if actor_user_id == responsible else None)
+    return compute_due_at(task.due_date, None, writer_zone=zone, responsible_prefs=found, app_tz=tz)
 
 
-def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: str, data: TaskCreate, now: datetime,
-           tz: str = "UTC", user_exists: UserExists | None = None, writer_zone: str | None = None,
-           prefs: Any = None, extras: Mapping[str, Any] | None = None,
+def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: str, data: TaskCreate,
+           now: datetime, tz: str = "UTC", user_exists: UserExists | None = None,
+           writer_zone: str | None = None, prefs: Any = None, extras: Mapping[str, Any] | None = None,
            host_columns: Collection[str] = (), after_write: AfterWrite | None = None) -> Any:
-    """Insert a task. A client-chosen id replayed by the same owner returns the existing row; another owner's id is
-    ``id_taken``. ``writer_zone`` is the writer's stored zone (when None and ``prefs`` is given, the actor's stored zone is read from
-    ``prefs``), ``prefs`` a ``Preferences`` (None: defaults for
-    everyone), ``extras`` app columns named in ``host_columns``, ``after_write(session, task)`` runs after the flush."""
+    """Insert a task. A client-chosen id replayed by the same owner returns the existing row; another owner's
+    id is ``id_taken``.
+
+    ``writer_zone`` is the writer's stored zone. When it is None and ``prefs`` (a ``Preferences``; None means
+    the defaults for everyone) is given, a task that has a due date reads the actor's stored zone from
+    ``prefs``; an error that ``prefs.for_user`` raises then propagates. ``extras`` are app columns named in
+    ``host_columns``; ``after_write(session, task)`` runs after the flush."""
     if data.id:
         existing = session.get(task_model, data.id)
         if existing is not None:
@@ -112,7 +117,7 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
                 return existing
             raise TaskError("id_taken")
     now = to_naive_utc(now)
-    zone = _write_zone(data, writer_zone, prefs, session, actor_user_id)
+    _sent_zone(data)  # an unknown zone name is refused even when no due instant is computed
     task = task_model(
         owner_user_id=owner_user_id, created_by=actor_user_id, title=_title(data.title), notes=data.notes,
         due_date=data.due_date, due_time=data.due_time, priority=data.priority, status=TaskStatus.OPEN.value,
@@ -125,7 +130,9 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
         task.id = data.id
     _check_time(task)
     apply_extras(task, extras, host_columns)
-    task.due_at = _due_at(task, data, zone=zone, actor_user_id=actor_user_id, tz=tz, session=session, prefs=prefs)
+    if task.due_date is not None:
+        task.due_at = _due_at(task, data, writer_zone=writer_zone, actor_user_id=actor_user_id, tz=tz,
+                              session=session, prefs=prefs)
     mark_mirror(task)
     try:
         with session.begin_nested():
@@ -152,7 +159,7 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
     ``mirror_enabled`` cannot be cleared. ``due_at`` is recomputed only when the date, the time or the assignee
     actually differs from what is stored (a timed task is not recomputed by a reassignment)."""
     sent, now = data.model_fields_set, to_naive_utc(now)
-    zone = _write_zone(data, writer_zone, prefs, session, actor_user_id)
+    _sent_zone(data)  # an unknown zone name is refused even when no due instant is computed
     reassigning = "assigned_user_id" in sent and (data.assigned_user_id or None) != task.assigned_user_id
     if reassigning:
         require_owner(task, actor_user_id, permissions)
@@ -186,8 +193,8 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
     if task.due_date is None:
         task.due_at = None
     elif before != (task.due_date, task.due_time) or (reassigning and not task.due_time):
-        task.due_at = _due_at(task, data, zone=zone, actor_user_id=actor_user_id, tz=tz, session=session,
-                              prefs=prefs)
+        task.due_at = _due_at(task, data, writer_zone=writer_zone, actor_user_id=actor_user_id, tz=tz,
+                              session=session, prefs=prefs)
     mark_mirror(task)
     task.updated_at = now
     session.flush()

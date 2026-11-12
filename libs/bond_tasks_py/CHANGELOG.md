@@ -4,6 +4,8 @@
 Added
 - `service.create` / `update`: with `prefs` given and no zone sent and no `writer_zone`, a timed task uses the actor's
   stored zone (`prefs.for_user(session, actor).time_zone`); an empty zone falls through to `tz`.
+  The lookup is lazy: a write that does not compute `due_at` (a title-only update, a task with no date) never
+  reads `prefs`.
 - `sync_routes(on_deleted=)`: `on_deleted(ctx, session, task_id, owner_user_id)` runs after every real delete
   (mirrored or not), so a host can put away the task's notices. `after_delete` is unchanged.
 

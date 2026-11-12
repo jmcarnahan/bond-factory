@@ -101,7 +101,8 @@ class BondTaskRow extends StatelessWidget {
           ),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              // Stretch: the tappable body spans the whole row, as before the link chips.
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 BondPressable(
                   onTap: onTap,
@@ -113,7 +114,9 @@ class BondTaskRow extends StatelessWidget {
                 if (task.links.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: BondSpace.s8),
-                    child: Wrap(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
                       spacing: BondSpace.s8,
                       runSpacing: BondSpace.s4,
                       crossAxisAlignment: WrapCrossAlignment.center,
@@ -128,6 +131,7 @@ class BondTaskRow extends StatelessWidget {
                         if (task.links.length > _kMaxLinks)
                           Text(labels.moreLinksText(task.links.length - _kMaxLinks), style: text.small.copyWith(color: t.muted)),
                       ],
+                    ),
                     ),
                   ),
               ],

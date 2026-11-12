@@ -9,7 +9,8 @@
 - `BondPersonTile`: a person as a list row (avatar, name, subtitle, trailing).
 - `BondLabels`: `searching`, `searchFailed`, `remove`.
 - `BondTimeField` selects a box's text on focus, so typing replaces it.
-- `BondTextField` with a `semanticsId` exposes its error message as its own node `<id>-error`.
+- `BondTextField` with a `semanticsId` exposes its error message as its own node `<id>-error`, a live region
+  so a screen reader announces it when it appears.
 
 Tokens, theme, labels, semantics helper and the primitive widgets, lifted from the two near-identical app UI packages.
 

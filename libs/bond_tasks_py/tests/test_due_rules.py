@@ -306,3 +306,54 @@ def test_update_of_the_time_alone_uses_the_actors_stored_zone(session):
     task = make(session, due_date=DAY, due_time="09:30", prefs=MapPrefs(u1=NY))
     edit(session, task, due_time="10:00", prefs=MapPrefs(u1=NY))
     assert task.due_at == datetime(2026, 3, 12, 14, 0)
+
+
+class CountingPrefs(MapPrefs):
+    def __init__(self, **by_user):
+        super().__init__(**by_user)
+        self.calls = []
+
+    def for_user(self, session, user_id):
+        self.calls.append(user_id)
+        return super().for_user(session, user_id)
+
+
+class BrokenPrefs:
+    def for_user(self, session, user_id):
+        raise RuntimeError("settings store down")
+
+
+def test_a_title_only_update_never_reads_prefs(session):
+    task = make(session, due_date=DAY, due_time="09:30")
+    prefs = CountingPrefs(u1=NY)
+    edit(session, task, title="Renamed", prefs=prefs)
+    assert prefs.calls == []
+    edit(session, task, due_time="09:30", prefs=prefs)  # the same value: nothing differs, nothing computed
+    assert prefs.calls == []
+
+
+def test_create_without_a_due_date_never_reads_prefs(session):
+    prefs = CountingPrefs(u1=NY)
+    assert make(session, prefs=prefs).due_at is None
+    assert prefs.calls == []
+
+
+def test_a_stored_zone_that_is_not_an_iana_name_gives_the_app_default(session):
+    task = make(session, due_date=DAY, due_time="09:30", prefs=MapPrefs(u1=UserPrefs(time_zone="Not/AZone")))
+    assert task.due_at == datetime(2026, 3, 12, 9, 30)
+
+
+def test_prefs_raising_during_a_write_that_needs_the_zone_propagates(session):
+    with pytest.raises(RuntimeError, match="settings store down"):
+        make(session, due_date=DAY, due_time="09:30", prefs=BrokenPrefs())
+    task = make(session, due_date=DAY, due_time="09:30")
+    with pytest.raises(RuntimeError):
+        edit(session, task, due_time="10:00", prefs=BrokenPrefs())
+    edit(session, task, title="No zone needed", prefs=BrokenPrefs())  # a write that needs no zone still succeeds
+
+
+def test_an_unknown_zone_sent_is_still_refused_on_a_title_only_update(session):
+    task = make(session)
+    with pytest.raises(TaskError) as caught:
+        edit(session, task, title="x", time_zone="Mars/Olympus")
+    assert caught.value.code == "invalid_time_zone"

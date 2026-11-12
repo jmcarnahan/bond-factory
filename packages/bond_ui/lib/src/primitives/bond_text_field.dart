@@ -128,6 +128,7 @@ class BondTextField extends StatelessWidget {
             child: Semantics(
               identifier: '$semanticsId-error',
               label: errorText,
+              liveRegion: true,
               container: true,
               child: ExcludeSemantics(
                 child: Text(errorText!, style: text.small.copyWith(color: t.danger.press)),
