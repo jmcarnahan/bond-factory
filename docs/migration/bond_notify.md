@@ -20,8 +20,8 @@ import 'package:http/http.dart' as http; // a test passes MockClient from packag
 final apiClient = ApiClient(baseUrl: Uri.parse('https://api.example.com'), http: http.Client(), tokens: tokenSource);
 final api = NoticesApi(apiClient);                         // prefix '/notices'
 final controller = NoticeController(PollingNoticeFeed(api)); // polls every 30 seconds while someone listens
-await controller.start();
-controller.states.listen((s) => render(s.items, s.unreadCount, s.loading, s.error));
+await controller.start();  // returns before the first read lands: the first state is loading with no items
+controller.states.listen((s) => render(s.items, s.unreadCount, s.loading, s.error)); // wait for loading == false
 controller.markRead(id);  controller.dismiss(id);          // optimistic, revert on failure
 await controller.markAllRead();
 ```

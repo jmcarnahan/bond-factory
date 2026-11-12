@@ -9,9 +9,13 @@ and `task_support.py`. The note for the library is `bond_tasks_py.md`, the wire 
 The libs ship mixins and no migrations. All seven classes live in ONE database. The names below are the reference host's.
 
 ```python
-from sqlalchemy.orm import DeclarativeBase
-from bond_tasks_py import (NoticeLedgerMixin, NoticeOutboxMixin, TaskLinkIndexMixin, TasksMixin, TaskUserSettingsMixin)
-from bond_notify_py import NoticesMixin
+from datetime import UTC, datetime
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Session
+import bond_tasks_py as tasks      # the module: it exports a `Notice` Protocol, so do not import that name next to a model `Notice`
+from bond_tasks_py import (NoticeLedgerMixin, NoticeOutboxMixin, StoredPreferences, TaskCreate, TaskFilters,
+                           TaskLinkIndexMixin, TasksMixin, TaskUserSettingsMixin, make_link_hook, sqlite_savepoint_setup)
+from bond_notify_py import InboxNotifier, NoticesMixin, dismiss_for_source, dismiss_stale
 from bond_push_py import PushDevicesMixin
 
 class Base(DeclarativeBase): pass
@@ -24,7 +28,8 @@ class Notice(NoticesMixin, Base): pass          # bond_notify_py
 class PushDevice(PushDevicesMixin, Base): pass  # bond_push_py
 ```
 
-In a test, `create_engine("sqlite://")` (in memory) works once you call `sqlite_savepoint_setup(engine)`.
+In a test, `create_engine("sqlite://")` (in memory) works once you call `sqlite_savepoint_setup(engine)`, but an in-memory
+database is per connection and thread: single-threaded use only. With a threaded server or a `TestClient` use a file URL or `StaticPool`.
 
 ## 2. Service calls
 
@@ -45,7 +50,21 @@ All take a session first, flush and never commit. `now` is a datetime (naive UTC
 | `task_item` | `task_item(task, *, today, now, names=None)` (`today` is `viewer_today(now, zone)`); `task_items(tasks, *, today, now, names=None)` for a list, `names` being a callable from user ids to a name map |
 | settings | `get_settings(session, settings_model, user_id)`, `update_settings(session, *, settings_model, task_model, user_id, data, tz, now, on_recomputed=None)` |
 
+What three arguments of `create` and `update` mean:
+- `prefs`: a `Preferences` such as `StoredPreferences(TaskUserSettings)`. It supplies each user's zone and work day. With `None` everyone has the defaults.
+- `writer_zone`: the zone to use for this write when the request sent none. A zone sent with the write wins over it. If `writer_zone` is
+  None and `prefs` is given, the actor's stored zone is read from `prefs`. Then the app default `tz`. A timed task uses the actor's zone, not the assignee's. A date-only task uses it only when the actor is the
+  responsible user (that user's own stored zone wins). The device `due_at` hint is checked only against a zone SENT with the write.
+- `user_exists`: a callable `(user_id) -> bool` checked for `assigned_user_id`. With `None` the check is skipped and any assignee id is accepted
+  (`unknown_assignee` is never raised).
+
 ## 3. Routes and the call behind each
+
+Register the static paths (`/tasks/today`, `/tasks/settings`, `/tasks/parse`, `/tasks/links/search`, `/tasks/summary`) BEFORE `/tasks/{id}`,
+or the id route swallows them. The viewer zone is, in order: the `time_zone` query value, the person's stored zone, the app default
+(`effective_zone`). `GET /tasks/today` uses `today(...)` and `task_item(..., today=viewer_today(now, zone))`. In `task_item(names=)` the names
+are a dict (user id to name), in `task_items(names=)` a callable that takes the list of ids. A `PUT` handler takes the parsed body as a
+`TaskUpdate` model (not a dict with defaults filled in), so an omitted field is unchanged and an explicit null clears it.
 
 | Route | Calls |
 |---|---|
@@ -59,7 +78,9 @@ All take a session first, flush and never commit. `now` is a datetime (naive UTC
 | `DELETE /tasks/{id}` | `delete` with `link_index_model=`, then `dismiss_for_source` |
 | `PUT /tasks/{id}/checklist/{item_id}` | `get` then `set_checklist_item` |
 | `GET`, `PUT /tasks/settings` | `get_settings`, `update_settings` (with `on_recomputed` calling `dismiss_stale`), then `settings_item` |
-| `POST /notices/{id}/act` | `apply_notice_action`, then mark read and `dismiss_for_source` on done or cancel |
+| `POST /notices/{id}/act` | `session.get(Notice, id)` (404 `notice_not_found`), check `notice.user_id` (403 `not_notice_owner`), `get` the task, `apply_notice_action`, `mark_read`, `dismiss_for_source` on done or cancel |
+
+Run the sweep every minute, and never less often than every 15 minutes: the `due` stage lasts 15 minutes and a later sweep claims `past` instead.
 
 `dismiss_for_source(session, Notice, task_id, now, *, user_ids=None)` and `dismiss_stale(session, Notice, task_id, due_at, now)`
 live in `bond_notify_py`, not `bond_tasks_py`. The reference host's after-write hook (`todo_wiring.after_task_write`) runs after every task write, REST or sync: for a closed

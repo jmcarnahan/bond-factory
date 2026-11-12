@@ -50,7 +50,7 @@ later is needed (`RETURNING`). PostgreSQL needs nothing.
 ## 5. Running the sweep
 From a `bond_jobs` tick, as the `before` hook, throttled with `before_every`:
 ```python
-# models are in bond_tasks_py_host.md; push = PushNotifier(PushDevice, ApnsSender(key_pem, key_id, team_id))
+# imports and models: bond_tasks_py_host.md (its `Notice` Protocol clashes with a model named Notice: import the module); push = PushNotifier(PushDevice, ApnsSender(key_pem, key_id, team_id))
 KW = dict(task_model=Task, ledger_model=TaskNoticeLedger, outbox_model=TaskNoticeOutbox)
 def sweep(session, now):  # bond_jobs.tick(..., before=sweep, before_every=60); tick commits after the hook
     sweep_due(session, now=now, prefs=StoredPreferences(TaskUserSettings), tz="UTC",

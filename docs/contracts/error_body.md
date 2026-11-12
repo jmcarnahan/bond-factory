@@ -41,7 +41,7 @@ Status 422:
             "errors": [{"loc": ["body", "field"], "msg": "...", "type": "..."}]}}
 ```
 
-The server never echoes the rejected input.
+The server never echoes the rejected input. A host may map a framework validation error to a more specific code: the example does for a task priority outside 1 to 3 (`invalid_priority`) and a bad time zone (`invalid_time_zone`) through a body pre-check. Every other body error stays `validation_error`.
 
 ## Retry-After
 

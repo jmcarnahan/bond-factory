@@ -268,3 +268,41 @@ def test_backfill_uses_the_creators_zone_for_a_timed_task(session):
     prefs = MapPrefs(u1=UserPrefs(time_zone="America/New_York"))
     assert backfill_due_at(session, task_model=Task, prefs=prefs, tz="UTC", now=NOW) == 1
     assert task.due_at == datetime(2026, 3, 12, 13, 30)
+
+
+NY = UserPrefs(time_zone="America/New_York")
+
+
+def test_zone_falls_back_to_the_actors_stored_zone_from_prefs(session):
+    task = make(session, due_date=DAY, due_time="09:30", prefs=MapPrefs(u1=NY))
+    assert task.due_at == datetime(2026, 3, 12, 13, 30)
+
+
+def test_an_explicit_writer_zone_beats_the_prefs_lookup(session):
+    task = make(session, due_date=DAY, due_time="09:30", prefs=MapPrefs(u1=NY), writer_zone="Asia/Tokyo")
+    assert task.due_at == datetime(2026, 3, 12, 0, 30)
+
+
+def test_a_zone_sent_beats_both(session):
+    task = make(session, due_date=DAY, due_time="09:30", prefs=MapPrefs(u1=NY), writer_zone="Asia/Tokyo",
+                time_zone="America/Los_Angeles")
+    assert task.due_at == datetime(2026, 3, 12, 16, 30)
+
+
+def test_no_prefs_or_no_stored_zone_means_the_app_default(session):
+    assert make(session, due_date=DAY, due_time="09:30").due_at == datetime(2026, 3, 12, 9, 30)
+    assert make(session, due_date=DAY, due_time="09:30", prefs=MapPrefs()).due_at == datetime(2026, 3, 12, 9, 30)
+    empty = MapPrefs(u1=UserPrefs(time_zone=""))
+    assert make(session, due_date=DAY, due_time="09:30", prefs=empty).due_at == datetime(2026, 3, 12, 9, 30)
+
+
+def test_the_actors_zone_is_used_not_the_responsible_users_for_a_timed_task(session):
+    prefs = MapPrefs(u1=NY, u2=UserPrefs(time_zone="Asia/Tokyo"))
+    task = make(session, assigned_user_id="u2", due_date=DAY, due_time="09:30", prefs=prefs)
+    assert task.due_at == datetime(2026, 3, 12, 13, 30)
+
+
+def test_update_of_the_time_alone_uses_the_actors_stored_zone(session):
+    task = make(session, due_date=DAY, due_time="09:30", prefs=MapPrefs(u1=NY))
+    edit(session, task, due_time="10:00", prefs=MapPrefs(u1=NY))
+    assert task.due_at == datetime(2026, 3, 12, 14, 0)

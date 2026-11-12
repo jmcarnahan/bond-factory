@@ -15,8 +15,8 @@ Migration note: `docs/migration/bond_notify.md`.
 - `NoticeFeed` is the seam: `watch()`, `refresh()`, `markRead`, `dismiss`, `markAllRead`, `serverUnreadCount` (null when
   the list is complete), `dispose()`. `PollingNoticeFeed(api, {interval: 30 s})` polls the REST API while someone listens.
   A sync-store feed lives in `bond_notify_powersync`.
-- `NoticeController(feed, {fresh: 10 min, clock})`: `states` (replays the current `NoticeState`: `items`, `unreadCount`,
-  `loading`, `error`), `start()`, `refresh()`, `markRead`, `dismiss`, `markAllRead`, `dispose()`. Read and dismiss are
+- `NoticeController(feed, {fresh: 10 min, clock})`: `states` (a stream, there is no synchronous `state` getter; it replays the current `NoticeState`: `items`, `unreadCount`,
+  `loading`, `error`), `start()` (returns before the first read lands: the first state is `loading` with no items, wait for `loading == false`), `refresh()`, `markRead`, `dismiss`, `markAllRead`, `dispose()`. Read and dismiss are
   optimistic and revert on failure. `newUnread` fires once per notice id, and only for a notice created within `fresh`.
 - `NoticeLabels`: every user-visible string, English defaults (inbox title, empty, mark all read, Done, Snooze, Cancel
   task, Undo, Last reminder, unread count, loading, retry, relative times). No other string is in the package.

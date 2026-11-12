@@ -19,13 +19,14 @@ Notices, stages and the ledger are in `docs/contracts/notices.md`. Reasons for t
 1. `due_at` is computed by the server, truncated to the minute, and null if and only if `due_date` is null. A dated
    task with a null `due_at` is "not yet computed": the sweep repairs it. It is never read as undated.
 2. A timed task (`due_time` set): `due_at` is `due_date` + `due_time` read in a zone. The zone is the one sent with
-   the write (`time_zone`), else the writer's stored zone, else the app default.
+   the write (`time_zone`), else the `writer_zone` the host passes, else the actor's stored zone read from `prefs` (none or empty means not stored), else the app default. A timed task uses the actor's
+   zone, not the assignee's. A sent zone name is checked: an unknown one is 422 `invalid_time_zone`. The sync path does the same lookup.
 3. A client `due_at` is a hint for a timed task only. It is accepted when the offset from the wall clock is a multiple
    of 15 minutes within -12:00 to +14:00 and, if a `time_zone` came with the same write, equals that zone's result.
    Otherwise it is ignored and recomputed. A write is never refused because of `due_at`, and an unparseable `due_at`, on REST or sync, is ignored and the server computes it.
 4. A date-only task: `due_at` is `due_date` at the responsible user's `end_of_day`. The responsible user is the
-   assignee, else the owner. The zone is that user's stored zone. If none is stored and the writer is the
-   responsible user, the zone sent with the write. Else the app default. A client `due_at` is ignored.
+   assignee, else the owner. The zone is that user's stored zone. If none is stored and the actor is the
+   responsible user, the zone of the write (rule 2). Else the app default. A client `due_at` is ignored.
 5. A task write never stores a zone for anyone. A zone is stored only by that user's settings update.
 6. Recompute only when a write changes `due_date`, `due_time` or `assigned_user_id` to a value that differs from the
    stored one, or through `recompute_day_due` (the responsible user changed `end_of_day` or `time_zone`). A timed task

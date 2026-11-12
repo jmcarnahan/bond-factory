@@ -21,6 +21,7 @@ Per recipient R with settings P and zone Z (R's stored zone if it is a known nam
   blocks. Seq 0 of `past` is left out when the first morning comes at or before `due_at` + 15 minutes.
 - `max_past` is a parameter of the sweep and of the phone scheduler, default 5. The notice with seq `max_past` has
   `last = true` and nothing is claimed after it. The task stays overdue in lists and in the inbox. Only alerts stop.
+- Sweep cadence: a tick claims only the stage current at that moment, and the `due` stage lasts 15 minutes (`DUE_WINDOW`). A sweep that runs less often than every 15 minutes can miss it (the next sweep claims the `past` stage). Run it every minute, never above 15.
 - Each tick claims only the current stage and seq, never earlier ones. A missed day makes seq jump. Two sweeps in a
   day make one row. `since` marks stage times before it as ledger status `skipped` (not sent) so a first run does not flood.
 - Only open tasks with a non-null `due_at` have stages. A timed task whose `due_at` is null has no stages.
@@ -116,7 +117,7 @@ is 403 `not_task_owner`. An action id other than the three is 422 `invalid_actio
 | `POST /push/devices` (201) | `{device_id, token, platform (ios), environment, topic?}` | `{device_id}` |
 | `DELETE /push/devices/{device_id}` (204) | none | none |
 
-`act` applies the action, marks the notice read, and on done or cancel puts away the task's other notices. The
+`act` loads the notice and the app checks it is the caller's (404 `notice_not_found`, 403 `not_notice_owner`), loads its task, applies the action (`apply_notice_action`), marks the notice read, and on done or cancel puts away the task's other notices. The
 `act` route and the device routes are the app's own. In the example, `act` needs the `tasks.write` capability (read and dismiss need only a session). `GET /notices` shows the user's own, undismissed notices, newest
 first by `(created_at, id)`. `list_notices` also returns the next cursor: an app that pages sends it as `before`. Errors: 404 `notice_not_found`, 403 `not_notice_owner`, 422 `invalid_cursor`. Device
 errors (`PushError`): 422 `invalid_platform`, `invalid_environment`, `token_required`, `device_id_required`,

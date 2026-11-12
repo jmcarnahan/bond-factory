@@ -70,6 +70,20 @@ def _sent_zone(data: TaskCreate | TaskUpdate) -> str | None:
     return name
 
 
+def _write_zone(data: TaskCreate | TaskUpdate, writer_zone: str | None, prefs: Any, session: Any,
+                actor_user_id: str) -> str | None:
+    """The zone of a write: the zone sent, else ``writer_zone``, else the actor's stored zone from ``prefs`` (empty
+    means not stored). None falls through to the app default."""
+    sent = _sent_zone(data)
+    if sent:
+        return sent
+    if writer_zone:
+        return writer_zone
+    if prefs is not None:
+        return prefs.for_user(session, actor_user_id).time_zone or None
+    return None
+
+
 def _due_at(task: Any, data: TaskCreate | TaskUpdate, *, zone: str | None, actor_user_id: str, tz: str,
             session: Any, prefs: Any) -> datetime | None:
     """The task's due instant under rules 3 and 4 of the due-instant decision. ``zone`` is the zone of this write
@@ -88,7 +102,8 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
            prefs: Any = None, extras: Mapping[str, Any] | None = None,
            host_columns: Collection[str] = (), after_write: AfterWrite | None = None) -> Any:
     """Insert a task. A client-chosen id replayed by the same owner returns the existing row; another owner's id is
-    ``id_taken``. ``writer_zone`` is the writer's stored zone, ``prefs`` a ``Preferences`` (None: defaults for
+    ``id_taken``. ``writer_zone`` is the writer's stored zone (when None and ``prefs`` is given, the actor's stored zone is read from
+    ``prefs``), ``prefs`` a ``Preferences`` (None: defaults for
     everyone), ``extras`` app columns named in ``host_columns``, ``after_write(session, task)`` runs after the flush."""
     if data.id:
         existing = session.get(task_model, data.id)
@@ -97,7 +112,7 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
                 return existing
             raise TaskError("id_taken")
     now = to_naive_utc(now)
-    zone = _sent_zone(data) or writer_zone
+    zone = _write_zone(data, writer_zone, prefs, session, actor_user_id)
     task = task_model(
         owner_user_id=owner_user_id, created_by=actor_user_id, title=_title(data.title), notes=data.notes,
         due_date=data.due_date, due_time=data.due_time, priority=data.priority, status=TaskStatus.OPEN.value,
@@ -137,7 +152,7 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
     ``mirror_enabled`` cannot be cleared. ``due_at`` is recomputed only when the date, the time or the assignee
     actually differs from what is stored (a timed task is not recomputed by a reassignment)."""
     sent, now = data.model_fields_set, to_naive_utc(now)
-    zone = _sent_zone(data) or writer_zone
+    zone = _write_zone(data, writer_zone, prefs, session, actor_user_id)
     reassigning = "assigned_user_id" in sent and (data.assigned_user_id or None) != task.assigned_user_id
     if reassigning:
         require_owner(task, actor_user_id, permissions)

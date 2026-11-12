@@ -43,7 +43,7 @@ task = service.create(
     session, task_model=Task, owner_user_id=uid, actor_user_id=uid, now=now, tz="UTC",
     data=TaskCreate(title="Call back", due_date=date(2026, 11, 20), due_time="14:30", priority=3,
                     remind_minutes_before=-3, links=[{"kind": "contact", "id": "c1", "label": "Ann"}]),
-    writer_zone="America/Chicago", prefs=StoredPreferences(Settings),
+    writer_zone="America/Chicago", prefs=StoredPreferences(Settings),  # no zone sent: writer_zone, else the actor's stored zone
     extras={"contact_id": "c1"}, host_columns=("contact_id",), after_write=make_link_hook(LinkIndex))
 
 prefs, warnings = update_settings(session, settings_model=Settings, task_model=Task, user_id=uid,
@@ -97,7 +97,7 @@ notifier stay pending (`unrouted`) and fail after 7 days. `prune_ledger` also re
 ## Rules to know
 - One overdue meaning: an open task is overdue when `due_at < now`. Summary, today and the list agree (`is_overdue`).
 - `due_at` is server-computed, naive UTC, null only when `due_date` is null. A timed task uses the writer's zone
-  (sent, else stored, else app default); a date-only task uses the responsible user's end of day and zone. A client
+  (sent, else `writer_zone`, else the actor's stored zone read from `prefs`, else app default); a date-only task uses the responsible user's end of day and zone. A client
   `due_at` is a hint for a timed task only, checked only against a zone sent with the same write (`sent_zone`);
   it never causes a refusal.
 - `due_at` is recomputed only when a write changes the date, time or assignee, or the user's end of day or zone
