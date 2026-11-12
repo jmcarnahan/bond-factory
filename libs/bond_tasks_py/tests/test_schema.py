@@ -9,8 +9,8 @@ from bond_tasks_py import ITEM_KEYS, TASK_COLUMNS, ChecklistInput, TaskCreate, T
 from bond_tasks_py.schema import normalize_checklist
 
 LITERAL_COLUMNS = [
-    "id", "owner_user_id", "created_by", "assigned_user_id", "title", "notes", "due_date", "due_time", "status",
-    "completed_at", "completed_by", "checklist", "remind_minutes_before", "remind_at", "reminded_at",
+    "id", "owner_user_id", "created_by", "assigned_user_id", "title", "notes", "due_date", "due_time", "priority",
+    "due_at", "status", "completed_at", "completed_by", "checklist", "remind_minutes_before", "remind_at", "reminded_at",
     "mirror_enabled", "mirror_status", "external_provider", "external_event_id", "external_account_user_id",
     "external_etag", "links", "source", "created_at", "updated_at",
 ]
@@ -31,6 +31,7 @@ def test_table_name_and_composite_indexes():
     assert composite == {
         "ix_tasks_owner_status_due": ["owner_user_id", "status", "due_date"],
         "ix_tasks_assignee_status_due": ["assigned_user_id", "status", "due_date"],
+        "ix_tasks_status_due_at": ["status", "due_at"],
     }
 
 
@@ -49,7 +50,7 @@ def test_defaults_on_insert(session):
 
 
 def test_item_keys_are_the_contract_list():
-    assert len(ITEM_KEYS) == 24 and ITEM_KEYS[0] == "id" and ITEM_KEYS[-1] == "overdue"
+    assert len(ITEM_KEYS) == 26 and ITEM_KEYS[0] == "id" and ITEM_KEYS[-1] == "overdue"
 
 
 def test_client_chosen_id_pattern():
@@ -67,10 +68,11 @@ def test_due_time_pattern():
 
 
 def test_remind_minutes_range():
-    for ok in (-2, -1, 0, 15):
+    for ok in (-3, -2, -1, 0, 15, 10080, 525600):
         assert TaskCreate(remind_minutes_before=ok).remind_minutes_before == ok
-    with pytest.raises(ValidationError):
-        TaskCreate(remind_minutes_before=-3)
+    for bad in (-4, 525601):
+        with pytest.raises(ValidationError):
+            TaskCreate(remind_minutes_before=bad)
 
 
 def test_update_tracks_what_was_sent():
@@ -124,9 +126,44 @@ def test_nul_bytes_are_refused_everywhere():
             build()
 
 
-def test_only_four_update_fields_accept_null():
-    for field in ("due_date", "due_time", "assigned_user_id", "notes", "title"):
+def test_priority_is_one_to_three_and_null_clears_on_update():
+    assert TaskCreate(priority=3).priority == 3
+    for bad in (0, 4, -1):
+        with pytest.raises(ValidationError):
+            TaskCreate(priority=bad)
+    assert TaskUpdate.model_validate({"priority": None}).model_fields_set == {"priority"}
+
+
+def test_due_at_and_time_zone_are_accepted_as_hints():
+    data = TaskCreate(due_at="2026-03-12T16:30:00Z", time_zone="America/Los_Angeles")
+    assert data.due_at is not None and data.time_zone == "America/Los_Angeles"
+    with pytest.raises(ValidationError):
+        TaskCreate(time_zone="x" * 65)
+
+
+def test_only_five_update_fields_accept_null():
+    for field in ("due_date", "due_time", "priority", "assigned_user_id", "notes", "title"):
         assert TaskUpdate.model_validate({field: None}).model_fields_set == {field}
     for field in ("checklist", "links", "remind_minutes_before", "mirror_enabled"):
         with pytest.raises(ValidationError):
             TaskUpdate.model_validate({field: None})
+
+
+def test_duplicate_links_keep_the_first():
+    from bond_tasks_py.schema import LinkInput, normalize_links
+
+    links = normalize_links([LinkInput(kind="contact", id="c1", label="First"),
+                             LinkInput(kind="contact", id="c2"),
+                             LinkInput(kind="contact", id="c1", label="Second"),
+                             LinkInput(kind="loan", id="c1")])
+    assert [(x["kind"], x["id"], x["label"]) for x in links] == [
+        ("contact", "c1", "First"), ("contact", "c2", None), ("loan", "c1", None)]
+
+
+def test_new_error_codes_are_422_with_messages():
+    from bond_tasks_py import CODES, TaskError
+
+    for code in ("invalid_time_zone", "invalid_priority"):
+        assert CODES[code][0] == 422 and CODES[code][1]
+        err = TaskError(code)
+        assert err.status == 422 and err.code == code and err.message == CODES[code][1]

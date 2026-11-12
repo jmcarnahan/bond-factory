@@ -1,29 +1,34 @@
 """The ``TaskItem`` wire shape (also the shared fixture ``fixtures/tasks/task.json``)."""
 
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
+from bond_tasks_py.due import is_overdue
 from bond_tasks_py.models import MirrorStatus, TaskStatus
 from bond_tasks_py.timeutil import iso_z
 
 ITEM_KEYS = (
-    "id", "title", "notes", "due_date", "due_time", "status", "owner_user_id", "owner_name", "assigned_user_id",
-    "assignee_name", "checklist", "remind_minutes_before", "remind_at", "reminded_at", "links", "completed_at",
-    "mirror_enabled", "mirror_status", "external_provider", "external_event_id", "source", "created_at", "updated_at",
-    "overdue",
+    "id", "title", "notes", "due_date", "due_time", "priority", "due_at", "status", "owner_user_id", "owner_name",
+    "assigned_user_id", "assignee_name", "checklist", "remind_minutes_before", "remind_at", "reminded_at", "links",
+    "completed_at", "mirror_enabled", "mirror_status", "external_provider", "external_event_id", "source",
+    "created_at", "updated_at", "overdue",
 )
 
 Names = Callable[[list[str]], dict[str, str]]
 
 
-def is_overdue(task: Any, today: date) -> bool:
+def _overdue(task: Any, today: date, now: datetime | None) -> bool:
+    """With ``now``, the one definition in ``due.is_overdue``. Without it (legacy callers), the old date rule:
+    open and ``due_date`` before the client's ``today``."""
+    if now is not None:
+        return is_overdue(task, now, viewer_today=today)
     return bool(task.status == TaskStatus.OPEN.value and task.due_date and task.due_date < today)
 
 
-def task_item(task: Any, *, today: date, names: dict[str, str] | None = None) -> dict:
+def task_item(task: Any, *, today: date, names: dict[str, str] | None = None, now: datetime | None = None) -> dict:
     """One task as JSON. ``names`` maps user id to display name (missing = null). ``overdue`` is measured against
-    the client's ``today``."""
+    ``now`` when given, else against the client's ``today``."""
     names = names or {}
     return {
         "id": task.id,
@@ -31,6 +36,8 @@ def task_item(task: Any, *, today: date, names: dict[str, str] | None = None) ->
         "notes": task.notes,
         "due_date": task.due_date.isoformat() if task.due_date else None,
         "due_time": task.due_time,
+        "priority": task.priority,
+        "due_at": iso_z(task.due_at),
         "status": task.status,
         "owner_user_id": task.owner_user_id,
         "owner_name": names.get(task.owner_user_id),
@@ -49,12 +56,12 @@ def task_item(task: Any, *, today: date, names: dict[str, str] | None = None) ->
         "source": task.source or "manual",
         "created_at": iso_z(task.created_at),
         "updated_at": iso_z(task.updated_at),
-        "overdue": is_overdue(task, today),
+        "overdue": _overdue(task, today, now),
     }
 
 
-def task_items(tasks: list[Any], *, today: date, names: Names | None = None) -> list[dict]:
+def task_items(tasks: list[Any], *, today: date, names: Names | None = None, now: datetime | None = None) -> list[dict]:
     """Many tasks; ``names`` is called once with every owner and assignee id."""
     ids = sorted({t.owner_user_id for t in tasks} | {t.assigned_user_id for t in tasks if t.assigned_user_id})
     resolved = names(ids) if names is not None and ids else {}
-    return [task_item(task, today=today, names=resolved) for task in tasks]
+    return [task_item(task, today=today, names=resolved, now=now) for task in tasks]

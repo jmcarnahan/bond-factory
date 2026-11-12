@@ -1,8 +1,11 @@
 /// Request bodies: create ([TaskDraft]) and update ([TaskPatch]).
 library;
 
+import 'package:bond_json/bond_json.dart';
+
 import 'task.dart';
 import 'task_enums.dart';
+import 'task_priority.dart';
 
 /// A value that was supplied, possibly as an explicit null.
 ///
@@ -40,6 +43,9 @@ class TaskDraft {
     this.mirrorEnabled = true,
     this.links = const [],
     this.source,
+    this.priority,
+    this.dueAt,
+    this.timeZone,
   });
 
   final String title;
@@ -55,6 +61,13 @@ class TaskDraft {
   final bool mirrorEnabled;
   final List<TaskLink> links;
   final String? source;
+  final TaskPriority? priority;
+
+  /// The device computed due instant (UTC), for a timed task only.
+  final DateTime? dueAt;
+
+  /// The device's IANA zone name, sent with the write.
+  final String? timeZone;
 
   /// Empty when the draft can be sent.
   List<TaskProblem> validate() => [
@@ -76,6 +89,9 @@ class TaskDraft {
         'mirror_enabled': mirrorEnabled,
         'links': [for (final l in links) l.toJson()],
         if (source != null) 'source': source,
+        if (priority != null) 'priority': priority!.wire,
+        if (dueAt != null) 'due_at': jiso(dueAt!),
+        if (_has(timeZone)) 'time_zone': timeZone,
       };
 }
 
@@ -94,6 +110,9 @@ class TaskPatch {
     this.remindMinutesBefore,
     this.mirrorEnabled,
     this.links,
+    this.priority,
+    this.dueAt,
+    this.timeZone,
   });
 
   /// A patch that sets every editable field from [d] (a form save): fields the
@@ -108,6 +127,9 @@ class TaskPatch {
         remindMinutesBefore: d.remindMinutesBefore,
         mirrorEnabled: d.mirrorEnabled,
         links: d.links,
+        priority: Present(d.priority),
+        dueAt: d.dueAt == null ? null : Present(d.dueAt),
+        timeZone: d.timeZone,
       );
 
   final String? title;
@@ -120,6 +142,13 @@ class TaskPatch {
   final bool? mirrorEnabled;
   final List<TaskLink>? links;
 
+  /// `Present(null)` clears the priority.
+  final Present<TaskPriority>? priority;
+
+  /// The device computed instant for a timed task; omit for a date-only task.
+  final Present<DateTime>? dueAt;
+  final String? timeZone;
+
   Map<String, Object?> toJson() => {
         if (title != null) 'title': title,
         if (notes != null) 'notes': notes!.value,
@@ -130,6 +159,9 @@ class TaskPatch {
         if (remindMinutesBefore != null) 'remind_minutes_before': remindMinutesBefore,
         if (mirrorEnabled != null) 'mirror_enabled': mirrorEnabled,
         if (links != null) 'links': [for (final l in links!) l.toJson()],
+        if (priority != null) 'priority': priority!.value?.wire,
+        if (dueAt != null) 'due_at': dueAt!.value == null ? null : jiso(dueAt!.value!),
+        if (_has(timeZone)) 'time_zone': timeZone,
       };
 }
 

@@ -10,6 +10,8 @@ CODES: dict[str, tuple[int, str]] = {
     "title_required": (422, "A title is required."),
     "due_time_requires_date": (422, "A due time needs a due date."),
     "id_taken": (409, "That id is already in use."),
+    "invalid_time_zone": (422, "That time zone is not known."),
+    "invalid_priority": (422, "Priority is 1 (low), 2 (normal) or 3 (high)."),
 }
 
 

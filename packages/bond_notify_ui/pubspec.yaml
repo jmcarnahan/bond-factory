@@ -1,0 +1,21 @@
+name: bond_notify_ui
+description: 'Notice list, row and badge widgets for the bond apps.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  bond_notify:
+    path: ../bond_notify
+  bond_ui:
+    path: ../bond_ui
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bond_test_support:
+    path: ../bond_test_support

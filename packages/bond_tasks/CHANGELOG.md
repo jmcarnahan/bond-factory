@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0 - unreleased
+- `Task.priority` (`TaskPriority`) and `Task.dueAt` (keys `priority`, `due_at`, right after `due_time`);
+  `TaskDraft` and `TaskPatch` gain `priority`, `dueAt`, `timeZone`; `TaskFilters.timeZone`; `kRemindUseDefault` (-3);
+  `Task.copyWith`.
+- `TaskToday`, `TaskTodayCounts`; `ParseResult`, `CaptureItem` (`TaskCandidate`, `EventCandidate`), `LinkCandidate`,
+  `LinkOption`; `TaskSettings`, `TaskSettingsPatch`, `TaskSettingsApi`; `LinkSearch`; `TimeZoneSource`, `ZoneReporter`.
+- `TasksApi`: `today`, `cancel`, `parse`, `searchLinks`; every task call accepts `timeZone`.
+- `TaskRepository`, `RemoteTaskRepository`, `TaskController`, `TaskControllerState`, `TaskClock`, `TaskTicker`,
+  `deviceDueAt`, `isOverdue`, `dayFor`, `TaskStage`, `NoticeAction`, `TaskPrefs`, `StageTime`, `stageTimes`,
+  `currentStage`, `stageOf`, `deadlineToken`, `noticeId`, `fnv1a31`, `inQuietHours`, `kNoticeCategory`.
+  `deviceDueAt`, `isOverdue`, `dayFor`, `deadlineToken`, `inQuietHours`, `TaskTicker` and `TaskClock` are real;
+  `stageTimes`, `currentStage`, `stageOf`, `RemoteTaskRepository`, `TaskController` and `ZoneReporter` throw
+  `UnimplementedError` until they are built.
+- `TaskLabels` gains priority, stage and action strings; `CaptureLabels`, `SettingsLabels`.
+- New dependency: `crypto` (sha256 for `noticeId`).
+
 ## 0.1.0 - unreleased
 - `Task` (the `TaskItem` wire shape, exactly its keys), `ChecklistItem`, `TaskLink`, `TaskStatus`, `MirrorStatus`,
   `kRemindNone` (-2) and `kRemindMorningOf` (-1). Due date and time stay `YYYY-MM-DD` / `HH:MM` strings.

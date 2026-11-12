@@ -1,0 +1,7 @@
+{
+  "time_zone": "America/Los_Angeles",
+  "start_of_day": "08:00",
+  "end_of_day": "17:00",
+  "lead_minutes": 60,
+  "warnings": []
+}

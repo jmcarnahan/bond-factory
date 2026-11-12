@@ -10,6 +10,7 @@ dependencies:
     path: ../bond_json
   bond_api:
     path: ../bond_api
+  crypto: ^3.0.0
 dev_dependencies:
   http: ^1.2.0
   lints: ^6.0.0

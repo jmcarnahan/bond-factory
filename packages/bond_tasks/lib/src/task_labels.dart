@@ -2,6 +2,7 @@
 library;
 
 import 'task_enums.dart';
+import 'task_priority.dart';
 
 class TaskLabels {
   const TaskLabels({
@@ -57,6 +58,22 @@ class TaskLabels {
     this.summaryToday = 'Due today',
     this.summaryNoDate = 'No date',
     this.external = 'Calendar',
+    this.remindDefault = 'My default',
+    this.priorityLow = 'Low',
+    this.priorityNormal = 'Normal',
+    this.priorityHigh = 'High',
+    this.priority = 'Priority',
+    this.stageDueSoon = 'Due soon',
+    this.stageDueNow = 'Due now',
+    this.stageOverdue = 'Overdue',
+    this.actionDone = 'Done',
+    this.actionSnooze = 'Snooze',
+    this.actionCancelTask = 'Cancel task',
+    this.lastReminder = 'Last reminder',
+    this.undo = 'Undo',
+    this.missed = 'Missed',
+    this.sectionUndated = 'No date',
+    this.sectionDoneToday = 'Done today',
   });
 
   final String title;
@@ -111,6 +128,30 @@ class TaskLabels {
   final String summaryToday;
   final String summaryNoDate;
   final String external;
+  final String remindDefault;
+  final String priorityLow;
+  final String priorityNormal;
+  final String priorityHigh;
+  final String priority;
+  final String stageDueSoon;
+  final String stageDueNow;
+  final String stageOverdue;
+  final String actionDone;
+  final String actionSnooze;
+  final String actionCancelTask;
+  final String lastReminder;
+  final String undo;
+
+  /// An event in the past (a task past its due time is "Overdue").
+  final String missed;
+  final String sectionUndated;
+  final String sectionDoneToday;
+
+  String priorityText(TaskPriority p) => switch (p) {
+        TaskPriority.low => priorityLow,
+        TaskPriority.normal => priorityNormal,
+        TaskPriority.high => priorityHigh,
+      };
 
   String statusText(TaskStatus s) => switch (s) {
         TaskStatus.open => statusOpen,
@@ -124,6 +165,7 @@ class TaskLabels {
         kRemindNone => remindNone,
         kRemindMorningOf => remindMorningOf,
         1 => remind1,
+        kRemindUseDefault => remindDefault,
         15 => remind15,
         60 => remind60,
         1440 => remind1440,

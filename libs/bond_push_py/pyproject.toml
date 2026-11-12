@@ -1,0 +1,31 @@
+[project]
+name = "bond_push_py"
+version = "0.1.0"
+description = "Apple push delivery: device table mixin, sender seam, APNs sender, notifier, sync routes"
+requires-python = ">=3.12,<3.14"
+license = "MIT"
+dependencies = [
+    "sqlalchemy>=2.0.36",
+    "httpx[http2]>=0.27",
+    "PyJWT>=2.8",
+    "cryptography>=42",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.6"]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bond_push_py*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

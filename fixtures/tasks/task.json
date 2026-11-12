@@ -4,6 +4,8 @@
   "notes": "Attach the revised scope before sending.",
   "due_date": "2026-03-12",
   "due_time": "09:30",
+  "priority": 3,
+  "due_at": "2026-03-12T16:30:00Z",
   "status": "open",
   "owner_user_id": "user-1",
   "owner_name": "Demo User",

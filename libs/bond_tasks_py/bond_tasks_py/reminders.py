@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlalchemy import update
 
-from bond_tasks_py.models import MORNING_OF, NO_REMINDER, TaskStatus
+from bond_tasks_py.models import MORNING_OF, TaskStatus
 from bond_tasks_py.protocols import Scheduler
 from bond_tasks_py.timeutil import local_to_utc, parse_hhmm, to_naive_utc
 
@@ -23,8 +23,9 @@ def dedupe_key(task_id: str) -> str:
 
 
 def compute_remind_at(due_date: date | None, due_time: str | None, remind_minutes_before: int, tz: str) -> datetime | None:
-    """The reminder instant as naive UTC, or None (no date, or encoding -2). ``tz`` is an IANA name."""
-    if due_date is None or remind_minutes_before == NO_REMINDER:
+    """The reminder instant as naive UTC, or None (no date, or an encoding below -1: -2 none, -3 "use my default",
+    which queues nothing here). ``tz`` is an IANA name."""
+    if due_date is None or remind_minutes_before < MORNING_OF:
         return None
     if remind_minutes_before == MORNING_OF:
         return local_to_utc(due_date, MORNING, tz)

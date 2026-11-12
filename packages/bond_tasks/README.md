@@ -13,3 +13,7 @@ await api.update(task.id, const TaskPatch(dueDate: Present(null))); // clears th
 - Due date and time are `YYYY-MM-DD` and `HH:MM` strings (local wall clock, never UTC).
 - `remind_minutes_before`: `kRemindNone` (-2), `kRemindMorningOf` (-1), or minutes before.
 - `DemoJobsApi` is for the fake-mode example only.
+- `Task.priority` and `Task.dueAt` (UTC) are new; `overdue` is the server's flag, re-derived on the device by `isOverdue`.
+- `TasksApi.today`, `parse` (capture; creates nothing) and `searchLinks`; `TaskSettingsApi` for the work day and zone.
+- `TaskRepository` is the seam under `TaskController` (`RemoteTaskRepository` for REST, a sync-store one elsewhere).
+- `noticeId` and `fnv1a31` match the Python ids (`fixtures/tasks/notice_ids.json`).

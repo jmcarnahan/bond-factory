@@ -114,6 +114,15 @@ bond_storage = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
 | `bond_signin (py)` | Python | 4 | Direct Google/Microsoft sign-in: Protocol seams, scope policy, router factory |
 | `bond_signin (dart)` | pure Dart | 4 | Sign-in client: attempts, returns and the session gateway |
 | `bond_signin_ui` | Flutter | 4 | Sign-in screen, buttons, scope-ask card, system-browser port |
+| `bond_notify_py` | Python | 5 | Stored inbox: notices table, list, read, dismiss and sync handlers (the ledger, stages and sweep live in `bond_tasks_py`) |
+| `bond_push_py` | Python | 5 | Apple push sender (APNs over HTTP/2) and device tokens |
+| `bond_capture_py` | Python | 5 | Natural-language capture: parse model output into tasks and events |
+| `bond_notify` | pure Dart | 5 | Notice models, client and inbox stream |
+| `bond_notify_ui` | Flutter | 5 | Inbox and notice widgets |
+| `bond_push` | Flutter | 5 | Apple push registration plugin |
+| `bond_tasks_notifications` | Flutter | 5 | Local reminders for tasks: three stages, per-task budget, tap routing |
+| `bond_tasks_powersync` | Flutter | 5 | PowerSync adapter for task tables |
+| `bond_notify_powersync` | Flutter | 5 | PowerSync adapter for notice tables |
 
 `demos/sdk_demo` (Flutter web, :8078) and `services/sdk_example` (FastAPI, :8012) exercise every module in
 fake mode and are the reference for wiring. The walk recipe is `docs/test/WEB.md`.

@@ -1,0 +1,32 @@
+[project]
+name = "bond_capture_py"
+version = "0.1.0"
+description = "Natural-language capture: model schema, prompt, candidates and a degraded fallback"
+requires-python = ">=3.12,<3.14"
+license = "MIT"
+dependencies = [
+    "pydantic>=2.8",
+    "tzdata>=2024.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.6"]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bond_capture_py*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md"]  # the boundary gate flags a `bond_x =` key, so the wildcard key is used
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

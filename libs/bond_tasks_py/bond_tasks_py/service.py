@@ -84,7 +84,7 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
     now = to_naive_utc(now)
     task = task_model(
         owner_user_id=owner_user_id, created_by=actor_user_id, title=_title(data.title), notes=data.notes,
-        due_date=data.due_date, due_time=data.due_time, status=TaskStatus.OPEN.value,
+        due_date=data.due_date, due_time=data.due_time, priority=data.priority, status=TaskStatus.OPEN.value,
         assigned_user_id=_check_assignee(data.assigned_user_id, user_exists),
         checklist=normalize_checklist(data.checklist, existing=None, now=now), links=normalize_links(data.links),
         remind_minutes_before=data.remind_minutes_before, mirror_enabled=data.mirror_enabled, source=data.source,
@@ -112,7 +112,7 @@ def create(session: Any, *, task_model: Any, owner_user_id: str, actor_user_id: 
 def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now: datetime, tz: str = "UTC",
            user_exists: UserExists | None = None) -> Any:
     """Apply the fields in ``data.model_fields_set``. Omitted = unchanged; ``None`` clears ``due_date`` (and so the
-    time), ``due_time``, ``assigned_user_id`` and ``notes``; ``title`` and ``mirror_enabled`` cannot be cleared."""
+    time), ``due_time``, ``priority``, ``assigned_user_id`` and ``notes``; ``title`` and ``mirror_enabled`` cannot be cleared."""
     sent, now = data.model_fields_set, to_naive_utc(now)
     reassigning = "assigned_user_id" in sent and (data.assigned_user_id or None) != task.assigned_user_id
     if reassigning:
@@ -129,6 +129,8 @@ def update(session: Any, *, task: Any, actor_user_id: str, data: TaskUpdate, now
             task.due_time = None
     if "due_time" in sent:
         task.due_time = data.due_time
+    if "priority" in sent:
+        task.priority = data.priority
     if reassigning:
         task.assigned_user_id = _check_assignee(data.assigned_user_id, user_exists)
     if "checklist" in sent:

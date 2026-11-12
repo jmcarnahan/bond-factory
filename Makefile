@@ -7,7 +7,7 @@ export FLUTTER DART
 
 .DEFAULT_GOAL := help
 
-include make/dart.mk make/python.mk make/gates.mk make/changed.mk
+include make/dart.mk make/python.mk make/gates.mk make/changed.mk make/postgres.mk
 
 .PHONY: help test
 test: test-dart test-flutter test-service test-libs test-example ## Run every test suite (Dart, Flutter, Python services, libs, example)

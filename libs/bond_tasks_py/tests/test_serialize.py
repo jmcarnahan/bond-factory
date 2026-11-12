@@ -1,13 +1,14 @@
 import json
 import re
-from datetime import date
+from datetime import date, datetime, time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from conftest import NOW, Task
 
 from bond_tasks_py import ITEM_KEYS, TaskCreate, service, task_item, task_items
-from bond_tasks_py.timeutil import parse_iso
+from bond_tasks_py.timeutil import iso_z, parse_hhmm, parse_iso
 
 FIXTURE = Path(__file__).resolve().parents[2].parent / "fixtures" / "tasks" / "task.json"
 
@@ -17,7 +18,8 @@ def row_from_wire(wire: dict) -> Task:
     stamp = lambda key: parse_iso(wire[key]) if wire[key] else None
     return Task(
         id=wire["id"], title=wire["title"], notes=wire["notes"], due_date=date.fromisoformat(wire["due_date"]) if wire["due_date"] else None,
-        due_time=wire["due_time"], status=wire["status"], owner_user_id=wire["owner_user_id"],
+        due_time=wire["due_time"], priority=wire.get("priority"), due_at=stamp("due_at") if "due_at" in wire else None,
+        status=wire["status"], owner_user_id=wire["owner_user_id"],
         created_by=wire["owner_user_id"], assigned_user_id=wire["assigned_user_id"], checklist=wire["checklist"],
         remind_minutes_before=wire["remind_minutes_before"], remind_at=stamp("remind_at"),
         reminded_at=stamp("reminded_at"), links=wire["links"], completed_at=stamp("completed_at"),
@@ -27,21 +29,99 @@ def row_from_wire(wire: dict) -> Task:
     )
 
 
-FIXTURES = ["task.json", "task_cancelled.json"]
+FIXTURES = ["task.json", "task_cancelled.json", "task_timed.json", "task_day_self.json",
+            "task_day_other_null_due.json", "task_overdue.json"]
+FIXTURE_NOW = datetime(2026, 3, 11, 20, 0)  # naive UTC; 13:00 on 2026-03-11 in America/Los_Angeles
 
 
-@pytest.mark.parametrize("name", FIXTURES)
-def test_fixture_round_trips_exactly(name):
-    wire = json.loads((FIXTURE.parent / name).read_text())
+def named(wire: dict) -> dict:
     names = {wire["owner_user_id"]: wire["owner_name"]}
     if wire["assigned_user_id"]:
         names[wire["assigned_user_id"]] = wire["assignee_name"]
-    assert task_item(row_from_wire(wire), today=date(2026, 3, 11), names=names) == wire
+    return names
+
+
+@pytest.mark.parametrize("name", FIXTURES)
+def test_fixture_round_trips_exactly_by_the_instant(name):
+    wire = json.loads((FIXTURE.parent / name).read_text())
+    assert task_item(row_from_wire(wire), today=date(2026, 3, 11), names=named(wire), now=FIXTURE_NOW) == wire
+
+
+@pytest.mark.parametrize("name", FIXTURES)
+def test_fixture_round_trips_exactly_by_the_date_rule(name):
+    """Old path (``now`` omitted): with the viewer's today on 2026-03-12 every fixture agrees."""
+    wire = json.loads((FIXTURE.parent / name).read_text())
+    assert task_item(row_from_wire(wire), today=date(2026, 3, 12), names=named(wire)) == wire
 
 
 @pytest.mark.parametrize("name", FIXTURES)
 def test_fixture_has_exactly_the_item_keys(name):
-    assert set(json.loads((FIXTURE.parent / name).read_text())) == set(ITEM_KEYS)
+    wire = json.loads((FIXTURE.parent / name).read_text())
+    assert set(wire) == set(ITEM_KEYS) and len(wire) == 26
+
+
+def test_old_shape_fixture_lacks_the_two_new_keys():
+    wire = json.loads((FIXTURE.parent / "task_old_shape.json").read_text())
+    assert set(wire) == set(ITEM_KEYS) - {"priority", "due_at"} and len(wire) == 24
+    item = task_item(row_from_wire(wire), today=date(2026, 3, 11), names=named(wire))
+    assert item["priority"] is None and item["due_at"] is None
+
+
+def test_the_timed_fixture_instant_is_the_zone_conversion():
+    wire = json.loads((FIXTURE.parent / "task.json").read_text())
+    local = datetime.combine(date.fromisoformat(wire["due_date"]), parse_hhmm(wire["due_time"]),
+                             tzinfo=ZoneInfo("America/Los_Angeles"))
+    assert iso_z(local) == wire["due_at"]
+
+
+def test_the_date_only_fixture_is_end_of_day_in_the_owners_zone():
+    wire = json.loads((FIXTURE.parent / "task_day_self.json").read_text())
+    local = datetime.combine(date.fromisoformat(wire["due_date"]), time(17, 0), tzinfo=ZoneInfo("America/Los_Angeles"))
+    assert iso_z(local) == wire["due_at"]
+    assert json.loads((FIXTURE.parent / "task_day_other_null_due.json").read_text())["due_at"] is None
+
+
+def test_today_summary_and_settings_fixtures_have_their_shapes():
+    today = json.loads((FIXTURE.parent / "today.json").read_text())
+    assert set(today) == {"overdue", "today", "undated", "done_today", "counts"}
+    for key in ("overdue", "today", "undated", "done_today"):
+        assert today[key] and today["counts"][key] == len(today[key])
+        assert all(set(entry) == set(ITEM_KEYS) for entry in today[key])
+    assert all(entry["overdue"] for entry in today["overdue"])
+    assert not any(entry["overdue"] for key in ("today", "undated", "done_today") for entry in today[key])
+    summary = json.loads((FIXTURE.parent / "summary.json").read_text())
+    assert set(summary) == {"open", "overdue", "due_today", "no_date"} and all(type(v) is int for v in summary.values())
+    settings = json.loads((FIXTURE.parent / "settings.json").read_text())
+    assert settings == {"time_zone": "America/Los_Angeles", "start_of_day": "08:00", "end_of_day": "17:00",
+                        "lead_minutes": 60, "warnings": []}
+
+
+def test_overdue_by_the_instant_needs_open_and_a_past_due_at(session):
+    task = Task(owner_user_id="u1", created_by="u1", title="t", due_date=date(2026, 3, 11), due_time="09:00",
+                due_at=datetime(2026, 3, 11, 16, 0), status="open")
+    assert task_item(task, today=date(2026, 3, 11), now=datetime(2026, 3, 11, 16, 1))["overdue"] is True
+    assert task_item(task, today=date(2026, 3, 11), now=datetime(2026, 3, 11, 16, 0))["overdue"] is False
+    # the date rule alone would say not overdue (today is the due date): the instant wins when ``now`` is given
+    assert task_item(task, today=date(2026, 3, 11))["overdue"] is False
+    task.status = "done"
+    assert task_item(task, today=date(2026, 3, 12), now=datetime(2026, 3, 12))["overdue"] is False
+
+
+def test_overdue_falls_back_to_the_date_when_due_at_is_not_computed(session):
+    task = Task(owner_user_id="u1", created_by="u1", title="t", due_date=date(2026, 3, 10), status="open")
+    assert task_item(task, today=date(2026, 3, 11), now=datetime(2026, 3, 11, 20, 0))["overdue"] is True
+    assert task_item(task, today=date(2026, 3, 10), now=datetime(2026, 3, 10, 20, 0))["overdue"] is False
+
+
+def test_an_undated_task_with_now_is_never_overdue():
+    task = Task(owner_user_id="u1", created_by="u1", title="t", status="open")
+    assert task_item(task, today=date(2030, 1, 1), now=datetime(2030, 1, 1))["overdue"] is False
+
+
+def test_task_items_pass_now_through(session):
+    task = Task(owner_user_id="u1", created_by="u1", title="t", due_date=date(2026, 3, 11), due_time="09:00",
+                due_at=datetime(2026, 3, 11, 16, 0), status="open")
+    assert task_items([task], today=date(2026, 3, 11), now=datetime(2026, 3, 11, 17, 0))[0]["overdue"] is True
 
 
 def test_item_key_order_is_the_contract_order(session):
@@ -100,7 +180,9 @@ def check_wire_types(item: dict) -> None:
     assert item["mirror_status"] in {"pending", "mirrored", "skipped", "failed"}
     assert item["external_provider"] in {None, "google", "microsoft"}
     assert isinstance(item["remind_minutes_before"], int) and not isinstance(item["remind_minutes_before"], bool)
-    assert item["remind_minutes_before"] >= -2
+    assert item["remind_minutes_before"] >= -3
+    assert item["priority"] in {None, 1, 2, 3}
+    assert item["due_at"] is None or TIMESTAMP.match(item["due_at"])
     assert isinstance(item["overdue"], bool) and isinstance(item["mirror_enabled"], bool)
     for key in ("remind_at", "reminded_at", "completed_at", "created_at", "updated_at"):
         assert item[key] is None or TIMESTAMP.match(item[key]), key

@@ -9,6 +9,9 @@ const int kRemindNone = -2;
 /// `remind_minutes_before`: at the start of the day (08:00 local) of the due date.
 const int kRemindMorningOf = -1;
 
+/// `remind_minutes_before`: use the user's default lead (`lead_minutes`).
+const int kRemindUseDefault = -3;
+
 /// The lifecycle of a task.
 enum TaskStatus {
   open('open'),

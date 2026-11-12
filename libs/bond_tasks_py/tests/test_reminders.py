@@ -29,6 +29,13 @@ def test_no_reminder_encoding():
     assert compute_remind_at(DAY, "10:00", -2, "UTC") is None
 
 
+def test_use_my_default_queues_nothing():
+    """-3 means "use my default" (the notice stages own it); the queued reminder must not read it as minutes."""
+    assert compute_remind_at(DAY, "10:00", -3, "UTC") is None
+    assert compute_remind_at(DAY, None, -3, "UTC") is None
+    assert compute_remind_at(DAY, "10:00", -4, "UTC") is None
+
+
 def test_no_date_means_no_reminder():
     assert compute_remind_at(None, None, 15, "UTC") is None
 
