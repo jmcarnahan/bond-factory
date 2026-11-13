@@ -43,6 +43,7 @@ from ..auth_dep import current_user_id
 from ..models.notices import Notice
 from ..models.push import PushDevice
 from ..models.sync import Note
+from ..models.task_settings import TaskUserSettings
 from ..models.tasks import Task
 
 KEY_FILE = "sync_key.pem"
@@ -91,7 +92,7 @@ def _notes(session, ctx: Ctx, op, data: dict) -> None:
 
 
 def build_host(app: FastAPI) -> Host:
-    """Four synced tables: ``notes`` (handled here), ``tasks``, ``notices`` and ``push_devices`` (routes shipped by
+    """Five synced tables: ``notes`` (handled here), ``tasks``, ``task_user_settings``, ``notices`` and ``push_devices`` (routes shipped by
     the libs, wired in ``sync_todo.py``)."""
     tasks_wiring.install(app)  # the preferences, link hook and sender the TODO routes use (routes load alphabetically)
     routes = {("notes", None): Route(frozenset({"put", "patch", "delete"}), _notes, ("title", "body"))}
@@ -99,8 +100,8 @@ def build_host(app: FastAPI) -> Host:
     return Host(
         routes=routes,
         tables={"notes": Note.__table__, "tasks": Task.__table__, "notices": Notice.__table__,
-                "push_devices": PushDevice.__table__},
-        single_action=frozenset({"notes", "tasks", "notices", "push_devices"}),
+                "push_devices": PushDevice.__table__, "task_user_settings": TaskUserSettings.__table__},
+        single_action=frozenset({"notes", "tasks", "notices", "push_devices", "task_user_settings"}),
         reject_for=sync_todo.reject_for,
         already_written=sync_todo.already_written,
     )

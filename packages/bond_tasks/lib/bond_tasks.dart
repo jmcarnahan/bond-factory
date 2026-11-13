@@ -18,6 +18,7 @@ export 'src/task_repository.dart';
 export 'src/task_sections.dart';
 export 'src/task_settings.dart';
 export 'src/task_settings_api.dart';
+export 'src/task_settings_store.dart';
 export 'src/task_stage.dart';
 export 'src/task_ticker.dart';
 export 'src/task_today.dart';

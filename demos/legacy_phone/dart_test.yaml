@@ -1,0 +1,5 @@
+tags:
+  real_db:
+    # Opens a real PowerSync database; needs the core library that powersync's build hook downloads once.
+  real_service:
+    # Never used here; the Makefile excludes it.

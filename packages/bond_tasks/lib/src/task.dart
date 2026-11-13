@@ -8,7 +8,7 @@ import 'task_priority.dart';
 
 /// One checklist line. [doneAt] is null while open.
 class ChecklistItem {
-  const ChecklistItem({required this.id, required this.text, this.doneAt});
+  const ChecklistItem({required this.id, required this.text, this.doneAt, this.unticked = false});
 
   factory ChecklistItem.fromJson(Object? json) {
     final m = _asMap(json, 'checklist item');
@@ -19,12 +19,25 @@ class ChecklistItem {
   final String text;
   final DateTime? doneAt;
 
+  /// The user cleared this item's tick in this edit; tells the server to untick. Not stored, not read from JSON.
+  final bool unticked;
+
   bool get done => doneAt != null;
 
-  Map<String, Object?> toJson() => {'id': id, 'text': text, 'done_at': doneAt == null ? null : jiso(doneAt!)};
+  /// An item the user unticked sends `done: false` so the server unticks it. Any other item sends no `done`
+  /// (the server keeps what it stores, so a stale copy cannot untick another person's tick); a ticked item sends
+  /// `done_at` only. `fromJson` ignores `done` and reads `done_at`.
+  Map<String, Object?> toJson() => {...toStoredJson(), if (unticked && doneAt == null) 'done': false};
 
-  ChecklistItem copyWith({String? text, DateTime? doneAt, bool clearDone = false}) =>
-      ChecklistItem(id: id, text: text ?? this.text, doneAt: clearDone ? null : (doneAt ?? this.doneAt));
+  /// The item as the server answers and a store keeps it: `id`, `text`, `done_at`, never `done`.
+  Map<String, Object?> toStoredJson() => {'id': id, 'text': text, 'done_at': doneAt == null ? null : jiso(doneAt!)};
+
+  ChecklistItem copyWith({String? text, DateTime? doneAt, bool clearDone = false}) => ChecklistItem(
+        id: id,
+        text: text ?? this.text,
+        doneAt: clearDone ? null : (doneAt ?? this.doneAt),
+        unticked: clearDone || (doneAt == null && unticked),
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -218,7 +231,7 @@ class Task {
         'owner_name': ownerName,
         'assigned_user_id': assignedUserId,
         'assignee_name': assigneeName,
-        'checklist': [for (final c in checklist) c.toJson()],
+        'checklist': [for (final c in checklist) c.toStoredJson()],
         'remind_minutes_before': remindMinutesBefore,
         'links': [for (final l in links) l.toJson()],
         'completed_at': completedAt == null ? null : jiso(completedAt!),

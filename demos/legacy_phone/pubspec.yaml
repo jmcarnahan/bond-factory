@@ -1,0 +1,32 @@
+name: legacy_phone
+description: 'Test-only harness: the SDK task store over a phone database that already exists.'
+publish_to: none
+resolution: workspace
+version: 0.1.0
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  bond_tasks:
+    path: ../../packages/bond_tasks
+  bond_tasks_powersync:
+    path: ../../packages/bond_tasks_powersync
+  bond_sync_powersync:
+    path: ../../packages/bond_sync_powersync
+  powersync: ^2.5.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bond_tasks_ui:
+    path: ../../packages/bond_tasks_ui
+  bond_tasks_notifications:
+    path: ../../packages/bond_tasks_notifications
+  bond_notify:
+    path: ../../packages/bond_notify
+  bond_ui:
+    path: ../../packages/bond_ui
+  bond_test_support:
+    path: ../../packages/bond_test_support

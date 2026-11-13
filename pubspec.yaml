@@ -30,3 +30,4 @@ workspace:
   - packages/bond_signin_ui
   - packages/bond_auth_secure_storage
   - demos/sdk_demo
+  - demos/legacy_phone

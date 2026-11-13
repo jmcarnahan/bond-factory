@@ -160,11 +160,19 @@ sync and mirror traits. Fixes, each with a lib test:
   with `dataclasses.replace`) makes an update send the rest only. The first push still sends every field. Left fields are the
   person's after that: the task's own change to them (for example `remind_minutes_before` and the event reminder) is NOT
   propagated; the task's notices still follow the task. Name `start`, `end` and `is_all_day` together or not at all.
+- Sync, JSON text: `checklist` and `links` arriving as JSON text (what a phone store writes) are parsed by the lib's handler, so a host does NOT need `client_json` for these two; blank text is not sent, and text that is not a JSON list is `invalid`.
+- Mirror, no answer from the provider: `sync_mirror(..., transport_pending=True)` leaves a task `pending` (pointer, etag and
+  provider untouched) when the create or update got no HTTP answer: a timeout or connect failure (`classify` returns
+  `transport`: error `status` exactly `0`, or a class named `TransportError`, `ConnectError`, `TimeoutException`,
+  `ConnectionError` or `TimeoutError`). The next edit of the task retries. Default False: such a failure ends `failed`, as
+  before. Use it when an existing app treats "provider unreachable" as not-yet-mirrored. Trade-off: a request that reached the
+  provider but whose answer was lost is retried on the next edit and can create a second event, and nothing retries until
+  that next edit. A task that was completed, deleted or reassigned while the provider did not answer keeps the state its newer write left. A provider answer (5xx) is still `failed`; a 401 is still `skipped`.
 - Old rows: a NULL `remind_minutes_before` (column added by ALTER TABLE) reads as the default in stages, the sweep, the mirror draft and the item, so no backfill is needed (a backfill to -3 is still harmless).
 
 What applies to EVERY adopter without opting in: a NULL `remind_minutes_before` reads as the default (stages, sweep, mirror
 draft, and the item now shows -3); a blank `priority` / `remind_minutes_before` from a device is treated as not sent inside the
-lib's handler; the `complete`, `reopen` and `cancel` routes read no data. What the host must opt in to: `Route.optional` (pass it
+lib's handler; the `complete`, `reopen` and `cancel` routes read no data. What the host must opt in to: `transport_pending` (see above), `Route.optional` (pass it
 on, so an unreadable `due_at` or priority is dropped before the dispatcher rejects it) and `MirrorDraft.leave` (in `draft_for`).
 
 Checked, no lib change (recipes):
@@ -179,3 +187,30 @@ Recorded limits: the mirror's bookkeeping write (`mirror_status`, the event poin
 `updated_at` `onupdate` stamps the REAL clock on a mirrored row even when the app clock is pinned. The calendar lib's fake keeps
 no event reminder, so a reminder is checked by the patch it was (not) sent in. The example passes `r.optional` on, so it has these fixes.
 
+## 9. Settings over sync
+
+`settings_routes(settings_model, task_model, now=, defaults=, tz=, on_recomputed=)` returns one route keyed by the settings
+table's name (`(settings_model.__tablename__, None)`, for example `task_user_settings`), put and patch only (no delete). Wrap
+it as the sync lib's `Route(r.ops, r.handler, r.reads, r.optional)`, add the table to `Host.tables` and its name to
+`single_action`; `settings_verdict_for` is the same mapper as `verdict_for` (a host that already maps `TaskError` needs no
+change).
+- **Meaning.** Put and patch are the same: a key present with a value sets it, a key present with null resets it to the app
+  default (NULL is stored), an absent key is unchanged, and no row yet is created. Unknown keys, and a `user_id` key, are
+  ignored. The handler runs `update_settings` inside the op's transaction, so the user's date-only due instants are recomputed
+  there (pass `on_recomputed(session, task, old_due_at, now)` to put away stale notices, as the REST route's hook does).
+- **Row id.** The op's row id must be the signed-in user's id, else a `forbidden` verdict with the message `not_settings_owner`;
+  nothing is written. The payload never names the user.
+- **Refusals.** A bad `HH:MM`, zone or lead is an `invalid` verdict whose message is `invalid_start_of_day`,
+  `invalid_end_of_day`, `invalid_time_zone` or `invalid_lead_minutes`; equal start and end is `invalid_work_day`. A value of the
+  wrong storage type (a number for an `HH:MM` column, text for the lead) is refused by the dispatcher's coercion with the plain
+  message `invalid` when the host's column names match the wire keys.
+- **What does not travel.** The server's warnings (`lead_longer_than_work_day`, `time_zone_unknown`) are REST-only; a phone
+  derives `overridden` from the non-null cells of its own row, and reads the app default itself.
+- **Stream rule.** A device syncs its own row only: `WHERE user_id = auth.user_id()` (the renamed column for a legacy table).
+- **Row id on the phone.** The phone's row id has to equal the user id. Whether a sync stream may select `user_id AS id` is
+  UNVERIFIED on a real sync service. The documented fallback is a real `id` column that always equals `user_id`: a stored or
+  generated column in the database, or a column the app fills when it creates the row, and the stream selects `id` as it is.
+- **Renamed columns.** The wire keys are the lib's attribute names. A host whose columns are renamed adapts keys before the
+  lib's handler, as for tasks (the legacy host's `sync_settings.adapt` widens `reads` with the legacy column names and renames
+  them; a lib key wins when both are sent). A legacy row whose time keeps seconds (`08:00:00`) cannot be read by the lib: a
+  settings write for that user is refused `invalid` until the adoption migration trims it.

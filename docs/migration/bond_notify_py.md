@@ -69,6 +69,22 @@ in the host's `reject_for`. A device may set `read_at` and `dismissed_at` on its
 clock. Another user's row is a `NoticeError`. The stream names `id, user_id, kind, title, body, data, created_at,
 read_at, dismissed_at` `WHERE user_id = auth.user_id()`. `source_id` stays server-side.
 
+For an app that already exists, `services/legacy_host` mounts it with no new route: the `notices` table is created by the
+adoption migration (`legacy_ddl.py`), `("notices", None)` is added beside the task routes (`sync_wiring.py`, no legacy-key
+adapter, the host clock as `now`), `notices` joins `tables` and `single_action`, and `reject_for` tries the task verdict,
+then `inbox.verdict_for`, then the push one. Proven by `services/legacy_host/tests/test_notices_sync.py`:
+
+| case | answer |
+|---|---|
+| patch `read_at` or `dismissed_at` with any non-null time | `ok`; the host clock is stored, the device's time is ignored |
+| the same patch again, or with another time | `ok`; the first stamp is kept |
+| dismiss | `ok`; also reads (an earlier read stamp is kept) |
+| a null value | `ok`; clears nothing |
+| another user's notice | `forbidden` / `not_notice_owner`; the row is untouched |
+| unknown id | `not_found` / `notice_not_found` |
+| put or delete | `unsupported` / `Not supported` (the lib offers the patch only) |
+| "read all" | one patch per row in one upload; each row is stamped |
+
 ## 5. What to test
 
 - Assert `NOTICE_COLUMNS` against the engine and round-trip `fixtures/notify/notice.json` through `notice_item`.

@@ -15,7 +15,7 @@ final schema = Schema([...noticesTables(), ...pushDevicesTables(), ...syncSuppor
 SELECT id, user_id, kind, title, body, data, created_at, read_at, dismissed_at
 FROM notices WHERE user_id = auth.user_id()
 
-SELECT id, user_id, device_id, token, platform, environment, topic, last_seen_at, disabled_at, created_at
+SELECT id, user_id, device_id, platform, environment, topic, last_seen_at, disabled_at, created_at
 FROM push_devices WHERE user_id = auth.user_id()
 ```
 

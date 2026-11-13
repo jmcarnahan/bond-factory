@@ -100,6 +100,10 @@ user's end of day. The device uses its own zone and Python the user's stored zon
 - `TaskSettings.overridden` and `isOverridden(field)` say which settings the user set; `TaskSettingsPatch(reset: {...})` returns a field to the app default.
   The server answers the effective values plus `overridden`; an older server omits the list, so `overridden` is null, `overriddenKnown` is false and `isOverridden` is false.
 
+## 6b. Checklist ticks over sync, settings store
+- Checklist ticks over sync: an item the user unticks (`copyWith(clearDone: true)` sets `ChecklistItem.unticked`) sends `done: false`, so unticking an item reaches the server through REST and through a phone store's sync upload. A client that omits `done` still means "no change". `Task.toJson` is unchanged (no `done` key). Every other item sends no `done`, so last writer wins only for items the user ticked or unticked in that edit; a stale copy re-sent with a new item cannot untick another person's tick. A stale copy that still holds a tick re-ticks an item someone else unticked since (the server takes `done_at` as sent; unchanged from before). A phone store that keeps the checklist as JSON text writes `done: false` for an unticked item too. A ticked item sends `done_at` only (no `done`), so the device's tick time is kept.
+- `TaskSettingsStore` is the interface behind `TaskSettingsApi`; `ZoneReporter` takes any store, so a local database that syncs can stand in for the HTTP client.
+
 ## 7. Known gaps
 - No quick-add text parsing, no inline editor, no loan picker: they stay in the app.
 - A: all-day events with an end time lose the end. Multi-day events are not tasks.

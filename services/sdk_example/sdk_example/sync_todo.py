@@ -16,6 +16,7 @@ from datetime import datetime
 import bond_notify_py as inbox
 import bond_push_py as push
 import bond_tasks_py as tasks
+from bond_notify_py import dismiss_stale
 from bond_sync_py import rejected, written_by
 from bond_tasks_py import TaskRoute, sync_routes
 from fastapi import FastAPI
@@ -91,6 +92,11 @@ def todo_routes(app: FastAPI) -> dict:
             todo_wiring.dismiss_for_those_who_left(session, task, before, _now())
 
     routes[("tasks", None)] = TaskRoute(base.ops, handler, base.reads, base.optional)
+    def moved(session, task, old_due_at, moment) -> None:
+        dismiss_stale(session, Notice, task.id, task.due_at, moment)  # as the REST settings route does
+
+    routes.update(tasks.settings_routes(TaskUserSettings, Task, now=_now, defaults=state.default_prefs, tz=tz,
+                                        on_recomputed=moved))  # key ("task_user_settings", None): own row, id = user id
     routes.update(inbox.notice_routes(Notice, now=_now))
     routes.update(push.device_routes(PushDevice, now=_now))
     return routes

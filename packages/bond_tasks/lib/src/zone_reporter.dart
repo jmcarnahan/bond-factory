@@ -2,7 +2,7 @@
 library;
 
 import 'task_settings.dart';
-import 'task_settings_api.dart';
+import 'task_settings_store.dart';
 
 abstract interface class TimeZoneSource {
   /// The device's IANA zone name, or null when unknown.
@@ -17,7 +17,7 @@ class ZoneReporter {
   ZoneReporter(this.source, this.api);
 
   final TimeZoneSource source;
-  final TaskSettingsApi api;
+  final TaskSettingsStore api;
 
   String? _sent;
   bool _seeded = false;

@@ -68,6 +68,7 @@ capture, phone alerts) is adopted in the order of `docs/migration/todo-checklist
 | `services/sdk_example` | Python | reference FastAPI app wiring every bond Python lib; never shipped |
 | `services/legacy_host` | Python | test-only "existing app" host: legacy columns, wire and clients; never shipped |
 | `demos/roof_demo`, `demos/sdk_demo` | Flutter | roof demo; web and iOS harness for every SDK package. Not shipped |
+| `demos/legacy_phone` | Flutter | test-only "existing phone database": the task store over a local table an app already ships; never shipped |
 
 ## House rules
 

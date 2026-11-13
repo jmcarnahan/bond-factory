@@ -1,0 +1,83 @@
+{
+  "note": "What the legacy phone store queues at stage widened for a create with a two-item checklist, a tick of item a, an untick through copyWith(clearDone: true) and an added item (no `done` key anywhere) (demos/legacy_phone, test/checklist_test.dart). Regenerate with BOND_REGEN_FIXTURES=1.",
+  "requests": [
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "put",
+            "table": "tasks",
+            "id": "ck-1",
+            "data": {
+              "checklist": "[{\"id\":\"a\",\"text\":\"Bring ID\",\"done_at\":null},{\"id\":\"b\",\"text\":\"Sign form\",\"done_at\":null}]",
+              "created_at": "2026-03-11T20:00:00.000Z",
+              "created_by": "u-owner",
+              "links": "[]",
+              "mirror_status": "skipped",
+              "owner_user_id": "u-owner",
+              "remind_minutes_before": -3,
+              "source": "manual",
+              "status": "open",
+              "sync_to_calendar": 1,
+              "title": "Bring the papers",
+              "updated_at": "2026-03-11T20:00:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "patch",
+            "table": "tasks",
+            "id": "ck-1",
+            "data": {
+              "checklist": "[{\"id\":\"a\",\"text\":\"Bring ID\",\"done_at\":\"2026-03-11T20:01:00.000Z\"},{\"id\":\"b\",\"text\":\"Sign form\",\"done_at\":null}]",
+              "updated_at": "2026-03-11T20:01:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "patch",
+            "table": "tasks",
+            "id": "ck-1",
+            "data": {
+              "checklist": "[{\"id\":\"a\",\"text\":\"Bring ID\",\"done_at\":null,\"done\":false},{\"id\":\"b\",\"text\":\"Sign form\",\"done_at\":null}]",
+              "updated_at": "2026-03-11T20:02:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "patch",
+            "table": "tasks",
+            "id": "ck-1",
+            "data": {
+              "checklist": "[{\"id\":\"a\",\"text\":\"Bring ID\",\"done_at\":null},{\"id\":\"b\",\"text\":\"Sign form\",\"done_at\":null},{\"id\":\"c\",\"text\":\"Pay fee\",\"done_at\":null}]",
+              "updated_at": "2026-03-11T20:03:00.000Z"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

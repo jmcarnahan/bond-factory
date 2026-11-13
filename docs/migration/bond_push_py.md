@@ -72,6 +72,36 @@ again sends nothing new.
 - A dead token (`MockSender(fail_tokens={token: PushResult(ok=False, unregistered=True)})`) disables the device and the notice is "unregistered".
 - A build moving from sandbox to release changes `environment`. The sender must follow it.
 
+## 6a. Devices over sync (recommended)
+
+The sync path, `device_routes(PushDevice, now=...)` on the server and `SyncPushDevices` on the phone, is the RECOMMENDED
+way to register devices when the app already syncs. The REST pair in `services/sdk_example` is an example for apps without
+sync. No new REST route is needed: wrap `DeviceRoute` as the dispatcher's `Route`, mount `("push_devices", None)` beside the
+task routes, add the table to `tables` and `single_action`, and let `reject_for` try `verdict_for` after the task one
+(`services/legacy_host/legacy_host/sync_wiring.py`). The table is new for an app that never had one: the adoption migration
+creates it (`legacy_ddl.py` shows the DDL).
+
+- Stream rule (the app's sync service configuration; this repository cannot test it, so check it there): a device's rows go only to their own user, `... FROM push_devices WHERE user_id = auth.user_id()`. Never
+  stream another user's row: `token` must not leave the server for anyone but the user whose device it is.
+- Prefer a stream that OMITS `token` (`SELECT id, user_id, device_id, platform, environment, topic, last_seen_at, disabled_at, created_at ...`): no Dart class reads it back, and a token is a send capability. `SyncPushDevices.register` still works when the local `token` reads NULL (`packages/bond_notify_powersync/test/token_omitted_test.dart`).
+- Server-owned: `user_id` (the session, never the payload), `last_seen_at` (the host clock on every accepted write),
+  `disabled_at` (cleared by a write) and `created_at`. A payload that names them is ignored.
+- Unregister (a `delete`) removes the row; deleting a row that is gone is still `ok`. A token held by another row moves to the
+  new registrant (the old row is deleted), whichever user held it.
+- Verdicts, proven by `services/legacy_host/tests/test_push_devices_sync.py` (always a 200 answer, one verdict per op, the
+  other ops of the upload still apply):
+
+| code | message | meaning |
+|---|---|---|
+| `forbidden` | `not_device_owner` | the id is another user's row, or a new row's id is not the caller's own formula id |
+| `not_found` | `device_not_found` | a patch of a row that does not exist |
+| `invalid` | `invalid_platform`, `invalid_environment`, `token_required`, `token_too_long`, `device_id_required`, `device_id_too_long` | the value failed `register_device`'s checks |
+| `invalid` | `invalid` | a non-string `token` or `topic`: the dispatcher's column coercion refuses it before the lib sees it |
+
+- Fixture: `fixtures/legacy_host/upload_push_devices.json` (put, patch of `token`, delete) is what `SyncPushDevices` queues
+  (`packages/bond_notify_powersync/test/legacy_upload_test.dart`) and what the legacy host replays.
+- Sign-out order: `unregister`, wait for the upload drain, `disconnect`, then clear the local database.
+
 ## 7. Not proven
 
 Default tests prove nothing about Apple. To prove a key, team id and app capability before wiring anything, set

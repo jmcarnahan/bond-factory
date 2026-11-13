@@ -207,3 +207,19 @@ def test_timezone_argument_sets_prefer_header():
     p, seen = provider(lambda r: httpx.Response(200, json={"value": []}), timezone="Pacific Standard Time")
     p.list_events(start=START, end=END)
     assert seen[0].headers["Prefer"] == 'outlook.timezone="Pacific Standard Time"'
+
+
+@pytest.mark.parametrize("failure", [httpx.ConnectTimeout("slow"), httpx.ConnectError("refused")])
+def test_no_answer_is_unavailable_with_status_zero(failure):
+    """A host tells "no answer" (status 0) from a provider 5xx by this status."""
+    def handler(request):
+        raise failure
+
+    p, _ = provider(handler)
+    with pytest.raises(Unavailable) as info:
+        p.list_events(start=START, end=END)
+    assert info.value.status == 0
+    p, _ = provider(lambda r: httpx.Response(503))
+    with pytest.raises(Unavailable) as answered:
+        p.list_events(start=START, end=END)
+    assert answered.value.status == 503

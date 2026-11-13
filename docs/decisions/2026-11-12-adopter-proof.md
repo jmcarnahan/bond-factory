@@ -17,7 +17,7 @@ Those collisions appear only when tests run against that shape.
   legacy host (`services/legacy_host`) or comes from an adopter's own battery run by `make adopter-check`. Prose lists
   from reading code are not accepted.
 - **P3** A module is not "ready to adopt" until the legacy host exercises it.
-- **P4** The legacy host has seven traits, each with tests in `make test`:
+- **P4** The legacy host has eight traits, each with tests in `make test`:
 
   | Trait | What it proves |
   |---|---|
@@ -28,6 +28,7 @@ Those collisions appear only when tests run against that shape.
   | New client on the old wire | the shared client reads the legacy shape through its adapter |
   | Existing tables | the module attaches to tables and data that already exist |
   | Partial ownership of an external record | the app owns some fields of a record another system also writes |
+  | An existing phone database | the phone store works over a local table the app already ships (missing columns, renamed flag, app columns, old rows, joined tables); checklist ticks and untick, and per-user settings over sync, are part of it |
 
 - **P5** `make adopter-check APP=<path>` is opt-in and local, because apps are separate repositories. Run it for each
   known adopter before a merge to `main` that changes a module that adopter pins.
@@ -35,3 +36,5 @@ Those collisions appear only when tests run against that shape.
   same change. A fix is either a generic seam the host opts into (default behaviour unchanged), or a tolerant-reader
   change that alters only how malformed, blank or NULL input is treated. Any default that does change is named in the
   module's CHANGELOG.
+
+Amended 2026-11-12: eighth trait added (round 3)

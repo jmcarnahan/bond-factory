@@ -1,0 +1,37 @@
+{
+  "note": "Synthetic upload bodies of a phone that registers, refreshes and unregisters its push device through the sync upload: what SyncPushDevices (packages/bond_notify_powersync) queues, one {user, body} per request. The id is d_ + the first 32 hex of sha256('<userId>|<deviceId>'). Tokens are obviously fake. The patch carries only the changed column (a token refresh on the same environment and topic). packages/bond_notify_powersync/test/legacy_upload_test.dart asserts the phone queues exactly these ops; services/legacy_host replays them.",
+  "requests": [
+    {
+      "user": "u-owner",
+      "body": {
+        "transaction_id": 1,
+        "ops": [
+          {"seq": 0, "op": "put", "table": "push_devices", "id": "d_5168102721f8975f1191df7369f4f7d5", "data": {
+            "user_id": "u-owner", "device_id": "device-1",
+            "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "platform": "ios", "environment": "sandbox", "topic": "com.example.app",
+            "last_seen_at": "2026-11-12T15:00:00.000Z", "created_at": "2026-11-12T15:00:00.000Z"}}
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "transaction_id": 2,
+        "ops": [
+          {"seq": 0, "op": "patch", "table": "push_devices", "id": "d_5168102721f8975f1191df7369f4f7d5", "data": {
+            "token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "transaction_id": 3,
+        "ops": [
+          {"seq": 0, "op": "delete", "table": "push_devices", "id": "d_5168102721f8975f1191df7369f4f7d5"}
+        ]
+      }
+    }
+  ]
+}

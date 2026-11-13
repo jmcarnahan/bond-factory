@@ -1,0 +1,66 @@
+{
+  "note": "What the legacy phone store queues for a date-only task, a zone and end-of-day write into the app's `user_prefs` (columns tz, day_end) and a reset of the end of day (demos/legacy_phone, test/settings_test.dart). Regenerate with BOND_REGEN_FIXTURES=1.",
+  "requests": [
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "put",
+            "table": "tasks",
+            "id": "ph-s1",
+            "data": {
+              "checklist": "[]",
+              "created_at": "2026-03-11T20:00:00.000Z",
+              "created_by": "u-owner",
+              "due_date": "2026-11-20",
+              "links": "[]",
+              "mirror_status": "pending",
+              "owner_user_id": "u-owner",
+              "remind_minutes_before": -3,
+              "source": "manual",
+              "status": "open",
+              "sync_to_calendar": 1,
+              "title": "Date only",
+              "updated_at": "2026-03-11T20:00:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "put",
+            "table": "user_prefs",
+            "id": "u-owner",
+            "data": {
+              "day_end": "18:30",
+              "tz": "America/Denver"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "patch",
+            "table": "user_prefs",
+            "id": "u-owner",
+            "data": {
+              "day_end": null
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

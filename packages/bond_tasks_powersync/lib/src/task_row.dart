@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:bond_sync_powersync/bond_sync_powersync.dart';
 import 'package:bond_tasks/bond_tasks.dart';
 
+import 'task_table_shape.dart';
 import 'tasks_tables.dart';
 
 /// UTC ISO-8601 with milliseconds and a trailing Z, the form the server writes.
@@ -26,7 +27,7 @@ String? _time(Object? v) {
 /// the stored one. See `PowerSyncTaskRepository.mirrorStatusFor`.
 typedef MirrorStatusFor = String? Function(SyncRow row);
 
-String? _mirror(SyncRow row, MirrorStatusFor? hook) {
+String? _mirror(SyncRow row, MirrorStatusFor? hook, TaskTableShape shape) {
   if (hook != null) {
     try {
       final v = hook(row);
@@ -35,10 +36,22 @@ String? _mirror(SyncRow row, MirrorStatusFor? hook) {
       // keep the stored value for this row
     }
   }
-  return _str(row['mirror_status']);
+  return shape.has('mirror_status') ? _str(row[shape.local('mirror_status')]) : null;
 }
 
 String? _str(Object? v) => v?.toString();
+
+/// Like [_str] but the empty string reads as null (a note keeps its spaces).
+String? _empty(Object? v) {
+  final s = v?.toString();
+  return s == null || s.isEmpty ? null : s;
+}
+
+/// Like [_str] but a blank string reads as null (rows an old build wrote).
+String? _nb(Object? v) {
+  final s = v?.toString();
+  return s == null || s.trim().isEmpty ? null : s;
+}
 
 int? _int(Object? v) {
   if (v is int) return v;
@@ -83,34 +96,56 @@ final Set<String> _known = {'id', '_metadata', ...kTaskColumns};
 /// [mirrorStatusFor] (default null: the stored `mirror_status` is used) is asked for each row. A
 /// non-null answer is a `MirrorStatus` wire value (`pending`, `mirrored`, `skipped`, `failed`) that
 /// replaces the stored one; null keeps the stored value. An unknown string shows as `pending`. A hook
-/// that throws keeps the stored value for that row; the rest of the list still reads.
-Task taskFromRow(SyncRow row, {required DateTime nowUtc, MirrorStatusFor? mirrorStatusFor}) {
+/// that throws keeps the stored value for that row; the rest of the list still reads. The hook gets the
+/// row as stored (local column names).
+///
+/// [shape] (default: the module's own table) says where each module column lives: a cell is read by its
+/// local name, a renamed column never lands in `Task.extras` and an absent column reads as null.
+///
+/// Tolerant reader: a blank string (empty or only spaces) in `assigned_user_id`, `due_date` or `due_time`, and the empty
+/// string in `notes`, reads as null.
+/// Only when [shape] is not the default (it has `absent` or `rename` entries, or orders by date then time):
+/// a timed row without a due instant gets the device's (`deviceDueAt` of its date and time). The default
+/// shape keeps a missing `due_at` as null (existing behaviour).
+Task taskFromRow(SyncRow row, {required DateTime nowUtc, MirrorStatusFor? mirrorStatusFor, TaskTableShape shape = const TaskTableShape()}) {
+  Object? cell(String c) => shape.has(c) ? row[shape.local(c)] : null;
+  final dueDate = _nb(cell('due_date')), dueTime = _nb(cell('due_time'));
+  final dueAt = _time(cell('due_at')) ?? (_isShaped(shape) ? _deviceDue(dueDate, dueTime) : null);
+  final flag = cell('mirror_enabled');
   final m = <String, Object?>{
     'id': _str(row['id']),
-    'title': _str(row['title']),
-    'notes': _str(row['notes']),
-    'due_date': _str(row['due_date']),
-    'due_time': _str(row['due_time']),
-    'priority': _int(row['priority']),
-    'due_at': _time(row['due_at']),
-    'status': _str(row['status']),
-    'owner_user_id': _str(row['owner_user_id']),
-    'assigned_user_id': _str(row['assigned_user_id']),
-    'checklist': _list(row['checklist'], (e) => _ok(e, ChecklistItem.fromJson)),
-    'remind_minutes_before': _int(row['remind_minutes_before']),
-    'links': _list(row['links'], (e) => _ok(e, TaskLink.fromJson)),
-    'completed_at': _time(row['completed_at']),
-    'mirror_enabled': row['mirror_enabled'] == null ? null : _int(row['mirror_enabled']) != 0,
-    'mirror_status': _mirror(row, mirrorStatusFor),
-    'external_provider': _str(row['external_provider']),
-    'external_event_id': _str(row['external_event_id']),
-    'source': _str(row['source']),
-    'created_at': _time(row['created_at']),
-    'updated_at': _time(row['updated_at']),
+    'title': _str(cell('title')),
+    'notes': _empty(cell('notes')),
+    'due_date': dueDate,
+    'due_time': dueTime,
+    'priority': _int(cell('priority')),
+    'due_at': dueAt,
+    'status': _str(cell('status')),
+    'owner_user_id': _str(cell('owner_user_id')),
+    'assigned_user_id': _nb(cell('assigned_user_id')),
+    'checklist': _list(cell('checklist'), (e) => _ok(e, ChecklistItem.fromJson)),
+    'remind_minutes_before': _int(cell('remind_minutes_before')),
+    'links': _list(cell('links'), (e) => _ok(e, TaskLink.fromJson)),
+    'completed_at': _time(cell('completed_at')),
+    'mirror_enabled': flag == null ? null : _int(flag) != 0,
+    'mirror_status': _mirror(row, mirrorStatusFor, shape),
+    'external_provider': _str(cell('external_provider')),
+    'external_event_id': _str(cell('external_event_id')),
+    'source': _str(cell('source')),
+    'created_at': _time(cell('created_at')),
+    'updated_at': _time(cell('updated_at')),
   };
+  final renamed = shape.rename.values.toSet();
   for (final e in row.entries) {
-    if (!_known.contains(e.key) && !kTaskItemKeys.contains(e.key)) m[e.key] = e.value;
+    if (!_known.contains(e.key) && !renamed.contains(e.key) && !kTaskItemKeys.contains(e.key)) m[e.key] = e.value;
   }
   final task = Task.fromJson(m);
   return task.copyWith(overdue: isOverdue(task, nowUtc));
+}
+
+bool _isShaped(TaskTableShape s) => s.absent.isNotEmpty || s.rename.isNotEmpty || s.dueOrder == TaskDueOrder.dateThenTime;
+
+String? _deviceDue(String? date, String? time) {
+  final at = deviceDueAt(date, time);
+  return at == null ? null : isoZ(at);
 }

@@ -79,4 +79,22 @@ void main() {
     await r.reporter.reportIfChanged();
     expect(r.seen, isEmpty);
   });
+
+  test('reports the zone through a store that is not the HTTP api', () async {
+    final store = _FakeStore();
+    final source = _Source()..zone = 'America/Denver';
+    await ZoneReporter(source, store).reportIfChanged();
+    expect(store.patches.map((p) => p.timeZone), ['America/Denver']);
+  });
+}
+
+class _FakeStore implements TaskSettingsStore {
+  final List<TaskSettingsPatch> patches = [];
+  @override
+  Future<TaskSettings> get() async => TaskSettings.fromJson(const {});
+  @override
+  Future<TaskSettings> update(TaskSettingsPatch p) async {
+    patches.add(p);
+    return TaskSettings.fromJson(const {});
+  }
 }

@@ -20,7 +20,7 @@ and the coordinator do not change.
 SELECT id, user_id, kind, title, body, data, created_at, read_at, dismissed_at
 FROM notices WHERE user_id = auth.user_id()
 
-SELECT id, user_id, device_id, token, platform, environment, topic, last_seen_at, disabled_at, created_at
+SELECT id, user_id, device_id, platform, environment, topic, last_seen_at, disabled_at, created_at
 FROM push_devices WHERE user_id = auth.user_id()
 ```
 
@@ -67,6 +67,20 @@ await db.disconnect();          // then clear the database
 ```
 
 Clearing first loses the DELETE and leaves the token registered on the server.
+
+## 5a. The server side for an app that already exists
+
+`SyncPushDevices` is the RECOMMENDED way to register a device when the app syncs; the REST pair in the example service is for
+apps without sync. The server needs no new route: `device_routes` mounted in the app's upload host. Stream rule (set in the app's sync service; not
+testable here): only the user's own device rows (`WHERE user_id = auth.user_id()`), so another user's `token` never reaches a phone. The server owns
+`user_id`, `last_seen_at`, `disabled_at` and `created_at`. The verdict table, the fixture and the host wiring are in
+`docs/migration/bond_push_py.md` section 6a; `test/legacy_upload_test.dart` proves the phone queues exactly the ops the
+legacy host replays.
+
+- The `push_devices` stream should OMIT `token`: `SELECT id, user_id, device_id, platform, environment, topic, last_seen_at,
+  disabled_at, created_at FROM push_devices WHERE user_id = auth.user_id()`. No Dart class reads the token back, and a token
+  is a send capability. `SyncPushDevices.register` still works when the local `token` reads NULL after a sync: it writes
+  the token without reading it, and the queued op is a patch of `token` (`test/token_omitted_test.dart`).
 
 ## 6. What to test
 
