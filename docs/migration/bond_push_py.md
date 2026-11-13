@@ -83,6 +83,7 @@ creates it (`legacy_ddl.py` shows the DDL).
 
 - Stream rule (the app's sync service configuration; this repository cannot test it, so check it there): a device's rows go only to their own user, `... FROM push_devices WHERE user_id = auth.user_id()`. Never
   stream another user's row: `token` must not leave the server for anyone but the user whose device it is.
+- Prefer a stream that OMITS `token` (`SELECT id, user_id, device_id, platform, environment, topic, last_seen_at, disabled_at, created_at ...`): no Dart class reads it back, and a token is a send capability. `SyncPushDevices.register` still works when the local `token` reads NULL (`packages/bond_notify_powersync/test/token_omitted_test.dart`).
 - Server-owned: `user_id` (the session, never the payload), `last_seen_at` (the host clock on every accepted write),
   `disabled_at` (cleared by a write) and `created_at`. A payload that names them is ignored.
 - Unregister (a `delete`) removes the row; deleting a row that is gone is still `ok`. A token held by another row moves to the

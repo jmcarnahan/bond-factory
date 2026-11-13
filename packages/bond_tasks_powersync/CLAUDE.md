@@ -2,10 +2,10 @@
 Role: TaskRepository over the PowerSync SyncDb adapter.
 
 ## Key files
-- `lib/bond_tasks_powersync.dart` is the barrel; code is in `lib/src/`.
-- Reads `powersync_task_repository.dart`; a write runs in `task_write_flow.dart` (prepare, mirror, statement, afterWrite) over
-  `task_writes.dart`; `task_queries.dart` SELECT text; `task_hooks.dart`; `task_table_shape.dart` (an existing table's shape).
-- Tests: `barrel_test.dart` + `barrel_shape_test.dart` reference every public name; the rest use `FakeSyncDb.tables(applySql: true)`;
+- The barrel is `lib/bond_tasks_powersync.dart`; code is in `lib/src/`. Reads `powersync_task_repository.dart`; a write runs in `task_write_flow.dart` (prepare, mirror, statement, afterWrite) over
+  `task_writes.dart`; `task_queries.dart` SELECT text; `task_hooks.dart`; `task_table_shape.dart` (an existing table's shape);
+  `task_settings_store.dart` + `task_settings_tables.dart` (the synced settings row).
+- Tests: `barrel_*test.dart` reference every public name; the rest use `FakeSyncDb.tables(applySql: true)`;
   `shape_*_test.dart` use the legacy table of `shape_support.dart`.
 
 ## Commands
@@ -13,7 +13,7 @@ Role: TaskRepository over the PowerSync SyncDb adapter.
 - `make analyze`
 
 ## Notes
-- `real_database_test.dart` and `shape_real_database_test.dart` (tag `real_db`) open a real PowerSync database: they need the native
+- `real_database_test.dart`, `shape_real_database_test.dart`, `settings_real_database_test.dart` (tag `real_db`) open a real PowerSync database: they need the native
   library powersync's build hook downloads once (network on the first run, then cached in `build/`); missing, `db.initialize()` fails.
 
 ## Rules

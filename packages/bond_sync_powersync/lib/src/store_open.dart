@@ -3,13 +3,13 @@ library;
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
 
 import 'package:bond_sync/bond_sync.dart';
 import 'package:powersync/powersync.dart';
 
 import 'policy.dart';
 import 'store.dart';
+import 'store_files_stub.dart' if (dart.library.io) 'store_files_io.dart';
 import 'sync_db.dart';
 
 /// The `sync_meta` key that holds when the local copy was reset (a moved-aside store).
@@ -132,39 +132,18 @@ class SyncStoreOpener {
   /// Renames a database file and its `-wal`, `-shm` and `-journal` siblings to
   /// `<name>.bad-<unix ms>`. Returns the renamed paths. Never throws, never
   /// deletes (except older moved-aside copies, after the new rename worked).
+  ///
+  /// On the web this does nothing and returns an empty list (no file is moved); it does not report that.
   List<String> moveAside(String base) {
-    final stamp = _now().millisecondsSinceEpoch;
-    final moved = <String>[];
-    for (final suffix in const ['', '-wal', '-shm', '-journal']) {
-      try {
-        final f = File('$base$suffix');
-        if (f.existsSync()) {
-          final to = '$base$suffix.bad-$stamp';
-          f.renameSync(to);
-          moved.add(to);
-        }
-      } catch (_) {}
-    }
+    final moved = renameAside(base, _now().millisecondsSinceEpoch);
     if (moved.isNotEmpty) deleteMovedAside(base, keep: moved.toSet());
     return moved;
   }
 
   /// Deletes every `<db>.bad-*` file (and sibling) of the database at [base].
-  static void deleteMovedAside(String base, {Set<String> keep = const {}}) {
-    try {
-      final slash = base.lastIndexOf(RegExp(r'[/\\]'));
-      final dir = Directory(base.substring(0, slash));
-      final name = base.substring(slash + 1);
-      for (final f in dir.listSync()) {
-        final n = f.uri.pathSegments.last;
-        if (n.startsWith(name) && n.contains('.bad-') && !keep.contains(f.path)) {
-          try {
-            f.deleteSync();
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-  }
+  ///
+  /// On the web this does nothing, silently.
+  static void deleteMovedAside(String base, {Set<String> keep = const {}}) => removeMovedAside(base, keep);
 }
 
 /// Ends the connection, THEN closes the file: closing under a live connection
@@ -180,12 +159,10 @@ Future<void> closeQuietly(SyncDb db) async {
 
 /// Deletes the database file at [base] with its `-wal`, `-shm`, `-journal`
 /// siblings and any moved-aside copies.
+///
+/// On the web this does NOTHING, silently: it does not wipe local data there. Clear a web store with the sync SDK
+/// (`PowerSyncDatabase.disconnectAndClear`).
 void deleteStoreFiles(String base) {
-  for (final suffix in const ['', '-wal', '-shm', '-journal']) {
-    try {
-      final f = File('$base$suffix');
-      if (f.existsSync()) f.deleteSync();
-    } catch (_) {}
-  }
+  removeDbFiles(base);
   SyncStoreOpener.deleteMovedAside(base);
 }

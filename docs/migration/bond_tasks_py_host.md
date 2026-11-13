@@ -131,6 +131,7 @@ Works unchanged:
   also lets an admin edit. `task_items(...)` gives bond's dict; the host adds keys and rewrites the instants.
 - **Write extras**: build them from the app's own fields, not from `Task.extras` wholesale; a host that accepts both vocabularies lets bond's key win and never writes response-only keys (`calendar_event_id`, `client_name`, `case_label`).
 - **A NULL `remind_minutes_before`** (applies to every adopter, no opt-in; opt-in changes are `Route.optional`, `MirrorDraft.leave` and `sync_mirror(transport_pending=True)`, see `bond_tasks_py.md` section 8) (the column was added after the rows existed) reads as `USE_DEFAULT_REMINDER` in the stages, the sweep, the mirror draft and the item: no backfill needed (`test_an_old_row_with_a_null_reminder_follows_the_default`).
+- **Settings over sync**: a table of per-user preferences with renamed columns is served by `sync_settings.py` of the legacy host (a route of the lib, an `adapt` that renames the old keys, one table entry); see `bond_tasks_py.md` section 9 for the row-id and stream rules and the seconds limit.
 - **Provider unreachable** (`sync_mirror(transport_pending=True)`, default False): a create or update with no answer from the
   provider (timeout, connect failure) leaves the task `pending` with any stored event pointer kept; the next edit retries.
   Without it the row ends `failed`. The trade-off: a request that reached the provider but whose answer was lost is retried

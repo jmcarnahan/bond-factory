@@ -50,7 +50,7 @@ affected() {
     libs/bond_calendar/*) echo libs/bond_calendar services/sdk_example services/legacy_host ;;
     libs/bond_tasks_py/*) echo libs/bond_tasks_py services/sdk_example services/legacy_host ;;
     libs/bond_signin/*) echo libs/bond_signin services/sdk_example ;;
-    libs/bond_notify_py/*) echo libs/bond_notify_py services/sdk_example ;;
+    libs/bond_notify_py/*) echo libs/bond_notify_py services/sdk_example services/legacy_host ;;
     libs/bond_push_py/*) echo libs/bond_push_py services/sdk_example services/legacy_host ;;
     libs/bond_capture_py/*) echo libs/bond_capture_py services/sdk_example ;;
     services/sdk_example/*)  echo services/sdk_example ;;

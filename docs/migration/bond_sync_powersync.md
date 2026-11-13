@@ -77,3 +77,12 @@ Three additions, all optional. `bond_tasks_powersync.md` and `bond_notify_powers
   INSERT, UPDATE and DELETE and honours WHERE, ORDER BY and LIMIT in SELECT, so a wrong column or WHERE fails a test. A
   statement shape it cannot read throws. The fake keeps one watch controller per SQL (`watchControllerFor`).
 - Add the new tables to the app schema beside `syncSupportTables()`: `tasksTables()`, `noticesTables()`, `pushDevicesTables()`.
+
+## 8. On the web
+
+The store opener compiles to JavaScript: no file but `store_files_io.dart` imports `dart:io`, and
+`make -C packages/bond_sync_powersync web-compile` checks that and compiles it. On the web the file moves and deletes do
+nothing, silently: `moveAside` returns an empty list, and `deleteStoreFiles` and `deleteMovedAside` delete nothing, so a
+sign-out that calls `deleteStoreFiles` has NOT wiped local data there. Clearing a web store is the sync SDK's job:
+`PowerSyncDatabase.disconnectAndClear` (present in the powersync package source); this package does not wrap it. Nothing was
+run in a browser.

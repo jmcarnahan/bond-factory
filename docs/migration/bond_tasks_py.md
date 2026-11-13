@@ -187,3 +187,30 @@ Recorded limits: the mirror's bookkeeping write (`mirror_status`, the event poin
 `updated_at` `onupdate` stamps the REAL clock on a mirrored row even when the app clock is pinned. The calendar lib's fake keeps
 no event reminder, so a reminder is checked by the patch it was (not) sent in. The example passes `r.optional` on, so it has these fixes.
 
+## 9. Settings over sync
+
+`settings_routes(settings_model, task_model, now=, defaults=, tz=, on_recomputed=)` returns one route keyed by the settings
+table's name (`(settings_model.__tablename__, None)`, for example `task_user_settings`), put and patch only (no delete). Wrap
+it as the sync lib's `Route(r.ops, r.handler, r.reads, r.optional)`, add the table to `Host.tables` and its name to
+`single_action`; `settings_verdict_for` is the same mapper as `verdict_for` (a host that already maps `TaskError` needs no
+change).
+- **Meaning.** Put and patch are the same: a key present with a value sets it, a key present with null resets it to the app
+  default (NULL is stored), an absent key is unchanged, and no row yet is created. Unknown keys, and a `user_id` key, are
+  ignored. The handler runs `update_settings` inside the op's transaction, so the user's date-only due instants are recomputed
+  there (pass `on_recomputed(session, task, old_due_at, now)` to put away stale notices, as the REST route's hook does).
+- **Row id.** The op's row id must be the signed-in user's id, else a `forbidden` verdict with the message `not_settings_owner`;
+  nothing is written. The payload never names the user.
+- **Refusals.** A bad `HH:MM`, zone or lead is an `invalid` verdict whose message is `invalid_start_of_day`,
+  `invalid_end_of_day`, `invalid_time_zone` or `invalid_lead_minutes`; equal start and end is `invalid_work_day`. A value of the
+  wrong storage type (a number for an `HH:MM` column, text for the lead) is refused by the dispatcher's coercion with the plain
+  message `invalid` when the host's column names match the wire keys.
+- **What does not travel.** The server's warnings (`lead_longer_than_work_day`, `time_zone_unknown`) are REST-only; a phone
+  derives `overridden` from the non-null cells of its own row, and reads the app default itself.
+- **Stream rule.** A device syncs its own row only: `WHERE user_id = auth.user_id()` (the renamed column for a legacy table).
+- **Row id on the phone.** The phone's row id has to equal the user id. Whether a sync stream may select `user_id AS id` is
+  UNVERIFIED on a real sync service. The documented fallback is a real `id` column that always equals `user_id`: a stored or
+  generated column in the database, or a column the app fills when it creates the row, and the stream selects `id` as it is.
+- **Renamed columns.** The wire keys are the lib's attribute names. A host whose columns are renamed adapts keys before the
+  lib's handler, as for tasks (the legacy host's `sync_settings.adapt` widens `reads` with the legacy column names and renames
+  them; a lib key wins when both are sent). A legacy row whose time keeps seconds (`08:00:00`) cannot be read by the lib: a
+  settings write for that user is refused `invalid` until the adoption migration trims it.

@@ -204,7 +204,7 @@ void main() {
       expect(db.statements.last.toString(), 'tx SELECT COUNT(*) AS n FROM tasks WHERE sync_to_calendar = ? AND client_ref = ? AND status = ? [0, C1, open]');
     });
 
-    test('an unknown key, an absent column, id and an empty map throw before any SQL', () async {
+    test('an unknown key, an absent column and id throw before any SQL', () async {
       final db = legacyDb(rows);
       final repo = legacyRepo(db);
       for (final eq in [
@@ -212,7 +212,6 @@ void main() {
         {'priority': 3},
         {'id': 'a'},
         {'client_ref; DROP TABLE tasks': 1},
-        <String, Object?>{},
       ]) {
         await expectLater(repo.listWhere(eq), throwsArgumentError);
         expect(() => repo.watchWhere(eq), throwsArgumentError);

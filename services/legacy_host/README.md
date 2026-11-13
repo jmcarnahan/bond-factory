@@ -17,7 +17,7 @@ make -C services/legacy_host lint
 | 5 New clients on the legacy wire | the SDK's `TaskDraft` / `TaskPatch` bodies in, recorded answers out | `tests/test_new_client_wire.py` |
 | 6 Pre-existing tables | grants in `file_share_grants`, settings in `user_prefs` | `tests/test_existing_tables.py` |
 | 7 Provider-side edits | the calendar mirror (host-sync) | `tests/test_provider_edits.py` |
-| 8 An existing phone database | the SDK phone store over a local `tasks` table the app already ships (missing columns, renamed flag, app columns, old rows, joined tables); the queue it records is replayed here unchanged | `demos/legacy_phone`: `make -C demos/legacy_phone test`; `tests/test_phone_store_upload.py`: `make -C services/legacy_host test T=tests/test_phone_store_upload.py` |
+| 8 An existing phone database | the SDK phone store over a local `tasks` table the app already ships (missing columns, renamed flag, app columns, old rows, joined tables); the queues it records (tasks, checklist ticks, settings) are replayed here unchanged | `demos/legacy_phone`: `make -C demos/legacy_phone test`; `tests/test_phone_store_upload.py`, `tests/test_phone_checklist_upload.py`, `tests/test_phone_settings_upload.py` |
 
 ## Tables that pre-date the modules
 

@@ -7,9 +7,18 @@
 library;
 
 import 'package:bond_sync_powersync/bond_sync_powersync.dart';
+import 'package:bond_tasks_powersync/bond_tasks_powersync.dart';
 import 'package:powersync/powersync.dart';
 
 enum LegacyStage { asShipped, widened }
+
+/// The app's preferences table (`user_prefs`, one row per user) names the four settings differently.
+const Map<String, String> kPrefsRename = {
+  'time_zone': 'tz',
+  'start_of_day': 'day_start',
+  'end_of_day': 'day_end',
+  'lead_minutes': 'remind_lead',
+};
 
 /// The nine SDK columns the app's table lacks until [LegacyStage.widened].
 const List<String> kMissingColumns = [
@@ -52,5 +61,6 @@ Schema legacySchema(LegacyStage stage) => Schema([
       const Table('users', [Column.text('name'), Column.text('email')]),
       const Table('clients', [Column.text('first_name'), Column.text('last_name')]),
       const Table('cases', [Column.text('client_id'), Column.text('label'), Column.integer('file_no')]),
+      ...taskSettingsTables(table: 'user_prefs', rename: kPrefsRename),
       ...syncSupportTables(),
     ]);

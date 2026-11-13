@@ -26,7 +26,7 @@ LEGACY_DDL = (
         theme VARCHAR, updated_at DATETIME NOT NULL)""",
 )
 
-#: Columns the old tables lack, and the `push_devices` table the app never had. `purpose` is the only one a row needs a value for; the migration backfills it.
+#: Columns the old tables lack, and the `push_devices` and `notices` tables the app never had. `purpose` is the only one a row needs a value for; the migration backfills it.
 ADOPT = (
     "ALTER TABLE tasks ADD COLUMN priority INTEGER",
     "ALTER TABLE tasks ADD COLUMN due_at DATETIME",
@@ -50,6 +50,13 @@ ADOPT = (
         topic VARCHAR(255), last_seen_at DATETIME NOT NULL, disabled_at DATETIME, created_at DATETIME NOT NULL,
         CONSTRAINT uq_push_devices_user_device UNIQUE (user_id, device_id))""",
     "CREATE INDEX ix_push_devices_user_id ON push_devices (user_id)",
+    # the inbox, also new: the `NOTICE_COLUMNS` contract of `bond_notify_py`
+    """CREATE TABLE notices (
+        id VARCHAR(32) NOT NULL PRIMARY KEY, user_id VARCHAR NOT NULL, kind VARCHAR(32) NOT NULL,
+        title VARCHAR(255) NOT NULL, body TEXT NOT NULL, data JSON NOT NULL, source_id VARCHAR,
+        created_at DATETIME NOT NULL, read_at DATETIME, dismissed_at DATETIME)""",
+    "CREATE INDEX ix_notices_user_created ON notices (user_id, created_at)",
+    "CREATE INDEX ix_notices_source_id ON notices (source_id)",
 )
 
 

@@ -20,7 +20,7 @@ and the coordinator do not change.
 SELECT id, user_id, kind, title, body, data, created_at, read_at, dismissed_at
 FROM notices WHERE user_id = auth.user_id()
 
-SELECT id, user_id, device_id, token, platform, environment, topic, last_seen_at, disabled_at, created_at
+SELECT id, user_id, device_id, platform, environment, topic, last_seen_at, disabled_at, created_at
 FROM push_devices WHERE user_id = auth.user_id()
 ```
 
@@ -76,6 +76,11 @@ testable here): only the user's own device rows (`WHERE user_id = auth.user_id()
 `user_id`, `last_seen_at`, `disabled_at` and `created_at`. The verdict table, the fixture and the host wiring are in
 `docs/migration/bond_push_py.md` section 6a; `test/legacy_upload_test.dart` proves the phone queues exactly the ops the
 legacy host replays.
+
+- The `push_devices` stream should OMIT `token`: `SELECT id, user_id, device_id, platform, environment, topic, last_seen_at,
+  disabled_at, created_at FROM push_devices WHERE user_id = auth.user_id()`. No Dart class reads the token back, and a token
+  is a send capability. `SyncPushDevices.register` still works when the local `token` reads NULL after a sync: it writes
+  the token without reading it, and the queued op is a patch of `token` (`test/token_omitted_test.dart`).
 
 ## 6. What to test
 

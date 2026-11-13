@@ -68,8 +68,11 @@ one row. A malformed JSON cell gives an empty list.
   `completed_by` = the user, reopen and cancel write NULL; default false); `mirrorStatusOnWrite: (after, before) => String?`
   (a non-null result is written to `mirror_status` in the same statement; default null: create writes `pending`, nothing else
   touches it); `prepare: (tx, TaskWrite) async => values` and `afterWrite: (tx, TaskWrite) async {}` (app rules inside the write
-  transaction; default null); reads `getTask`, `watchTask`, `listWhere`, `watchWhere` (equality filters on module or extra columns,
-  not owner-filtered, `total` in the same snapshot) and `watchList(TaskFilters)`; `taskFromRow(..., shape:)`.
+  transaction; default null); reads `getTask`, `watchTask`, `listWhere`, `watchWhere` (equality filters on module or extra columns, `total` in the same snapshot;
+  not owner-filtered unless `mine: true` adds owner-or-assignee in SQL; an EMPTY map is everyone, or mine with `mine: true`, so the app
+  picks mine, a linked record or everyone, each with `limit` and `total`) and `watchList(TaskFilters)`; `taskFromRow(..., shape:)`.
+- `PowerSyncTaskSettingsStore.update` checks `HH:MM` for the start and end of day and the lead range (0..10080) locally and throws `ArgumentError`
+  with nothing written; it does not check the time zone (the server does).
 - Guards: a `prepare` for a create must still return every required column (`owner_user_id`, `assigned_user_id`, `title`, `status`,
   `due_date`, `due_time`, `completed_at`, `created_at`, `updated_at`), and a `prepare` for an update may not add or change `status`,
   `completed_at` or `completed_by` (use complete, reopen or cancel); both throw `ArgumentError` and write nothing. SQLite keywords
@@ -125,6 +128,10 @@ PowerSyncTaskRepository legacyTaskRepository(
       afterWrite: (tx, w) => tx.execute("DELETE FROM sync_rejections WHERE table_name = 'tasks' AND row_id = ?", [w.id]),
     );
 
+/// The per-user settings over the app's own `user_prefs` table: its row id is the user id, its columns are renamed.
+PowerSyncTaskSettingsStore legacyTaskSettingsStore(SyncDb db, String userId) =>
+    PowerSyncTaskSettingsStore(db, userId: userId, table: 'user_prefs', rename: kPrefsRename);
+
 String? _s(Object? v) => v is String && v.trim().isNotEmpty ? v.trim() : null;
 
 /// One rule for reads and writes: a dated, open task with the flag on (NULL is on) waits for the calendar.
@@ -166,13 +173,15 @@ Future<List<Task>> _names(SyncSql sql, List<Task> tasks) async {
   ];
 }
 
-/// The app's rules, inside the write transaction: blank links are NULL, a case implies its client (and a case of
-/// another client is refused), and `case_file_no` follows the case.
+/// The app's rules, inside the write transaction: blank links are NULL, a case implies its client (a case of another
+/// client, or a blank client on a task that has a case, is refused), and `case_file_no` follows the case.
 Future<Map<String, Object?>> _rules(SyncSql tx, TaskWrite w) async {
   final v = {...w.values};
   for (final k in const ['client_ref', 'case_ref']) {
     if (v.containsKey(k)) v[k] = _s(v[k]);
   }
+  final kase = v.containsKey('case_ref') ? v['case_ref'] : _s(w.before?['case_ref']);
+  if (v.containsKey('client_ref') && v['client_ref'] == null && kase != null) throw StateError('client_required_by_case');
   if (!v.containsKey('case_ref')) return v;
   final c = v['case_ref'] == null ? null : await tx.getOptional('SELECT client_id, file_no FROM cases WHERE id = ?', [v['case_ref']]);
   final client = v.containsKey('client_ref') ? v['client_ref'] : _s(w.before?['client_ref']);
@@ -205,6 +214,22 @@ absent. After stage two the old rows still have no `due_at`, so name `dueOrder: 
 all tie and the newest created comes first (pinned in `read_test.dart`). A timed old row with no `due_at` reads `deviceDueAt(date,
 time)`, so overdue, `today()`, `summary()` and the local alerts all work on it.
 
+**Visibility, ticks, blank ids, cancelled rows.**
+- Who sees what is the app's choice, in SQL, with `limit` and `total`: mine (`watchOpen`, or `listWhere({}, mine: true)`), one record
+  (`listWhere({'client_ref': id})`, optionally `mine: true`) or everyone (`listWhere({})`). The local database may hold other users' rows
+  (a global stream); `watchOpen` and `mine` never show them.
+- Ticking a checklist item is a patch of `checklist` (stage two only; at stage one the value is dropped silently and nothing is queued).
+  Untick through `item.copyWith(clearDone: true)`: only an item the user unticked in that edit sends `done: false`, so the server unticks it;
+  an item that was simply never ticked sends `{id, text, done_at: null}` (no `done`), so a phone with a stale copy never unticks another
+  person's tick, and a ticked item sends its own `done_at` stamp. Offline ticks queue as patches and replay in order
+  (`upload_phone_checklist.json`: create, tick, untick, add an item).
+- A blank id in a patch (`''` for client, case or assignee) is NULL. The recipe refuses `''` for the client of a task that has a case
+  (it throws `client_required_by_case`; nothing is written or queued); clearing both in one write is fine.
+- A cancelled row shows cancelled locally and is listed by `listWhere` under a null or `all` status, never under `open`. When sync
+  removes the row, every watch (`watchOpen`, `watchTask` (null), `watchWhere`) re-emits without it.
+- The edit of an old row writes only the columns the edit changes: a column that is NULL and unchanged is never queued, so the module never
+  relies on an old client keeping columns it does not declare.
+
 **Limits found.**
 - The default read of a link column keeps `''` as it is stored; the enricher above is where it becomes "no link".
 - `mirrorStatusFor` is not asked for a stored `mirrored` or `failed` row in this recipe: a server-owned state is shown as stored.
@@ -215,6 +240,28 @@ time)`, so overdue, `today()`, `summary()` and the local alerts all work on it.
   needs its own upload filter.
 - The server ignores the phone's `mirror_status`, `completed_by` and app-derived columns it does not know (`case_file_no`) and owns `created_at`; on the device they are an optimistic local display until the next download overwrites them.
 - A real database inside a widget test needs `tester.runAsync` alternating with `pump` (a plain `await` never resumes under FakeAsync).
+
+## 4c. Settings on the phone
+
+The per-user settings (zone, start and end of day, lead minutes) travel over sync like tasks. `taskSettingsTables(table:, rename:)` adds
+the table to the schema (one row per user, `lead_minutes` an integer, the rest text); `PowerSyncTaskSettingsStore(db, userId:, defaults:,
+table:, rename:)` is a `TaskSettingsStore` (`get`, `watch`, `update`), so `ZoneReporter` and the settings form run over it unchanged.
+An app whose table exists (here `user_prefs` with `tz`, `day_start`, `day_end`, `remind_lead`) passes `table:` and `rename:` (wire name to local
+column); add it to both stage schemas. The recipe is the last function of `legacy_store.dart` above, `legacyTaskSettingsStore(db, userId)`,
+with the app's rename map:
+```dart
+const kPrefsRename = {'time_zone': 'tz', 'start_of_day': 'day_start', 'end_of_day': 'day_end', 'lead_minutes': 'remind_lead'};
+```
+(`taskSettingsTables(table: 'user_prefs', rename: kPrefsRename)` goes in the schema.)
+- No row, or a NULL cell, reads as the app default from `defaults`; `overridden` is the wire names whose cell is set; `warnings` is always
+  empty (the server's warnings do not travel over sync).
+- `update` with no row inserts `(id, <only the columns set or reset>)` (a queued put); with a row it updates only those (a queued patch);
+  a name in `reset` writes NULL (the server reads null as "the app default"); an empty patch writes nothing; a bad `HH:MM` throws
+  `ArgumentError` and writes nothing.
+- The row id is the user id. On the server the table's key is the user id, so `op.id` must be the session user (else `forbidden`,
+  `not_settings_owner`). Whether a stream can expose `user_id AS id` is UNVERIFIED against a real sync service; the fallback is a real `id`
+  column on the table. Proven here: `demos/legacy_phone` settings tests and `upload_phone_settings.json`, replayed on the legacy host (the
+  row holds `tz` and `day_end`, a date-only task's due instant is recomputed, the reset returns the default).
 
 ## 5. Sign-out
 

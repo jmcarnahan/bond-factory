@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- `store_open.dart` no longer imports `dart:io`: the file moves and deletes sit behind a conditional import (`store_files_io.dart`; on the web `store_files_stub.dart`, where moving aside moves nothing and deleting does nothing, silently). Public API unchanged. `make -C packages/bond_sync_powersync web-compile` (root `make web-compile-sync`, which `make test-flutter` runs) fails if any file but `store_files_io.dart` imports `dart:io`, and compiles the opener to JavaScript. Nothing was run in a browser.
 - `FakeSyncDb` with `applySql: true` also runs `SELECT COUNT(*) [AS n] FROM t [WHERE ...]` (one row, the count of the
   matches) and `LIMIT n OFFSET m`. Additive; every statement it ran before reads the same.
 - `waitForUploadDrain(db, {timeout, poll})`: true once the CRUD queue is empty, false on timeout. Call it between the last

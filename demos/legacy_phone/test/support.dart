@@ -91,6 +91,27 @@ void forEachStage(String name, Future<void> Function(LegacyEnv env) body, {bool 
 /// The first value of [s] that satisfies [ok]; subscribes at once, so start it before the write that causes it.
 Future<T> nextWhere<T>(Stream<T> s, bool Function(T) ok) => s.firstWhere(ok).timeout(const Duration(seconds: 10));
 
+
+/// What the connector would send for each queued CRUD transaction, drained: `[{user, body: {ops: [...]}}]`.
+Future<List<Object?>> queuedRequests(LegacyEnv env) async {
+  final store = PowerSyncSyncStore.withDb(
+    env.db,
+    policy: SyncPolicy(schema: legacySchema(env.stage)),
+  );
+  final out = <Object?>[];
+  while (true) {
+    final batch = await store.nextBatch();
+    if (batch == null) return out;
+    out.add({
+      'user': 'u-owner',
+      'body': {
+        'ops': [for (final o in batch.ops) o.toJson()],
+      },
+    });
+    await batch.complete();
+  }
+}
+
 /// A subscription that keeps what it saw, for a re-emit test: await [first] (the OLD value), write, then await [next]
 /// with the new value. It cannot pass without a real emission after the write.
 class Watch<T> {

@@ -165,33 +165,9 @@ class PowerSyncTaskRepository implements TaskRepository {
 
   Future<TaskPage> _list(SyncSql sql, TaskFilters f) async {
     final now = clock.nowUtc();
-    final where = <String>[];
-    final args = <Object?>[];
-    final status = f.status ?? 'open';
-    if (status == 'open' || status == 'done' || status == 'cancelled') {
-      where.add('${_sql.c('status')} = ?');
-      args.add(status);
-    }
-    if ((f.scope ?? 'mine') == 'mine') {
-      where.add(_sql.mine);
-      args.addAll([userId, userId]);
-    }
-    if (f.ownerUserId != null) {
-      where.add('${_sql.c('owner_user_id')} = ?');
-      args.add(f.ownerUserId);
-    }
-    if (f.assignedUserId != null) {
-      where.add('${_sql.c('assigned_user_id')} = ?');
-      args.add(f.assignedUserId);
-    }
-    if (f.assignedToMe) {
-      where.add('${_sql.c('assigned_user_id')} = ?');
-      args.add(userId);
-    }
-    if (f.noDate) where.add('${_sql.c('due_date')} IS NULL');
-    final q = 'SELECT * FROM $kTasksTable${where.isEmpty ? '' : ' WHERE ${where.join(' AND ')}'} ${_sql.order}';
+    final (q, args) = _sql.listQuery(f, userId);
     var tasks = _decode(await sql.getAll(q, args), now);
-    if (!f.noDate) tasks = _inRange(tasks, f);
+    if (!f.noDate) tasks = tasksInRange(tasks, f);
     if (f.linkId != null) {
       tasks = [
         for (final t in tasks)
@@ -215,48 +191,33 @@ class PowerSyncTaskRepository implements TaskRepository {
   }
 
   /// A page of the tasks whose columns equal [equals] (module column names or [extraColumns]; a null value
-  /// means `IS NULL`), NOT limited to this user's tasks. [status] `open`, `done` or `cancelled` also filters;
+  /// means `IS NULL`); an empty map matches every row. NOT limited to this user's tasks unless [mine] is true (owner or assignee, in SQL, after the equals conditions and before the status). [status] `open`, `done` or `cancelled` also filters;
   /// any other value (or null) does not. [limit] defaults to 25 and [offset] to 0; `total` counts every match.
-  /// Throws [ArgumentError] for an empty map, an unknown key, a column the shape marks absent or a negative limit or offset ([watchWhere] throws at call time).
-  Future<TaskPage> listWhere(Map<String, Object?> equals, {String? status, int? limit, int? offset}) =>
-      readSnapshot(db, (sql) => _where(sql, equals, status, limit, offset));
+  /// Throws [ArgumentError] for an unknown key, a column the shape marks absent or a negative limit or offset ([watchWhere] throws at call time).
+  Future<TaskPage> listWhere(Map<String, Object?> equals, {bool mine = false, String? status, int? limit, int? offset}) =>
+      readSnapshot(db, (sql) => _where(sql, equals, mine, status, limit, offset));
 
   /// [listWhere] as a live snapshot over the tasks table and [extraWatchTables].
-  Stream<TaskPage> watchWhere(Map<String, Object?> equals, {String? status, int? limit, int? offset}) {
-    _sql.equalsWhere(equals, extraColumns, status); // these throw now, before anything subscribes
+  Stream<TaskPage> watchWhere(Map<String, Object?> equals, {bool mine = false, String? status, int? limit, int? offset}) {
+    _sql.equalsWhere(equals, extraColumns, status, mine: mine, userId: userId); // these throw now, before anything subscribes
     _checkPaging(limit, offset);
-    return watchSnapshot(db, [kTasksTable, ...extraWatchTables], (sql) => _where(sql, equals, status, limit, offset));
+    return watchSnapshot(db, [kTasksTable, ...extraWatchTables], (sql) => _where(sql, equals, mine, status, limit, offset));
   }
 
   void _checkPaging(int? limit, int? offset) {
     if ((limit ?? 0) < 0 || (offset ?? 0) < 0) throw ArgumentError('limit and offset must not be negative');
   }
 
-  Future<TaskPage> _where(SyncSql sql, Map<String, Object?> equals, String? status, int? limit, int? offset) async {
-    final (where, args) = _sql.equalsWhere(equals, extraColumns, status);
+  Future<TaskPage> _where(SyncSql sql, Map<String, Object?> equals, bool mine, String? status, int? limit, int? offset) async {
+    final (where, args) = _sql.equalsWhere(equals, extraColumns, status, mine: mine, userId: userId);
     _checkPaging(limit, offset);
     final lim = limit ?? 25, off = offset ?? 0;
-    final w = where.join(' AND ');
-    final rows = await sql.getAll('SELECT * FROM $kTasksTable WHERE $w ${_sql.order} LIMIT ? OFFSET ?', [...args, lim, off]);
-    final count = await sql.getOptional('SELECT COUNT(*) AS n FROM $kTasksTable WHERE $w', args);
+    final w = where.isEmpty ? '' : ' WHERE ${where.join(' AND ')}';
+    final rows = await sql.getAll('SELECT * FROM $kTasksTable$w ${_sql.order} LIMIT ? OFFSET ?', [...args, lim, off]);
+    final count = await sql.getOptional('SELECT COUNT(*) AS n FROM $kTasksTable$w', args);
     final total = (count?['n'] as num?)?.toInt() ?? 0;
     final items = await _enrich(sql, _decode(rows, clock.nowUtc()));
     return TaskPage(items: items, total: total, limit: lim, offset: off);
-  }
-
-  List<Task> _inRange(List<Task> tasks, TaskFilters f) {
-    final hiParts = [if (f.onOrBefore != null) f.onOrBefore!, if (f.dueTo != null) f.dueTo!]..sort();
-    final lo = f.dueFrom, hi = hiParts.isEmpty ? null : hiParts.first;
-    if (lo == null && hi == null) return tasks;
-    return [
-      for (final t in tasks)
-        if (_dayIn(dayFor(t, (u) => u.toLocal()), lo, hi, f.includeUndated)) t,
-    ];
-  }
-
-  bool _dayIn(String? day, String? lo, String? hi, bool includeUndated) {
-    if (day == null) return includeUndated;
-    return (lo == null || day.compareTo(lo) >= 0) && (hi == null || day.compareTo(hi) <= 0);
   }
 
   Future<Task> _decodeOne(SyncSql sql, SyncRow row) async {

@@ -34,6 +34,10 @@ PowerSyncTaskRepository legacyTaskRepository(
       afterWrite: (tx, w) => tx.execute("DELETE FROM sync_rejections WHERE table_name = 'tasks' AND row_id = ?", [w.id]),
     );
 
+/// The per-user settings over the app's own `user_prefs` table: its row id is the user id, its columns are renamed.
+PowerSyncTaskSettingsStore legacyTaskSettingsStore(SyncDb db, String userId) =>
+    PowerSyncTaskSettingsStore(db, userId: userId, table: 'user_prefs', rename: kPrefsRename);
+
 String? _s(Object? v) => v is String && v.trim().isNotEmpty ? v.trim() : null;
 
 /// One rule for reads and writes: a dated, open task with the flag on (NULL is on) waits for the calendar.
@@ -75,13 +79,15 @@ Future<List<Task>> _names(SyncSql sql, List<Task> tasks) async {
   ];
 }
 
-/// The app's rules, inside the write transaction: blank links are NULL, a case implies its client (and a case of
-/// another client is refused), and `case_file_no` follows the case.
+/// The app's rules, inside the write transaction: blank links are NULL, a case implies its client (a case of another
+/// client, or a blank client on a task that has a case, is refused), and `case_file_no` follows the case.
 Future<Map<String, Object?>> _rules(SyncSql tx, TaskWrite w) async {
   final v = {...w.values};
   for (final k in const ['client_ref', 'case_ref']) {
     if (v.containsKey(k)) v[k] = _s(v[k]);
   }
+  final kase = v.containsKey('case_ref') ? v['case_ref'] : _s(w.before?['case_ref']);
+  if (v.containsKey('client_ref') && v['client_ref'] == null && kase != null) throw StateError('client_required_by_case');
   if (!v.containsKey('case_ref')) return v;
   final c = v['case_ref'] == null ? null : await tx.getOptional('SELECT client_id, file_no FROM cases WHERE id = ?', [v['case_ref']]);
   final client = v.containsKey('client_ref') ? v['client_ref'] : _s(w.before?['client_ref']);

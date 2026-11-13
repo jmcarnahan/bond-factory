@@ -8,7 +8,7 @@ Role: tasks table, services, due instants, notice stages, sweep, outbox, calenda
 - `stages.py` notice_id/fnv1a31/stages; `quiet.py`; `sweep.py` + `sweep_claim.py` claim; `outbox.py` deliver; `retention.py`; `compose.py`
 - Seams: `protocols.py` (prefs, permissions, links, mirror); `notify_protocols.py` (Notice, notifiers)
 - `routes.py` `make_tasks_router` (fastapi), `routes_core.py` its fastapi-free rules
-- `mirror.py` (`draft_for` hook; `MirrorDraft.leave` = fields an update omits); `sync_routes.py` (`TaskRoute.optional`, `NO_READS`); `dialect.py` ON CONFLICT insert, `sqlite_savepoint_setup`, `ensure_savepoint_safe`
+- `mirror.py` (`draft_for` hook; `MirrorDraft.leave` = fields an update omits); `sync_routes.py` (`TaskRoute.optional`, `NO_READS`); `settings_routes.py` (settings table over sync, own row); `dialect.py` ON CONFLICT insert, `sqlite_savepoint_setup`, `ensure_savepoint_safe`
 - Fixtures in `../../fixtures/tasks/` (task*.json, stage_times.json, notice_ids.json) pin Dart parity
 - Rules: `docs/decisions/2026-11-11-due-instant.md`, `-notify-ledger.md`, `-links.md`
 

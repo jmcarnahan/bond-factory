@@ -47,7 +47,7 @@ The adoption-gap seams (`bond_api` `endsSession` and per-call timeouts, `bond_ta
 
 The uploads guard fix (resolved-path check in `bond_service_kit`), the legacy host and the adopter lane are first available at the merge commit of this branch, `c6387288b3316fb10289c473b447a92b8ffb8782` (PR #15).
 
-The mirror `transport_pending` flag, the phone store seams for an existing phone database (`TaskTableShape`, `listWhere`, the write hooks) and the legacy phone package are first available at the merge commit of this branch, to be filled when it merges: `<this branch's merge commit>`.
+The mirror `transport_pending` flag, the phone store seams for an existing phone database (`TaskTableShape`, `listWhere`, the write hooks), the checklist untick fix (`ChecklistItem.unticked`), task settings over sync (`settings_routes`, `PowerSyncTaskSettingsStore`, `TaskSettingsStore`), the web-safe store opener and the legacy phone package are first available at the merge commit of this branch, to be filled when it merges: `<this branch's merge commit>`.
 
 Rules:
 - A local patch names the file, the reason and the upstream issue or PR. No patch lives longer than one upgrade.

@@ -38,8 +38,7 @@ void main() {
     expect(ids((await env.repo.listWhere({'assigned_user_id': 'u-editor'})).items), ['o-pm', 'o-theirs']);
   });
 
-  forEachStage('listWhere refuses an empty map and an unknown key', (env) async {
-    expect(() => env.repo.listWhere({}), throwsArgumentError);
+  forEachStage('listWhere refuses an unknown key (an empty map is everyone since K3)', (env) async {
     expect(() => env.repo.listWhere({'bogus': 1}), throwsArgumentError);
     expect(() => env.repo.listWhere({'sync_to_calendar': 1}), throwsArgumentError, reason: 'a local name is not a module name');
     expect(() => env.repo.listWhere({'id; DROP TABLE tasks': 1}), throwsArgumentError);

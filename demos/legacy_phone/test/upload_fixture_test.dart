@@ -9,7 +9,6 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bond_sync_powersync/bond_sync_powersync.dart';
 import 'package:bond_tasks/bond_tasks.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:legacy_phone/legacy_phone.dart';
@@ -21,25 +20,6 @@ const _paths = {
   LegacyStage.widened:
       '../../fixtures/legacy_host/upload_phone_store_widened.json',
 };
-
-Future<List<Object?>> _requests(LegacyEnv env) async {
-  final store = PowerSyncSyncStore.withDb(
-    env.db,
-    policy: SyncPolicy(schema: legacySchema(env.stage)),
-  );
-  final out = <Object?>[];
-  while (true) {
-    final batch = await store.nextBatch();
-    if (batch == null) return out;
-    out.add({
-      'user': 'u-owner',
-      'body': {
-        'ops': [for (final o in batch.ops) o.toJson()],
-      },
-    });
-    await batch.complete();
-  }
-}
 
 void main() {
   for (final stage in LegacyStage.values) {
@@ -89,7 +69,7 @@ void main() {
                 'What the legacy phone store queues at stage ${stage.name} (demos/legacy_phone, test/upload_fixture_test.dart): '
                 'the app\'s own column names only. Regenerate with BOND_REGEN_FIXTURES=1. `user` is the session user of each request; '
                 'requests are replayed in order.',
-            'requests': await _requests(env),
+            'requests': await queuedRequests(env),
           };
           if (Platform.environment['BOND_REGEN_FIXTURES'] == '1') {
             File(path).writeAsStringSync(

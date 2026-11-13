@@ -1,6 +1,24 @@
 # Changelog
 
 ## Unreleased
+Phase 2 (same opt-in rule: nothing here changes a default).
+- `PowerSyncTaskSettingsStore` (a `TaskSettingsStore`), `taskSettingsTables({table, rename})`, `kTaskSettingsTable`
+  (`task_user_settings`), `kTaskSettingsColumns` (`time_zone`, `start_of_day`, `end_of_day` text; `lead_minutes` integer).
+  One row per user, id = the user id. `get`, `watch()` (re-emits after a local write and after a row arrives by sync), `update`.
+  Read: a NULL cell or no row gives the `defaults:` value; `overridden` is the wire names whose cell is not NULL (empty with no
+  row); `warnings` is always empty (the server's warnings do not travel over sync). Update: no row is
+  `INSERT INTO <t> (id, <only the columns set or reset>) VALUES (...)` (a queued put); a row is `UPDATE <t> SET <only those> WHERE id = ?`
+  (a queued patch); `reset` writes NULL and wins over a value; an empty patch writes nothing; `start_of_day` / `end_of_day`
+  must be `HH:MM` and `lead_minutes` 0..10080 (`ArgumentError`, nothing written; `update` fails as a Future; the zone is not
+  checked locally); returns the settings read back. `rename` maps a
+  wire name to the local column (SQL and queued keys use the local names); table and column names are checked like
+  `TaskTableShape.rename` (`ArgumentError`). A `ZoneReporter` over the store writes the device zone once.
+- `listWhere` / `watchWhere` take `mine` (default false): adds `(owner_user_id = ? OR assigned_user_id = ?)` in SQL, after the
+  equals conditions and before the status; an EMPTY `equals` map is now accepted (it used to throw `ArgumentError`; no WHERE
+  when nothing filters). Mine: `watchOpen` or `listWhere({}, mine: true)`; a linked record: `listWhere({'client_ref': id})`;
+  everyone: `listWhere({})`. A `status` other than `open`, `done`, `cancelled` does not filter, so cancelled rows show only then.
+- Pinned (test only): ticking a checklist item through `update` stores and queues its `done_at` (no `done` key); unticking with
+  `copyWith(clearDone: true)` stores and queues `done: false` for that item only; a later edit re-sends it with no `done`.
 Opt-in seams for an app whose phone database already exists (a local `tasks` table of its own). With none of the new
 arguments given, every SQL string, parameter list and result is as before; the two lines under "Changed by default" are the only
 exceptions.

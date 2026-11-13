@@ -28,7 +28,7 @@ Those collisions appear only when tests run against that shape.
   | New client on the old wire | the shared client reads the legacy shape through its adapter |
   | Existing tables | the module attaches to tables and data that already exist |
   | Partial ownership of an external record | the app owns some fields of a record another system also writes |
-  | An existing phone database | the phone store works over a local table the app already ships (missing columns, renamed flag, app columns, old rows, joined tables) |
+  | An existing phone database | the phone store works over a local table the app already ships (missing columns, renamed flag, app columns, old rows, joined tables); checklist ticks and untick, and per-user settings over sync, are part of it |
 
 - **P5** `make adopter-check APP=<path>` is opt-in and local, because apps are separate repositories. Run it for each
   known adopter before a merge to `main` that changes a module that adopter pins.

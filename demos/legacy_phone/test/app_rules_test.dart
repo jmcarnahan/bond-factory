@@ -17,8 +17,8 @@ void main() {
     await env.repo.create(const TaskDraft(title: 'x', id: 'n-1', extras: {'client_ref': '', 'case_ref': '  '}));
     expect(await links(env, 'n-1'), [null, null, null]);
     env.tick();
-    await env.repo.update('o-timed', const TaskPatch(extras: {'client_ref': ''}));
-    expect((await env.row('o-timed'))['client_ref'], isNull);
+    await env.repo.update('o-none', const TaskPatch(extras: {'client_ref': ''})); // no case on it: the client may go
+    expect((await env.row('o-none'))['client_ref'], isNull);
   });
 
   forEachStage('a case implies its client', (env) async {

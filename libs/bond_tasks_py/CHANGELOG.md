@@ -35,6 +35,12 @@ Added
   NULL the values equal to the old constants: 08:00, 17:00, 60). A reset can be refused with `invalid_work_day` when the
   default equals the other stored bound: reset both together. Hosts need a revision that drops NOT NULL on the three columns.
 
+- Settings over sync (new file `settings_routes.py`): `settings_routes(settings_model, task_model, *, now, defaults, tz,
+  on_recomputed)` returns `{(settings_model.__tablename__, None): TaskRoute(put, patch)}` and `settings_verdict_for(exc)`;
+  `SETTINGS_FIELDS`. Put and patch mean the same (present + null = reset to the app default, absent = unchanged, no row =
+  created); the handler runs `update_settings` in the op's transaction, so due instants are recomputed. `op.id` must be the
+  session user's id (`forbidden`, message `not_settings_owner`); a bad value is `invalid` with `invalid_<field>` (or
+  `invalid_work_day`); no delete op. New exports, no change to existing behaviour.
 - Sync writes, tolerant reader: `checklist` and `links` sent as JSON text (a phone store writes `"[]"` or `'[{...}]'`) are
   parsed before validation, on put and patch; blank text is not sent; text that is not JSON or not a list is refused like
   any wrong type (`invalid`). A real list works as before. A host needs no `client_json` entry for these two.
