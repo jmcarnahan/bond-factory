@@ -395,3 +395,18 @@ def test_db_unavailable_flag():
     assert DbUnavailable.db_unavailable is True
     assert getattr(DbUnavailable("down"), "db_unavailable", False) is True
     assert getattr(ValueError("x"), "db_unavailable", False) is False
+
+
+def test_a_route_optional_keys_are_dropped_when_blank_or_unreadable_not_rejected(factory, ctx):
+    from bond_sync_py import Route
+    seen = []
+
+    def put(session, c, o, data):
+        seen.append(data)
+
+    host = make_host(routes={("items", None): Route(frozenset({"put"}), put, ("title", "count", "flag"), ("count",))})
+    assert wire(factory, host, ctx, op(title="A", count=""))["status"] == "ok"
+    assert wire(factory, host, ctx, op(title="A", count="many"))["status"] == "ok"
+    assert wire(factory, host, ctx, op(title="A", count="4"))["status"] == "ok"
+    assert seen == [{"title": "A"}, {"title": "A"}, {"title": "A", "count": 4}]
+    assert wire(factory, host, ctx, op(title="A", flag="maybe"))["code"] == "invalid"  # not optional: still strict

@@ -1,0 +1,7 @@
+{
+  "detail": {
+    "error_code": "NOT_TASK_OWNER",
+    "code": "not_task_owner",
+    "message": "Only the owner can link a task to a client or case."
+  }
+}

@@ -212,3 +212,19 @@ def test_past_zero_when_the_first_morning_is_exactly_fifteen_minutes_after_due(d
     task = _task(datetime(2026, 3, 12, 23, due_minute), remind=-2)
     stages = stage_times(task, prefs, "UTC", datetime(2026, 3, 12))
     assert (("past", 0) in [(s.stage, s.seq) for s in stages]) is has_past0
+
+
+def test_a_null_reminder_follows_the_default_in_stages_mirror_and_item(session):
+    """A column added to old rows is NULL: it reads as USE_DEFAULT_REMINDER, never a TypeError."""
+    from conftest import NOW, Task
+
+    from bond_tasks_py import TaskCreate, service, task_item
+    from bond_tasks_py.mirror import _snapshot
+    created = service.create(session, task_model=Task, owner_user_id="u1", actor_user_id="u1", now=NOW,
+                             data=TaskCreate(title="A", due_date=date(2026, 11, 10), due_time="09:00"))
+    default_stages = stage_times(created, UserPrefs(), "UTC", NOW)
+    default_draft = _snapshot(session, created, "UTC").draft
+    created.remind_minutes_before = None
+    assert stage_times(created, UserPrefs(), "UTC", NOW) == default_stages
+    assert _snapshot(session, created, "UTC").draft.reminder_minutes == default_draft.reminder_minutes
+    assert task_item(created, today=date(2026, 11, 8), now=NOW)["remind_minutes_before"] == -3

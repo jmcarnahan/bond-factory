@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.1.0 - unreleased
+- A NULL `download_count` (a legacy table whose count column is nullable) counts as 0: `claim` stored NULL + 1 = NULL and
+  never matched, and the cap comparison never matched either, so such a link resolved but could not be claimed. Both now
+  use `coalesce(download_count, 0)`; `has_live_link` too. No API change.
 - Grant seams, all defaulting to today's behaviour:
   - `make_download_router(delivery="stream"|"redirect", presign_seconds=60)`: redirect mode checks the object exists,
     signs the URL, claims, then answers 302 (a signing fault answers 503 and leaves the download unclaimed). The local backend (no presign) still streams. `after_download` cannot be

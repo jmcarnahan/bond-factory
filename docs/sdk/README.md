@@ -94,6 +94,13 @@ roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
   3. `flutter pub get` or `poetry lock`, then run the app's tests and gates.
   4. Update the pins file. Local patches are temporary: send them upstream, then delete them.
 
+### Before merging to main
+
+- Run `make adopter-check APP=<checkout>` for each known adopter when the change touches a module that adopter pins
+  ([adopter-check.md](adopter-check.md)).
+- A new module or seam needs a legacy-host test in `services/legacy_host`
+  ([decision](../decisions/2026-11-12-adopter-proof.md)).
+
 ## Module index
 
 | Module | Layer | Phase | What it is |

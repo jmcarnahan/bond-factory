@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Any
 
 from bond_tasks_py.due import is_overdue
-from bond_tasks_py.models import MirrorStatus
+from bond_tasks_py.models import MirrorStatus, reminder_setting
 from bond_tasks_py.timeutil import iso_z
 
 ITEM_KEYS = (
@@ -50,7 +50,7 @@ def task_item(task: Any, *, today: date, now: datetime, names: dict[str, str] | 
         "assigned_user_id": task.assigned_user_id,
         "assignee_name": names.get(task.assigned_user_id) if task.assigned_user_id else None,
         "checklist": [dict(entry) for entry in (task.checklist or [])],
-        "remind_minutes_before": task.remind_minutes_before,
+        "remind_minutes_before": reminder_setting(task),
         "links": _links(task, labels),
         "completed_at": iso_z(task.completed_at),
         "mirror_enabled": bool(task.mirror_enabled),

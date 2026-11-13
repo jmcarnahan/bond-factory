@@ -1,6 +1,6 @@
 """The TODO tables on the sync host: tasks, notices and push_devices (the libs ship the handlers).
 
-    todo_routes(app)   {(table, action): route} for `routes/sync.py` to wrap as `Route(r.ops, r.handler, r.reads)`;
+    todo_routes(app)   {(table, action): route} for `routes/sync.py` to wrap as `Route(r.ops, r.handler, r.reads, r.optional)`;
                        task writes pass the same `prepare` rule as the REST routes (`todo_wiring.owner_edits_closed`)
     reject_for         a lib error (`TaskError`, `NoticeError`, `PushError`) becomes a sync verdict
     already_written    a replayed `put` of a row the user already owns is a success
@@ -90,7 +90,7 @@ def todo_routes(app: FastAPI) -> dict:
         if task is not None:
             todo_wiring.dismiss_for_those_who_left(session, task, before, _now())
 
-    routes[("tasks", None)] = TaskRoute(base.ops, handler, base.reads)
+    routes[("tasks", None)] = TaskRoute(base.ops, handler, base.reads, base.optional)
     routes.update(inbox.notice_routes(Notice, now=_now))
     routes.update(push.device_routes(PushDevice, now=_now))
     return routes

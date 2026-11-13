@@ -87,6 +87,7 @@ def apply(session_factory, host: Host, ctx: Ctx, op: UploadOp, *, close_sessions
                 host.tables, op.table, op.data, route.reads,
                 client_bools=host.client_bools.get(op.table, frozenset()),
                 client_json=host.client_json.get(op.table, frozenset()),
+                optional=route.optional,
             )
             if has_nul(op.id) or has_nul(data):
                 raise Rejected("That value is not valid", code=INVALID)

@@ -1,0 +1,28 @@
+version = 1
+
+[[python]]
+dir = "py"
+setup = []
+overlay = "sh -c 'echo \"$0\" >> overlay.log' {lib}"
+libs = ["bond_service_kit", "bond_storage"]
+
+[[flutter]]
+dir = "app"
+packages = ["bond_tasks"]
+setup = []
+
+[[suite]]
+name = "overlay"
+dir = "py"
+run = "python3 tests/check_lib.py"
+
+[[suite]]
+name = "overrides"
+dir = "app"
+run = '''sh -c 'for p in bond_tasks bond_api bond_json; do grep -qF "path: \"$0/packages/$p\"" pubspec_overrides.yaml || exit 1; done' {bond}'''
+
+[[suite]]
+name = "isolated"
+dir = "py"
+run = "python3 tests/check_lib.py --isolated"
+env = { STUB_CHECK = "1" }

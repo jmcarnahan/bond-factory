@@ -5,6 +5,8 @@ import pytest
 from conftest import NOW, Task
 
 from bond_tasks_py import TaskCreate, TaskError, service, sync_routes, verdict_for
+from bond_tasks_py.models import USE_DEFAULT_REMINDER
+from bond_tasks_py.sync_routes import NO_READS
 
 
 @dataclass
@@ -339,3 +341,39 @@ def test_an_unparseable_due_at_is_ignored_like_a_wrong_hint_on_put_and_patch(ses
         assert session.get(Task, f"g{n}").due_at == datetime(2026, 11, 9, 9, 30)
         call(route, session, "u1", Op(f"g{n}", "patch"), {"due_time": "11:00", "due_at": bad})
         assert session.get(Task, f"g{n}").due_at == datetime(2026, 11, 9, 11, 0)
+
+
+def test_the_closing_routes_read_no_data_and_the_task_route_lists_its_optional_keys():
+    table = routes()
+    for action in ("complete", "reopen", "cancel"):
+        assert table[("tasks", action)].reads == NO_READS and table[("tasks", action)].optional == ()
+    route = table[("tasks", None)]
+    assert set(route.optional) == {"due_at", "priority", "remind_minutes_before"} and set(route.optional) <= set(route.reads)
+    assert set(routes(fields=["title", "priority"])[("tasks", None)].optional) == {"priority"}
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_a_blank_priority_or_reminder_is_not_sent_on_put_and_patch(session, blank):
+    route = routes()[("tasks", None)]
+    call(route, session, "u1", Op("b1", "put"), {"title": "A", "priority": blank, "remind_minutes_before": blank})
+    task = session.get(Task, "b1")
+    assert task.priority is None and task.remind_minutes_before == USE_DEFAULT_REMINDER
+    call(route, session, "u1", Op("b1", "patch"), {"priority": 3, "remind_minutes_before": 15})
+    call(route, session, "u1", Op("b1", "patch"), {"title": "B", "priority": blank, "remind_minutes_before": blank})
+    assert (task.title, task.priority, task.remind_minutes_before) == ("B", 3, 15)  # a blank changes nothing
+
+
+def test_a_priority_that_is_not_blank_is_still_checked(session):
+    route = routes()[("tasks", None)]
+    with pytest.raises(TaskError) as caught:
+        call(route, session, "u1", Op("b2", "put"), {"title": "A", "priority": 9})
+    assert caught.value.code == "invalid_priority"
+
+
+def test_the_closing_routes_name_no_key_a_payload_can_carry():
+    """`()` would mean "coerce every key" to the sync dispatcher, so the reads must be non-empty AND match nothing."""
+    payload = {"status", "completed_at", "completed_by", "mirror_status", "updated_at", "created_at", "title", "due_at"}
+    columns = set(Task.__table__.columns.keys())
+    for action in ("complete", "reopen", "cancel"):
+        reads = routes()[("tasks", action)].reads
+        assert reads and not set(reads) & (columns | payload)

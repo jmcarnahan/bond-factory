@@ -110,3 +110,7 @@ None. Set `legacy_detail_string=True` now; P already sends object bodies and can
   the "per-request env rates" gap in section 6. A callable is first called on first use, so it may read settings that load after
   import. A bad later value keeps the last good rate and logs a warning.
 - A lib error class can set `db_unavailable = True` and `UnhandledErrorMiddleware` answers it 503 `db_unavailable`.
+
+## 8. Notes
+- 2026-11-12: the uploads guard (`mount_uploads`) now resolves the path before deciding, following parent-directory segments and
+  symbolic links, and a null byte answers 404. An app that carried its own override of the guard can delete it at its next pin.

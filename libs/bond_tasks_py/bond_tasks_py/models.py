@@ -70,6 +70,12 @@ TASK_COLUMNS: dict[str, bool] = {
 }
 
 
+def reminder_setting(task) -> int:
+    """The task's reminder setting; a NULL (a column added to old rows) reads as ``USE_DEFAULT_REMINDER``."""
+    value = task.remind_minutes_before
+    return USE_DEFAULT_REMINDER if value is None else value
+
+
 class TasksMixin:
     __tablename__ = "tasks"
 

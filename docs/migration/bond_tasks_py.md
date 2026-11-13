@@ -143,3 +143,39 @@ queues work for after the response; `after_delete` and `after_delete_commit(back
 - Test: a fake clock sweep over close, due and past with an `InboxNotifier`, and one `sweep_due` twice (second claims 0).
 - Known limits: with both a Google and a Microsoft connection the example mirrors to Google only. A multi-process
   SQLite app must retry on a busy error.
+
+## 8. Proved by the legacy host (2026-11-12)
+
+A test-only host (legacy column names, app columns, a legacy wire, an old sync client, a user-edited calendar event) drove the
+sync and mirror traits. Fixes, each with a lib test:
+
+- Sync, unreadable hint: an unreadable `due_at` sent with a valid title was rejected `invalid` by the dispatcher's coercion
+  although `sync_routes` drops a bad hint. `TaskRoute.optional` lists `due_at`, `priority` and `remind_minutes_before`; pass it on
+  (`Route(r.ops, r.handler, r.reads, r.optional)`, needs the sync lib that has `Route.optional`) and a blank or unreadable value
+  of those keys is left out. An unreadable non-blank priority is also treated as not sent; a readable one outside 1 to 3 is still
+  `invalid_priority`.
+- Sync, blank numbers: an old client's `priority: ""` and `remind_minutes_before: ""` are "not sent" (same seam, and `_fields`).
+- Sync, closing ops: `complete`, `reopen` and `cancel` read no data (`NO_READS`); one unreadable ignored key no longer rejects them.
+- Mirror, partial ownership: `MirrorDraft.leave = frozenset({"location", "categories", "reminder_minutes"})` (set in `draft_for`
+  with `dataclasses.replace`) makes an update send the rest only. The first push still sends every field. Left fields are the
+  person's after that: the task's own change to them (for example `remind_minutes_before` and the event reminder) is NOT
+  propagated; the task's notices still follow the task. Name `start`, `end` and `is_all_day` together or not at all.
+- Old rows: a NULL `remind_minutes_before` (column added by ALTER TABLE) reads as the default in stages, the sweep, the mirror draft and the item, so no backfill is needed (a backfill to -3 is still harmless).
+
+What applies to EVERY adopter without opting in: a NULL `remind_minutes_before` reads as the default (stages, sweep, mirror
+draft, and the item now shows -3); a blank `priority` / `remind_minutes_before` from a device is treated as not sent inside the
+lib's handler; the `complete`, `reopen` and `cancel` routes read no data. What the host must opt in to: `Route.optional` (pass it
+on, so an unreadable `due_at` or priority is dropped before the dispatcher rejects it) and `MirrorDraft.leave` (in `draft_for`).
+
+Checked, no lib change (recipes):
+- Old-client keys: a renamed flag works in sync when the host widens `reads` with the old key (the dispatcher coerces it by the
+  table column) and renames it to `mirror_enabled` in a wrapper. The lib's own key already takes 1/0/"0"/"1" through the schema.
+- Blank app columns: `BLANK_IS_NONE` covers the lib's own four fields. A host column keeps `""` unless `prepare` returns `None`
+  for it (the legacy host's `prepare` does, and it is also where an owner-only relink is enforced).
+- `source` is device-writable on a put (and ignored on a patch); owner, `created_by`, `completed_*`, `mirror_*`, `external_*` and
+  `*_at` stamps in a payload are never read.
+
+Recorded limits: the mirror's bookkeeping write (`mirror_status`, the event pointer) touches the row, so the mixin's
+`updated_at` `onupdate` stamps the REAL clock on a mirrored row even when the app clock is pinned. The calendar lib's fake keeps
+no event reminder, so a reminder is checked by the patch it was (not) sent in. The example passes `r.optional` on, so it has these fixes.
+

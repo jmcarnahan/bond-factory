@@ -19,3 +19,5 @@
   `window` override until `rate` is next set).
 - `code_aliases` given as a plain string is one alias.
 - `UnhandledErrorMiddleware` answers 503 `db_unavailable` for any exception with a truthy `db_unavailable` attribute.
+- The uploads guard decides on the resolved path as well as the raw one: parent-directory segments and symbolic links are
+  resolved first, so neither can reach the private prefix; a null byte in the path answers 404.

@@ -20,6 +20,8 @@ class Route:
     ops: frozenset
     handler: Callable
     reads: tuple = ()
+    #: names in ``reads`` that are left out of the data when their value is blank or unreadable, instead of rejecting the op
+    optional: tuple = ()
 
 
 @dataclass

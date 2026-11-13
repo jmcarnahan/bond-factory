@@ -1,0 +1,26 @@
+{
+  "note": "The verdicts of upload_old_client.json, one answer per request in order. No request answers 4xx/5xx as a whole.",
+  "answers": [
+    {"results": [
+      {"seq": 0, "status": "ok"},
+      {"seq": 1, "status": "ok"},
+      {"seq": 2, "status": "ok"},
+      {"seq": 3, "status": "ok"},
+      {"seq": 4, "status": "ok"},
+      {"seq": 5, "status": "ok"},
+      {"seq": 6, "status": "ok"},
+      {"seq": 7, "status": "ok"},
+      {"seq": 8, "status": "ok"}
+    ]},
+    {"results": [
+      {"seq": 0, "status": "rejected", "code": "forbidden", "message": "not_task_owner"},
+      {"seq": 1, "status": "ok"}
+    ]},
+    {"results": [
+      {"seq": 0, "status": "ok"}
+    ]},
+    {"results": [
+      {"seq": 0, "status": "rejected", "code": "forbidden", "message": "not_task_editor"}
+    ]}
+  ]
+}

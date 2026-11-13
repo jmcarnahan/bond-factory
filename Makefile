@@ -7,10 +7,10 @@ export FLUTTER DART
 
 .DEFAULT_GOAL := help
 
-include make/dart.mk make/python.mk make/gates.mk make/changed.mk make/postgres.mk
+include make/dart.mk make/python.mk make/gates.mk make/changed.mk make/postgres.mk make/adopter.mk
 
 .PHONY: help test
-test: test-dart test-flutter test-service test-libs test-example ## Run every test suite (Dart, Flutter, Python services, libs, example)
+test: test-dart test-flutter test-service test-libs test-example test-legacy-host test-adopter-lane ## Run every test suite (Dart, Flutter, Python services, libs, example, legacy host, adopter lane)
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:[^#]*## /\t/' | sort | awk -F'\t' '{printf "  %-16s %s\n", $$1, $$2}'

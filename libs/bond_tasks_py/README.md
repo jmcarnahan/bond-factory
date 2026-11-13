@@ -71,7 +71,7 @@ routes = sync_routes(Task, tz="UTC", prefs=StoredPreferences(Settings), host_col
                      link_hook=make_link_hook(LinkIndex), link_index_model=LinkIndex)
 ```
 Handlers for `("tasks", None)` put, patch, delete and for `complete`, `reopen`, `cancel`. Wrap each as the sync lib's
-`Route(r.ops, r.handler, r.reads)`; map errors with `verdict_for(exc)` in the host's `reject_for` hook. `zone_of`
+`Route(r.ops, r.handler, r.reads, r.optional)`; map errors with `verdict_for(exc)` in the host's `reject_for` hook. `zone_of`
 supplies the writer's stored zone, because a sync op carries none. A put also accepts `source`; a patch carrying only a `due_at` hint changes nothing. A hard delete
 removes the task's link-index rows when `link_index_model` is given. A device's `due_at` is a hint, dropped if unreadable.
 
@@ -116,5 +116,5 @@ notifier stay pending (`unrouted`) and fail after 7 days. `prune_ledger` also re
   `isolation_level=None` on connect plus a `BEGIN` in the engine `begin` event: call `sqlite_savepoint_setup(engine)`
   once per engine, which does exactly that. Postgres is unaffected.
 
-Refusals raise `TaskError(code, message, status)`; `CODES` lists them. The calendar mirror takes `draft_for=` to reshape the event (it must not write; `failed` is retried on the next write).
+Refusals raise `TaskError(code, message, status)`; `CODES` lists them. The calendar mirror takes `draft_for=` to reshape the event (it must not write; `failed` is retried on the next write); its draft's `leave` names fields an update omits.
 Routes: install with the `http` extra (git form in `docs/sdk/README.md`, "Python": add `extras = ["http"]` to the Poetry line, or pip `pip install "bond_tasks_py[http] @ git+https://github.com/jmcarnahan/bond-factory.git@<sha>#subdirectory=libs/bond_tasks_py"`), then `from bond_tasks_py.routes import make_tasks_router` (never imported by the package; see its docstring). Include the router AFTER your own static `/tasks/<name>` routes, or `/{id}` answers them. `extra_where_for` narrows the list route only; it is not a visibility rule (use `permissions`, `read_all_dep`).

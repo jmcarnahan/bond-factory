@@ -29,6 +29,7 @@
 - decisions/2026-11-12-capture-rich-mode.md — capture rich mode: location, notes, length and invitees behind a flag, default wire unchanged
 - decisions/2026-11-12-router-factories.md — task and inbox routes as router factories in two Python libs
 - decisions/2026-11-12-themable-shape.md — corner radii become a theme token (BondShape) with the old values as default
+- decisions/2026-11-12-adopter-proof.md — adopter proof: requests arrive as failing tests, the legacy host's seven traits, `make adopter-check`
 - ../libs/bond_notify_py/README.md — stored inbox (notices table, list, read, dismiss, sync handlers); the ledger, stages and sweep live in bond_tasks_py (no sibling bond_* imports)
 - ../libs/bond_push_py/README.md — Apple push sender and device tokens (no sibling bond_* imports)
 - ../libs/bond_capture_py/README.md — natural-language capture: a phrase becomes task and event candidates through a model-client Protocol (no sibling bond_* imports)
@@ -42,6 +43,7 @@
 - migration/bond_tasks_py_host.md — the code an app writes around bond_tasks_py: models, routes and the service call behind each, signatures
 - migration/README.md — one note per module: what it replaces, the adapter, call sites, data, acceptance
 - sdk/README.md — how an app consumes bond-factory (Dart git + SHA, Python Poetry or wheel), versioning, module index
+- sdk/adopter-check.md — `.bond-adopter.toml` format and `make adopter-check`: an app's own battery against this tree
 - sdk/sdk-pins.md — template an app copies to record its pins and local patches
 - sdk/release-2026-11-todo.md — release notes of the TODO checklist: new, removed, what an app must do, what is unproven
 - test/WEB.md — Playwright walk recipe for demos/sdk_demo, with the TODO checklist routes and walk steps
