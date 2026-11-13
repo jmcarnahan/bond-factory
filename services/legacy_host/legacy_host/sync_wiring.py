@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from typing import Any
 
+import bond_push_py as push
 from bond_sync_py import Ctx, Host, Route, UploadRequest, rejected, upload
 from bond_tasks_py import sync_routes, verdict_for
 from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Request
 
 from . import mirror_wiring, rules
 from .deps import current_user
-from .models import HOST_COLUMNS, Task, User
+from .models import HOST_COLUMNS, PushDevice, Task, User
 
 LEGACY_KEY = "sync_to_calendar"
 LIB_KEY = "mirror_enabled"
@@ -39,7 +40,7 @@ def adapt(route: Any) -> Route:
 
 
 def reject_for(session: Any, user: Any, op: Any, exc: Exception) -> Any:
-    verdict = verdict_for(exc)
+    verdict = verdict_for(exc) or push.verdict_for(exc)  # the task verdict first, then the push one
     return rejected(op.seq, *verdict) if verdict else None
 
 
@@ -60,8 +61,11 @@ def build_host(app: FastAPI) -> Host:
     routes = sync_routes(Task, now=now, host_columns=HOST_COLUMNS, prepare=rules.prepare, user_exists=user_exists,
                          permissions=rules.LegacyPermissions(lambda uid: _admin(app, uid)),
                          after_write=after_write, after_delete=after_delete)
-    return Host(routes={key: adapt(route) for key, route in routes.items()}, tables={"tasks": Task.__table__},
-                single_action=frozenset({"tasks"}), reject_for=reject_for)
+    host_routes = {key: adapt(route) for key, route in routes.items()}
+    for key, device in push.device_routes(PushDevice, now=now).items():  # the device writes its own row: no adapt
+        host_routes[key] = Route(device.ops, device.handler, device.reads)
+    return Host(routes=host_routes, tables={"tasks": Task.__table__, "push_devices": PushDevice.__table__},
+                single_action=frozenset({"tasks", "push_devices"}), reject_for=reject_for)
 
 
 def _admin(app: FastAPI, user_id: str | None) -> bool:

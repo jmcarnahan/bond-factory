@@ -1,8 +1,8 @@
 /// A tiny SQL engine for [FakeSyncDb] table mode with `applySql: true`.
 ///
 /// It understands exactly the shapes the adapters write: `SELECT cols FROM t [WHERE e] [ORDER BY e [DESC], ...]
-/// [LIMIT n]`, `INSERT [OR REPLACE] INTO t (cols) VALUES (...)`, `UPDATE t SET c = e, ... WHERE e` and
-/// `DELETE FROM t WHERE e`. An expression is `AND` / `OR` / `NOT`, parentheses, `= != <> < <= > >=`,
+/// [LIMIT n [OFFSET m]]`, `SELECT COUNT(*) [AS n] FROM t [WHERE e]`, `INSERT [OR REPLACE] INTO t (cols) VALUES (...)`,
+/// `UPDATE t SET c = e, ... WHERE e` and `DELETE FROM t WHERE e`. An expression is `AND` / `OR` / `NOT`, parentheses, `= != <> < <= > >=`,
 /// `IS [NOT] NULL`, `[NOT] IN (...)`, columns, `?` parameters, numbers, `'strings'` and `NULL`. Anything else
 /// throws [UnsupportedError], so a test fails loudly instead of passing on a statement nobody evaluated.
 /// Comparison follows SQLite: NULL compares unknown (false), NULL sorts first, text compares by code unit.
@@ -289,9 +289,18 @@ List<SyncRow> select(String sql, List<Object?> params, List<SyncRow> rows, Set<S
   final p = _P(sql, params, columns);
   if (!p.eat('SELECT')) return rows;
   final names = <String>[];
-  do {
-    names.add(p.t[p.i++]);
-  } while (p.eat(','));
+  String? countAs;
+  if (p.at('COUNT')) {
+    p.i++;
+    p.need('(');
+    p.need('*');
+    p.need(')');
+    countAs = p.eat('AS') ? p.ident() : 'COUNT(*)';
+  } else {
+    do {
+      names.add(p.t[p.i++]);
+    } while (p.eat(','));
+  }
   p.need('FROM');
   p.ident();
   var out = rows;
@@ -317,9 +326,12 @@ List<SyncRow> select(String sql, List<Object?> params, List<SyncRow> rows, Set<S
   }
   if (p.eat('LIMIT')) {
     final n = p.operand()(const {});
+    final skip = p.eat('OFFSET') ? p.operand()(const {}) : null;
+    if (skip is num) out = out.skip(skip.toInt()).toList();
     if (n is num) out = out.take(n.toInt()).toList();
   }
   if (!p.done) throw UnsupportedError('fake sql: trailing "${p.peek}" in $sql');
+  if (countAs != null) return [{countAs: out.length}];
   if (names.length == 1 && names.first == '*') return out;
   for (final n in names) {
     p.checkColumn(n);

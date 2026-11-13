@@ -4,7 +4,7 @@ Shared SDK monorepo for the bond app family (avalon-crm, sbel-crm, paga-time): s
 
 ## Layout
 - packages/  — Dart/Flutter packages (`bond_<x>` core, `bond_<x>_ui` widgets). Conventions + commands: packages/<pkg>/CLAUDE.md
-- demos/     — Flutter harnesses, never shipped. Conventions + commands: demos/roof_demo/CLAUDE.md
+- demos/     — Flutter harnesses, never shipped. Conventions + commands: demos/roof_demo/CLAUDE.md; demos/legacy_phone is the test-only "existing phone database" (the Dart side of services/legacy_host)
 - services/  — Python services. Conventions + commands: services/roof_measure/CLAUDE.md; services/legacy_host is the test-only "existing app" host
 - libs/      — Python libs (`bond_<x>`: tasks, notices, push, sync, storage, jobs, calendar, sign-in and more; no lib imports another). Conventions + commands: libs/<lib>/CLAUDE.md
 - fixtures/  — cross-language contract fixtures (<= 100 KB each); see fixtures/README.md

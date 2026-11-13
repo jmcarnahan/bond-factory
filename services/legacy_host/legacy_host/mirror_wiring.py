@@ -6,6 +6,7 @@
 
 The host does not own an event's location, categories or reminder after the first push: a person edits them in their
 own calendar, so `draft_for` names them in `leave` and the lib's update patch omits them (a create sends all).
+`run_mirror` also opts in to `transport_pending`: a provider that gives no answer leaves the task `pending`.
 """
 
 from __future__ import annotations
@@ -73,7 +74,7 @@ def install(app: FastAPI) -> None:
 
 def run_mirror(app: FastAPI, task_id: str) -> None:
     sync_mirror(app.state.session_factory, Task, task_id, app.state.mirror_providers, tz="UTC",
-                draft_for=app.state.mirror_draft_for)
+                draft_for=app.state.mirror_draft_for, transport_pending=True)
 
 
 def queue(app: FastAPI, ctx: Any, task: Any) -> None:

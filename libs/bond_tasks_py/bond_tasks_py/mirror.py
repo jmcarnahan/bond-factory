@@ -65,8 +65,15 @@ def _names(exc: BaseException) -> set[str]:
     return {cls.__name__ for cls in type(exc).__mro__}
 
 
+#: class names (anywhere in an exception's lineage) that mean the request got no HTTP answer at all
+TRANSPORT_NAMES = frozenset({"TransportError", "ConnectError", "TimeoutException", "ConnectionError", "TimeoutError"})
+
+
 def classify(exc: BaseException) -> str:
-    """``not_found``, ``etag``, ``reconnect`` or ``other``."""
+    """``not_found``, ``etag``, ``reconnect``, ``transport`` or ``other``.
+
+    ``transport`` = no answer from the provider: ``status`` is exactly ``0``, or the lineage names a transport class
+    (``TRANSPORT_NAMES``). Any other numeric ``status`` (a 503, say) is an answer, so never ``transport``."""
     names, status = _names(exc), getattr(exc, "status", None)
     if "NotFound" in names or status in (404, 410):
         return "not_found"
@@ -74,6 +81,9 @@ def classify(exc: BaseException) -> str:
         return "etag"
     if "ReconnectRequired" in names or status == 401:
         return "reconnect"
+    answered = isinstance(status, int | float) and not isinstance(status, bool) and status != 0
+    if (type(status) is int and status == 0) or (names & TRANSPORT_NAMES and not answered):
+        return "transport"
     return "other"
 
 
@@ -98,6 +108,7 @@ class _Snap:
     event_user: str | None
     etag: str | None
     draft: MirrorDraft | None
+    status: str | None = None
 
 
 DraftFor = Callable[[Any, Any, MirrorDraft], MirrorDraft]
@@ -112,7 +123,7 @@ def _snapshot(session: Any, task: Any, tz: str, draft_for: DraftFor | None = Non
             draft = draft_for(session, task, draft)
             if not isinstance(draft, MirrorDraft):
                 raise TypeError(f"draft_for must return a MirrorDraft, not {type(draft).__name__}")
-    return _Snap(mailbox_of(task), eligible, task.external_event_id, task.external_account_user_id, task.external_etag, draft)
+    return _Snap(mailbox_of(task), eligible, task.external_event_id, task.external_account_user_id, task.external_etag, draft, task.mirror_status)
 
 
 def _finish(session_factory: Any, task_model: Any, task_id: str, **fields: Any) -> None:
@@ -175,18 +186,20 @@ def _upsert(mirror: Any, draft: MirrorDraft, event_id: str | None, etag: str | N
 
 
 def sync_mirror(session_factory: Any, task_model: Any, task_id: str, providers: MirrorProviders, *, tz: str = "UTC",
-                draft_for: DraftFor | None = None) -> None:
+                draft_for: DraftFor | None = None, transport_pending: bool = False) -> None:
     """Reconcile the task's external event with its row. Never raises.
 
-    ``draft_for(session, task, draft)`` returns the draft to send (its return value is the draft used)."""
+    ``draft_for(session, task, draft)`` returns the draft to send (its return value is the draft used).
+    ``transport_pending=True``: a create/update that got no answer from the provider leaves the row ``pending`` (nothing
+    else changes) and the next edit retries; the default ends it ``failed``. A 5xx answer is still ``failed``."""
     try:
-        _sync(session_factory, task_model, task_id, providers, tz, draft_for)
+        _sync(session_factory, task_model, task_id, providers, tz, draft_for, transport_pending)
     except Exception:
         LOGGER.warning("task-mirror-degraded: sync of task %s failed", task_id, exc_info=True)
 
 
 def _sync(session_factory: Any, task_model: Any, task_id: str, providers: MirrorProviders, tz: str,
-          draft_for: DraftFor | None = None) -> None:
+          draft_for: DraftFor | None = None, transport_pending: bool = False) -> None:
     with session_factory() as session:
         task = session.get(task_model, task_id)
         if task is None:
@@ -222,6 +235,11 @@ def _sync(session_factory: Any, task_model: Any, task_id: str, providers: Mirror
     try:
         event = _upsert(mirror, snap.draft, old_event, snap.etag if old_event else None)
     except Exception as exc:  # noqa: BLE001
+        if transport_pending and classify(exc) == "transport":
+            LOGGER.warning("task-mirror: the provider did not answer for task %s; the next edit retries: %s", task_id, exc)
+            if _unchanged(session_factory, task_model, task_id, snap, old_event):  # else a newer write or pass owns the row
+                _finish(session_factory, task_model, task_id, mirror_status=MirrorStatus.PENDING.value)
+            return
         LOGGER.warning("task-mirror-degraded: write for task %s failed: %s", task_id, exc)
         _finish(session_factory, task_model, task_id, mirror_status=_failure_status(exc))
         return
@@ -249,6 +267,14 @@ def _sync(session_factory: Any, task_model: Any, task_id: str, providers: Mirror
         mirror.delete_event(event.id)
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning("task-mirror-degraded: removal of duplicate event %s failed: %s", event.id, exc)
+
+
+def _unchanged(session_factory: Any, task_model: Any, task_id: str, snap: _Snap, event_id: str | None) -> bool:
+    """The row is as this pass found it: eligible, same mailbox, same status and same event pointer."""
+    with session_factory() as session:
+        task = session.get(task_model, task_id)
+        return (task is not None and mirror_eligible(task) and mailbox_of(task) == snap.mailbox
+                and task.mirror_status == snap.status and task.external_event_id == event_id)
 
 
 def _claim_pointer(session_factory: Any, task_model: Any, task_id: str, expected_event: str | None,

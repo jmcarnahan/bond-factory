@@ -26,7 +26,7 @@ LEGACY_DDL = (
         theme VARCHAR, updated_at DATETIME NOT NULL)""",
 )
 
-#: Columns the old tables lack. `purpose` is the only one a row needs a value for; the migration backfills it.
+#: Columns the old tables lack, and the `push_devices` table the app never had. `purpose` is the only one a row needs a value for; the migration backfills it.
 ADOPT = (
     "ALTER TABLE tasks ADD COLUMN priority INTEGER",
     "ALTER TABLE tasks ADD COLUMN due_at DATETIME",
@@ -43,6 +43,13 @@ ADOPT = (
     "ALTER TABLE file_share_grants ADD COLUMN last_downloaded_at DATETIME",
     "ALTER TABLE file_share_grants ADD COLUMN last_ip VARCHAR(200)",
     "ALTER TABLE file_share_grants ADD COLUMN updated_at DATETIME",
+    # a table the app never had: created whole, the `PUSH_DEVICE_COLUMNS` contract of `bond_push_py`
+    """CREATE TABLE push_devices (
+        id VARCHAR NOT NULL PRIMARY KEY, user_id VARCHAR NOT NULL, device_id VARCHAR(64) NOT NULL,
+        token VARCHAR(255) NOT NULL UNIQUE, platform VARCHAR(8) NOT NULL, environment VARCHAR(12) NOT NULL,
+        topic VARCHAR(255), last_seen_at DATETIME NOT NULL, disabled_at DATETIME, created_at DATETIME NOT NULL,
+        CONSTRAINT uq_push_devices_user_device UNIQUE (user_id, device_id))""",
+    "CREATE INDEX ix_push_devices_user_id ON push_devices (user_id)",
 )
 
 

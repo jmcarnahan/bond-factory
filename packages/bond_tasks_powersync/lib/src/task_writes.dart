@@ -17,6 +17,7 @@ import 'package:bond_sync_powersync/bond_sync_powersync.dart';
 import 'package:bond_tasks/bond_tasks.dart';
 
 import 'task_row.dart';
+import 'task_table_shape.dart';
 import 'tasks_tables.dart';
 
 final RegExp kClientId = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
@@ -34,14 +35,13 @@ String newTaskId([Random? random]) {
 String _checklist(List<ChecklistItem> l) => jsonEncode([for (final c in l) c.toJson()]);
 String _links(List<TaskLink> l) => jsonEncode([for (final c in l) c.toJson()]);
 
-/// INSERT of a new task; returns its id.
-Future<String> insertTask(
-  SyncSql tx,
+/// The module-named columns of a new task (without `id`) and its id; validates the draft.
+(String, Map<String, Object?>) buildInsert(
   TaskDraft d, {
   required String userId,
   required DateTime nowUtc,
   Set<String> extraColumns = const {},
-}) async {
+}) {
   final problems = d.validate();
   if (problems.isNotEmpty) throw ArgumentError('invalid task draft: ${problems.map((p) => p.name).join(', ')}');
   final id = d.id ?? newTaskId();
@@ -49,8 +49,7 @@ Future<String> insertTask(
   final timed = d.dueDate != null && d.dueDate!.isNotEmpty && d.dueTime != null && d.dueTime!.isNotEmpty;
   final dueAt = timed ? (d.dueAt ?? deviceDueAt(d.dueDate, d.dueTime)) : null;
   final now = isoZ(nowUtc);
-  final values = <String, Object?>{
-    'id': id,
+  return (id, {
     'owner_user_id': userId,
     'created_by': userId,
     'assigned_user_id': _blank(d.assignedUserId),
@@ -71,12 +70,39 @@ Future<String> insertTask(
     'created_at': now,
     'updated_at': now,
     ..._extraValues(d.extras, extraColumns),
-  };
-  final cols = values.keys.toList();
+  });
+}
+
+/// Module-named [values] as the local table names them: values of absent columns are dropped, renamed
+/// columns take their local name, anything else (an extra column) passes through. Order is kept.
+Map<String, Object?> localValues(TaskTableShape shape, Map<String, Object?> values) => {
+      for (final e in values.entries)
+        if (!kTaskColumns.contains(e.key))
+          e.key: e.value
+        else if (shape.has(e.key))
+          shape.local(e.key): e.value,
+    };
+
+/// INSERT of local-named [values] for [id].
+Future<void> executeInsert(SyncSql tx, String id, Map<String, Object?> values) async {
+  final cols = ['id', ...values.keys];
   await tx.execute(
     'INSERT INTO $kTasksTable (${cols.join(', ')}) VALUES (${List.filled(cols.length, '?').join(', ')})',
-    [for (final c in cols) values[c]],
+    [id, ...values.values],
   );
+}
+
+/// INSERT of a new task; returns its id. Values of columns the [shape] marks absent are dropped.
+Future<String> insertTask(
+  SyncSql tx,
+  TaskDraft d, {
+  required String userId,
+  required DateTime nowUtc,
+  Set<String> extraColumns = const {},
+  TaskTableShape shape = const TaskTableShape(),
+}) async {
+  final (id, values) = buildInsert(d, userId: userId, nowUtc: nowUtc, extraColumns: extraColumns);
+  await executeInsert(tx, id, localValues(shape, values));
   return id;
 }
 
@@ -94,8 +120,14 @@ Map<String, Object?> _extraValues(Map<String, Object?> extras, Set<String> colum
 
 String? _blank(String? s) => s == null || s.isEmpty ? null : s;
 
-/// The columns a [patch] changes, in a fixed order, given the stored [row]; empty when nothing changes.
-Map<String, Object?> patchColumns(SyncRow row, TaskPatch p, {Set<String> extraColumns = const {}}) {
+/// The columns a [patch] changes (module names, in a fixed order), given the stored [row] (local names, read
+/// through [shape]); empty when nothing changes. Absent columns are not dropped here: see `localValues`.
+Map<String, Object?> patchColumns(
+  SyncRow row,
+  TaskPatch p, {
+  Set<String> extraColumns = const {},
+  TaskTableShape shape = const TaskTableShape(),
+}) {
   final set = <String, Object?>{};
   if (p.title != null) set['title'] = p.title;
   if (p.notes != null) set['notes'] = _blank(p.notes!.value);
@@ -107,7 +139,7 @@ Map<String, Object?> patchColumns(SyncRow row, TaskPatch p, {Set<String> extraCo
   if (p.mirrorEnabled != null) set['mirror_enabled'] = p.mirrorEnabled! ? 1 : 0;
   if (p.links != null) set['links'] = _links(p.links!);
   if (p.priority != null) set['priority'] = p.priority!.value?.wire;
-  final oldDate = _blank(row['due_date'] as String?), oldTime = _blank(row['due_time'] as String?);
+  final oldDate = _blank(row[shape.local('due_date')] as String?), oldTime = _blank(row[shape.local('due_time')] as String?);
   final newDate = p.dueDate != null ? _blank(p.dueDate!.value) : oldDate;
   var newTime = p.dueTime != null ? _blank(p.dueTime!.value) : oldTime;
   if (newDate == null && newTime != null) {
@@ -129,25 +161,63 @@ Map<String, Object?> patchColumns(SyncRow row, TaskPatch p, {Set<String> extraCo
   return set;
 }
 
-/// UPDATE of only [set] plus `updated_at`; no statement when [set] is empty.
-Future<void> updateColumns(SyncSql tx, String id, Map<String, Object?> set, DateTime nowUtc) async {
-  if (set.isEmpty) return;
-  final all = {...set, 'updated_at': isoZ(nowUtc)};
+/// UPDATE of local-named [values] (which already hold `updated_at`); no statement when empty.
+Future<void> executeUpdate(SyncSql tx, String id, Map<String, Object?> values) async {
+  if (values.isEmpty) return;
   await tx.execute(
-    'UPDATE $kTasksTable SET ${all.keys.map((c) => '$c = ?').join(', ')} WHERE id = ?',
-    [...all.values, id],
+    'UPDATE $kTasksTable SET ${values.keys.map((c) => '$c = ?').join(', ')} WHERE id = ?',
+    [...values.values, id],
   );
 }
 
-/// UPDATE for complete (`done`), reopen (`open`) and cancel (`cancelled`).
-Future<void> setStatus(SyncSql tx, String id, String action, DateTime nowUtc) async {
+/// UPDATE of only [set] (module names; absent columns dropped) plus `updated_at`; no statement when [set] is empty.
+Future<void> updateColumns(
+  SyncSql tx,
+  String id,
+  Map<String, Object?> set,
+  DateTime nowUtc, {
+  TaskTableShape shape = const TaskTableShape(),
+}) async {
+  if (set.isEmpty) return;
+  await executeUpdate(tx, id, {...localValues(shape, set), shape.local('updated_at'): isoZ(nowUtc)});
+}
+
+/// The local-named values of a status action: status, `completed_at`, then (with [writeCompletedBy] and the
+/// column present) `completed_by` (the user on complete, null otherwise), then `updated_at`.
+Map<String, Object?> statusValues(
+  String action,
+  DateTime nowUtc, {
+  TaskTableShape shape = const TaskTableShape(),
+  bool writeCompletedBy = false,
+  String? userId,
+}) {
   final (status, completed) = switch (action) {
     'complete' => ('done', isoZ(nowUtc)),
     'reopen' => ('open', null),
     _ => ('cancelled', null),
   };
-  await tx.execute(
-    'UPDATE $kTasksTable SET status = ?, completed_at = ?, updated_at = ?, _metadata = ? WHERE id = ?',
-    [status, completed, isoZ(nowUtc), jsonEncode({'action': action}), id],
-  );
+  return {
+    shape.local('status'): status,
+    shape.local('completed_at'): completed,
+    if (writeCompletedBy && shape.has('completed_by')) shape.local('completed_by'): action == 'complete' ? userId : null,
+    shape.local('updated_at'): isoZ(nowUtc),
+  };
 }
+
+/// UPDATE of a status action's local-named [values]; `_metadata` carries the action so the upload picks the route.
+Future<void> executeStatus(SyncSql tx, String id, String action, Map<String, Object?> values) => tx.execute(
+      'UPDATE $kTasksTable SET ${values.keys.map((c) => '$c = ?').join(', ')}, _metadata = ? WHERE id = ?',
+      [...values.values, jsonEncode({'action': action}), id],
+    );
+
+/// UPDATE for complete (`done`), reopen (`open`) and cancel (`cancelled`).
+Future<void> setStatus(
+  SyncSql tx,
+  String id,
+  String action,
+  DateTime nowUtc, {
+  TaskTableShape shape = const TaskTableShape(),
+  bool writeCompletedBy = false,
+  String? userId,
+}) =>
+    executeStatus(tx, id, action, statusValues(action, nowUtc, shape: shape, writeCompletedBy: writeCompletedBy, userId: userId));

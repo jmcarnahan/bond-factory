@@ -1270,6 +1270,7 @@ version = "0.1.0"
 source = { editable = "services/legacy_host" }
 dependencies = [
     { name = "bond-calendar" },
+    { name = "bond-push-py" },
     { name = "bond-service-kit" },
     { name = "bond-storage" },
     { name = "bond-sync-py" },
@@ -1290,6 +1291,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "bond-calendar", editable = "libs/bond_calendar" },
+    { name = "bond-push-py", editable = "libs/bond_push_py" },
     { name = "bond-service-kit", editable = "libs/bond_service_kit" },
     { name = "bond-storage", editable = "libs/bond_storage" },
     { name = "bond-sync-py", editable = "libs/bond_sync_py" },

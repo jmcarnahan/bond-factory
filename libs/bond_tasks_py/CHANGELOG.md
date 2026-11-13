@@ -35,6 +35,15 @@ Added
   NULL the values equal to the old constants: 08:00, 17:00, 60). A reset can be refused with `invalid_work_day` when the
   default equals the other stored bound: reset both together. Hosts need a revision that drops NOT NULL on the three columns.
 
+- Sync writes, tolerant reader: `checklist` and `links` sent as JSON text (a phone store writes `"[]"` or `'[{...}]'`) are
+  parsed before validation, on put and patch; blank text is not sent; text that is not JSON or not a list is refused like
+  any wrong type (`invalid`). A real list works as before. A host needs no `client_json` entry for these two.
+- `sync_mirror(transport_pending=False)`: opt-in. When True, a create or update that got no answer from the provider
+  (`classify` = `transport`) leaves `mirror_status` `pending` and changes nothing else (pointer, etag, provider kept); the
+  next edit retries. Default False: such a failure ends `failed` as before. A provider answer (5xx) is still `failed`, 401
+  still `skipped`. Delete paths unchanged. `classify` can now return `transport` (status exactly 0, or a lineage naming
+  `TransportError`, `ConnectError`, `TimeoutException`, `ConnectionError` or `TimeoutError`; a non-zero numeric status is
+  never transport); it used to return `other` for these, and the default paths treat both the same.
 - `sync_mirror(draft_for=)`: `draft_for(session, task, draft)` returns the event to send (body, length, categories,
   reminder), called while the snapshot session is open. If it raises, returns something that is not a `MirrorDraft`, or
   the task's date or time is malformed, the row ends `failed` before any provider call (it used to stay `pending`).

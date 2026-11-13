@@ -45,7 +45,9 @@ The TODO modules (`bond_tasks*`, `bond_notify*`, `bond_push`, `bond_push_py`, `b
 
 The adoption-gap seams (`bond_api` `endsSession` and per-call timeouts, `bond_tasks_py` `prepare`, `extra_where`, `labels`, `grandfather_before`, app-set work-day defaults and `draft_for`, `bond_notify_py` `get_owned`, `bond_sync_py` `now` and `close_sessions`, `bond_calendar` `Forbidden` and `reminder_off`, `bond_storage` redirect grants, `bond_jobs` `run_schedule`, `bond_service_kit` `fake_clock_router`, `code_aliases` and callable rates, `bond_push_py` live check, `bond_tasks` and `bond_tasks_powersync` extras, the Wave B items (`make_tasks_router` and `make_notices_router` with the `http` extra, `task_item(extra=)`, rich capture and `resolver_kinds`, `bond_calendar` attendees as `Person`, `jtimeOrNull`, rich `bond_tasks` candidates, `mirrorStatusFor`, `BondShape`), and the new `bond_push_apple` and `bond_auth_secure_storage` packages) are first available at `48902a28604ce197ae99b3a09e565a1ed088fa5a`.
 
-The uploads guard fix (resolved-path check in `bond_service_kit`), the legacy host and the adopter lane are first available at the merge commit of this branch, to be filled when it merges: `<this branch's merge commit>`.
+The uploads guard fix (resolved-path check in `bond_service_kit`), the legacy host and the adopter lane are first available at the merge commit of this branch, `c6387288b3316fb10289c473b447a92b8ffb8782` (PR #15).
+
+The mirror `transport_pending` flag, the phone store seams for an existing phone database (`TaskTableShape`, `listWhere`, the write hooks) and the legacy phone package are first available at the merge commit of this branch, to be filled when it merges: `<this branch's merge commit>`.
 
 Rules:
 - A local patch names the file, the reason and the upstream issue or PR. No patch lives longer than one upgrade.

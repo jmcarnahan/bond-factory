@@ -14,6 +14,7 @@ a permanent verdict on the device). The dispatcher's coercion would reject it fi
 ``ctx.user`` is the session user id (a string) or an object with ``user_id`` / ``id``.
 """
 
+import json
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import Any
@@ -39,6 +40,8 @@ OPTIONAL = ("due_at",) + BLANK_IS_ABSENT
 #: ``reads`` of a route whose handler uses no data (complete, reopen, cancel): a name no column has, so nothing is
 #: coerced. An empty ``reads`` would mean "coerce every key", and one unreadable ignored key would reject the op.
 NO_READS = ("",)
+#: Columns a phone store writes as JSON text (``"[]"``): parsed before validation (see ``_fields``).
+JSON_TEXT = ("checklist", "links")
 
 
 @dataclass(frozen=True)
@@ -73,6 +76,15 @@ def _fields(data: dict, allowed: Collection[str] = FIELDS) -> dict:
             value = data[key]
             if key in BLANK_IS_ABSENT and isinstance(value, str) and not value.strip():
                 continue  # a blank number is not sent
+            if key in JSON_TEXT and isinstance(value, str):
+                if not value.strip():
+                    continue  # blank text is not sent
+                try:
+                    parsed = json.loads(value)
+                except (ValueError, RecursionError):  # a deeply nested text is text, not a crash
+                    parsed = None
+                if isinstance(parsed, list):  # anything else stays text: the schema refuses it like any wrong type
+                    value = parsed
             out[key] = None if key in BLANK_IS_NONE and value == "" else value
     if "due_at" in out:  # only a hint: unreadable or null is dropped, never raised
         try:

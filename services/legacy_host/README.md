@@ -17,6 +17,7 @@ make -C services/legacy_host lint
 | 5 New clients on the legacy wire | the SDK's `TaskDraft` / `TaskPatch` bodies in, recorded answers out | `tests/test_new_client_wire.py` |
 | 6 Pre-existing tables | grants in `file_share_grants`, settings in `user_prefs` | `tests/test_existing_tables.py` |
 | 7 Provider-side edits | the calendar mirror (host-sync) | `tests/test_provider_edits.py` |
+| 8 An existing phone database | the SDK phone store over a local `tasks` table the app already ships (missing columns, renamed flag, app columns, old rows, joined tables); the queue it records is replayed here unchanged | `demos/legacy_phone`: `make -C demos/legacy_phone test`; `tests/test_phone_store_upload.py`: `make -C services/legacy_host test T=tests/test_phone_store_upload.py` |
 
 ## Tables that pre-date the modules
 
@@ -30,6 +31,10 @@ which is what `ADD COLUMN` leaves in the rows that exist. The one value a row ne
 | `tasks` | `priority`, `due_at`, `checklist`, `links`, `remind_minutes_before`, `mirror_status`, `external_provider`, `external_etag`, `source` | `sync_to_calendar`, `calendar_event_id`, `calendar_event_user_id` |
 | `file_share_grants` | `purpose`, `owner_type`, `owner_id`, `last_downloaded_at`, `last_ip`, `updated_at` | `attachment_id`, `sender_id`, `hits` (nullable), `created_at` (nullable); app column `recipient_note` |
 | `user_prefs` | none | `uid`, `tz`, `day_start`, `day_end`, `remind_lead`; app column `theme` |
+
+Push devices over sync: a phone registers its own `push_devices` row through `POST /sync/upload` (no REST route); see `tests/test_push_devices_sync.py`.
+
+Mirror `pending` opt-in: the phone store can write `mirror_status` itself (`mirrorStatusOnWrite` in `demos/legacy_phone/lib/src/legacy_store.dart`), so a row that waits for the calendar says `pending` on the device before the server's answer syncs back.
 
 Known limits are pinned in the tests and listed in `docs/migration/bond_tasks_py_host.md` section 5.
 

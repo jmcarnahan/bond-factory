@@ -7,6 +7,7 @@ overridden by attribute (`mirror_enabled = Column("sync_to_calendar", ...)`), an
 from __future__ import annotations
 
 import sqlalchemy as sa
+from bond_push_py import PushDevicesMixin
 from bond_storage import GrantsMixin
 from bond_tasks_py import TasksMixin, TaskUserSettingsMixin
 from sqlalchemy import Boolean, Column, String
@@ -84,3 +85,7 @@ class UserPrefs(TaskUserSettingsMixin, Base):
     end_of_day = Column("day_end", String(5), nullable=True)
     lead_minutes = Column("remind_lead", sa.Integer, nullable=True)
     theme = Column(String, nullable=True)
+
+
+class PushDevice(PushDevicesMixin, Base):
+    """A table the app did not have: the adoption migration creates it, the mixin's columns as they are."""

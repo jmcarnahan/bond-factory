@@ -14,6 +14,7 @@ dependencies = [
     "bond_sync_py",
     "bond_calendar",
     "bond_tasks_py",
+    "bond_push_py",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +34,7 @@ bond_storage = { workspace = true }
 bond_sync_py = { workspace = true }
 bond_calendar = { workspace = true }
 bond_tasks_py = { workspace = true }
+bond_push_py = { workspace = true }
 
 [tool.ruff]
 line-length = 110

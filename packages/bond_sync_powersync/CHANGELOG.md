@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- `FakeSyncDb` with `applySql: true` also runs `SELECT COUNT(*) [AS n] FROM t [WHERE ...]` (one row, the count of the
+  matches) and `LIMIT n OFFSET m`. Additive; every statement it ran before reads the same.
 - `waitForUploadDrain(db, {timeout, poll})`: true once the CRUD queue is empty, false on timeout. Call it between the last
   local write and a sign-out clear.
 - `FakeSyncDb.tables(..., applySql: true, columns: {...})` evaluates SQL against `tables`: INSERT (also OR REPLACE),

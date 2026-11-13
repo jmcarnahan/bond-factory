@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import bond_calendar as cal
 import pytest
 from sync_util import raw, upload
 
@@ -107,3 +108,44 @@ def test_without_leave_a_host_overwrites_what_the_person_set(app, client):
     patch(client, title="Send the revised quote")
     assert event.location is None and event.categories == []
     assert {"location", "categories", "reminder_minutes"} <= set(updates(app)[-1][1])
+
+
+# -- no answer from the provider leaves the task pending (transport_pending) -----------------------------------------
+
+COLS = ("mirror_status", "calendar_event_id", "calendar_event_user_id")
+
+
+def test_no_answer_on_create_leaves_the_task_pending_with_no_event(app, client):
+    app.state.calendar.fail_next(cal.Unavailable(status=0))
+    put(client)
+    assert raw(app, "t-m", *COLS) == ("pending", None, None) and len(app.state.calendar.events) == 0
+
+
+def test_the_next_edit_after_no_answer_creates_exactly_one_event(app, client):
+    app.state.calendar.fail_next(cal.Unavailable(status=0))
+    put(client)
+    patch(client, title="Send it again")
+    event = app.state.calendar.events[0]
+    assert len(app.state.calendar.events) == 1
+    assert raw(app, "t-m", *COLS) == ("mirrored", event.id, "u-owner")
+
+
+def test_no_answer_on_update_keeps_the_event_and_pointer_and_is_pending(mirrored, client):
+    app = mirrored
+    before = raw(app, "t-m", *COLS)
+    app.state.calendar.fail_next(cal.Unavailable(status=0))
+    patch(client, title="Saved anyway")
+    assert raw(app, "t-m", "title") == ("Saved anyway",)
+    assert raw(app, "t-m", *COLS) == ("pending", before[1], before[2]) and len(app.state.calendar.events) == 1
+
+
+def test_a_provider_5xx_answer_is_failed(app, client):
+    app.state.calendar.fail_next(cal.Unavailable())
+    put(client)
+    assert raw(app, "t-m", *COLS) == ("failed", None, None) and len(app.state.calendar.events) == 0
+
+
+def test_a_reconnect_answer_is_skipped(app, client):
+    app.state.calendar.fail_next(cal.ReconnectRequired())
+    put(client)
+    assert raw(app, "t-m", *COLS) == ("skipped", None, None)

@@ -1,0 +1,142 @@
+{
+  "note": "What the legacy phone store queues at stage widened (demos/legacy_phone, test/upload_fixture_test.dart): the app's own column names only. Regenerate with BOND_REGEN_FIXTURES=1. `user` is the session user of each request; requests are replayed in order.",
+  "requests": [
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "put",
+            "table": "tasks",
+            "id": "ph-1",
+            "data": {
+              "case_file_no": 101,
+              "case_ref": "ca-1",
+              "checklist": "[]",
+              "client_ref": "cl-1",
+              "created_at": "2026-03-11T20:00:00.000Z",
+              "created_by": "u-owner",
+              "due_at": "2026-11-20T17:30:00.000Z",
+              "due_date": "2026-11-20",
+              "due_time": "09:30",
+              "links": "[]",
+              "mirror_status": "pending",
+              "notes": "bring docs",
+              "owner_user_id": "u-owner",
+              "remind_minutes_before": -3,
+              "source": "manual",
+              "status": "open",
+              "sync_to_calendar": 1,
+              "title": "Call the client",
+              "updated_at": "2026-03-11T20:00:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "patch",
+            "table": "tasks",
+            "id": "ph-1",
+            "data": {
+              "case_file_no": null,
+              "case_ref": null,
+              "title": "Call the client back",
+              "updated_at": "2026-03-11T20:01:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "patch",
+            "table": "tasks",
+            "id": "ph-1",
+            "action": "complete",
+            "data": {
+              "completed_at": "2026-03-11T20:02:00.000Z",
+              "completed_by": "u-owner",
+              "mirror_status": "skipped",
+              "status": "done",
+              "updated_at": "2026-03-11T20:02:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "patch",
+            "table": "tasks",
+            "id": "ph-1",
+            "action": "reopen",
+            "data": {
+              "completed_at": null,
+              "completed_by": null,
+              "mirror_status": "pending",
+              "status": "open",
+              "updated_at": "2026-03-11T20:03:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "put",
+            "table": "tasks",
+            "id": "ph-2",
+            "data": {
+              "checklist": "[]",
+              "created_at": "2026-03-11T20:04:00.000Z",
+              "created_by": "u-owner",
+              "due_date": "2026-11-21",
+              "links": "[]",
+              "mirror_status": "skipped",
+              "owner_user_id": "u-owner",
+              "remind_minutes_before": -3,
+              "source": "manual",
+              "status": "open",
+              "sync_to_calendar": 0,
+              "title": "Water the plants",
+              "updated_at": "2026-03-11T20:04:00.000Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {
+            "seq": 0,
+            "op": "delete",
+            "table": "tasks",
+            "id": "ph-2",
+            "data": {}
+          }
+        ]
+      }
+    }
+  ]
+}

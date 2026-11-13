@@ -68,6 +68,15 @@ await db.disconnect();          // then clear the database
 
 Clearing first loses the DELETE and leaves the token registered on the server.
 
+## 5a. The server side for an app that already exists
+
+`SyncPushDevices` is the RECOMMENDED way to register a device when the app syncs; the REST pair in the example service is for
+apps without sync. The server needs no new route: `device_routes` mounted in the app's upload host. Stream rule (set in the app's sync service; not
+testable here): only the user's own device rows (`WHERE user_id = auth.user_id()`), so another user's `token` never reaches a phone. The server owns
+`user_id`, `last_seen_at`, `disabled_at` and `created_at`. The verdict table, the fixture and the host wiring are in
+`docs/migration/bond_push_py.md` section 6a; `test/legacy_upload_test.dart` proves the phone queues exactly the ops the
+legacy host replays.
+
 ## 6. What to test
 
 - `make -C packages/bond_notify_powersync test`. Use `FakeSyncDb.tables(..., applySql: true, columns: ...)` from

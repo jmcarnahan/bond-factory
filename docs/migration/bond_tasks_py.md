@@ -160,11 +160,19 @@ sync and mirror traits. Fixes, each with a lib test:
   with `dataclasses.replace`) makes an update send the rest only. The first push still sends every field. Left fields are the
   person's after that: the task's own change to them (for example `remind_minutes_before` and the event reminder) is NOT
   propagated; the task's notices still follow the task. Name `start`, `end` and `is_all_day` together or not at all.
+- Sync, JSON text: `checklist` and `links` arriving as JSON text (what a phone store writes) are parsed by the lib's handler, so a host does NOT need `client_json` for these two; blank text is not sent, and text that is not a JSON list is `invalid`.
+- Mirror, no answer from the provider: `sync_mirror(..., transport_pending=True)` leaves a task `pending` (pointer, etag and
+  provider untouched) when the create or update got no HTTP answer: a timeout or connect failure (`classify` returns
+  `transport`: error `status` exactly `0`, or a class named `TransportError`, `ConnectError`, `TimeoutException`,
+  `ConnectionError` or `TimeoutError`). The next edit of the task retries. Default False: such a failure ends `failed`, as
+  before. Use it when an existing app treats "provider unreachable" as not-yet-mirrored. Trade-off: a request that reached the
+  provider but whose answer was lost is retried on the next edit and can create a second event, and nothing retries until
+  that next edit. A task that was completed, deleted or reassigned while the provider did not answer keeps the state its newer write left. A provider answer (5xx) is still `failed`; a 401 is still `skipped`.
 - Old rows: a NULL `remind_minutes_before` (column added by ALTER TABLE) reads as the default in stages, the sweep, the mirror draft and the item, so no backfill is needed (a backfill to -3 is still harmless).
 
 What applies to EVERY adopter without opting in: a NULL `remind_minutes_before` reads as the default (stages, sweep, mirror
 draft, and the item now shows -3); a blank `priority` / `remind_minutes_before` from a device is treated as not sent inside the
-lib's handler; the `complete`, `reopen` and `cancel` routes read no data. What the host must opt in to: `Route.optional` (pass it
+lib's handler; the `complete`, `reopen` and `cancel` routes read no data. What the host must opt in to: `transport_pending` (see above), `Route.optional` (pass it
 on, so an unreadable `due_at` or priority is dropped before the dispatcher rejects it) and `MirrorDraft.leave` (in `draft_for`).
 
 Checked, no lib change (recipes):
