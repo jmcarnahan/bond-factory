@@ -7,7 +7,7 @@ plus the small services some of them need.
 
 - `packages/` Dart and Flutter packages (`bond_<x>` pure Dart core, `bond_<x>_ui` widgets, adapters per backend). One pub workspace (root `pubspec.yaml`).
 - `libs/` Python libraries the services import (SQLAlchemy mixins, Protocol seams, no migrations). One uv workspace (root `pyproject.toml`, `uv.lock`).
-- `services/` Python services: `roof_measure` (the one deployed service) and `sdk_example` (a reference app, never shipped).
+- `services/` Python services: `roof_measure` (the one deployed service) and `sdk_example` (a reference app, never shipped); `services/legacy_host` is a test-only "existing app" host.
 - `demos/` Flutter harnesses that exercise the packages end to end. Not shipped.
 - `fixtures/` JSON fixtures shared by the Python and Dart tests.
 - `docs/` `contracts/` (wire contracts), `decisions/`, `migration/` (one note per module), `sdk/`, `test/` (walk recipes), `research/`. Index: `docs/README.md`.
@@ -22,11 +22,12 @@ Root make targets use `flutter` from your PATH; override with `make FLUTTER=/pat
 
 ```
 make setup-service  # create the service virtualenv (Python library use: docs/contract-0.2.md section 3)
-make test           # test-dart + test-flutter + test-service + test-libs + test-example
+make test           # test-dart + test-flutter + test-service + test-libs + test-example + test-legacy-host + test-adopter-lane
 make analyze        # dart analyze / flutter analyze
 make gates          # popups, ui tokens, boundaries, line cap, public hygiene
 make demo-web       # run the demo in Chrome
 make build-web      # release web build in demos/roof_demo/build/web
+make adopter-check APP=<checkout>  # an adopting app's own battery against this tree (docs/sdk/adopter-check.md)
 make changed        # modules affected by changes vs main (BASE=<ref> to change)
 cd services/roof_measure && make measure ADDR="100 Example Ave, Sampletown, CA 90000"
 ```
@@ -65,6 +66,7 @@ capture, phone alerts) is adopted in the order of `docs/migration/todo-checklist
 | `libs/bond_notify_py`, `bond_push_py`, `bond_capture_py` | Python | stored inbox; Apple push delivery; natural-language capture |
 | `services/roof_measure` | Python | address -> footprint + LiDAR (+ Solar) -> roof model JSON; also importable as a library (GPL-3.0-or-later) |
 | `services/sdk_example` | Python | reference FastAPI app wiring every bond Python lib; never shipped |
+| `services/legacy_host` | Python | test-only "existing app" host: legacy columns, wire and clients; never shipped |
 | `demos/roof_demo`, `demos/sdk_demo` | Flutter | roof demo; web and iOS harness for every SDK package. Not shipped |
 
 ## House rules

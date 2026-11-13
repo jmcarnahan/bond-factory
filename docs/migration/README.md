@@ -4,6 +4,9 @@ One file per module says which app files it replaces, the adapter the app writes
 changes, the acceptance commands and the behaviour the module dropped. These files name the three apps and their
 real paths on purpose; nothing else in the repo does. Consuming syntax and pins: `docs/sdk/README.md`, `docs/sdk/sdk-pins.md`.
 The policy behind it: `docs/decisions/2026-11-08-shared-modules-policy.md` (divergence happens only in the app's adapters).
+Requests back to the modules follow `docs/decisions/2026-11-12-adopter-proof.md`: P1 an app never waits on the modules, it adapts
+in its own adapter and ships; P2 a request is a failing test (legacy host or `make adopter-check`) plus a patch, not a prose list;
+P3 a module is not ready to adopt until the legacy host exercises it.
 
 ## Legend
 
@@ -72,7 +75,7 @@ Each seam defaults to the old behaviour, so a pinned app is not affected until i
 - Two package splits: `bond_push_apple` (`bond_push_apple.md`, with `bond_push.md`) and `bond_auth_secure_storage`
   (`bond_auth_secure_storage.md`, with `bond_signin.md`). The moved classes are not re-exported: change the import.
 
-Reasons are in the six `docs/decisions/2026-11-12-*.md` files. The example service and the demo exercise each seam.
+Reasons are in the nine seam records among the `docs/decisions/2026-11-12-*.md` files. The example service and the demo exercise each seam.
 
 ## Dart and Python pairs
 

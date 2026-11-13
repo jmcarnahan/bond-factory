@@ -3,8 +3,8 @@ Role: server side of device sync: applies a queue of local writes one transactio
 
 ## Key files
 - `envelope.py` wire models (`UploadRequest` <= 100 ops, unique seq; `OpResult`; `server_now_iso`); `verdicts.py` codes, `Rejected`/`Skipped`/`Resolved`, `DbUnavailable`, database-down classifier
-- `routes.py` `Route`, `Ctx`, `Host`, `route_for`; `dispatcher.py` `apply` / `upload` (one transaction per op, seq order)
-- `coerce.py` device values to server types, NUL check; `replay.py` `LoggedBugs`, `written_by`
+- `routes.py` `Route` (`reads`, `optional`), `Ctx`, `Host`, `route_for`; `dispatcher.py` `apply` / `upload` (one transaction per op, seq order)
+- `coerce.py` device values to server types (`optional=` keys dropped when unreadable), NUL check; `replay.py` `LoggedBugs`, `written_by`
 - `tokens.py` `SyncTokenSettings`, `mint_sync_token`, `jwks`, key loading; `publication.py` `add_table`; `source_sql.py` `render_source_sql`
 
 ## Tests

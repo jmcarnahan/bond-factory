@@ -1,7 +1,7 @@
 # Python service targets.
 LIBS = $(wildcard libs/*)
 
-.PHONY: test-service setup-service setup-py test-libs lint-libs test-example serve-example
+.PHONY: test-service setup-service setup-py test-libs lint-libs test-example serve-example test-legacy-host
 
 test-service: ## Run the roof_measure service tests
 	$(MAKE) -C services/roof_measure test
@@ -23,3 +23,6 @@ test-example: ## Run the sdk_example tests
 
 serve-example: ## Serve sdk_example on :8012
 	$(MAKE) -C services/sdk_example serve
+
+test-legacy-host: ## Run the legacy_host tests (a test-only host with legacy columns, wire and tables)
+	$(MAKE) -C services/legacy_host test

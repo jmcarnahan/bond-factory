@@ -12,7 +12,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from bond_tasks_py.due import valid_zone
-from bond_tasks_py.models import MORNING_OF, NO_REMINDER, USE_DEFAULT_REMINDER, TaskStatus
+from bond_tasks_py.models import MORNING_OF, NO_REMINDER, USE_DEFAULT_REMINDER, TaskStatus, reminder_setting
 from bond_tasks_py.protocols import UserPrefs
 from bond_tasks_py.quiet import next_work_start, sendable
 from bond_tasks_py.timeutil import local_to_utc, to_naive_utc
@@ -69,7 +69,7 @@ def effective_zone(prefs: UserPrefs, tz: str) -> str:
 
 def _lead(task: Any, prefs: UserPrefs) -> int | None:
     """Close-stage lead in minutes for the numeric settings (N, -3); None for none and for "morning of" (-1)."""
-    setting = task.remind_minutes_before
+    setting = reminder_setting(task)
     if setting >= 0:
         lead = min(setting, MAX_LEAD_MINUTES)
     elif setting == USE_DEFAULT_REMINDER:
@@ -89,7 +89,7 @@ class _Plan:
         self.close_at = self._close_at(task)
 
     def _close_at(self, task: Any) -> datetime | None:
-        setting = task.remind_minutes_before
+        setting = reminder_setting(task)
         if setting == MORNING_OF:
             start = local_to_utc(self.local_due, self.prefs.start_of_day, self.zone)
             return start if start < self.due_at else None

@@ -112,3 +112,34 @@ task it calls `dismiss_for_source`, for an open task `dismiss_stale` with the cu
 | `past` | the responsible user and the owner (once if they are the same person) |
 
 Pass `recipients=` to `sweep_due` for another rule (`Recipients.for_stage(session, task, stage)`).
+
+## 5. Proved by the legacy host
+
+`services/legacy_host` is a test-only host that differs from `sdk_example` the way an app that already exists does; one
+test file per trait (table in its README). Everything below worked without a change to the lib unless a limit says so.
+
+Works unchanged:
+- **Renamed columns**: override the mixin attribute (`mirror_enabled = Column("sync_to_calendar", Boolean, ...)`,
+  `external_event_id`, `external_account_user_id`; the same for `TaskUserSettingsMixin` and `GrantsMixin`). Service
+  calls, serialisation, queries and the mirror use the attribute; SQL goes to the old column.
+- **App columns**: `host_columns=("client_ref", "case_ref")` plus a `prepare(session, task, actor, extras)` rule. The
+  rule gets only the allow-listed extras, may raise `TaskError` (nothing is written, including the other fields of the
+  same request), and returns the extras to store; blank to NULL, "changing needs the owner or an admin" (a resent
+  unchanged value is not a change) and "a case implies its client" all fit there.
+- **Own routes over `service.*`** instead of `make_tasks_router`: a different wire (extra keys, naive timestamps with
+  microseconds, an error body with `error_code`), request bodies in two vocabularies, and a `Permissions` object that
+  also lets an admin edit. `task_items(...)` gives bond's dict; the host adds keys and rewrites the instants.
+- **Write extras**: build them from the app's own fields, not from `Task.extras` wholesale; a host that accepts both vocabularies lets bond's key win and never writes response-only keys (`calendar_event_id`, `client_name`, `case_label`).
+- **A NULL `remind_minutes_before`** (applies to every adopter, no opt-in; opt-in changes are `Route.optional` and `MirrorDraft.leave`, see `bond_tasks_py.md` section 8) (the column was added after the rows existed) reads as `USE_DEFAULT_REMINDER` in the stages, the sweep, the mirror draft and the item: no backfill needed (`test_an_old_row_with_a_null_reminder_follows_the_default`).
+- **Tables that pre-date the modules**: old rows with NULL in every column the mixin added list, serialise, update,
+  complete and reopen; `today` and `summary` count them. Old `user_prefs` rows with NULLs follow the app default and a
+  stored `07:30` reads as an override.
+
+Limits pinned in the tests:
+- A stored work-day time with seconds (`08:00:00`) makes every read of that user's preferences raise `ValueError`;
+  normalise the column to `HH:MM` in the migration.
+- Checklist items keep bond's `done_at` shape (`...Z`, no microseconds) on the legacy wire; only the four task instants
+  are rewritten.
+- A rule that returns a key the lib owns, or a name that is not a model column, raises `ValueError` (a 500): keep
+  `prepare` to the app's columns.
+

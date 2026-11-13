@@ -89,7 +89,8 @@ def _live(model: Any, now: datetime, enforce_cap: bool = True) -> list[Any]:
     """Filters that match a grant that can still be used."""
     filters = [model.revoked_at.is_(None), model.expires_at > now]
     if enforce_cap:
-        filters.append(sa.or_(model.max_downloads.is_(None), model.download_count < model.max_downloads))
+        filters.append(sa.or_(model.max_downloads.is_(None),
+                              sa.func.coalesce(model.download_count, 0) < model.max_downloads))  # NULL counts as 0
     return filters
 
 
@@ -149,8 +150,8 @@ def claim(session: Session, grant: Any, ip: str | None = None, *, enforce_cap: b
     (the caller then commits or rolls back, so its own writes and the claim land together)."""
     model = type(grant)
     stamp = now()
-    values: dict[str, Any] = {"download_count": model.download_count + 1, "last_downloaded_at": stamp,
-                              "updated_at": stamp}
+    values: dict[str, Any] = {"download_count": sa.func.coalesce(model.download_count, 0) + 1,  # NULL counts as 0
+                              "last_downloaded_at": stamp, "updated_at": stamp}
     if ip:
         values["last_ip"] = ip[:MAX_IP_LEN]
     result = session.execute(sa.update(model).where(model.id == grant.id, *_live(model, stamp, enforce_cap))

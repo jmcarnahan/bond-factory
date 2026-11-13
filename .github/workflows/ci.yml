@@ -58,7 +58,7 @@ jobs:
         with:
           python-version: '3.12'
       # sdk_example depends on all twelve libs, so this installs them without roof_measure's heavy geo stack.
-      - run: uv sync --locked --all-extras --package sdk_example
+      - run: uv sync --locked --all-extras --package sdk_example --package legacy_host
       - run: make test-libs
       - run: make lint-libs
       - name: Postgres-marked tests (bond_jobs, bond_tasks_py, bond_notify_py, bond_push_py)
@@ -72,6 +72,9 @@ jobs:
         run: LICENCE_SKIP=dart bash tool/licence_check.sh
       - run: make test-example
       - run: make -C services/sdk_example lint
+      - run: make test-legacy-host
+      - run: make -C services/legacy_host lint
+      - run: make test-adopter-lane
 
   roof-measure:
     runs-on: ubuntu-latest

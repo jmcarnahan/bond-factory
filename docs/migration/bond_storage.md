@@ -106,3 +106,13 @@ Optional route seams (all default to the behaviour above):
   (use `after_download`), S3 reads at client-build time (now `StorageSettings`).
 - The S3 client cache is keyed by region, endpoint and style; timeouts are fixed when a client is first built.
 - `mint` and `claim` use naive UTC and accept `now=`; `claim` commits (unless `commit=False`) and refreshes the grant.
+
+## 5. A grants table that already exists
+
+`GrantsMixin` describes a new table, but an app with a table of its own can attach it by overriding attributes
+(`document_id = mapped_column("attachment_id", ...)`, `created_by` and `download_count` the same way, `created_at`
+nullable) and adding its own columns beside; `mint(extra=)` fills those. The migration only ADDS what the old table
+lacks (`purpose` with a server default, `owner_type`, `owner_id`, `last_downloaded_at`, `last_ip`, `updated_at`).
+A NULL `download_count` (the old column was nullable) counts as 0 in `claim`, in the cap check and in `has_live_link`;
+before this fix such a link resolved but `claim` stored `NULL + 1` and returned False, so the download was refused.
+Proved by `services/legacy_host/tests/test_existing_tables.py` and `libs/bond_storage/tests/test_grants_null_count.py`.

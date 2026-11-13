@@ -58,6 +58,21 @@ Added
   who left after a reassign.
 - `apply_notice_action` "done" or "cancel" on a task that is not open is a no-op returning the task.
 - A `due_at` that does not parse is dropped by `TaskCreate` / `TaskUpdate` (it is only a hint), never a 422.
+- `MirrorDraft.leave: frozenset[str] = frozenset()` (a list, tuple or set is accepted and normalised; None is empty; a str is a `ValueError`): names of draft fields an UPDATE must not send (the person keeps them in
+  their own calendar, for example `location`, `categories`, `reminder_minutes`). A create, including the one after a not-found
+  update, sends every field; the etag re-read path sends the same reduced patch. `leave` is never a payload key. An unknown
+  name, or `start`/`end`/`is_all_day` not left together, is a `ValueError` at construction (a bad `draft_for` result: the
+  row ends `failed`). The default sends all fields as before. A task's own change to a left field is not propagated.
+- `TaskRoute.optional` (new 4th field, default `()`): on `("tasks", None)` it lists `due_at`, `priority` and
+  `remind_minutes_before` (those in `fields`). A host that passes it on (`Route(r.ops, r.handler, r.reads, r.optional)`) has
+  the dispatcher leave a blank or unreadable (not only blank) value of those keys out, with no verdict, instead of rejecting the op, so an unreadable `due_at`
+  hint keeps its promise and an old client's `priority: ""` is "not sent". "Blank or unreadable" is deliberate (approved): an unreadable non-blank `priority` is also left out. A host that does not pass it behaves as before.
+  `_fields` also treats a blank `priority` / `remind_minutes_before` as not sent. A readable priority outside 1 to 3 is
+  still `invalid_priority`.
+- `sync_routes`: `complete`, `reopen` and `cancel` routes have `reads=NO_READS` (`("",)`, a name no column has) instead of `()`,
+  which coerced every key: an unreadable key the handler ignores (an old client resending `completed_at: "garbage"`) no longer
+  rejects the op.
+- `models.reminder_setting(task)`: a NULL `remind_minutes_before` (a column added to old rows) reads as `USE_DEFAULT_REMINDER` in `stages` (`stage_times`, `current_stage`, the sweep), the mirror draft and `task_item`; it raised `TypeError` before.
 
 Changed (breaking)
 - `now` is required (keyword): `task_item(task, *, today, now, names=None)`, `task_items(tasks, *, today, now,

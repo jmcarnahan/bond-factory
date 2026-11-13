@@ -15,6 +15,10 @@ snapshot session is open. If it raises, returns something that is not a ``Mirror
 is malformed, the row finishes ``failed`` before any provider call. ``draft_for`` must not write: a flush is rolled
 back, a commit would persist. If it fails during a reassignment the old event stays until the next good sync.
 ``failed`` is not terminal: the next write to the task sets ``pending`` again.
+
+A draft's ``leave`` names the fields an UPDATE must not send (the person keeps them in their own calendar, for example
+``location``, ``categories``, ``reminder_minutes``); a create, including the one after a not-found update, sends all.
+A task's own change to a field in ``leave`` is therefore not propagated.
 """
 
 import logging
@@ -26,7 +30,7 @@ from typing import Any
 
 from sqlalchemy import update
 
-from bond_tasks_py.models import MirrorStatus, TaskStatus
+from bond_tasks_py.models import MirrorStatus, TaskStatus, reminder_setting
 from bond_tasks_py.protocols import MirrorDraft, MirrorPointer, MirrorProviders
 from bond_tasks_py.timeutil import local_to_utc, parse_hhmm
 
@@ -103,7 +107,7 @@ def _snapshot(session: Any, task: Any, tz: str, draft_for: DraftFor | None = Non
     eligible = mirror_eligible(task)
     draft = None
     if eligible:
-        draft = build_draft(task.title, task.notes, task.due_date, task.due_time, task.remind_minutes_before, tz)
+        draft = build_draft(task.title, task.notes, task.due_date, task.due_time, reminder_setting(task), tz)
         if draft_for is not None:
             draft = draft_for(session, task, draft)
             if not isinstance(draft, MirrorDraft):
@@ -152,7 +156,7 @@ def _delete_remote(session_factory: Any, providers: MirrorProviders, user_id: st
 def _upsert(mirror: Any, draft: MirrorDraft, event_id: str | None, etag: str | None) -> Any:
     if not event_id:
         return mirror.create_event(draft)
-    patch = asdict(draft)
+    patch = {k: v for k, v in asdict(draft).items() if k != "leave" and k not in draft.leave}
     try:
         return mirror.update_event(event_id, patch, etag=etag)
     except Exception as exc:

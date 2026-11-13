@@ -74,3 +74,44 @@ def test_aware_column_keeps_its_offset():
     aware = sa.Table("a", META, sa.Column("at", sa.DateTime(timezone=True)))
     out = coerce({"a": aware}, "a", {"at": "2026-01-01T10:00:00+02:00"})["at"]
     assert out.utcoffset().total_seconds() == 7200
+
+
+def test_an_optional_key_that_is_blank_or_unreadable_is_left_out():
+    out = coerce(TABLES, "t", {"n": "", "x": "garbage", "at": "not a date", "b": "  ", "text": "kept"},
+                 optional=("n", "x", "at", "b"))
+    assert out == {"text": "kept"}
+
+
+def test_an_optional_key_that_reads_is_converted_like_any_other():
+    out = coerce(TABLES, "t", {"n": " 7 ", "at": "2026-11-08T10:00:00.123456Z", "b": 0}, optional=("n", "at", "b"))
+    assert out == {"n": 7, "at": datetime(2026, 11, 8, 10, 0, 0, 123456), "b": False}
+
+
+def test_a_key_not_named_optional_stays_strict():
+    with pytest.raises(ValueError):
+        coerce(TABLES, "t", {"n": "", "x": "2"}, optional=("x",))
+    with pytest.raises(ValueError):
+        coerce(TABLES, "t", {"at": "garbage"}, optional=("n",))
+
+
+def test_optional_none_stays_none_and_the_default_changes_nothing():
+    assert coerce(TABLES, "t", {"n": None}, optional=("n",)) == {"n": None}
+    with pytest.raises(ValueError):
+        coerce(TABLES, "t", {"n": ""})
+
+
+def test_a_reads_list_naming_no_column_coerces_nothing_while_an_empty_one_coerces_every_key():
+    data = {"at": "not a date"}
+    assert coerce(TABLES, "t", data, ("",)) == {}
+    with pytest.raises(ValueError):
+        coerce(TABLES, "t", data, ())
+
+
+def test_an_optional_key_is_left_out_on_a_type_error_and_on_an_overflow_too():
+    with pytest.raises(TypeError):
+        coerce(TABLES, "t", {"x": [1]})  # a list for a Float column
+    assert coerce(TABLES, "t", {"x": [1], "text": "k"}, optional=("x",)) == {"text": "k"}
+    far = "9999-12-31T23:59:59-05:00"  # converting to UTC leaves the datetime range
+    with pytest.raises(OverflowError):
+        coerce(TABLES, "t", {"at": far})
+    assert coerce(TABLES, "t", {"at": far}, optional=("at",)) == {}

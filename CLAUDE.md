@@ -5,7 +5,7 @@ Shared SDK monorepo for the bond app family (avalon-crm, sbel-crm, paga-time): s
 ## Layout
 - packages/  — Dart/Flutter packages (`bond_<x>` core, `bond_<x>_ui` widgets). Conventions + commands: packages/<pkg>/CLAUDE.md
 - demos/     — Flutter harnesses, never shipped. Conventions + commands: demos/roof_demo/CLAUDE.md
-- services/  — Python services. Conventions + commands: services/roof_measure/CLAUDE.md
+- services/  — Python services. Conventions + commands: services/roof_measure/CLAUDE.md; services/legacy_host is the test-only "existing app" host
 - libs/      — Python libs (`bond_<x>`: tasks, notices, push, sync, storage, jobs, calendar, sign-in and more; no lib imports another). Conventions + commands: libs/<lib>/CLAUDE.md
 - fixtures/  — cross-language contract fixtures (<= 100 KB each); see fixtures/README.md
 - docs/      — contracts/, decisions/, research/; index docs/README.md
@@ -20,6 +20,7 @@ Shared SDK monorepo for the bond app family (avalon-crm, sbel-crm, paga-time): s
 - Before a PR: `make changed` shows affected modules (reverse deps included);
   `make test-changed` runs them.
 - Full `make test` runs ONCE per branch, pre-PR, never mid-task.
+- Before a PR that changes a module an adopter pins: `make adopter-check APP=<checkout>` (docs/sdk/adopter-check.md).
 - `make analyze` and `make gates` are cheap; run freely.
 - Tee long output to `tmp/` (e.g. `make test 2>&1 | tee tmp/test.log`).
 - Override toolchains: `make FLUTTER=/path/to/flutter`.

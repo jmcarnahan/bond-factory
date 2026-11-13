@@ -1,7 +1,7 @@
 """Structural seams the app wires. This lib imports no sibling lib: the real objects come from the app."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime, time
 from typing import Any, Protocol
 
@@ -19,6 +19,20 @@ class MirrorDraft:
     location: str | None = None
     categories: tuple[str, ...] = ()
     reminder_minutes: int | None = None
+    #: Names of the fields above that an UPDATE leaves alone, because the person owns them once the event exists (they
+    #: edit the location, categories or reminder in their own calendar). A create sends every field. Never a payload key.
+    leave: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        if isinstance(self.leave, str):
+            raise ValueError("MirrorDraft.leave takes a collection of field names, not a string")  # noqa: TRY004
+        object.__setattr__(self, "leave", frozenset(self.leave or ()))  # a list, tuple or set is fine; None is empty
+        names = {f.name for f in fields(self)} - {"leave"}
+        unknown = set(self.leave) - names
+        if unknown:
+            raise ValueError(f"MirrorDraft.leave names no draft field: {', '.join(sorted(unknown))}")
+        if (when := self.leave & {"start", "end", "is_all_day"}) and when != {"start", "end", "is_all_day"}:
+            raise ValueError("MirrorDraft.leave takes start, end and is_all_day together or not at all")
 
 
 class MirroredEvent(Protocol):

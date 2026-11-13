@@ -1,0 +1,64 @@
+{
+  "note": "Synthetic recorded-style upload bodies from an old client that knows only the legacy data keys (sync_to_calendar as 1/0, client_ref, case_ref). `user` is the session user of each request; requests are replayed in order.",
+  "requests": [
+    {
+      "user": "u-owner",
+      "body": {
+        "transaction_id": 1,
+        "ops": [
+          {"seq": 0, "op": "put", "table": "tasks", "id": "t-1", "data": {
+            "title": "Call the client", "notes": "bring docs", "due_date": "2026-11-20", "due_time": "09:30",
+            "client_ref": "cl-1", "case_ref": "", "assigned_user_id": "", "sync_to_calendar": 1,
+            "owner_user_id": "u-stranger", "created_by": "u-stranger", "status": "open", "mirror_status": "pending",
+            "source": "old_client", "created_at": "2020-01-02T03:04:05.123456", "updated_at": "2020-01-02T03:04:05.123456",
+            "bogus": "x", "extra": {"a": {"b": [1, 2]}}, "legacy_flag": true}},
+          {"seq": 1, "op": "put", "table": "tasks", "id": "t-2", "data": {
+            "title": "Water the plants", "due_date": "2026-11-21", "sync_to_calendar": 0}},
+          {"seq": 2, "op": "put", "table": "tasks", "id": "t-3", "data": {
+            "title": "Review contract", "assigned_user_id": "u-editor", "client_ref": "cl-1", "case_ref": "ca-1",
+            "sync_to_calendar": 1}},
+          {"seq": 3, "op": "put", "table": "tasks", "id": "t-4", "data": {
+            "title": "Unreadable hint", "due_date": "2026-11-22", "due_at": "garbage", "priority": "",
+            "remind_minutes_before": ""}},
+          {"seq": 4, "op": "put", "table": "tasks", "id": "t-5", "data": {
+            "title": "Blank hint", "due_at": "", "priority": 2}},
+          {"seq": 5, "op": "patch", "table": "tasks", "id": "t-1", "action": "complete", "data": {
+            "status": "done", "completed_at": "2026-11-08T10:00:00.123456", "completed_by": "u-stranger",
+            "mirror_status": "mirrored", "updated_at": "2026-11-08T10:00:00.123456"}},
+          {"seq": 6, "op": "patch", "table": "tasks", "id": "t-1", "action": "reopen", "data": {
+            "status": "open", "completed_at": null, "zzz": "unknown"}},
+          {"seq": 7, "op": "patch", "table": "tasks", "id": "t-1", "data": {
+            "title": "Call the client back", "client_ref": "cl-1", "mirror_status": "mirrored", "owner_user_id": "u-editor",
+            "updated_at": "2026-11-08T10:00:00.123456"}},
+          {"seq": 8, "op": "patch", "table": "tasks", "id": "t-4", "action": "complete", "data": {
+            "status": "done", "completed_at": "not a date", "updated_at": "also not a date"}}
+        ]
+      }
+    },
+    {
+      "user": "u-editor",
+      "body": {
+        "ops": [
+          {"seq": 0, "op": "patch", "table": "tasks", "id": "t-3", "data": {"case_ref": "ca-2"}},
+          {"seq": 1, "op": "patch", "table": "tasks", "id": "t-3", "data": {"title": "Review contract v2", "client_ref": "cl-1"}}
+        ]
+      }
+    },
+    {
+      "user": "u-owner",
+      "body": {
+        "ops": [
+          {"seq": 0, "op": "patch", "table": "tasks", "id": "t-3", "data": {"client_ref": ""}}
+        ]
+      }
+    },
+    {
+      "user": "u-stranger",
+      "body": {
+        "ops": [
+          {"seq": 0, "op": "patch", "table": "tasks", "id": "t-1", "data": {"title": "Not mine"}}
+        ]
+      }
+    }
+  ]
+}

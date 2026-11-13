@@ -38,6 +38,7 @@ upload path; `bond_service_kit.UploadLimit` can replace it), the rate limits, an
   already owns. Each op still commits or rolls back (an accepted op commits the caller's pending work, a rejected op rolls it back); the app closes the session at the end of the request.
 - Pinned clock: `upload(..., now=lambda: pinned)` sets `server_now` (a naive value is taken as UTC, an aware one is converted), so a phone's server clock follows a pinned server clock.
 - `Route.reads=()` coerces every key in the op's data. List the keys to coerce only those.
+- `Route.optional` names keys of `reads` that are left out when blank or unreadable instead of rejecting the op (`coerce(..., optional=)`). Default `()`: as before. `bond_tasks_py.sync_routes` fills it; pass it on: `Route(r.ops, r.handler, r.reads, r.optional)`.
 - `DbUnavailable.db_unavailable` is `True`, so error middleware can answer 503 from `getattr(exc, "db_unavailable", False)`.
 
 - S: `sbelcrm/sync/app/settings.py` becomes a function that builds `SyncTokenSettings(url=..., private_key=...,
@@ -98,3 +99,17 @@ Differences from the seeds that apply to both apps:
 - S: the 503 body `POWERSYNC_OFF` in `rest/routers/powersync.py` stays until the clients move to `{"detail": {"code": "sync_off"}}`.
 - A: the dispatcher's stricter id rule would reject A's ids with `.` or `:`. Either keep `apply` in the app for those
   tables or change the id scheme; decide before cutover.
+
+## 7. Proved by the legacy host (2026-11-12)
+
+A test-only host with renamed columns, app columns and an old client that sends only the legacy data keys replayed recorded
+uploads (`fixtures/legacy_host/upload_old_client*.json`) through `upload`.
+
+- Fixed: a key that cannot be read could reject an op the handler would have shrugged off. `Route.optional` (above) is the seam.
+- Checked, no change: `coerce` looks a column up by TABLE column name. A renamed attribute (`mirror_enabled` stored in
+  `sync_to_calendar`) therefore coerces the OLD key (`sync_to_calendar`, a Boolean) and passes the lib's key through unchanged,
+  where the task schema reads 1/0/"0"/"1"/true/false itself. No stored value was wrong, either way. A host that takes the old
+  key widens `reads` with it and renames it in a wrapper before the lib's handler (a few lines, `adapt` in the host).
+- Recorded: a text blank (`""`) in a host column stays `""` in the data; the host's `prepare` turns it into NULL.
+- Recorded: more than 100 ops, a repeated `seq` and a key outside `data` that the envelope does not know (the models forbid extra keys) are still whole-request 422s, not verdicts. An old client that adds its own key beside `data` is refused whole.
+

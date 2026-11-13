@@ -65,40 +65,53 @@ def coerce(
     *,
     client_bools: Iterable[str] = frozenset(),
     client_json: Iterable[str] = frozenset(),
+    optional: Iterable[str] = frozenset(),
 ) -> dict:
     """Convert ``data`` for ``table``. With ``only`` just those keys are read, so a malformed column nobody uses never rejects
     an op. Columns the table lacks (client-only columns) pass through, except names in ``client_bools`` / ``client_json``.
-    Raises ``ValueError`` on a value of the wrong shape. JSON conversion is by name, never by column type."""
+    Raises ``ValueError`` on a value of the wrong shape. JSON conversion is by name, never by column type.
+    A name in ``optional`` whose value is blank text or cannot be converted is left out of the result instead of raising,
+    as if the device had not sent it (every other key is as strict as before)."""
     if only is not None and only != ():
         data = {k: data[k] for k in only if k in data}
     meta = tables.get(table)
-    bools, jsons = set(client_bools), set(client_json)
+    bools, jsons, lenient = set(client_bools), set(client_json), set(optional)
     out: dict = {}
     for key, value in data.items():
         column = meta.columns.get(key) if meta is not None else None
-        if value is None:
-            out[key] = None
-        elif key in bools:
-            out[key] = _to_bool(value)
-        elif key in jsons:
-            out[key] = _to_json(value)
-        elif column is None:
-            out[key] = value
-        elif isinstance(column.type, sa.Boolean):
-            out[key] = _to_bool(value)
-        elif isinstance(column.type, sa.Integer):
-            out[key] = _to_int(value)
-        elif isinstance(column.type, sa.Float):
-            out[key] = _to_float(value)
-        elif isinstance(column.type, sa.DateTime):
-            out[key] = _to_datetime(value, bool(column.type.timezone))
-        elif isinstance(column.type, sa.String):  # Text is a String subclass
-            if not isinstance(value, str):
-                raise ValueError("not text")
-            out[key] = value
-        else:
-            out[key] = value
+        if key not in lenient:
+            out[key] = _convert(column, key, value, bools, jsons)
+        elif not (isinstance(value, str) and not value.strip()):
+            try:
+                out[key] = _convert(column, key, value, bools, jsons)
+            except (ValueError, TypeError, OverflowError):
+                pass  # an optional key that cannot be read is left out, as if not sent
     return out
+
+
+def _convert(column, key: str, value, bools: set, jsons: set):
+    """One value as the server's type (``ValueError`` on the wrong shape)."""
+    if value is None:
+        return None
+    if key in bools:
+        return _to_bool(value)
+    if key in jsons:
+        return _to_json(value)
+    if column is None:
+        return value
+    if isinstance(column.type, sa.Boolean):
+        return _to_bool(value)
+    if isinstance(column.type, sa.Integer):
+        return _to_int(value)
+    if isinstance(column.type, sa.Float):
+        return _to_float(value)
+    if isinstance(column.type, sa.DateTime):
+        return _to_datetime(value, bool(column.type.timezone))
+    if isinstance(column.type, sa.String):  # Text is a String subclass
+        if not isinstance(value, str):
+            raise ValueError("not text")  # noqa: TRY004
+        return value
+    return value
 
 
 def has_nul(value) -> bool:

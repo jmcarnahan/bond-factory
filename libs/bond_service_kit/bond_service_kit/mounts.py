@@ -73,16 +73,37 @@ class GuardedUploads(StaticFiles):
         super().__init__(directory=directory)
         self.private = private_prefix.strip("/").casefold()
 
-    def _blocked(self, path: str) -> bool:
+    def _under_private(self, path: str) -> bool:
         # Case-insensitive: macOS and Windows resolve ``Private/x`` to the same file a case-sensitive check would allow.
         normalized = path.replace(os.sep, "/").strip("/").casefold()
-        return bool(self.private) and (normalized == self.private or normalized.startswith(self.private + "/"))
+        return normalized == self.private or normalized.startswith(self.private + "/")
+
+    def _blocked(self, path: str) -> bool:
+        """True when the raw path, or the path once parent segments and symbolic links are resolved, is private."""
+        if not self.private:
+            return False
+        if self._under_private(path):
+            return True
+        root = os.path.realpath(self.directory)
+        try:
+            resolved = os.path.realpath(os.path.join(root, path.lstrip("/" + os.sep)))
+        except (ValueError, OSError):  # an embedded null byte or an unreadable link: no such file
+            LOGGER.warning("Refused an uploads request for an unreadable path: %r", path)
+            return True
+        rel = os.path.relpath(resolved, root)
+        if rel == ".." or rel.startswith(".." + os.sep):
+            return False  # outside the directory: StaticFiles refuses it as before
+        return self._under_private(rel)
 
     async def get_response(self, path: str, scope: Scope):  # type: ignore[no-untyped-def]
         if self._blocked(path):
-            LOGGER.warning("Refused an uploads request for a private key: %s", path)
+            LOGGER.warning("Refused an uploads request for a private path: %r", path)
             raise StarletteHTTPException(status_code=404)
-        response = await super().get_response(path, scope)
+        try:
+            response = await super().get_response(path, scope)
+        except (ValueError, OSError):  # a null byte or a link loop reached the file lookup
+            LOGGER.warning("Refused an uploads request for an unreadable path: %r", path)
+            raise StarletteHTTPException(status_code=404) from None
         if response.status_code == 200 and not _inline_safe(response.headers.get("content-type", "")):
             response.headers["content-type"] = "application/octet-stream"
             response.headers["content-disposition"] = _attachment(Path(path).name)

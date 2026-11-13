@@ -1,13 +1,16 @@
 """Sync routes for apps that sync ``tasks`` to devices.
 
-``sync_routes(task_model, ...)`` returns ``{(table, action): TaskRoute}``. ``TaskRoute`` has the same three fields as the
-sync lib's ``Route`` (``ops``, ``handler``, ``reads``), and each handler has its signature ``handler(session, ctx,
-op, data)``: the app wraps them (``Route(r.ops, r.handler, r.reads)``). This lib does not import the sync lib, so the
+``sync_routes(task_model, ...)`` returns ``{(table, action): TaskRoute}``. ``TaskRoute`` has the same four fields as the
+sync lib's ``Route`` (``ops``, ``handler``, ``reads``, ``optional``), and each handler has its signature ``handler(session, ctx,
+op, data)``: the app wraps them (``Route(r.ops, r.handler, r.reads, r.optional)``). This lib does not import the sync lib, so the
 handlers raise ``TaskError``; map it with ``verdict_for`` in the host's ``reject_for`` hook.
 
 Routes: ``("tasks", None)`` put / patch / delete, ``("tasks", "complete")``, ``("tasks", "reopen")`` and
 ``("tasks", "cancel")``. A device's ``due_at`` is only a hint: a malformed one is dropped, never raised (a raise is
-a permanent verdict on the device).
+a permanent verdict on the device). The dispatcher's coercion would reject it first, so the route lists it (and
+``priority`` and ``remind_minutes_before``, which an old client may send as ``""``) in ``optional``: a host passes it on
+(``Route(r.ops, r.handler, r.reads, r.optional)``) and a blank or unreadable (not only blank) value of those keys is left out, as not sent, with no verdict.
+``complete``, ``reopen`` and ``cancel`` read no data, so no key of theirs can reject the op.
 ``ctx.user`` is the session user id (a string) or an object with ``user_id`` / ``id``.
 """
 
@@ -28,6 +31,14 @@ FIELDS = ("title", "notes", "due_date", "due_time", "priority", "due_at", "assig
           "remind_minutes_before", "mirror_enabled", "checklist", "links", "source")
 BLANK_IS_NONE = ("notes", "due_date", "due_time", "assigned_user_id")
 READS = FIELDS + ("status",)
+#: Numbers an old client may send as ``""``: a blank is "not sent" and the schema checks the rest (see ``_fields``).
+BLANK_IS_ABSENT = ("priority", "remind_minutes_before")
+#: ``TaskRoute.optional``: keys the sync dispatcher leaves out of the data when their value is blank or unreadable,
+#: instead of rejecting the op (``due_at`` is only a hint; the two numbers take a blank).
+OPTIONAL = ("due_at",) + BLANK_IS_ABSENT
+#: ``reads`` of a route whose handler uses no data (complete, reopen, cancel): a name no column has, so nothing is
+#: coerced. An empty ``reads`` would mean "coerce every key", and one unreadable ignored key would reject the op.
+NO_READS = ("",)
 
 
 @dataclass(frozen=True)
@@ -35,6 +46,8 @@ class TaskRoute:
     ops: frozenset
     handler: Callable
     reads: tuple = ()
+    #: keys of ``reads`` the dispatcher leaves out when blank or unreadable (the sync lib's ``Route.optional``)
+    optional: tuple = ()
 
 
 def actor_of(ctx: Any) -> str:
@@ -58,6 +71,8 @@ def _fields(data: dict, allowed: Collection[str] = FIELDS) -> dict:
     for key in allowed:
         if key in data:
             value = data[key]
+            if key in BLANK_IS_ABSENT and isinstance(value, str) and not value.strip():
+                continue  # a blank number is not sent
             out[key] = None if key in BLANK_IS_NONE and value == "" else value
     if "due_at" in out:  # only a hint: unreadable or null is dropped, never raised
         try:
@@ -113,6 +128,7 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
     host = tuple(host_columns)
     allowed = _allowed(fields)
     reads = tuple(k for k in FIELDS if k in allowed) + ("status",) + host
+    optional = tuple(k for k in OPTIONAL if k in allowed)
 
     def changed(ctx: Any, session: Any, task: Any) -> None:
         if after_write is not None:
@@ -179,10 +195,10 @@ def sync_routes(task_model: Any, *, now: Callable = utcnow, tz: str = "UTC",
         return handler
 
     return {
-        ("tasks", None): TaskRoute(frozenset({"put", "patch", "delete"}), _dispatch(put, patch, delete), reads),
-        ("tasks", "complete"): TaskRoute(frozenset({"put", "patch"}), lifecycle_route(service.complete)),
-        ("tasks", "reopen"): TaskRoute(frozenset({"put", "patch"}), lifecycle_route(service.reopen)),
-        ("tasks", "cancel"): TaskRoute(frozenset({"put", "patch"}), lifecycle_route(service.cancel)),
+        ("tasks", None): TaskRoute(frozenset({"put", "patch", "delete"}), _dispatch(put, patch, delete), reads, optional),
+        ("tasks", "complete"): TaskRoute(frozenset({"put", "patch"}), lifecycle_route(service.complete), NO_READS),
+        ("tasks", "reopen"): TaskRoute(frozenset({"put", "patch"}), lifecycle_route(service.reopen), NO_READS),
+        ("tasks", "cancel"): TaskRoute(frozenset({"put", "patch"}), lifecycle_route(service.cancel), NO_READS),
     }
 
 

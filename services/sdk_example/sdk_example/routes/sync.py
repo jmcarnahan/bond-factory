@@ -95,7 +95,7 @@ def build_host(app: FastAPI) -> Host:
     the libs, wired in ``sync_todo.py``)."""
     tasks_wiring.install(app)  # the preferences, link hook and sender the TODO routes use (routes load alphabetically)
     routes = {("notes", None): Route(frozenset({"put", "patch", "delete"}), _notes, ("title", "body"))}
-    routes.update({key: Route(r.ops, r.handler, r.reads) for key, r in sync_todo.todo_routes(app).items()})
+    routes.update({key: Route(r.ops, r.handler, r.reads, getattr(r, "optional", ())) for key, r in sync_todo.todo_routes(app).items()})
     return Host(
         routes=routes,
         tables={"notes": Note.__table__, "tasks": Task.__table__, "notices": Notice.__table__,

@@ -1,0 +1,42 @@
+[project]
+name = "legacy_host"
+version = "0.1.0"
+description = "Test-only host that differs from sdk_example the way an app that already exists does: legacy columns, app columns, a legacy wire, pre-existing tables"
+requires-python = ">=3.12,<3.14"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.115",
+    "sqlalchemy>=2.0.36",
+    "pydantic>=2.8",
+    "httpx>=0.27",
+    "bond_service_kit",
+    "bond_storage",
+    "bond_sync_py",
+    "bond_calendar",
+    "bond_tasks_py",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.6", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["legacy_host*"]
+
+[tool.uv.sources]
+bond_service_kit = { workspace = true }
+bond_storage = { workspace = true }
+bond_sync_py = { workspace = true }
+bond_calendar = { workspace = true }
+bond_tasks_py = { workspace = true }
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

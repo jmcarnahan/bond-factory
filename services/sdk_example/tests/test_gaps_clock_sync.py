@@ -75,3 +75,11 @@ def test_a_database_outage_is_answered_by_the_middleware_not_the_route(client, h
     assert reply.status_code == 503 and reply.headers["retry-after"] == "5"
     assert reply.json() == {"detail": {"code": "db_unavailable",
                                        "message": "The database is not answering. Try again in a few seconds"}}
+
+
+def test_an_unreadable_due_at_hint_beside_a_title_is_ok_not_invalid(client, h):
+    """`sync_routes` drops a malformed hint; the route passes `optional` on so the coercion does not reject it first."""
+    ops = [{"seq": 0, "op": "put", "table": "tasks", "id": "t-hint", "data": {"title": "Hint", "due_at": "garbage"}},
+           {"seq": 1, "op": "put", "table": "tasks", "id": "t-blank", "data": {"title": "Blank", "priority": ""}}]
+    reply = client.post("/sync/upload", json={"transaction_id": 2, "ops": ops}, headers=h)
+    assert [r["status"] for r in reply.json()["results"]] == ["ok", "ok"]
