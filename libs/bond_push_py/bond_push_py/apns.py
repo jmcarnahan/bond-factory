@@ -29,6 +29,7 @@ RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 #: Apple refuses a provider-token refresh more often than every 20 minutes.
 FORCED_REFRESH_GAP = timedelta(minutes=20)
 MAX_PAYLOAD_BYTES = 4096
+_INTERRUPTION_LEVELS = frozenset({"passive", "active", "time-sensitive", "critical"})
 
 
 def _epoch(moment: datetime) -> int:
@@ -133,6 +134,10 @@ class ApnsSender:
             aps["thread-id"] = message.thread_id
         if message.category:
             aps["category"] = message.category
+        if message.badge is not None:
+            aps["badge"] = message.badge
+        if message.interruption_level is not None:
+            aps["interruption-level"] = message.interruption_level
         body: dict[str, Any] = {k: v for k, v in message.data.items() if k != "aps"}
         body["aps"] = aps
         return body
@@ -153,6 +158,14 @@ class ApnsSender:
             return PushResult(ok=False, error="invalid_environment")
         if message.collapse_id and len(message.collapse_id.encode()) > 64:
             return PushResult(ok=False, error="collapse_id_too_long")
+        if message.badge is not None and (
+            isinstance(message.badge, bool) or not isinstance(message.badge, int) or message.badge < 0
+        ):
+            return PushResult(ok=False, error="invalid_badge")
+        if message.interruption_level is not None and (
+            not isinstance(message.interruption_level, str) or message.interruption_level not in _INTERRUPTION_LEVELS
+        ):
+            return PushResult(ok=False, error="invalid_interruption_level")
         content = json.dumps(self._body(message), separators=(",", ":")).encode()
         if len(content) > MAX_PAYLOAD_BYTES:
             return PushResult(ok=False, error="payload_too_large")

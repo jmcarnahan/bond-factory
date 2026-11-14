@@ -8,7 +8,9 @@ from datetime import datetime
 class PushMessage:
     """One push to one device token. ``collapse_id`` is the notice id (Apple ``apns-collapse-id``);
     ``category`` becomes the Apple ``category`` field, so the phone shows the action buttons registered under it
-    (the tasks lib's ``NOTICE_CATEGORY``, "bond.task"). ``priority`` is the Apple ``apns-priority`` (10 or 5)."""
+    (the tasks lib's ``NOTICE_CATEGORY``, "bond.task"). ``priority`` is the Apple ``apns-priority`` (10 or 5).
+    ``badge`` (int >= 0, 0 clears) is Apple ``aps.badge``; ``interruption_level`` (passive | active | time-sensitive |
+    critical) is Apple ``aps.interruption-level``. Unset (None) leaves the payload unchanged."""
 
     token: str
     environment: str  # "sandbox" | "production"
@@ -21,6 +23,8 @@ class PushMessage:
     priority: int = 10
     thread_id: str | None = None
     category: str | None = None
+    badge: int | None = None
+    interruption_level: str | None = None
 
 
 @dataclass(frozen=True)

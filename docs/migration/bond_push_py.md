@@ -62,6 +62,12 @@ again sends nothing new.
   mistake). `BadDeviceToken`, 410 and `Unregistered` disable the token. A payload over 4096 bytes is never sent.
 - No Apple `category` goes out by default. An Apple push has no action buttons. A tap opens the task and the in-app
   banner offers Done, Snooze and Cancel. `PushNotifier(category=...)` can set one, but the phone plugin cannot report which button was pressed, so leave it off.
+- `PushMessage.badge` (int >= 0, 0 clears; Apple `aps.badge`) and `PushMessage.interruption_level` (passive | active |
+  time-sensitive | critical; Apple `aps.interruption-level`) are optional. Unset leaves the payload unchanged.
+  Only `ApnsSender` validates them (coded `invalid_badge` / `invalid_interruption_level`, never sent, not retryable);
+  `MockSender` records anything. `time-sensitive` needs the app's Time Sensitive Notifications capability. `critical`
+  needs Apple's entitlement and a critical sound dictionary, which `_body` does not build (`"sound": "default"`), so it
+  is out of scope beyond the key. `PushNotifier` sets neither.
 - Tokens and keys are never logged. A device registered after a notice was sent does not receive it.
 
 ## 6. What to test
