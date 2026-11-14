@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -46,6 +47,15 @@ class Host:
     already_written: Callable[[Any, Any, UploadOp], bool] | None = None
     client_bools: Mapping[str, frozenset] = field(default_factory=dict)
     client_json: Mapping[str, frozenset] = field(default_factory=dict)
+    #: Overrides the op-id rule (default ``[A-Za-z0-9_-]{1,64}``), applied with ``fullmatch``. For a host whose devices
+    #: already hold longer or punctuated ids. Use explicit ASCII classes; the wire still caps an id at 256 chars.
+    #: ``\w``/``\d`` admit Unicode and a trailing ``$`` admits a final newline, so prefer ``[A-Za-z0-9...]`` classes.
+    id_pattern: re.Pattern[str] | None = None
+
+    def __post_init__(self) -> None:
+        pattern = self.id_pattern
+        if pattern is not None and not (isinstance(pattern, re.Pattern) and isinstance(pattern.pattern, str)):
+            raise TypeError("Host.id_pattern must be a compiled str pattern (re.compile(...)) or None")
 
 
 def route_for(host: Host, op: UploadOp) -> Route:

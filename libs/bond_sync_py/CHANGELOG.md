@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.0 - unreleased
+- `Host.id_pattern` (default None = today's `[A-Za-z0-9_-]{1,64}` rule): a host whose devices already hold longer or punctuated op ids overrides the rule; applied with `fullmatch`; the wire's 256-char cap still applies.
 - `Route.optional` (default `()`) and `coerce(..., optional=)`: names in `reads` whose value is blank text or cannot be converted are left out of the data instead of rejecting the op. Every other key is as strict as before.
 - `upload` and `apply` take `close_sessions: bool = True`; `False` leaves the session open for a request-scoped factory.
 - `upload` takes `now: Callable[[], datetime] | None = None`, the clock behind `server_now` (a naive value is taken as UTC). With `close_sessions=False` on a shared session an accepted op commits the caller's pending work, a rejected op rolls it back.

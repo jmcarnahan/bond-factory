@@ -20,7 +20,7 @@ The caller is the signed-in session user, never a field of the body. Unknown fie
 | `op.seq` | int, 0 or more; ops are applied in `seq` order |
 | `op.op` | `put`, `patch` or `delete` |
 | `op.table` | 1 to 64 chars |
-| `op.id` | at most 256 chars on the wire; the dispatcher accepts only `[A-Za-z0-9_-]{1,64}` (whole string) |
+| `op.id` | at most 256 chars on the wire; the dispatcher accepts only `[A-Za-z0-9_-]{1,64}` (whole string) unless the host sets `Host.id_pattern` |
 | `op.action` | optional, 1 to 32 chars; Dart omits it when null |
 | `op.data` | object; a put carries every non-null column, a patch only the changed ones |
 
@@ -64,7 +64,7 @@ Default `message` texts. These are normative for what the shared core produces; 
 
 | Code | Produced by | Default `message` |
 |---|---|---|
-| `invalid` | id fails the pattern | `That id is not valid` |
+| `invalid` | id fails the host's pattern (default `[A-Za-z0-9_-]{1,64}`) | `That id is not valid` |
 | `invalid` | NUL byte in id or data | `That value is not valid` |
 | `invalid` | wrong value shape (coercion, data error) | `invalid` (the code) |
 | `unsupported` | no route for table/action/op | `Not supported` |
