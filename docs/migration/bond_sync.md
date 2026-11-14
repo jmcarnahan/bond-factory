@@ -49,7 +49,7 @@ split into app policy and the shared packages (see 2 and 3).
 - S: delete `core/` after switching imports; check S tests that assert a 5xx count (it is not counted now).
 - A constants map: `kSyncUploadChunk` to `UploadLimits.chunkSize`; `kSyncUploadSendCap` to `sendCaps: {'messages:send': 20}`;
   `kSyncTransient*` to `UploadLimits.transient*`; `syncDbPath(Directory dir, ...)` to `syncDbPath(dir.path, ..., prefix: 'avalon')`.
-- `newId()` is a uuid v4 and fits the server rule `[A-Za-z0-9_-]{1,64}`; A's ids with `.` or `:` do not.
+- `newId()` is a uuid v4 and fits the server rule `[A-Za-z0-9_-]{1,64}`; A's ids with `.` or `:` do not (the server side sets `Host.id_pattern` for such ids).
 
 ## 4. Data
 

@@ -10,6 +10,15 @@ against an app that has not added its file yet; `SUITE=<name>` runs one suite; `
 `python3 tool/adopter_check.py --app <path> --bond <this checkout> [--config FILE] [--suite NAME] [--keep] [--list]` (`--list` prints the
 parsed plan and runs nothing).
 
+## Adopters
+
+Run the lane for every adopter that pins a module the change touches, before the PR merges. Pass each app's checkout as `APP=`. S and A are the two adopting apps, named as in `docs/migration/README.md`.
+
+| App | Adopter file | Suites |
+|---|---|---|
+| S | `.bond-adopter.toml` (present) | overlay-took, backend, web, phone |
+| A | planned (draft in its migration notes) | until the file lands, run its own tests by hand after re-pinning |
+
 ## `.bond-adopter.toml`
 
 The app owns this file, at its root. Version 1:
@@ -128,5 +137,9 @@ run = "flutter test"
 - The copy has no virtualenv, so `setup` must create one (for example `poetry install`).
 - Suites that read fixtures by relative path keep working because the layout is kept.
 - Set `TZ` in a suite's `env` when the app's tests need a fixed zone.
+- A Python lib or service that lives outside `libs/` (for example `services/roof_measure`) is not an `overlay` entry:
+  install it with a `setup` command that names `{bond}` (for example `poetry run python -m pip install --no-deps -e {bond}/services/roof_measure`).
+- When the app's Flutter projects form a pub workspace, point the `[[flutter]]` `dir` at the workspace root: pub writes
+  and reads `pubspec_overrides.yaml` there, not in a member package.
 - Self-test of the lane itself, against a stub app that needs no Poetry or Flutter: `make test-adopter-lane`
   (and `make adopter-check APP=tool/adopter_stub` to see a run).

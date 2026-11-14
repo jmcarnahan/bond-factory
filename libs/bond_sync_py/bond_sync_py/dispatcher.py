@@ -78,7 +78,8 @@ def apply(session_factory, host: Host, ctx: Ctx, op: UploadOp, *, close_sessions
     session = session_factory()
     try:
         try:
-            if _ID.fullmatch(op.id) is None:  # ASCII, the whole string: no Unicode digits, no trailing newline
+            # default rule: ASCII, the whole string (no Unicode digits, no trailing newline); a host may set its own
+            if (host.id_pattern or _ID).fullmatch(op.id) is None:
                 raise Rejected("That id is not valid", code=INVALID)
             if op.table in host.rest_only:
                 raise Rejected(USE_REST_MESSAGE, code=UNSUPPORTED)

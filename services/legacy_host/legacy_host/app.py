@@ -6,6 +6,7 @@ that already exists (a legacy one) alone. `app.state.session_factory` and `app.s
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from datetime import datetime
 
@@ -25,7 +26,8 @@ from .sync_wiring import register as register_sync
 from .wire import legacy_body, legacy_error
 
 
-def create_app(database_url: str, *, now: Callable[[], datetime] | None = None) -> FastAPI:
+def create_app(database_url: str, *, now: Callable[[], datetime] | None = None,
+               sync_id_pattern: re.Pattern[str] | None = None) -> FastAPI:
     app = FastAPI(title="legacy_host")
     engine = make_engine(database_url)
     Base.metadata.create_all(engine)
@@ -57,5 +59,5 @@ def create_app(database_url: str, *, now: Callable[[], datetime] | None = None) 
 
     app.include_router(task_router)
     app.include_router(extra_router)
-    register_sync(app)
+    register_sync(app, id_pattern=sync_id_pattern)
     return app

@@ -8,6 +8,7 @@ lib already does: server-owned keys are never read, unknown keys are ignored, `p
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import bond_notify_py as inbox
@@ -45,7 +46,7 @@ def reject_for(session: Any, user: Any, op: Any, exc: Exception) -> Any:
     return rejected(op.seq, *verdict) if verdict else None
 
 
-def build_host(app: FastAPI) -> Host:
+def build_host(app: FastAPI, *, id_pattern: re.Pattern[str] | None = None) -> Host:
     def now():
         return app.state.clock.utcnow_naive()
 
@@ -69,7 +70,8 @@ def build_host(app: FastAPI) -> Host:
     tables = {"tasks": Task.__table__, "push_devices": PushDevice.__table__, "notices": Notice.__table__}
     sync_settings.mount(app, host_routes, tables)  # the settings row over the legacy `user_prefs` columns
     return Host(routes=host_routes, tables=tables,
-                single_action=frozenset({"tasks", "push_devices", "notices", "user_prefs"}), reject_for=reject_for)
+                single_action=frozenset({"tasks", "push_devices", "notices", "user_prefs"}), reject_for=reject_for,
+                id_pattern=id_pattern)
 
 
 def _admin(app: FastAPI, user_id: str | None) -> bool:
@@ -77,9 +79,9 @@ def _admin(app: FastAPI, user_id: str | None) -> bool:
         return rules.is_admin(session, user_id)
 
 
-def register(app: FastAPI) -> None:
+def register(app: FastAPI, *, id_pattern: re.Pattern[str] | None = None) -> None:
     mirror_wiring.install(app)
-    host = build_host(app)
+    host = build_host(app, id_pattern=id_pattern)
     router = APIRouter(tags=["sync"])
 
     @router.post("/sync/upload")

@@ -28,7 +28,7 @@ upload path; `bond_service_kit.UploadLimit` can replace it), the rate limits, an
 | Moves to the lib | Stays in the app |
 |---|---|
 | `Rejected`, `Skipped`, `Ctx` base fields, `route_for`, `apply`/`upload`, coercion, NUL check, DB-down classifier, logged-bug memory | time policy (`TOO_OLD`, `MAX_DEVICE_OFFSET`, `FUTURE_*`, `as_of`, `parse_device_time`, `BadTime`, `TooOld`) |
-| the id check `[A-Za-z0-9_-]{1,64}` | A's own id pattern `^[A-Za-z0-9._:-]{1,200}$` and `det_id`: validate in the handlers, or wrap `apply` |
+| the id check `[A-Za-z0-9_-]{1,64}` (a host overrides it with `Host.id_pattern`) | A passes its own pattern `re.compile(r"[A-Za-z0-9._:-]{1,200}")` as `Host.id_pattern`; `det_id` stays in the app |
 | `OpResult`, `UploadResponse`, `server_now_iso` | `device_now` in the request and `demo_clock` in the token response |
 | | `TIME_TABLES` escalation, `MAX_SENDS`, thread/message handlers, `State` |
 
@@ -97,8 +97,10 @@ Differences from the seeds that apply to both apps:
 - `coerce` also converts DateTime columns (ISO text, trailing Z read as UTC). A bad value is an `invalid` verdict.
 - The previous-key problems are reported by `previous_reason(settings)` instead of log lines at startup.
 - S: the 503 body `POWERSYNC_OFF` in `rest/routers/powersync.py` stays until the clients move to `{"detail": {"code": "sync_off"}}`.
-- A: the dispatcher's stricter id rule would reject A's ids with `.` or `:`. Either keep `apply` in the app for those
-  tables or change the id scheme; decide before cutover.
+- A: the dispatcher's default id rule (`[A-Za-z0-9_-]{1,64}`) would reject A's ids with `.` or `:`. The seam is
+  `Host.id_pattern`: a compiled pattern applied with `fullmatch` before the NUL check, e.g.
+  `re.compile(r"[A-Za-z0-9._:-]{1,200}")`. The wire still caps an id at 256 chars. Use explicit ASCII classes or
+  `re.ASCII`, because `\w` and `\d` admit Unicode. No need to keep `apply` in the app for those tables.
 
 ## 7. Proved by the legacy host (2026-11-12)
 

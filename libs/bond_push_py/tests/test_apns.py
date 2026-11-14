@@ -221,3 +221,49 @@ def test_client_is_built_lazily_with_http2(keys, monkeypatch):
     assert made == {}
     sender.send([msg()])
     assert made["http2"] is True and made["timeout"] == 10.0
+
+
+def test_body_carries_badge_and_interruption_level(keys):
+    sender, apple = make(keys)
+    m = msg(badge=3, interruption_level="time-sensitive", thread_id="th", category="bond.task")
+    assert sender.send([m]) == [PushResult(ok=True)]
+    aps = json.loads(apple.requests[0].content)["aps"]
+    assert aps["badge"] == 3
+    assert aps["interruption-level"] == "time-sensitive"
+    assert aps["alert"] == {"title": "Due", "body": "Now"}
+    assert aps["sound"] == "default"
+    assert aps["thread-id"] == "th"
+    assert aps["category"] == "bond.task"
+    sender.send([msg(badge=0)])
+    assert json.loads(apple.requests[1].content)["aps"]["badge"] == 0
+
+
+GOLDEN_BODY = (
+    '{"notice_id":"n1","task_id":"t1","aps":{"alert":{"title":"T","body":"B"},"sound":"default",'
+    '"thread-id":"th","category":"bond.task"}}'
+)
+
+
+def test_body_unchanged_without_them():
+    import dataclasses
+
+    kw = {"token": TOKEN, "environment": "sandbox", "topic": "com.example.x", "title": "T", "body": "B",
+          "collapse_id": "c1", "data": {"notice_id": "n1", "task_id": "t1", "aps": {"x": 1}}, "priority": 10,
+          "thread_id": "th", "category": "bond.task"}
+    m = PushMessage(**kw)
+    assert json.dumps(ApnsSender._body(m), separators=(",", ":")) == GOLDEN_BODY
+    explicit = PushMessage(**kw, badge=None, interruption_level=None)
+    assert json.dumps(ApnsSender._body(explicit), separators=(",", ":")) == GOLDEN_BODY
+    full = PushMessage(**kw, badge=2, interruption_level="passive")
+    moved = dataclasses.replace(full, topic="x", environment="production")
+    assert moved.badge == 2 and moved.interruption_level == "passive"
+
+
+def test_push_message_fields_append_only():
+    import dataclasses
+
+    fields = dataclasses.fields(PushMessage)
+    assert [f.name for f in fields] == [
+        "token", "environment", "topic", "title", "body", "collapse_id", "data", "expires_at", "priority",
+        "thread_id", "category", "badge", "interruption_level"]
+    assert fields[-1].default is None and fields[-2].default is None

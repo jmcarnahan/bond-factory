@@ -29,7 +29,7 @@ def test_message_defaults_and_frozen():
         m.title = "x"
     assert [f.name for f in dataclasses.fields(PushMessage)] == [
         "token", "environment", "topic", "title", "body", "collapse_id", "data", "expires_at", "priority",
-        "thread_id", "category",
+        "thread_id", "category", "badge", "interruption_level",
     ]
     assert [f.name for f in dataclasses.fields(PushResult)] == ["ok", "unregistered", "retryable", "error"]
 

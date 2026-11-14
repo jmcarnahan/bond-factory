@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.1.0 - unreleased
+- `PushMessage.badge` and `PushMessage.interruption_level` (both optional, appended last): sent as Apple `aps.badge` and
+  `aps["interruption-level"]`; unset leaves the payload byte-identical. `ApnsSender` rejects a badge that is not an int
+  >= 0 (`invalid_badge`) and a level outside passive/active/time-sensitive/critical (`invalid_interruption_level`),
+  without sending and not retryable.
 - `PushDevicesMixin`, `PUSH_DEVICE_COLUMNS`, `PushMessage`, `PushResult`, `PushSender`, `NullSender`,
   `MockSender`, `PushError`, APNs host constants.
 - `ApnsSender(key_pem, key_id, team_id, *, client=None, now=None)`: HTTP/2, ES256 provider token cached 50

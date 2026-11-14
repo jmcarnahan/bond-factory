@@ -92,3 +92,16 @@ def test_aware_times_are_converted_to_utc(keys):  # noqa: F811
     sender, apple = make(keys, clock=lambda: datetime(2026, 11, 12, 20, 0, 0, tzinfo=plus5))  # 15:00 UTC
     sender.send([msg(expires_at=datetime(2026, 11, 12, 20, 10, 0, tzinfo=plus5))])
     assert apple.requests[0].headers["apns-expiration"] == str(epoch(datetime(2026, 11, 12, 15, 10, 0)))
+
+
+def test_bad_badge_or_interruption_level_is_coded_and_not_sent(keys):  # noqa: F811
+    sender, apple = make(keys)
+    for badge in (-1, True, "3", 1.5):
+        result = sender.send([msg(badge=badge)])[0]
+        assert result == PushResult(ok=False, error="invalid_badge")
+        assert not result.retryable
+    for level in ("urgent", "", ["active"], 1):
+        result = sender.send([msg(interruption_level=level)])[0]
+        assert result == PushResult(ok=False, error="invalid_interruption_level")
+        assert not result.retryable
+    assert apple.requests == []
