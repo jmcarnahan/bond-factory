@@ -39,7 +39,8 @@ def test_the_loop_is_two_schedules_the_sweep_every_n_seconds_and_the_prune_hourl
     assert seen["kwargs"]["on_result"] is script.print_result
 
 
-def test_the_real_runner_runs_both_entries_then_stops_when_asked(client, app, h, script, capsys):
+def test_the_real_runner_runs_both_entries_then_stops_when_asked(client, app, h, script, capsys, monkeypatch):
+    monkeypatch.setattr(script, "utcnow", app.state.clock.utcnow_naive)  # the fixture clock, not the real date
     task = timed(client, h)
     stop, ran = threading.Event(), []
 
