@@ -29,7 +29,8 @@ class BondTextField extends StatelessWidget {
     this.textAlign = TextAlign.start,
     this.focusColor,
     this.semanticsId,
-  });
+    this.hintMaxLines = 2,
+  }) : assert(hintMaxLines > 0);
 
   final TextEditingController? controller;
   final String? label;
@@ -58,6 +59,9 @@ class BondTextField extends StatelessWidget {
   /// The focus ring's colour; null keeps the theme's accent.
   final Color? focusColor;
   final String? semanticsId;
+
+  /// The most lines a long [hint] wraps to before it is cut.
+  final int hintMaxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +115,7 @@ class BondTextField extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: hint,
                 // A hint wraps (and the field grows) rather than being cut.
-                hintMaxLines: 2,
+                hintMaxLines: hintMaxLines,
                 // With an id the message is drawn below as its own node
                 // (`<id>-error`); the empty error widget keeps the red border.
                 errorText: semanticsId == null ? errorText : null,

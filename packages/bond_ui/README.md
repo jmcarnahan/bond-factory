@@ -32,10 +32,10 @@ Every interactive widget takes `String? semanticsId` and wraps itself with `bond
 | Widget | Notes |
 | --- | --- |
 | `BondButton`, `BondIconButton`, `BondPressable` | variants, loading, wrap, 48 px hit area |
-| `BondTextField`, `BondSearchField`, `BondInlineField` | label above, inline error, soft counter |
+| `BondTextField`, `BondSearchField`, `BondInlineField` | label above, inline error, soft counter; hint wraps to `hintMaxLines` lines (default 2) |
 | `BondSelect` | chips, segmented, radio list, expanding inline list |
-| `BondSegmented`, `BondChip`, `BondStatusChip` | choices and statuses |
-| `BondDateField`, `BondTimeField` | in-page calendar grid and time entry, no pickers |
+| `BondSegmented`, `BondChip`, `BondStatusChip` | choices and statuses; chips take `maxLines`, a `BondSegment` takes a `key` |
+| `BondDateField`, `BondTimeField` | in-page calendar grid and time entry, no pickers; `BondDateField.showToday` |
 | `BondConfirm` | inline arm, confirm, optional undo, arm timeout |
 | `BondBanner`, `BondActionRow`, `BondListRow`, `BondCard` | page-flow surfaces |
 | `BondAvatar`, `BondPhoto`, `BondDashedBorder` | display |
@@ -50,7 +50,7 @@ Inline only: nothing opens a dialog, sheet or menu. Colours come from BondTokens
 | BondAccountCard, BondAccountRow | Signed-in person. Expands in place. |
 | BondRailCard, BondRightRail | Cards and a column beside the content. |
 | BondPageHeader, BondCrumb | Title, subtitle, actions, breadcrumbs. |
-| BondTabs, BondTab | Underlined tabs. Scrolls sideways when narrow. |
+| BondTabs, BondTab | Underlined tabs. Scrolls sideways when narrow. A `BondTab` takes a `key`. |
 | BondTable, BondColumn | Aligned columns. Stacks each row below 540 wide. |
 | BondTimelineList | Time, tone dot, title, body. |
 | BondPersonChip | Palette-coloured pill. Dashed when unassigned. |
@@ -59,7 +59,7 @@ Inline only: nothing opens a dialog, sheet or menu. Colours come from BondTokens
 | BondGoogleSignInButton | Button and notice. The page owns the call. |
 | BondEmptyState, BondLoadingState, BondErrorState | Inline page states. |
 | BondStaleBanner | "Not updated since ...". The caller formats the time. |
-| BondDeactivated, BondStartupFailed | Whole-page inline states. |
+| BondDeactivated, BondStartupFailed | Whole-page inline states. `BondDeactivated.backgroundColor` overrides the surface. |
 | BondLogoMark | Places the app's own logo widget at a size. |
 
 ## Tests

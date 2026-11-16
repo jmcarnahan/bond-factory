@@ -18,7 +18,7 @@ enum BondDateMode { date, dateTime, time }
 /// [today] is the wall date for the person using the field, passed in from
 /// the app clock; the field never reads the device clock itself. A null
 /// [value] shows [placeholder] and selects nothing. With [onCleared] the open
-/// panel offers a Clear button.
+/// panel offers a Clear button; [showToday] false drops the Today button.
 ///
 /// With [semanticsId]: the field is the id itself, days are
 /// `'<id>-day-<yyyy-mm-dd>'`, month paging `'<id>-day-prev'` and
@@ -41,6 +41,7 @@ class BondDateField extends StatefulWidget {
     this.dayStartHour = 6,
     this.dayEndHour = 20,
     this.semanticsId,
+    this.showToday = true,
   });
 
   final String? label;
@@ -63,6 +64,10 @@ class BondDateField extends StatefulWidget {
   final int dayStartHour;
   final int dayEndHour;
   final String? semanticsId;
+
+  /// Whether the open panel offers a Today button. Date and dateTime modes
+  /// only; time mode has no Today button.
+  final bool showToday;
 
   @override
   State<BondDateField> createState() => _BondDateFieldState();
@@ -224,10 +229,11 @@ class _BondDateFieldState extends State<BondDateField> {
               onSelect: _selectTime,
               semanticsId: id == null ? null : '$id-time',
             ),
-          if (showDays || (widget.onCleared != null && hasValue))
+          if ((showDays && widget.showToday) ||
+              (widget.onCleared != null && hasValue))
             Wrap(
               children: [
-                if (showDays)
+                if (showDays && widget.showToday)
                   BondButton(
                     label: labels.today,
                     variant: BondButtonVariant.quiet,

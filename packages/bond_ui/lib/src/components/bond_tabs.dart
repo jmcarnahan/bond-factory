@@ -5,13 +5,17 @@ import '../semantics.dart';
 import '../tokens/tokens.dart';
 
 class BondTab {
-  const BondTab(this.label, {this.count, this.semanticsId});
+  const BondTab(this.label, {this.count, this.semanticsId, this.key});
 
   final String label;
   final int? count;
 
   /// Identifier a driver finds this tab by.
   final String? semanticsId;
+
+  /// Put on the tab's tappable, so a test can find one tab.
+  /// Keys must be unique among the tabs.
+  final Key? key;
 }
 
 /// Underlined tabs for switching sections of one page, all inline. A row wider
@@ -60,6 +64,7 @@ class _TabItem extends StatelessWidget {
       onTap: onTap,
       excludeChildren: true,
       child: BondPressable(
+        key: tab.key,
         onTap: onTap,
         child: Container(
           height: BondLayout.minTap,
