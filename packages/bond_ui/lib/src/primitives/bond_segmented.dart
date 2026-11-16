@@ -7,10 +7,14 @@ import '../tokens/tokens.dart';
 import 'bond_pressable.dart';
 
 class BondSegment<T> {
-  const BondSegment(this.value, this.label);
+  const BondSegment(this.value, this.label, {this.key});
 
   final T value;
   final String label;
+
+  /// Put on the cell's tappable, so a test can find one segment.
+  /// Keys must be unique among the segments.
+  final Key? key;
 }
 
 /// A row of mutually exclusive choices, always visible (EN / ES, Today /
@@ -128,6 +132,7 @@ class _Cell<T> extends StatelessWidget {
       onTap: onTap,
       excludeChildren: true,
       child: BondPressable(
+        key: segment.key,
         onTap: onTap,
         borderRadius: t.shape.r8All,
         color: selected ? t.surface : null,

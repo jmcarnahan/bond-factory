@@ -5,7 +5,8 @@ import '../tokens/tokens.dart';
 import 'bond_pressable.dart';
 
 /// A pill used for filters and choices. Tapping toggles [selected] in the
-/// caller's state. The label wraps rather than being cut.
+/// caller's state. The label wraps rather than being cut, unless [maxLines]
+/// caps it with an ellipsis.
 class BondChip extends StatelessWidget {
   const BondChip({
     super.key,
@@ -17,7 +18,8 @@ class BondChip extends StatelessWidget {
     this.countLabel,
     this.tone,
     this.semanticsId,
-  });
+    this.maxLines,
+  }) : assert(maxLines == null || maxLines > 0);
 
   final String label;
   final bool selected;
@@ -32,6 +34,9 @@ class BondChip extends StatelessWidget {
   /// Null is neutral.
   final BondToneRole? tone;
   final String? semanticsId;
+
+  /// Caps the label at this many lines with an ellipsis; null lets it wrap.
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +61,8 @@ class BondChip extends StatelessWidget {
           if (leading != null) ...[leading!, BondSpace.w8],
           Flexible(
             child: Text(label,
+                maxLines: maxLines,
+                overflow: maxLines == null ? null : TextOverflow.ellipsis,
                 style: BondText(t)
                     .style(BondText.small14, BondText.medium, color: fg)),
           ),

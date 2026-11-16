@@ -34,12 +34,17 @@ BondToneRole? bondToneFromName(String name) => switch (name) {
     };
 
 /// A small non-interactive pill showing a [BondStatus]. The label wraps
-/// instead of being cut.
+/// instead of being cut, unless [maxLines] caps it with an ellipsis.
 class BondStatusChip extends StatelessWidget {
-  const BondStatusChip(this.status, {super.key, this.semanticsId});
+  const BondStatusChip(this.status,
+      {super.key, this.semanticsId, this.maxLines})
+      : assert(maxLines == null || maxLines > 0);
 
   final BondStatus status;
   final String? semanticsId;
+
+  /// Caps the label at this many lines with an ellipsis; null lets it wrap.
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +68,8 @@ class BondStatusChip extends StatelessWidget {
           Flexible(
             child: Text(
               status.label,
+              maxLines: maxLines,
+              overflow: maxLines == null ? null : TextOverflow.ellipsis,
               style: BondText(t).style(BondText.label13, BondText.semibold,
                   color: c.foreground),
             ),

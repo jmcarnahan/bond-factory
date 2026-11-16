@@ -2,6 +2,14 @@
 
 ## 0.1.0 - unreleased
 
+### Added (optional widget parameters)
+Every default keeps today's behaviour.
+- `BondChip.maxLines` and `BondStatusChip.maxLines` (default null: the label wraps; a number caps it with an ellipsis).
+- `BondTextField.hintMaxLines` (default 2).
+- `BondSegment.key` and `BondTab.key` (default null; the key goes on the cell's tappable so a test can find it).
+- `BondDateField.showToday` (default true; false drops the Today button, Clear is unchanged).
+- `BondDeactivated.backgroundColor` (default null: the tokens' surface colour).
+
 ### Added (themable shape)
 - `BondShape` (`r4, r8, r12, r16, r20`, plus `r4All` to `r20All`, `copyWith`, `lerp`, equality) and `BondTokens.shape` (default `const BondShape()`, same values as before). Every widget reads its corner radii from `BondTokens.of(context).shape`.
 - `BondRadius.r4` to `r20` and `r4All` to `r20All` are `@Deprecated` aliases for one release. `BondRadius.pill` and `pillAll` stay (a pill is not a shape step).

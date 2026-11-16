@@ -18,6 +18,7 @@ class BondDeactivated extends StatelessWidget {
     this.note,
     this.extra,
     this.signOutSemanticsId,
+    this.backgroundColor,
   });
 
   final String title;
@@ -28,12 +29,15 @@ class BondDeactivated extends StatelessWidget {
   final Widget? extra;
   final String? signOutSemanticsId;
 
+  /// Null keeps the tokens' surface colour.
+  final Color? backgroundColor;
+
   @override
   Widget build(BuildContext context) {
     final t = BondTokens.of(context);
     final text = BondText(t);
     return Scaffold(
-      backgroundColor: t.surface,
+      backgroundColor: backgroundColor ?? t.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
