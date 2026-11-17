@@ -11,6 +11,8 @@ from typing import Any
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
+from .agent_draft import absorb_small_gaps, capture_gables, remap_gables
+from .agent_plan import PlanTools
 from .classify import RoofBlock, polygons_of, ridge_azimuth, ring_of
 from .skeleton import block_geometry, hip_roof_edges, measure, rect_fit, signed_area, split_footprint
 
@@ -51,11 +53,12 @@ def require_finite(args: Any) -> None:
         raise ValueError("a number in the call is not finite; copy numbers from the evidence table or a tool result")
 
 
-class Workspace:
+class Workspace(PlanTools):
     """Server-side state behind the tools: polygon registry and the set of citable numbers."""
 
     def __init__(self, footprint_ft: list[tuple[float, float]], rows: list[dict[str, Any]],
-                 segment_polys: dict[str, Polygon]) -> None:
+                 segment_polys: dict[str, Polygon], blockset: Any = None) -> None:
+        self.blockset = blockset  # LiDAR mode only: lets check_draft score a draft against the measured planes
         self.footprint = [tuple(p) for p in footprint_ft]
         self.polys: dict[str, list[tuple[float, float]]] = {"footprint": self.footprint}
         self.rows = {r["id"]: r for r in rows}
@@ -131,7 +134,7 @@ class Workspace:
     def hip_roof_edges(self, polygon_id: str, pitch_rise: float, gable_edges: list[int] | None = None
                        ) -> dict[str, Any]:
         ring = self._poly(polygon_id)
-        res = hip_roof_edges(ring, pitch_rise, set(gable_edges or ()))
+        res = hip_roof_edges(ring, pitch_rise, set(gable_edges or ()), ridge_fallback=True)
         t = res["totals"]
         return {"polygon_id": polygon_id, "form": "gable" if gable_edges else "hip",
                 "eave_ft": t["eaves_ft"], "rake_ft": t["rakes_ft"], "ridge_ft": t["ridges_ft"],
@@ -156,9 +159,13 @@ class Workspace:
     def finalize(self, args: dict[str, Any]) -> tuple[list[RoofBlock], list[dict[str, Any]], list[str]]:
         """Validate the decision; returns candidate blocks. Raises ValueError with a fix hint."""
         require_finite(args)
+        listed = args.get("blocks", [])
+        if not isinstance(listed, list) or not all(isinstance(b, dict) for b in listed):
+            raise ValueError("blocks must be a JSON array of block objects (polygon_id, form, pitch_rise, "
+                             "confidence, evidence), not a string; send it as real JSON")
         blocks: list[RoofBlock] = []
         decisions = []
-        for i, b in enumerate(args.get("blocks", [])):
+        for i, b in enumerate(listed):
             ring = self._poly(b["polygon_id"])
             form = b["form"]
             n = len(ring)
@@ -181,7 +188,8 @@ class Workspace:
                            pitch_rise=0.0 if form == "flat" else float(pitch), gable_edges=gable if form == "gable" else [],
                            aspect_deg=float(aspect) if aspect is not None and form == "shed" else None,
                            notes=[str(e) for e in b.get("evidence", [])], confidence=b.get("confidence", "medium"))
-            geom = block_geometry(form, rb.polygon, rb.pitch_rise, rb.gable_edges, rb.aspect_deg)
+            rb.ridge_gable = form == "gable"  # an agent gable the skeleton cannot extend is drawn from its ridge
+            geom = block_geometry(form, rb.polygon, rb.pitch_rise, rb.gable_edges, rb.aspect_deg, rb.ridge_gable)
             rb.ridge_azimuth_deg = ridge_azimuth(form, rb.polygon, rb.aspect_deg, geom)
             rb.notes.extend(n for n in geom.get("notes", []) if n not in rb.notes)
             blocks.append(rb)
@@ -196,4 +204,10 @@ class Workspace:
                     raise ValueError(f"blocks {i} and {j} overlap by {inter:.0f} sqft; split or fit them again")
         if not blocks:
             raise ValueError("finalize needs at least one block")
+        if self.blockset is not None:  # small gaps beside the blocks go to the neighbour, not to a Voronoi cell
+            captured = capture_gables(blocks)
+            if absorb_small_gaps(blocks, self.blockset.footprint):
+                remap_gables(blocks, captured)  # a re-ringed block has new edge indices
+                for rb, d in zip(blocks, decisions, strict=True):
+                    d["gable_edges"] = rb.gable_edges
         return blocks, decisions, [str(w) for w in args.get("warnings", [])]

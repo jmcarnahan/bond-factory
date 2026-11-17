@@ -17,6 +17,8 @@ from roof_measure.model import validate
 from roof_measure.pipeline import run_pipeline
 from roof_measure.version import PIPELINE_VERSION
 
+pytestmark = pytest.mark.usefixtures("no_planes_model")  # these tests pin the block model, see conftest
+
 SOLAR = ROOT / "fixtures" / "synthetic_solar_response.json"
 NEW_TOTALS = {"planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "plane_count"}
 KW = {"lat": 1.0, "lng": 1.0, "verify": False, "isolate": False}
@@ -193,10 +195,10 @@ def test_the_model_file_carries_the_same_keys(tmp_path):
     assert on_disk["quality"] == res.envelope["model"]["quality"] and len(on_disk["planes"]) == len(res.envelope["model"]["planes"])
 
 
-def test_pipeline_version_is_0_3_1_and_the_contract_name_is_unchanged():
+def test_pipeline_version_is_0_4_0_and_the_contract_name_is_unchanged():
     from roof_measure.version import CONTRACT
 
-    assert PIPELINE_VERSION == "0.3.1" and CONTRACT == "bond.roof_model/0.2"
+    assert PIPELINE_VERSION == "0.4.0" and CONTRACT == "bond.roof_model/0.2"
 
 
 def test_street_match_note_is_a_reason_code(tmp_path, monkeypatch):
@@ -240,7 +242,8 @@ def test_eval_harness_runs_on_the_fixtures_dir(tmp_path):
     assert r.returncode == 0, r.stderr
     lines = r.stdout.strip().splitlines()
     assert lines[0].split()[:3] == ["file", "planes", "facets"]
-    assert any(ln.startswith("two_level_l_blocks.json") and "multi_plane_simplified" in ln for ln in lines)
+    # rewritten for 0.4.0: the partition (planes_envelope) tiles this roof, so the poor block model is replaced by the planes model
+    assert any(ln.startswith("two_level_l_blocks.json") and "from_planes" in ln for ln in lines)
     assert any(ln.startswith("site1_blocks.json") for ln in lines)
     assert (out / "two_level_l_blocks.svg").read_text().startswith("<svg") and "sq ft" in (out / "two_level_l_blocks.svg").read_text()
     rows = json.loads((tmp_path / "m.json").read_text())

@@ -1,6 +1,6 @@
 # roof_measure envelope 0.3 (additive to 0.2)
 
-`PIPELINE_VERSION` is `0.3.1` (0.3.0 added the keys below; 0.3.1 adds the planes-only result and a sliver repair, see the end of this file); the contract name stays `bond.roof_model/0.2` and every 0.2 key keeps its meaning and its
+`PIPELINE_VERSION` is `0.4.0` (0.3.0 added the keys below; 0.3.1 adds the planes-only result and a sliver repair, see the end of this file; 0.4.0 adds the optional `other_buildings` key, see "Other buildings on the lot"); the contract name stays `bond.roof_model/0.2` and every 0.2 key keeps its meaning and its
 value. 0.3 only ADDS optional keys and three warning codes (`parcel_street_match`, `agent_failed_fell_back`, `model_failed`; and the street-match note moves from `other` to the first). A parser that ignores unknown keys (the Dart `RoofMeasurement`
 does) needs no change. `method_used` never gains a new value: a retry or a fallback is a reason code, not a method.
 `pipeline_version` keys the result cache, so 0.2.0 results are not reused after the upgrade.
@@ -37,6 +37,14 @@ plane survived (for example every plane lies outside the footprint). One object 
 | `height_ft` | number | height above ground, 0.01 |
 | `rms_ft` | number | plane-fit residual from LiDAR, 0.001 |
 | `filled_pct` | number | share of this plane's final area that came from gap filling, 0.1 |
+| `straightened` | bool | OPTIONAL (0.4.0): the plane's borders were redrawn as straight roof lines |
+| `straighten_method` | string | OPTIONAL (0.4.0): how (`envelope`, `arrangement`, `lines`); absent when not straightened |
+| `raw_plan_area_sqft` | number | OPTIONAL (0.4.0): the plan area of the LiDAR cluster before straightening, 0.1 |
+| `plane_eq` | [a, b, c] | OPTIONAL (0.4.0): height in feet above the common ground datum = a*x + b*y + c, model frame |
+| `section` | integer | OPTIONAL (0.4.0): planes with the same number meet without a height step |
+
+Since 0.4.0 the plane polygons and areas of a roof whose planes could be straightened differ from 0.3.1 for every
+caller (same keys, straighter borders); the model may also be drawn from these planes (see `model.source.from_planes`).
 
 ### `model.quality` (object): metrics only, no label
 
@@ -130,3 +138,71 @@ same-block neighbour it shares the longest border with, provided the merged face
 tiles exactly and the area does not change. The edge between the two facets disappears and the sliver's other edges
 belong to the neighbour. A warning (code `other`) names each merge. A model that passed validation before is never
 changed (the repair runs only for a facet that would fail).
+
+## Other buildings on the lot (pipeline 0.4.0)
+
+`measure(..., include_other_buildings=False)`: a new optional keyword. With the default it adds nothing (no
+`other_buildings`, no `lot_*` totals; other 0.4.0 changes still apply: on roofs whose planes are straightened and
+partitioned, `model.planes`, the plane totals and the quality metrics change, and a poor block model can be replaced
+by one built from the planes; no key is renamed or removed). When `True`, after the main building has
+been measured the library measures every other county outline of the parcel that is at least 120 sq ft (the county
+link already keeps only outlines with at least half of their area inside the parcel; at most the six largest) with
+the rule method (`lidar_skeleton`: no agent, no verifier), inside the same deadline and the same child process, each
+building getting at most a fair share of the time left (`remaining / buildings_left`; under 8 s the building and the
+ones after it are skipped). Only the LA County source has several outlines today; for any other footprint source, a
+blocks fixture or a lot with no second outline the call is a no-op. The existing warning
+`other_buildings_on_parcel` is unchanged.
+
+The main envelope then gains ONE optional top-level key, absent otherwise (never null):
+
+```
+"other_buildings": [        // largest first
+  {"index": 1,              // 1.., the order of this list
+   "footprint": {"provider": "...", "id": "...", "area_sqft": 424.0},
+   "offset_ft": [dx, dy],   // east, north, plan feet: this model's origin as seen from the main model's origin
+   "status": "ok" | "planes_only" | "failed",
+   "error_code": null | "<job code of errors.JOB_CODES, e.g. timeout, measurement_failed>",
+   "model": { ... },        // the same object as envelope.model (quality and planes included); null when failed
+   "totals": { ... } }      // the same keys as envelope.totals; null when failed
+]
+```
+
+`offset_ft` is how a client puts both models on one sheet: draw the second model's points at `point + offset_ft` in the
+main model's feet frame. Both models use the same north (the UTM grid of the main model's zone) and feet; each has its
+own origin (the south-west corner of its own bounding box), which is why the offset exists (`dx = (x0_other -
+x0_main) / 0.3048`, same for `y`, from the two frames' metric origins in the same CRS). `status` `planes_only` is the
+same condition as the main model's `source.planes_only` (empty facets, `model.planes` only). A building that fails
+or runs out of time is listed with `status` `failed`, a job code in `error_code`, and no model, totals or offset; the
+main result is unaffected, and the main `warnings` gain one `other` note naming the codes. A native crash of the child
+process while the extra buildings were measured is retried once without them (same note).
+
+Four NEW keys in the main `totals` (present only with the key above); every existing totals key keeps meaning "the main
+building":
+
+| Key | Meaning |
+|---|---|
+| `lot_buildings` | number of buildings in the lot totals: the main one plus the `ok` and `planes_only` others |
+| `lot_area_sqft` | sum of `area_sqft` over those buildings |
+| `lot_squares` | sum of `squares` over those buildings |
+| `lot_outline_perimeter_ft` | sum of `outline_perimeter_ft` over those buildings (`eave_ft` when a building has no such key) |
+
+
+
+## Model from the measured planes (`model_from_planes`, pipeline 0.4.0)
+
+When the block (or agent) model is poor (`model.quality.plane_mismatch_pct` >= 15, `model_uncovered_pct` >= 10, or the
+result would be planes-only) and the LiDAR planes were partitioned by the envelope (`planes[].straighten_method` is
+`envelope` or `arrangement`) and tile the outline, `model` is built from the planes instead. Shape: the ordinary
+`bond.roof_model/0.1`, one facet per plane and one `shed` block per plane (`flat` for a flat plane,
+`ridge_azimuth_deg` null), edges typed from the plane borders. Optional additions:
+
+| Where | Key | Meaning |
+|---|---|---|
+| `model.source` | `from_planes` | true on such a model; absent otherwise |
+| `model.quality` | `block_model_mismatch_pct`, `block_model_uncovered_pct` | what the replaced block/agent model scored (0.1); null when it was a planes-only result; present only with `from_planes` |
+| `model.quality.reasons` | `from_planes` | FIRST in the list when present |
+| warnings | `model_from_planes` | "The diagram was built from the measured roof planes." A replaced planes-only result keeps `model_failed` as well |
+
+`method_used` is the method that ran. `verification.verdict` is `unverified` (a from-planes model is never verified). A
+tapering height step (an envelope `hip` whose median step is 1.5 ft or more) is an edge of type `transition`: it adds to
+no flashing or cap total. Roofs that are good by the metrics are unchanged byte for byte.

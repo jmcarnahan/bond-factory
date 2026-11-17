@@ -111,7 +111,7 @@ def main() -> int:
                                solar_fixture=req["solar_fixture"], deadline=deadline,
                                lat_lng=tuple(req["lat_lng"]) if req["lat_lng"] else None,
                                on_stage=_stage_hook(req["method"], deadline), verify=req["verify"],
-                               render=False)
+                               render=False, include_other_buildings=bool(req.get("include_other_buildings")))
         _emit({"t": "ok", "envelope": res.envelope})
     except Exception as exc:
         log.warning("measurement failed: %s", type(exc).__name__)  # no traceback at WARNING: urls hold the address

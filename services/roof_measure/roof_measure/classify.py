@@ -153,6 +153,7 @@ class RoofBlock:
     source_blocks: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     confidence: str = "medium"
+    ridge_gable: bool = False  # a gable the skeleton cannot extend may be drawn from its ridge line (agent blocks)
 
     @property
     def poly(self) -> Polygon:
@@ -172,7 +173,7 @@ class RoofBlock:
                    gable_edges=[int(i) for i in d.get("gable_edges", [])], level_ft=d.get("level_ft"),
                    eave_height_ft=d.get("eave_height_ft"), ridge_azimuth_deg=d.get("ridge_azimuth_deg"),
                    source_blocks=list(d.get("source_blocks", [])), notes=list(d.get("notes", [])),
-                   confidence=d.get("confidence", "medium"))
+                   confidence=d.get("confidence", "medium"), ridge_gable=bool(d.get("ridge_gable", False)))
 
 
 @dataclass
@@ -413,7 +414,7 @@ def assign_levels(roof_blocks: list[RoofBlock], blockset: BlockSet) -> None:
         mean_z, ground = sumz / sumw, sumh / sumw
         rise = 0.0
         if rb.form != "flat":
-            geom = block_geometry(rb.form, rb.polygon, rb.pitch_rise, rb.gable_edges, rb.aspect_deg)
+            geom = block_geometry(rb.form, rb.polygon, rb.pitch_rise, rb.gable_edges, rb.aspect_deg, rb.ridge_gable)
             tot = sum(f["plan_area"] for f in geom["facets"]) or 1.0
             rise = sum(f["plan_area"] * _plane_at(f["plane"], *Polygon(f["polygon_xy"]).centroid.coords[0])
                        for f in geom["facets"]) / tot

@@ -100,9 +100,11 @@ def _extend_for_gables(poly: list[Pt], gable_idx: set[int], dist: float) -> list
 
 # ----------------------------------------------------------------------------- hip / gable
 def hip_roof_edges(polygon_ft: list[Any], pitch_rise: float, gable_edges: set[int] | list[int] | None = None,
-                   extend_ft: float | None = None) -> dict[str, Any]:
+                   extend_ft: float | None = None, ridge_fallback: bool = False) -> dict[str, Any]:
     """Facets and typed edges of a uniform-pitch roof over ``polygon_ft``.
 
+    ``ridge_fallback``: when the gable ends cannot be extended on this outline, draw the gable from its ridge line
+    (``skeleton_gable.ridge_gable``) instead of raising; off by default, so nothing that builds today changes.
     ``pitch_rise`` is inches of rise per 12 of run. ``gable_edges`` are indices of INPUT polygon
     edges (edge i = vertex i to i+1) that are gable ends: they get no eave and no facet and the
     sloped boundary of the facets along them is a rake.
@@ -133,7 +135,14 @@ def hip_roof_edges(polygon_ft: list[Any], pitch_rise: float, gable_edges: set[in
 
     big = extend_ft if extend_ft is not None else 4 * max(orig.bounds[2] - orig.bounds[0],
                                                           orig.bounds[3] - orig.bounds[1])
-    work, used = safe_extension(rpts, gab, big, _extend_for_gables) if gab else (rpts, big)
+    try:
+        work, used = safe_extension(rpts, gab, big, _extend_for_gables) if gab else (rpts, big)
+    except ValueError:
+        if not (ridge_fallback and gab):
+            raise
+        from .skeleton_gable import ridge_gable
+
+        return ridge_gable(polygon_ft, pitch_rise, gable)
     notes: list[str] = []
     if used != big:  # a silent change of geometry is not allowed: say it
         notes.append(f"Gable ends were extended by {used:.0f} ft instead of {big:.0f} ft because the sides next to "
@@ -361,7 +370,7 @@ def rect_fit(polygon: list[Any]) -> tuple[list[Pt], float, float, float]:
 
 # ----------------------------------------------------------------------------- per block dispatcher
 def block_geometry(form: str, polygon: list[Any], pitch_rise: float, gable_edges: list[int] | None = None,
-                   aspect_deg: float | None = None) -> dict[str, Any]:
+                   aspect_deg: float | None = None, ridge_fallback: bool = False) -> dict[str, Any]:
     """Facets and edges for one roof block, whatever its form.
 
     ``flat`` returns one facet (plane z = 0) and one ``outline`` edge per polygon edge (the
@@ -388,5 +397,6 @@ def block_geometry(form: str, polygon: list[Any], pitch_rise: float, gable_edges
     if form == "shed":
         return shed_roof_edges(polygon, pitch_rise, 180.0 if aspect_deg is None else aspect_deg)
     if form in ("hip", "gable"):
-        return hip_roof_edges(polygon, pitch_rise, set(gable_edges or ()) if form == "gable" else None)
+        return hip_roof_edges(polygon, pitch_rise, set(gable_edges or ()) if form == "gable" else None,
+                              ridge_fallback=ridge_fallback and form == "gable")
     raise ValueError(f"unknown roof form {form!r}")

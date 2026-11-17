@@ -160,7 +160,7 @@ def build_model(blockset: BlockSet, roof_blocks: list[RoofBlock], source: dict[s
     blks: list[_Blk] = []
     facets_out: list[dict[str, Any]] = []
     for rb in roof_blocks:
-        geom = block_geometry(rb.form, rb.polygon, rb.pitch_rise, rb.gable_edges, rb.aspect_deg)
+        geom = block_geometry(rb.form, rb.polygon, rb.pitch_rise, rb.gable_edges, rb.aspect_deg, rb.ridge_gable)
         fids: list[str] = []
         fpolys: list[Polygon] = []
         for f in geom["facets"]:

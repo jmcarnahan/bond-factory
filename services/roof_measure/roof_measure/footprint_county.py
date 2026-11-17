@@ -22,6 +22,7 @@ from .footprint_types import (
 )
 from .frame import project_geometry, utm_epsg_for
 from .geocode import Address
+from .street_names import same_street, street_key
 
 log = logging.getLogger(__name__)
 
@@ -36,13 +37,22 @@ MIN_PARCEL_OVERLAP = 0.5  # a building counts for a parcel when at least this sh
 Note = tuple[str, str]  # (warning code, text)
 
 
+def _situs_key(props: dict) -> str:
+    """The parcel's street as ``street_names.street_key`` text: situs direction plus situs street."""
+    return street_key(f"1 {str(props.get('SitusDirection', '')).strip()} {str(props.get('SitusStreet', '')).strip()}")
+
+
 def score_parcel(props: dict, address: Address) -> int:
-    """How well a parcel's situs address matches the input (higher is better)."""
-    num, direction, street = address_tokens(address.line1)
+    """How well a parcel's situs address matches the input (higher is better).
+
+    The street compares after ``street_names`` normalisation, so "Ave B" and "AVENUE B" are the same street; a
+    different street name or type is not.
+    """
+    num, direction, _ = address_tokens(address.line1)
     score = 0
     if num and str(props.get("SitusHouseNo", "")).strip() == num:
         score += 4
-    if street and street in str(props.get("SitusStreet", "")).upper().split():
+    if same_street(street_key(address.line1), _situs_key(props)):
         score += 4
     if direction and str(props.get("SitusDirection", "")).strip().upper() == direction:
         score += 1
@@ -72,6 +82,12 @@ def pick_parcel(features: list[dict], lat: float, lng: float, address: Address) 
     if same_num:
         return best, "street"
     return best, "nearest"
+
+
+def _building_info(feature: dict, poly: Polygon) -> dict:
+    props = feature["properties"]
+    area = props.get("AREA")
+    return {"id": str(props.get("BLD_ID") or props.get("OBJECTID")), "area_sqft": float(area) if area else area_sqft(poly)}
 
 
 def _esri_rings(parcel: Polygon) -> list[list[list[float]]]:
@@ -154,7 +170,8 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
         height_ft=float(props["HEIGHT"]) if props.get("HEIGHT") else None,
         area_sqft=float(area) if area else area_sqft(main),
         parcel_id=str(parcel["properties"].get("AIN")) if parcel["properties"].get("AIN") else None,
-        other_buildings=[t[3] for t in ok[1:]], match=match, source="lariac")
+        other_buildings=[t[3] for t in ok[1:]], match=match, source="lariac",
+        other_info=[_building_info(t[2], t[3]) for t in ok[1:]])
     for code, text in warnings:
         fp.warn(code, text)
     return fp, [], None
