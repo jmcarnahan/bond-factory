@@ -11,7 +11,7 @@ from .version import CONTRACT, PIPELINE_VERSION
 WARNING_CODES = ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
                  "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "method_fallback", "verifier_unverified",
                  "verifier_adjusted", "verifier_failed", "verifier_timeout", "solar_segments_only",
-                 "agent_failed_fell_back", "flat_roof_assumed", "other")
+                 "agent_failed_fell_back", "flat_roof_assumed", "model_failed", "other")
 TOTALS_KEYS = ("area_sqft", "squares", "eave_ft", "rake_ft", "ridge_ft", "hip_ft", "valley_ft", "step_flashing_ft",
                "predominant_pitch", "facets", "drip_edge_eave_ft", "drip_edge_eave_rake_ft", "ridge_cap_ridge_ft",
                "ridge_cap_ridge_hip_ft")
@@ -79,6 +79,10 @@ def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source:
         raise ValueError(f"verdict must be one of {VERDICTS}")
     codes = [c if c in WARNING_CODES else "other" for c in warning_codes]
     totals = totals_from_model(model)
+    if (model.get("source") or {}).get("planes_only") and assessment:
+        from .planes_only import planes_only_totals
+
+        totals = planes_only_totals(assessment.get("totals", {}))
     if assessment:
         model["quality"] = assessment["quality"]
         if "planes" in assessment:  # absent when the assessment failed

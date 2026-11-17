@@ -17,10 +17,10 @@ from typing import Any
 
 from shapely.errors import ShapelyError
 
-from . import cache, config
+from . import cache, config, planes_only
 from .classify import BlockSet, Classification, RoofBlock, classify_blocks
 from .deadline import Deadline, DeadlineExceeded
-from .envelope import build_envelope, cap_verification, totals_from_model
+from .envelope import TOTALS_KEYS, build_envelope, cap_verification, totals_from_model
 from .model import ModelError, build_model, write_model
 from .pipeline_notes import collect_warnings
 from .pipeline_stages import (  # noqa: F401
@@ -219,26 +219,39 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
         roof_blocks = classification.blocks
         if method == "lidar_agent":
             classification.notes.append("Deterministic path (no agent): LiDAR blocks classified by rules.")
+    net_exc: BaseException | None = None  # set when only the planes could be returned (planes_only.py)
     try:
+        planes_only.need_roof_blocks(roof_blocks, base, fpinfo)
         model = build_model(model_blockset, roof_blocks, source, classification)
     except (ModelError, ShapelyError) as exc:
-        if method not in AGENT_METHODS or no_agent or agent_fell_back:
-            raise
-        # the agent's blocks built a roof the model rejects (a sliver facet): the rules answer instead
-        agent_fell_back = _cause(exc)
-        classification = classify_blocks(model_blockset if method == "solar_agent" else base, **kw)
-        roof_blocks = classification.blocks
-        classification.notes.append(f"The agent's blocks did not build ({agent_fell_back}); classified by rules.")
-        source.pop("agent", None)
-        if method == "lidar_agent":
-            method, source["method"] = "lidar_skeleton", "lidar_skeleton"
-        model = build_model(model_blockset, roof_blocks, source, classification)
+        try:
+            if method not in AGENT_METHODS or no_agent or agent_fell_back:
+                raise
+            # the agent's blocks built a roof the model rejects (a sliver facet): the rules answer instead
+            agent_fell_back = _cause(exc)
+            classification = classify_blocks(model_blockset if method == "solar_agent" else base, **kw)
+            roof_blocks = classification.blocks
+            classification.notes.append(f"The agent's blocks did not build ({agent_fell_back}); classified by rules.")
+            source.pop("agent", None)
+            if method == "lidar_agent":
+                method, source["method"] = "lidar_skeleton", "lidar_skeleton"
+            planes_only.need_roof_blocks(roof_blocks, base, fpinfo)
+            model = build_model(model_blockset, roof_blocks, source, classification)
+        except (ModelError, ShapelyError) as final:
+            net_exc = final
+            model = planes_only.model_or_raise(final, base, source, fpinfo, _cause(final))
 
     # 3. verifier, then outputs from the FINAL model
     deadline.check("verify")
-    model, verification, verifier_transcript = _verify(model, verify, client, deadline, on_stage)
+    if net_exc is None:
+        model, verification, verifier_transcript = _verify(model, verify, client, deadline, on_stage)
+    else:  # a planes-only result has no edges to verify
+        verification, verifier_transcript = _no_verification(model, planes_only.NOT_VERIFIED), []
     on_stage("render")
     extra_warnings: list[tuple[str, str]] = []
+    if net_exc is not None:
+        extra_warnings.append((planes_only.CODE, planes_only.WARNING))
+        render = False  # the debug picture draws facets
     if agent_fell_back:
         text = f"The roof agent could not finish ({agent_fell_back}); the rule-based measurement was used instead."
         extra_warnings.append((AGENT_FELL_BACK, text))
@@ -271,6 +284,10 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     verification = cap_verification(verification, fpinfo["source"])  # final verdict before the warnings
     warnings, codes = collect_warnings(model, fpinfo, verification, density, fallback_from, method, extra_warnings)
     assessment = _assess(base, model, codes) if method != "solar_agent" else None
+    if net_exc is not None:
+        assessment = planes_only.assessment_or_raise(assessment, net_exc)
+        verification = {**verification, "original_totals": {k: v for k, v in planes_only.planes_only_totals(
+            assessment["totals"]).items() if k in TOTALS_KEYS}}
     envelope = build_envelope(model, method_used=method, footprint_source=fpinfo["source"], verification=verification,
                               warnings=warnings, warning_codes=codes, density_pts_m2=density, assessment=assessment)
     if assessment:

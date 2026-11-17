@@ -1,0 +1,295 @@
+{
+ "contract": "bond.roof_model/0.2",
+ "pipeline_version": "0.3.1",
+ "method_used": "lidar_skeleton",
+ "footprint_source": "lariac",
+ "generated_at": "2026-11-10T00:00:00Z",
+ "model": {
+  "schema": "bond.roof_model/0.1",
+  "generated_at": "2026-11-10T00:00:00Z",
+  "address": {
+   "line1": "100 Example Ave",
+   "city": "Sampletown",
+   "state": "CA",
+   "zip": "90000",
+   "formatted": "100 Example Ave, Sampletown, CA 90000"
+  },
+  "origin": {
+   "lat": 0.0,
+   "lng": 0.0
+  },
+  "north_deg": 0,
+  "units": "ft",
+  "source": {
+   "method": "lidar_skeleton",
+   "footprint": {
+    "provider": "synthetic",
+    "id": "T",
+    "area_sqft": 960.0
+   },
+   "lidar": {
+    "project": null,
+    "acquired": null,
+    "points_on_roof": null,
+    "density_per_m2": 14.0,
+    "fitted_area_sqft": 884.64
+   },
+   "solar": null,
+   "planes_only": true
+  },
+  "blocks": [],
+  "facets": [],
+  "edges": [],
+  "holes": [],
+  "totals": {
+   "total_area_sqft": 0,
+   "pitched_area_sqft": 0,
+   "flat_area_sqft": 0,
+   "predominant_pitch_rise": 0.0,
+   "predominant_pitch_area_sqft": 0.0,
+   "squares": 0.0,
+   "lengths_ft": {
+    "eave": 0.0,
+    "rake": 0.0,
+    "ridge": 0.0,
+    "hip": 0.0,
+    "valley": 0.0,
+    "step_flashing": 0.0,
+    "wall_flashing": 0.0,
+    "parapet": 0.0,
+    "transition": 0.0,
+    "unspecified": 0.0
+   }
+  },
+  "confidence": {
+   "overall": "low",
+   "notes": [
+    "The simple roof diagram could not be built; this result is the measured roof planes only.",
+    "ModelError: SYNTHETIC EXAMPLE: the diagram was declared unbuildable"
+   ]
+  },
+  "warnings": [],
+  "debug": {},
+  "quality": {
+   "plane_mismatch_pct": null,
+   "outline_covered_pct": 92.1,
+   "model_uncovered_pct": 100.0,
+   "level_spread_ft": 0.0,
+   "planes_lidar": 4,
+   "facets_model": 0,
+   "reasons": [
+    "model_failed"
+   ]
+  },
+  "planes": [
+   {
+    "id": "k0",
+    "polygon": [
+     [
+      12.0,
+      12.0
+     ],
+     [
+      0.85,
+      0.84
+     ],
+     [
+      0.85,
+      0.0
+     ],
+     [
+      39.15,
+      0.0
+     ],
+     [
+      39.15,
+      0.84
+     ],
+     [
+      28.0,
+      12.0
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 180.0,
+    "plan_area_sqft": 335.2,
+    "surface_area_sqft": 353.3,
+    "height_ft": 12.6,
+    "rms_ft": 0.1,
+    "filled_pct": 6.8
+   },
+   {
+    "id": "k1",
+    "polygon": [
+     [
+      40.0,
+      0.0
+     ],
+     [
+      40.0,
+      23.15
+     ],
+     [
+      39.16,
+      23.15
+     ],
+     [
+      28.0,
+      12.0
+     ],
+     [
+      39.15,
+      0.84
+     ],
+     [
+      39.15,
+      0.0
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 90.0,
+    "plan_area_sqft": 144.0,
+    "surface_area_sqft": 151.8,
+    "height_ft": 12.6,
+    "rms_ft": 0.1,
+    "filled_pct": 9.8
+   },
+   {
+    "id": "k2",
+    "polygon": [
+     [
+      40.0,
+      24.0
+     ],
+     [
+      0.0,
+      24.0
+     ],
+     [
+      0.0,
+      23.15
+     ],
+     [
+      0.84,
+      23.15
+     ],
+     [
+      12.0,
+      12.0
+     ],
+     [
+      28.0,
+      12.0
+     ],
+     [
+      39.16,
+      23.15
+     ],
+     [
+      40.0,
+      23.15
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 0.0,
+    "plan_area_sqft": 336.8,
+    "surface_area_sqft": 355.1,
+    "height_ft": 12.6,
+    "rms_ft": 0.1,
+    "filled_pct": 7.3
+   },
+   {
+    "id": "k3",
+    "polygon": [
+     [
+      0.0,
+      23.15
+     ],
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.85,
+      0.0
+     ],
+     [
+      0.85,
+      0.84
+     ],
+     [
+      12.0,
+      12.0
+     ],
+     [
+      0.84,
+      23.15
+     ]
+    ],
+    "pitch_rise": 4.0,
+    "aspect_deg": 270.0,
+    "plan_area_sqft": 144.0,
+    "surface_area_sqft": 151.8,
+    "height_ft": 12.6,
+    "rms_ft": 0.1,
+    "filled_pct": 9.7
+   }
+  ]
+ },
+ "totals": {
+  "area_sqft": 1012.0,
+  "squares": 10.12,
+  "eave_ft": 128.0,
+  "rake_ft": 0.0,
+  "ridge_ft": 0.0,
+  "hip_ft": 0.0,
+  "valley_ft": 0.0,
+  "step_flashing_ft": 0.0,
+  "predominant_pitch": 4.0,
+  "facets": 0,
+  "drip_edge_eave_ft": 128.0,
+  "drip_edge_eave_rake_ft": 128.0,
+  "ridge_cap_ridge_ft": 0.0,
+  "ridge_cap_ridge_hip_ft": 0.0,
+  "planes_surface_area_sqft": 1012.0,
+  "planes_pitch_weighted": 4.0,
+  "outline_perimeter_ft": 128.0,
+  "plane_count": 4
+ },
+ "verification": {
+  "verdict": "unverified",
+  "notes": [
+   "The roof diagram could not be built, so there were no edges to verify."
+  ],
+  "adjustments": [],
+  "original_totals": {
+   "area_sqft": 1012.0,
+   "squares": 10.12,
+   "eave_ft": 128.0,
+   "rake_ft": 0.0,
+   "ridge_ft": 0.0,
+   "hip_ft": 0.0,
+   "valley_ft": 0.0,
+   "step_flashing_ft": 0.0,
+   "predominant_pitch": 4.0,
+   "facets": 0,
+   "drip_edge_eave_ft": 128.0,
+   "drip_edge_eave_rake_ft": 128.0,
+   "ridge_cap_ridge_ft": 0.0,
+   "ridge_cap_ridge_hip_ft": 0.0
+  },
+  "model": null,
+  "rounds": 0,
+  "usage": {
+   "input_tokens": 0,
+   "output_tokens": 0
+  }
+ },
+ "confidence": 0.5,
+ "warnings": [
+  "A simple roof diagram could not be built; the measured roof planes are returned instead."
+ ],
+ "warning_codes": [
+  "model_failed"
+ ]
+}

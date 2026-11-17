@@ -152,7 +152,7 @@ def test_healthz_reports_abandoned_workers_and_queued_jobs_fail_when_all_are_stu
 
     c = make(tmp_path, stuck, job_timeout_s=0.1, workers=1, queue_max=5)
     c.app.state.service.runner.grace_s = 0.1
-    assert c.get("/healthz").json() == {"status": "ok", "pipeline_version": "0.3.0", "abandoned_workers": 0}
+    assert c.get("/healthz").json() == {"status": "ok", "pipeline_version": "0.3.1", "abandoned_workers": 0}
     a = c.post("/v1/measurements", json={**BODY, "lat": 1.0}).json()
     queued = c.post("/v1/measurements", json={**BODY, "lat": 2.0}).json()
     assert wait(c, a["id"], secs=5)["error"]["code"] == "timeout"

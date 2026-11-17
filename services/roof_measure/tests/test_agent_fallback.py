@@ -243,13 +243,22 @@ def test_rule_methods_are_untouched_and_never_call_the_agent(tmp_path, monkeypat
     assert res.method_used == "lidar_skeleton" and CODE not in res.envelope["warning_codes"] and client.calls == 0
 
 
-def test_a_rule_method_that_fails_in_the_model_still_fails(tmp_path, monkeypatch):
+def test_a_rule_method_that_fails_in_the_model_returns_the_planes_and_without_planes_still_fails(tmp_path, monkeypatch):
+    """Rewritten for 0.3.1: with LiDAR planes the model failure is no longer an error (planes_only.py)."""
     def build(*a, **k):
         raise ModelError("facet f1 has a spike")
 
     monkeypatch.setattr(pipeline, "build_model", build)
+    res = run(tmp_path, "lidar_skeleton")
+    assert res.envelope["model"]["source"]["planes_only"] and "model_failed" in res.envelope["warning_codes"]
+    from roof_measure.classify import BlockSet
+
+    bare = BlockSet.load(BLOCKS)
+    bare.blocks = []  # no LiDAR plane at all: the error stays what it was
+    bare.save(tmp_path / "bare.json")
     with pytest.raises(ModelError):
-        run(tmp_path, "lidar_skeleton")
+        pipeline.run_pipeline(ADDR, tmp_path / "bare", "lidar_skeleton", blocks_path=tmp_path / "bare.json",
+                              verify=False, render=False)
 
 
 def test_lidar_agent_without_agent_flag_is_the_old_deterministic_path(tmp_path, rules):

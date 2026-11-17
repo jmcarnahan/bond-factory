@@ -1,7 +1,7 @@
 # roof_measure envelope 0.3 (additive to 0.2)
 
-`PIPELINE_VERSION` is `0.3.0`; the contract name stays `bond.roof_model/0.2` and every 0.2 key keeps its meaning and its
-value. 0.3 only ADDS optional keys and two warning codes (`parcel_street_match`, `agent_failed_fell_back`; and the street-match note moves from `other` to the first). A parser that ignores unknown keys (the Dart `RoofMeasurement`
+`PIPELINE_VERSION` is `0.3.1` (0.3.0 added the keys below; 0.3.1 adds the planes-only result and a sliver repair, see the end of this file); the contract name stays `bond.roof_model/0.2` and every 0.2 key keeps its meaning and its
+value. 0.3 only ADDS optional keys and three warning codes (`parcel_street_match`, `agent_failed_fell_back`, `model_failed`; and the street-match note moves from `other` to the first). A parser that ignores unknown keys (the Dart `RoofMeasurement`
 does) needs no change. `method_used` never gains a new value: a retry or a fallback is a reason code, not a method.
 `pipeline_version` keys the result cache, so 0.2.0 results are not reused after the upgrade.
 The agent methods behave differently (they no longer raise on an agent failure): see "Agent methods" below and the CHANGELOG.
@@ -48,7 +48,7 @@ plane survived (for example every plane lies outside the footprint). One object 
 | `level_spread_ft` | highest minus lowest plane `height_ft` among the planes that cover at least 5% of the planes' area; a two-level roof shows several feet, a single-level one about 0. Null as above. 0.1 |
 | `planes_lidar` | number of snapped planes (= `model.planes` length); when the check failed, the number of LiDAR planes found |
 | `facets_model` | number of facets in `model.facets` |
-| `reasons` | codes, in this order when present: `multi_plane_simplified` (planes_lidar >= facets_model + 3 and mismatch >= 30), `low_outline_coverage` (covered < 70), `model_misses_roof_area` (`model_uncovered_pct` >= 10), `sparse_lidar` (the `low_point_density` warning), `parcel_street_match`, `other_buildings_on_parcel`, `agent_failed_fell_back` (a `lidar_agent` run fell back to the rules; the retry after a crashed process adds it too), `bad_lidar_block` (a LiDAR block with a NaN or infinite number was left out), `quality_failed` (first and alone but for the copied codes when the check failed) |
+| `reasons` | codes, in this order when present: `model_failed` (planes-only result: first, see the end of this file), `multi_plane_simplified` (planes_lidar >= facets_model + 3 and mismatch >= 30), `low_outline_coverage` (covered < 70), `model_misses_roof_area` (`model_uncovered_pct` >= 10), `sparse_lidar` (the `low_point_density` warning), `parcel_street_match`, `other_buildings_on_parcel`, `agent_failed_fell_back` (a `lidar_agent` run fell back to the rules; the retry after a crashed process adds it too), `bad_lidar_block` (a LiDAR block with a NaN or infinite number was left out), `quality_failed` (first and alone but for the copied codes when the check failed) |
 
 Read the metrics together, never `plane_mismatch_pct` alone: a single small LiDAR plane can be snapped over the whole outline and score a mismatch of 0.0. `outline_covered_pct` (and the reason `low_outline_coverage`) says how much of the outline the raw planes really covered, and `model_uncovered_pct` how much of the planes' area the model does not draw.
 
@@ -92,3 +92,41 @@ ran" must check `method_used` or the code.** A `lidar_agent` child killed by a s
 `lidar_skeleton`; a `solar_agent` crash still fails the measurement. `solar_agent` plus `agent_failed_fell_back` means the Solar segments were classified by the rules (`method_used` keeps
 the name; there is no new method value). A missing, invalid or revoked Anthropic key is NOT
 a fallback: it raises (`measurement_failed`, not retryable).
+
+## Planes-only result (`model_failed`, pipeline 0.3.1)
+
+Before 0.3.1 a roof whose block model failed validation (for example `measurement_failed: facet f45 has a spike (9.6
+deg)`) or came out of the classifier with no roof block was an ERROR although the LiDAR planes had been found. Now,
+for `lidar_skeleton`, `auto` and `lidar_agent` (after its fall back to the rules), when LiDAR planes survive snapping
+the call SUCCEEDS with a planes-only envelope. **These inputs used to raise `MeasureError` `measurement_failed`**; a
+caller that treats "an envelope came back" as "a roof diagram exists" must check `model.source.planes_only` or the
+warning code. With no plane at all (no LiDAR, every plane outside the footprint, `solar_agent`) the error is raised
+as before.
+
+| Where | Value |
+|---|---|
+| `model.source.planes_only` | `true` (the key is absent otherwise, never `false`) |
+| `model.facets`, `model.edges`, `model.blocks`, `model.holes` | `[]`; `model` still passes `validate` (schema `bond.roof_model/0.1`), its `totals` are zeros |
+| `model.confidence` | `overall` `low`, notes: the sentence "The simple roof diagram could not be built; this result is the measured roof planes only." and the cause (the validation message) |
+| `model.planes` | as always (snapped planes); at least one |
+| `model.quality` | `plane_mismatch_pct` null; `model_uncovered_pct` 100.0; `facets_model` 0; `reasons` start with `model_failed`; `multi_plane_simplified` and `model_misses_roof_area` are not given (the first reason says it), the others are kept (`low_outline_coverage`, `sparse_lidar`, ...) |
+| `totals` | every 0.2 key is present: `area_sqft` = `planes_surface_area_sqft`; `squares` = area / 100; `predominant_pitch` = the half-step bucket of `planes_pitch_weighted`; `facets` 0; `eave_ft`, `drip_edge_eave_ft`, `drip_edge_eave_rake_ft` = `outline_perimeter_ft`; `rake_ft`, `ridge_ft`, `hip_ft`, `valley_ft`, `step_flashing_ft`, `ridge_cap_ridge_ft`, `ridge_cap_ridge_hip_ft` = 0.0; plus the four plane totals. **The edge totals are NOT measured**: only the outline perimeter is known, it stands in for the eaves, and the other edge types are 0.0 because nobody measured them. Show the area, the pitch and the perimeter; do not offer ridge, hip or valley lengths |
+| `warning_codes` / `warnings` | `model_failed`: "A simple roof diagram could not be built; the measured roof planes are returned instead." (with `agent_failed_fell_back` when that happened first) |
+| `verification` | verdict `unverified`, `rounds` 0, `model` null, `adjustments` `[]`, a note that there were no edges to verify; `original_totals` are the totals above. The verifier does not run, whatever `verify` says |
+| `confidence` | 0.5 or lower (a low-confidence model, capped as always) |
+| `method_used` | the method that ran (`lidar_skeleton`, or `lidar_skeleton` after an agent fell back) |
+
+A consumer that draws the roof diagram must not draw it from a planes-only model (`facets` is empty): draw
+`model.planes` instead. The Dart `RoofModel.fromJson`, `LengthDiagram`, `AreaDiagram`, `SummaryBlock` and
+`RoofReport.pages` accept such a model without throwing (they draw a page with the legends and no roof;
+`packages/bond_roof/test/planes_only_test.dart`). Example: `fixtures/roof_planes_only/roof_measurement_0.3_planes_only.json`
+(kept apart from the 0.2 examples so that code that loads every envelope in `fixtures/` does not meet zero facets).
+
+### Sliver repair (pipeline 0.3.1)
+
+`model.validate` rejects a facet vertex sharper than 10 degrees. When the pipeline's own straight skeleton produces a
+facet that is a spike and tiny (area under 25 sq ft and under 2% of its block), the facet is merged into the
+same-block neighbour it shares the longest border with, provided the merged facet has no spike left; the block still
+tiles exactly and the area does not change. The edge between the two facets disappears and the sliver's other edges
+belong to the neighbour. A warning (code `other`) names each merge. A model that passed validation before is never
+changed (the repair runs only for a facet that would fail).

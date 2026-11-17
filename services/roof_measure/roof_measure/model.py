@@ -176,6 +176,8 @@ def build_model(blockset: BlockSet, roof_blocks: list[RoofBlock], source: dict[s
 
     edges = _build_edges(blks, border_steps(blockset))
     cleanup_notes = clean_facets(facets_out, edges)  # sliver spikes would fail validate; see model_cleanup.py
+    if any("merged into" in n for n in cleanup_notes):
+        edges = _cleanup_edges(edges)  # edges handed to the kept facet may now join their collinear neighbours
     totals = _totals(facets_out, edges)
     notes, warnings = _notes(blockset, blks, edges, diagnostics, method, source)
     warnings = [*warnings, *cleanup_notes]
@@ -200,6 +202,7 @@ def build_model(blockset: BlockSet, roof_blocks: list[RoofBlock], source: dict[s
                                             if blockset.blocks else 0.0)}
                       if lidar and method != "solar_agent" else None),
             "solar": source.get("solar"),
+            **({"planes_only": True} if source.get("planes_only") else {}),  # see planes_only.py
         },
         "blocks": [b.rb.to_dict() | {"polygon": _ccw(b.rb.polygon)} for b in blks],
         "facets": facets_out,
