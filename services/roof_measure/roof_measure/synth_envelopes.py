@@ -2,7 +2,8 @@
 
 ``python -m roof_measure.synth_envelopes [fixtures_dir]`` (or ``make fixtures``) rewrites
 ``roof_measurement_0.2_{pass,adjusted,unverified,fail}.json``, ``synthetic_flat_curbs.json``,
-``synthetic_hip_zigzag.json`` and ``synthetic_solar_response.json``.
+``synthetic_hip_zigzag.json`` and ``synthetic_solar_response.json``, and ``roof_planes_only/
+roof_measurement_0.3_planes_only.json`` (an envelope without a roof diagram; its own folder).
 
 The ``verification`` block of ``pass``, ``adjusted`` and ``unverified`` is what ``verify.verify`` emits: the
 LLM turns come from a scripted fake client (no network, no key) and ``unverified`` runs with the key removed.
@@ -19,7 +20,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from .envelope import build_envelope, totals_from_model
+from .envelope import TOTALS_KEYS, build_envelope, totals_from_model
 from .model import build_model
 from .synth import FIXTURES, synthetic_gable, synthetic_hip
 from .synth_extra import (
@@ -34,6 +35,8 @@ from .verify import verify
 
 OSM_WARNING = "Footprint from OpenStreetMap; parcel data unavailable outside Los Angeles County."
 LLM = "claude-sonnet-5-5"
+PLANES_ONLY_DIR = "roof_planes_only"
+PLANES_ONLY_NAME = "roof_measurement_0.3_planes_only"
 
 
 class ScriptedClient:
@@ -104,6 +107,50 @@ def envelopes() -> dict[str, dict[str, Any]]:
             "roof_measurement_0.2_unverified": unv_env, "roof_measurement_0.2_fail": fail_env}
 
 
+def planes_only_envelope() -> dict[str, Any]:
+    """The planes-only example: a 40 x 24 ft hip's four LiDAR planes, no roof diagram (invented frame and address).
+
+    Composed from the same functions the pipeline uses when the simple roof model cannot be built.
+    """
+    from shapely.geometry import Polygon
+
+    from . import planes_only
+    from .classify import BlockSet
+    from .quality import assess
+
+    fp = [(0.0, 0.0), (40.0, 0.0), (40.0, 24.0), (0.0, 24.0)]
+    inner = Polygon(fp).buffer(-0.6, join_style=2)
+    faces = [("k0", [(0, 0), (40, 0), (28, 12), (12, 12)], 180.0), ("k1", [(40, 0), (40, 24), (28, 12)], 90.0),
+             ("k2", [(40, 24), (0, 24), (12, 12), (28, 12)], 0.0), ("k3", [(0, 24), (0, 0), (12, 12)], 270.0)]
+    blocks = []
+    for bid, ring, aspect in faces:
+        part = Polygon(ring).intersection(inner)
+        pts = [[round(x, 2), round(y, 2)] for x, y in list(part.exterior.coords)[:-1]]
+        blocks.append({"id": bid, "kind": "sloped", "polygon_ft": pts, "plan_area_sqft": round(part.area, 1),
+                       "mean_z_ft": 13.0, "height_above_ground_ft": 12.6, "pitch_rise": 4.0, "aspect_deg": aspect,
+                       "rms_ft": 0.1, "n_cells": int(part.area)})
+    bs = BlockSet.from_dict({
+        "schema": "bond.roof_blocks/0.1", "address": {"line1": "100 Example Ave", "city": "Sampletown", "state": "CA",
+                                                       "zip": "90000", "formatted": "100 Example Ave, Sampletown, CA 90000"},
+        "origin": {"lat": 0.0, "lng": 0.0}, "frame": {"epsg": 32631, "x0_m": 0.0, "y0_m": 0.0},
+        "footprint_ft": [list(p) for p in [*fp, fp[0]]],
+        "footprint_meta": {"provider": "synthetic", "id": "T", "area_sqft": Polygon(fp).area, "height_ft": 20.0},
+        "lidar": {"density_per_m2": 14.0}, "blocks": blocks, "borders": [], "outline_edges": [], "extra": {}})
+    model = planes_only.build_planes_only_model(bs, {"method": "lidar_skeleton"},
+                                                "ModelError: SYNTHETIC EXAMPLE: the diagram was declared unbuildable")
+    model["generated_at"] = base_time = "2026-11-10T00:00:00Z"
+    assessment = assess(bs, model, [])
+    assert assessment is not None
+    assessment = {**assessment, "quality": planes_only.planes_only_quality(assessment["quality"])}
+    verification = {"verdict": "unverified", "notes": [planes_only.NOT_VERIFIED], "adjustments": [],
+                    "original_totals": {k: v for k, v in planes_only.planes_only_totals(assessment["totals"]).items()
+                                        if k in TOTALS_KEYS}, "model": None, "rounds": 0,
+                    "usage": {"input_tokens": 0, "output_tokens": 0}}
+    return build_envelope(model, method_used="lidar_skeleton", footprint_source="lariac", verification=verification,
+                          warnings=[planes_only.WARNING], warning_codes=[planes_only.CODE], density_pts_m2=14.0,
+                          generated_at=base_time, assessment=assessment)
+
+
 def generate_all(out_dir: Path = FIXTURES) -> dict[str, int]:
     """Write every fixture this module owns; returns name -> bytes."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -113,6 +160,10 @@ def generate_all(out_dir: Path = FIXTURES) -> dict[str, int]:
     for name, doc in docs.items():
         (write_raw if name == "synthetic_solar_response" else write_json)(out_dir / f"{name}.json", doc)
         sizes[name] = (out_dir / f"{name}.json").stat().st_size
+    sub = out_dir / PLANES_ONLY_DIR  # apart from the others: tools that load every envelope here would meet zero facets
+    sub.mkdir(parents=True, exist_ok=True)
+    write_json(sub / f"{PLANES_ONLY_NAME}.json", planes_only_envelope())
+    sizes[f"{PLANES_ONLY_DIR}/{PLANES_ONLY_NAME}"] = (sub / f"{PLANES_ONLY_NAME}.json").stat().st_size
     return sizes
 
 

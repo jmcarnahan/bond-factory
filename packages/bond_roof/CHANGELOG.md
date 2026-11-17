@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Tests only: a planes-only envelope (`fixtures/roof_planes_only/`, no facets or edges) parses, and `LengthDiagram`,
+  `AreaDiagram` and `SummaryBlock` build on it without throwing. No library change.
 - Licence: MIT (LICENSE file added). It was GPL-3.0-or-later with the rest of the repository;
   no code changes.
 

@@ -5,12 +5,15 @@ import json
 import math
 
 import pytest
+import spike_cases
 from conftest import FIXTURES
 
 from roof_measure import model as model_mod
+from roof_measure import model_cleanup as model_cleanup_mod
 from roof_measure.model import ModelError, _totals, validate
 from roof_measure.model_cleanup import clean_facets, interior_angle
 
+HERE_FIXTURES = spike_cases.FIXTURES
 FLAT = json.loads((FIXTURES / "synthetic_flat_parapet.json").read_text())
 
 
@@ -138,3 +141,112 @@ def test_clean_facets_removes_exact_duplicate_vertices_and_build_model_finishes_
         m = None  # rejecting a degenerate ring is acceptable; hanging is not
     assert time.monotonic() - start < 1.0
     assert m is None or m["totals"]["total_area_sqft"] == pytest.approx(959.2, abs=1.0)
+
+
+# ---- sliver facets: a spike facet that is tiny is merged into its same-block neighbour (model_slivers.py)
+def two_facets(with_right_neighbour=True):
+    """A 60 x 40 facet f1, its thin triangle f2 (tip angle 5.7 degrees on the outline, 20 sq ft) and, when asked, the
+    facet f3 on the other side of the triangle's long side: only the union with f3 loses the sharp tip."""
+    pitch = {"pitch_rise": 4.0, "kind": "sloped", "block": "b1"}
+    big = {"id": "f1", "polygon": [[0.0, 0.0], [60.0, 0.0], [60.0, 40.0], [0.0, 40.0]], "aspect_deg": 180.0,
+           "plan_area_sqft": 2400.0, "area_sqft": 2400.0 * math.sqrt(1 + 1 / 9), **pitch}
+    thin = {"id": "f2", "polygon": [[60.0, 0.0], [80.0, 0.0], [60.0, 2.0]], "aspect_deg": 90.0,
+            "plan_area_sqft": 20.0, "area_sqft": 20.0 * math.sqrt(1 + 1 / 9), **pitch}
+    right = {"id": "f3", "polygon": [[60.0, 2.0], [80.0, 0.0], [100.0, 0.0], [100.0, 40.0], [60.0, 40.0]],
+             "aspect_deg": 0.0, "plan_area_sqft": 1580.0, "area_sqft": 1580.0 * math.sqrt(1 + 1 / 9), **pitch}
+    edges = [{"id": "e1", "type": "eave", "points": [[0.0, 0.0], [60.0, 0.0]], "length_ft": 60.0, "facets": ["f1"]},
+             {"id": "e2", "type": "eave", "points": [[60.0, 0.0], [80.0, 0.0]], "length_ft": 20.0, "facets": ["f2"]},
+             {"id": "e3", "type": "hip", "points": [[80.0, 0.0], [60.0, 2.0]], "length_ft": 20.1, "facets": ["f2", "f3"]},
+             {"id": "e4", "type": "ridge", "points": [[60.0, 0.0], [60.0, 2.0]], "length_ft": 2.0, "facets": ["f1", "f2"]}]
+    return ([big, thin, right] if with_right_neighbour else [big, thin]), edges
+
+
+def test_a_sliver_facet_is_merged_into_the_neighbour_that_removes_its_spike():
+    facets, edges = two_facets()
+    surface = {f["id"]: f["area_sqft"] for f in facets}
+    notes = clean_facets(facets, edges)
+    assert notes == ["facet f2: sliver merged into facet f3"]  # f1 shares 2 ft but would keep the 5.7 degree tip
+    assert [f["id"] for f in facets] == ["f1", "f3"]
+    f3 = facets[1]
+    assert sorted(map(tuple, f3["polygon"])) == [(60.0, 0.0), (60.0, 40.0), (100.0, 0.0), (100.0, 40.0)]  # a rectangle
+    assert f3["plan_area_sqft"] == pytest.approx(1600.0)
+    assert f3["area_sqft"] == pytest.approx(surface["f2"] + surface["f3"])  # nothing lost, same pitch
+    assert {e["id"]: e["facets"] for e in edges} == {"e1": ["f1"], "e2": ["f3"], "e4": ["f1", "f3"]}  # e3 was the border
+    assert all(interior_angle(f["polygon"][i - 1], f["polygon"][i], f["polygon"][(i + 1) % len(f["polygon"])]) >= 10
+               for f in facets for i in range(len(f["polygon"])))
+
+
+def test_a_sliver_whose_only_neighbour_keeps_its_tip_is_left_alone():
+    facets, edges = two_facets(with_right_neighbour=False)
+    before = copy.deepcopy((facets, edges))
+    assert clean_facets(facets, edges) == []
+    assert (facets, edges) == before
+
+
+def test_a_sliver_over_the_area_bound_is_left_alone():
+    facets, edges = two_facets()
+    facets[1]["polygon"] = [[60.0, 0.0], [120.0, 0.0], [60.0, 8.0]]  # 240 sq ft, tip 7.6 degrees, over 25 sq ft
+    before = copy.deepcopy((facets, edges))
+    assert clean_facets(facets, edges) == []
+    assert (facets, edges) == before
+
+
+def test_a_sliver_with_no_neighbour_in_its_block_is_left_alone():
+    facets, edges = two_facets()
+    facets[1]["block"] = "b2"  # f1 and f3 belong to b1
+    before = copy.deepcopy((facets, edges))
+    assert clean_facets(facets, edges) == []
+    assert (facets, edges) == before
+
+
+def test_a_small_facet_without_a_spike_is_never_merged():
+    facets, edges = two_facets()
+    facets[1]["polygon"] = [[60.0, 0.0], [66.0, 0.0], [60.0, 6.0]]  # 18 sq ft, 45 degree tip
+    before = copy.deepcopy((facets, edges))
+    assert clean_facets(facets, edges) == []
+    assert (facets, edges) == before
+
+
+@pytest.mark.parametrize("name", spike_cases.FIXABLE)
+def test_a_jagged_roof_with_a_spike_facet_now_builds_with_the_area_unchanged(name):
+    with pytest.raises(ModelError, match="spike"):  # the 0.3.0 behaviour: no merge, the model is rejected
+        original = model_cleanup_mod.merge_slivers
+        model_cleanup_mod.merge_slivers = lambda facets, edges: []
+        try:
+            spike_cases.build(name)
+        finally:
+            model_cleanup_mod.merge_slivers = original
+    m = spike_cases.build(name)
+    rb = spike_cases.roof_block(name)
+    expected = rb.poly.area * math.sqrt(1 + (rb.pitch_rise / 12) ** 2)
+    assert m["totals"]["total_area_sqft"] == pytest.approx(expected, rel=0.01)
+    assert any("sliver merged into" in w for w in m["warnings"])
+    assert all(len(set(e["facets"])) == len(e["facets"]) for e in m["edges"])  # no edge lists a facet twice
+
+
+def test_a_spike_that_is_no_sliver_is_still_rejected():
+    with pytest.raises(ModelError, match="spike"):
+        spike_cases.build(spike_cases.UNFIXABLE)
+
+
+def test_merging_slivers_changes_nothing_on_every_committed_blocks_fixture(tmp_path):
+    """The guard: only a model that would fail validate is touched, so every roof that works today is identical."""
+    from quality_helpers import ROOT, SITE1, TWO_LEVEL
+
+    from roof_measure.classify import BlockSet, classify_blocks
+
+    files = [SITE1, TWO_LEVEL, *(HERE_FIXTURES.glob("*_blocks.json")), ROOT / "fixtures" / "site1_blocks.json"]
+    assert len(files) >= 5
+    for f in files:
+        bs = BlockSet.load(f)
+        cl = classify_blocks(bs)
+        with_merge = model_mod.build_model(bs, cl.blocks, {"method": "lidar_skeleton"}, cl)
+        original = model_cleanup_mod.merge_slivers
+        model_cleanup_mod.merge_slivers = lambda facets, edges: []
+        try:
+            without = model_mod.build_model(bs, cl.blocks, {"method": "lidar_skeleton"}, cl)
+        finally:
+            model_cleanup_mod.merge_slivers = original
+        for m in (with_merge, without):
+            m.pop("generated_at")
+        assert with_merge == without, f.name

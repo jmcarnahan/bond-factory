@@ -3,6 +3,8 @@
 ``model.validate`` rejects a facet vertex sharper than 10 degrees. The skeleton can produce such a vertex on a thin
 facet; this pass removes it when that is cheap (the polygon stays simple and loses under 0.5% of its area) and fixes
 what touches it: edges that ended at a removed spike tip lose this facet, and are dropped when no facet is left.
+A tiny facet that is a spike by itself (a triangle cannot lose a vertex) is merged into its same-block neighbour
+(``model_slivers``).
 Near-duplicate vertices (closer than 0.05 ft) are merged and the edges that ended on them are snapped to the kept one.
 """
 
@@ -12,6 +14,8 @@ import math
 from typing import Any
 
 from shapely.geometry import Polygon
+
+from .model_slivers import merge_slivers
 
 SPIKE_DEG = 10.0  # the bound validate enforces on every facet vertex
 DUP_FT = 0.05
@@ -102,4 +106,5 @@ def clean_facets(facets: list[dict[str, Any]], edges: list[dict[str, Any]]) -> l
             plan = Polygon(ring).area
             f["plan_area_sqft"] = plan
             f["area_sqft"] = plan * math.sqrt(1 + (f["pitch_rise"] / 12.0) ** 2)
+    notes.extend(merge_slivers(facets, edges))  # what a vertex cannot fix: a tiny facet that is all spike
     return notes

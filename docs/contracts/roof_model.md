@@ -94,6 +94,9 @@ Rules:
   the nearest block without measurement (tree cover, dropped cells).
 - `source.solar`, when present: `{"imagery_date": "2023-05-01", "imagery_quality": "HIGH",
   "segments": N}`.
+- `source.planes_only`, when present, is `true`: the service could not build the simple roof diagram and returned the
+  measured LiDAR planes only (pipeline 0.3.1, contract-0.3.md). `blocks`, `facets` and `edges` are then empty, `totals` are
+  zeros and the envelope's totals come from the planes. A renderer that draws facets must draw `planes` instead.
 
 ## 3. Edge classification rules (the service implements these; the renderer only draws)
 

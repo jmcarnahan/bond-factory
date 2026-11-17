@@ -1,5 +1,31 @@
 # roof_measure changelog
 
+## 0.3.1 (pipeline version; contract name unchanged, see ../../docs/contract-0.3.md)
+
+### Behaviour change for every caller of `lidar_skeleton`, `auto` and `lidar_agent` (additive for models that worked)
+- **Inputs that used to raise `MeasureError` `measurement_failed` now succeed with a planes-only result** when LiDAR
+  planes survive snapping: a block model that fails `model.validate` (most often "facet fN has a spike (x deg)"), or a
+  classification with no roof block although planes exist. The envelope has `model.source.planes_only` true, empty
+  `facets`/`edges`/`blocks`, `model.planes`, `model.quality` with `model_failed` as the first reason, every `totals`
+  key (area, squares and pitch from the planes; the outline perimeter for `eave_ft` and the two drip-edge totals; all
+  other edge totals 0.0 and NOT measured), the warning code `model_failed` and an unverified verification. `lidar_agent`
+  gets the same net after its fall back to the rules. With no plane at all (no LiDAR, every plane outside the footprint,
+  `solar_agent`) the error is raised as before. Callers that read "an envelope came back" as "a roof diagram exists"
+  must check `model.source.planes_only` or the code.
+- New warning code `model_failed` (in `envelope.WARNING_CODES`, contract-0.2 table, contract-0.3).
+- Sliver repair (`model_slivers.py`, called by `model_cleanup.clean_facets`): a facet that fails validation with a spike
+  and is under 25 sq ft and 2% of its block is merged into the same-block neighbour that removes the spike (longest
+  shared border first). Measured on three real roofs that used to fail (one facet of 1 to 11 sq ft per spike, 0.1% to
+  0.5% of the block); a model that passed before is never touched (pinned on every committed blocks fixture and checked
+  on four real roofs: identical envelopes). A merged facet appears as a model warning ("facet fN: sliver merged into
+  facet fM", code `other`).
+- `PIPELINE_VERSION` 0.3.0 to 0.3.1 (appears in `/healthz`, `pipeline_version`, keys the result cache: cached 0.3.0
+  results, including failures that are now planes-only results, are recomputed). The four 0.2 example fixtures were
+  regenerated (only that line changed). New example `fixtures/roof_planes_only/roof_measurement_0.3_planes_only.json`.
+- Known limit: the three real failures now build, but from jagged block outlines (up to 226 vertices) the skeleton
+  yields 65 to 227 small facets; they score "rough" (see `model.quality`). The simple model is not better for them than
+  the planes; the planes-only result is the honest answer when the model fails.
+
 ## 0.3.0 (pipeline version; contract name unchanged, see ../../docs/contract-0.3.md)
 
 ### Output changes for every caller (additive; every existing key and value is unchanged)
