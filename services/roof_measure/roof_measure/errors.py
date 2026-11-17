@@ -83,7 +83,7 @@ def code_for(exc: BaseException) -> str:
 
 HUMAN_MESSAGE_CLASSES = frozenset({
     "GeocodeError", "FootprintError", "AmbiguousBuilding", "LidarError", "LidarTooSparse", "BlocksError", "ModelError",
-    "PipelineError", "SolarUnavailable", "DeadlineExceeded", "FootprintUnavailable", "LidarUnavailable", "GeocodeUnavailable"})
+    "PipelineError", "AgentAuthError", "SolarUnavailable", "DeadlineExceeded", "FootprintUnavailable", "LidarUnavailable", "GeocodeUnavailable"})
 
 
 def error_from(exc: BaseException) -> dict[str, Any]:

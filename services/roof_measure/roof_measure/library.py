@@ -9,6 +9,7 @@ import json
 import math
 import shutil
 import tempfile
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from . import config, errors
 
 STAGES = ("geocode", "footprint", "lidar", "blocks", "model", "verify", "render")
 KILL_GRACE_S = 30.0
+AGENT_RETRY_MIN_S = 30.0  # a crashed lidar_agent child is retried as lidar_skeleton only with this much time left
 METHODS = ("lidar_skeleton", "lidar_agent", "solar_agent", "auto")  # pipeline.METHODS + "auto"
 
 
@@ -98,12 +100,62 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
                         "footprint_stage_s": None},
         }
         if isolate:
-            from ._isolate import run_isolated
-            return run_isolated(req, on_stage, grace=KILL_GRACE_S)
+            from ._isolate import ChildCrashed, run_isolated
+            started = time.monotonic()
+            seen: list[str] = []
+
+            def tracked(name: str) -> None:
+                seen.append(name)
+                if on_stage is not None:
+                    on_stage(name)
+
+            try:
+                return run_isolated(req, tracked, grace=KILL_GRACE_S)
+            except ChildCrashed as crash:
+                return _retry_after_crash(req, on_stage, crash, started, seen)
         return _run_in_process(req, on_stage)
     finally:
         if own_dir:
             shutil.rmtree(work, ignore_errors=True)
+
+
+def _retry_after_crash(req: dict[str, Any], on_stage: Callable[[str], None] | None, crash: MeasureError,
+                       started: float, seen: Sequence[str] = ()) -> dict[str, Any]:
+    """A ``lidar_agent`` child that died of a native crash is retried once as ``lidar_skeleton``.
+
+    The agent is an upgrade, never a new way to fail: the retry's envelope says ``method_used`` ``lidar_skeleton``
+    and carries the warning code ``agent_failed_fell_back`` (also in ``model.quality.reasons``) with the crash cause.
+    Any other method (a crashed ``solar_agent`` child has no LiDAR to fall back to) or too little time left raises the
+    crash itself; so does a retry that times out, so the crash cause is never hidden by a timeout. A child that hung
+    in the agent stage stopped itself (``_child``) and is retried the same way. Stages the first child already
+    reported are not reported again.
+    """
+    from . import _isolate
+
+    left = req["deadline_s"] - (time.monotonic() - started)
+    if req["method"] != "lidar_agent" or left < AGENT_RETRY_MIN_S:
+        raise crash
+    cause = crash.message.split("; stderr:")[0]  # "the measurement process exited with code -11 (SIGSEGV, ...)"
+    try:
+        done = set(seen)
+
+        def fresh(name: str) -> None:
+            if name not in done and on_stage is not None:
+                on_stage(name)
+
+        env = _isolate.run_isolated({**req, "method": "lidar_skeleton", "deadline_s": left}, fresh,
+                                    grace=KILL_GRACE_S)
+    except MeasureError as retry_error:
+        if retry_error.code == "timeout":
+            raise crash from retry_error
+        raise
+    text = f"The roof agent could not finish ({cause}); the rule-based measurement was used instead."
+    env["warnings"] = [*env.get("warnings", []), text]
+    env["warning_codes"] = [*env.get("warning_codes", []), "agent_failed_fell_back"]
+    quality = (env.get("model") or {}).get("quality")
+    if isinstance(quality, dict) and "agent_failed_fell_back" not in quality.get("reasons", []):
+        quality["reasons"] = [*quality.get("reasons", []), "agent_failed_fell_back"]
+    return env
 
 
 def purge_cache(cache_dir: str | Path, days: float = 30.0) -> int:

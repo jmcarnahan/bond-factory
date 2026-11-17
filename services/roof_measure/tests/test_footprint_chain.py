@@ -139,10 +139,10 @@ def test_outside_the_la_bbox_the_county_link_is_skipped(net):
     assert fp.source == "osm" and not any("LACounty" in u for u in net.urls())
 
 
-def test_weak_parcel_match_note_is_coded_other(net):
+def test_weak_parcel_match_note_has_its_own_code(net):
     county_ok(net, parcels=[parcel(house="102")])
     fp = footprint.fetch_footprint(LAT, LNG, ADDR)
-    assert fp.source == "lariac" and fp.warning_codes == ["other"] and "no exact parcel match" in fp.warnings[0]
+    assert fp.source == "lariac" and fp.warning_codes == ["parcel_street_match"] and "no exact parcel match" in fp.warnings[0]
 
 
 def empty_osm(net):

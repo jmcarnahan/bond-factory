@@ -20,20 +20,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import anthropic
-from shapely.geometry import Polygon, box
-from shapely.ops import unary_union
+from shapely.errors import ShapelyError
+from shapely.geometry import Polygon
 
 from . import config
-from .classify import BlockSet, RoofBlock, complete_tiling, polygons_of, ridge_azimuth, ring_of
+from .agent_tools import NUMBER_TOL, Workspace, _numbers, _r  # noqa: F401 - re-exported
+from .classify import BlockSet, RoofBlock, complete_tiling
 from .deadline import Deadline
-from .skeleton import block_geometry, hip_roof_edges, measure, rect_fit, signed_area, split_footprint
+from .pipeline_stages import PipelineError
+from .skeleton import measure
 
 log = logging.getLogger(__name__)
 
 MODEL = "claude-sonnet-5-5"
 MAX_ROUNDS = 12
-MAX_TOKENS = 6000
-NUMBER_TOL = 0.006
+MAX_TOKENS = 12000  # thinking counts inside max_tokens; 6000 left too little room for thinking plus a tool call
+THINKING = {"type": "between_tools"}  # explicit, like the verifier: behaviour must not depend on a model default
+# a tool may fail in these ways on bad model input; the model reads the message and retries (never a crash)
+TOOL_ERRORS = (KeyError, ValueError, TypeError, AttributeError, IndexError, ArithmeticError, RuntimeError, ShapelyError)
 
 SYSTEM_PROMPT = """You are a roof-geometry analyst. You receive a building footprint (vertices in feet, x east, \
 y north), an EVIDENCE table of roof segments placed on that footprint (Google Solar API segments, or LiDAR \
@@ -115,6 +119,13 @@ class AgentError(RuntimeError):
     """The agent did not produce an acceptable answer."""
 
 
+class AgentAuthError(PipelineError):
+    """The Anthropic key was rejected (invalid, revoked, no access). A caller error like a missing key.
+
+    Deliberately NOT an AgentError: the pipeline falls back to the rules only for genuine agent failures.
+    """
+
+
 @dataclass
 class AgentResult:
     blocks: list[RoofBlock]
@@ -126,29 +137,6 @@ class AgentResult:
     filled_pct: float = 0.0
     model: str = MODEL
     usage: dict[str, int] = field(default_factory=dict)
-
-
-def _r(o: Any, nd: int = 3) -> Any:
-    """Round floats in nested results so the model copies short, exact numbers."""
-    if isinstance(o, float):
-        return round(o, nd)
-    if isinstance(o, dict):
-        return {k: _r(v, nd) for k, v in o.items()}
-    if isinstance(o, (list, tuple)):
-        return [_r(v, nd) for v in o]
-    return o
-
-
-def _numbers(o: Any) -> list[float]:
-    if isinstance(o, bool):
-        return []
-    if isinstance(o, (int, float)):
-        return [float(o)]
-    if isinstance(o, dict):
-        return [n for v in o.values() for n in _numbers(v)]
-    if isinstance(o, (list, tuple)):
-        return [n for v in o for n in _numbers(v)]
-    return []
 
 
 # ----------------------------------------------------------------------------- evidence tables
@@ -178,159 +166,53 @@ def lidar_evidence_rows(bs: BlockSet) -> list[dict[str, Any]]:
     return rows
 
 
-# ----------------------------------------------------------------------------- tool workspace
-class Workspace:
-    """Server-side state behind the tools: polygon registry and the set of citable numbers."""
-
-    def __init__(self, footprint_ft: list[tuple[float, float]], rows: list[dict[str, Any]],
-                 segment_polys: dict[str, Polygon]) -> None:
-        self.footprint = [tuple(p) for p in footprint_ft]
-        self.polys: dict[str, list[tuple[float, float]]] = {"footprint": self.footprint}
-        self.rows = {r["id"]: r for r in rows}
-        self.segment_polys = segment_polys
-        self.allowed: list[float] = [0.0] + _numbers(rows)
-        self._n = 0
-
-    def _new(self, ring: list[tuple[float, float]]) -> str:
-        self._n += 1
-        pid = f"p{self._n}"
-        self.polys[pid] = ring_of(Polygon(ring), 0.0)  # always CCW so edge indices match what `measure` shows
-        return pid
-
-    def _poly(self, pid: str) -> list[tuple[float, float]]:
-        if pid not in self.polys:
-            raise KeyError(f"unknown polygon_id {pid!r}; known: {sorted(self.polys)}")
-        return self.polys[pid]
-
-    def _seg(self, ids: list[str]) -> list[dict[str, Any]]:
-        missing = [i for i in ids if i not in self.rows]
-        if missing:
-            raise KeyError(f"unknown segment ids {missing}; known: {sorted(self.rows)}")
-        return [self.rows[i] for i in ids]
-
-    # --- tools
-    def measure(self, polygon_id: str) -> dict[str, Any]:
-        m = measure(self._poly(polygon_id))
-        return {"polygon_id": polygon_id, "area_sqft": m["area_sqft"], "perimeter_ft": m["perimeter_ft"],
-                "bounds": list(m["bounds"]), "min_rotated_rect_ft": m["min_rotated_rect_ft"],
-                "edges": [{"index": e["index"], "from": list(e["from"]), "to": list(e["to"]),
-                           "length_ft": e["length_ft"], "outward_bearing_deg": e["outward_bearing_deg"]}
-                          for e in m["edges"]]}
-
-    def propose_split(self, polygon_id: str, line_ft: list[list[float]]) -> dict[str, Any]:
-        parts = split_footprint(self._poly(polygon_id), line_ft)
-        out = []
-        for part in parts:
-            pid = self._new(part["polygon"])
-            out.append({"polygon_id": pid, "area_sqft": part["area_sqft"],
-                        "bounds": list(Polygon(part["polygon"]).bounds)})
-        return {"parts": out}
-
-    def region_from_segments(self, segment_ids: list[str]) -> dict[str, Any]:
-        rows = self._seg(segment_ids)
-        fp = Polygon(self.footprint)
-        shapes = []
-        for r in rows:
-            sp = self.segment_polys.get(r["id"]) or box(*r["bbox_ft"])
-            shapes.append(sp if not r.get("inside_footprint", True) and r.get("form_hint") == "sloped"
-                          else sp.intersection(fp))
-        union = unary_union([s for s in shapes if not s.is_empty]).buffer(0)
-        parts = [p for p in polygons_of(union) if p.area > 1.0]
-        ground = sum(r["ground_area_sqft"] for r in rows)
-        out = []
-        for p in sorted(parts, key=lambda g: -g.area):
-            pid = self._new(ring_of(p.simplify(0.1), 0.0))
-            out.append({"polygon_id": pid, "area_sqft": p.area, "bounds": list(p.bounds)})
-        return {"parts": out, "segments_ground_area_sqft": ground}
-
-    def rect_fit(self, polygon_id: str) -> dict[str, Any]:
-        verts, short, long_, area = rect_fit(self._poly(polygon_id))
-        pid = self._new(verts)
-        return {"polygon_id": pid, "short_side_ft": short, "long_side_ft": long_, "area_sqft": area}
-
-    def pitch_rise_from_segments(self, segment_ids: list[str]) -> dict[str, Any]:
-        rows = [r for r in self._seg(segment_ids) if r.get("pitch_rise") is not None]
-        w = sum(r["ground_area_sqft"] for r in rows) or 1.0
-        mean = sum(r["pitch_rise"] * r["ground_area_sqft"] for r in rows) / w
-        vals = [r["pitch_rise"] for r in rows]
-        return {"pitch_rise": mean, "min": min(vals), "max": max(vals), "spread": max(vals) - min(vals),
-                "n_segments": len(rows)}
-
-    def hip_roof_edges(self, polygon_id: str, pitch_rise: float, gable_edges: list[int] | None = None
-                       ) -> dict[str, Any]:
-        ring = self._poly(polygon_id)
-        res = hip_roof_edges(ring, pitch_rise, set(gable_edges or ()))
-        t = res["totals"]
-        return {"polygon_id": polygon_id, "form": "gable" if gable_edges else "hip",
-                "eave_ft": t["eaves_ft"], "rake_ft": t["rakes_ft"], "ridge_ft": t["ridges_ft"],
-                "hip_ft": t["hips_ft"], "valley_ft": t["valleys_ft"], "roof_area_sqft": t["facet_area_sqft"],
-                "plan_area_sqft": t["plan_area_sqft"],
-                "facets": [{"aspect_deg": f["aspect_deg"], "area_sqft": f["area"]} for f in res["facets"]]}
-
-    def is_known(self, v: float) -> bool:
-        return any(abs(v - a) <= NUMBER_TOL for a in self.allowed)
-
-    def call(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        fn = getattr(self, name, None)
-        if name == "finalize" or fn is None or name.startswith("_"):
-            raise KeyError(f"unknown tool {name!r}")
-        res = _r(fn(**args))
-        self.allowed.extend(_numbers(res))
-        return res
-
-    # --- finalize
-    def finalize(self, args: dict[str, Any]) -> tuple[list[RoofBlock], list[dict[str, Any]], list[str]]:
-        """Validate the decision; returns candidate blocks. Raises ValueError with a fix hint."""
-        blocks: list[RoofBlock] = []
-        decisions = []
-        for i, b in enumerate(args.get("blocks", [])):
-            ring = self._poly(b["polygon_id"])
-            form = b["form"]
-            n = len(ring)
-            gable = [int(g) for g in b.get("gable_edges", [])]
-            if signed_area(ring) < 0:  # footprint given clockwise: reverse and remap edge indices
-                ring = ring[::-1]
-                gable = [(n - 2 - g) % n for g in gable]
-            if any(g < 0 or g >= n for g in gable):
-                raise ValueError(f"block {i}: gable_edges out of range for polygon {b['polygon_id']} ({n} edges)")
-            if form == "gable" and len(gable) < 2:
-                raise ValueError(f"block {i}: a gable needs at least two gable_edges")
-            pitch = b.get("pitch_rise")
-            if form != "flat" and (pitch is None or not self.is_known(float(pitch))):
-                raise ValueError(f"block {i}: pitch_rise {pitch} was not given by the evidence or a tool; "
-                                 "copy it from pitch_rise_from_segments")
-            aspect = b.get("aspect_deg")
-            if form == "shed" and (aspect is None or not self.is_known(float(aspect))):
-                raise ValueError(f"block {i}: a shed needs aspect_deg copied from the evidence azimuth")
-            rb = RoofBlock(id="", form=form, polygon=list(ring),
-                           pitch_rise=0.0 if form == "flat" else float(pitch), gable_edges=gable if form == "gable" else [],
-                           aspect_deg=float(aspect) if aspect is not None and form == "shed" else None,
-                           notes=[str(e) for e in b.get("evidence", [])], confidence=b.get("confidence", "medium"))
-            geom = block_geometry(form, rb.polygon, rb.pitch_rise, rb.gable_edges, rb.aspect_deg)
-            rb.ridge_azimuth_deg = ridge_azimuth(form, rb.polygon, rb.aspect_deg, geom)
-            blocks.append(rb)
-            decisions.append({"polygon_id": b["polygon_id"], "form": form, "pitch_rise": rb.pitch_rise,
-                              "gable_edges": rb.gable_edges, "aspect_deg": rb.aspect_deg,
-                              "confidence": rb.confidence, "evidence": rb.notes})
-        sloped = [Polygon(r.polygon).buffer(0) for r in blocks if r.form != "flat"]
-        for i in range(len(sloped)):
-            for j in range(i + 1, len(sloped)):
-                inter = sloped[i].intersection(sloped[j]).area
-                if inter > 0.1 * min(sloped[i].area, sloped[j].area):
-                    raise ValueError(f"blocks {i} and {j} overlap by {inter:.0f} sqft; split or fit them again")
-        if not blocks:
-            raise ValueError("finalize needs at least one block")
-        return blocks, decisions, [str(w) for w in args.get("warnings", [])]
-
-
 # ----------------------------------------------------------------------------- the loop
+def _tool_error_text(exc: Exception) -> str:
+    """What the model reads when a tool call fails: the message for our own checks, the class for library errors."""
+    if isinstance(exc, ShapelyError | AttributeError | IndexError | ArithmeticError | RuntimeError):
+        return (f"{type(exc).__name__}: the tool could not use that input ({str(exc)[:160]}); check the polygon ids, "
+                "numbers and JSON types in your call, or call rect_fit first")
+    return str(exc)
+
+
 def _block_dict(b: Any) -> dict[str, Any]:
+    """An assistant content block as a plain dict, to echo back in the next request.
+
+    Every block is kept as received: a thinking block needs its signature and a redacted_thinking block its data,
+    in the original order, or the API rejects the next turn. Unknown block types are kept, never rejected.
+    """
+    if hasattr(b, "model_dump"):  # a real SDK block
+        return b.model_dump(exclude_none=True)
     t = getattr(b, "type", None)
     if t == "text":
         return {"type": "text", "text": b.text}
     if t == "tool_use":
         return {"type": "tool_use", "id": b.id, "name": b.name, "input": dict(b.input)}
-    raise AgentError(f"unexpected content block type {t!r}")
+    if isinstance(b, dict):
+        return dict(b)
+    return {k: v for k, v in vars(b).items() if v is not None}  # a plain object (tests): keep what it carries
+
+
+def _thinking_of(content: list[dict[str, Any]]) -> dict[str, Any]:
+    """Transcript fields for the thinking blocks of one turn (text of ``thinking``, a count of redacted ones)."""
+    out: dict[str, Any] = {}
+    texts = [str(b.get("thinking", "")) for b in content if b.get("type") == "thinking"]
+    if texts:
+        out["thinking"] = texts
+    redacted = sum(1 for b in content if b.get("type") == "redacted_thinking")
+    if redacted:
+        out["redacted_thinking_blocks"] = redacted
+    return out
+
+
+def _check_stop(resp: Any) -> None:
+    """A turn cut off by the token limit or refused is a clear AgentError, not a silent malformed turn."""
+    stop = getattr(resp, "stop_reason", None)
+    if stop == "max_tokens":
+        raise AgentError(f"the model ran out of output tokens (max_tokens={MAX_TOKENS}, thinking included) "
+                         "before it finished a turn")
+    if stop == "refusal":
+        raise AgentError("the model declined to answer")
 
 
 def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, *, kind: str = "solar",
@@ -381,18 +263,23 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
             extra["timeout"] = deadline.timeout(30.0)
         try:
             resp = client.messages.create(model=model, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT, tools=TOOLS,
-                                          messages=messages, **extra)
+                                          messages=messages, thinking=THINKING, **extra)
+        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError):
+            raise AgentAuthError("The Anthropic API key was rejected (invalid, revoked or without access); "
+                                 "check ANTHROPIC_API_KEY or the anthropic_api_key argument.") from None
         except anthropic.APIError as exc:  # message is the API's own text; never the request (which holds no key)
             raise AgentError(f"Anthropic API error: {getattr(exc, 'message', type(exc).__name__)}") from None
         u = getattr(resp, "usage", None)
         if u is not None:
             usage["input_tokens"] += getattr(u, "input_tokens", 0) or 0
             usage["output_tokens"] += getattr(u, "output_tokens", 0) or 0
+        _check_stop(resp)
         content = [_block_dict(b) for b in resp.content]
         messages.append({"role": "assistant", "content": content})
         calls = [b for b in content if b["type"] == "tool_use"]
         entry: dict[str, Any] = {"round": rnd, "role": "assistant",
-                                 "text": " ".join(b["text"] for b in content if b["type"] == "text"),
+                                 "text": " ".join(str(b.get("text", "")) for b in content if b["type"] == "text"),
+                                 **_thinking_of(content),
                                  "tool_calls": [{"name": c["name"], "input": c["input"]} for c in calls],
                                  "tool_results": []}
         transcript.append(entry)
@@ -411,8 +298,8 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
                 else:
                     out = ws.call(c["name"], c["input"])
                 is_err = False
-            except (KeyError, ValueError, TypeError) as exc:
-                out, is_err = {"error": str(exc)}, True
+            except TOOL_ERRORS as exc:
+                out, is_err = {"error": _tool_error_text(exc)}, True
                 accepted = None if c["name"] == "finalize" else accepted
             entry["tool_results"].append({"name": c["name"], "result": out})
             results.append({"type": "tool_result", "tool_use_id": c["id"], "content": json.dumps(out),

@@ -6,6 +6,7 @@ import contextlib
 import json
 import os
 import queue
+import signal
 import subprocess
 import sys
 import threading
@@ -33,13 +34,46 @@ def _child_argv() -> list[str]:
     return [sys.executable, "-P", "-m", "roof_measure._child"]  # -P: the working directory stays off sys.path
 
 
+AGENT_HANG_EXIT = 4  # the child stops itself with this code when the agent stage outlives its time budget
+
+
+class ChildCrashed(MeasureError):
+    """The child process died on a signal (a native crash such as a segfault in CGAL) or stopped itself because the
+    agent stage hung past its time budget (exit code ``AGENT_HANG_EXIT``), not with an error reply.
+
+    ``signal_number`` is the signal; the message names it and carries the end of the child's stderr, where
+    ``faulthandler`` (enabled in ``_child``) left the Python traceback of the crash.
+    """
+
+    def __init__(self, code: str = "measurement_failed", message: str | None = None, retryable: bool | None = None,
+                 *, signal_number: int = 0) -> None:
+        super().__init__(code, message, retryable)  # same positional signature as MeasureError: copy and pickle work
+        self.signal_number = signal_number
+
+
 def _stderr_tail(path: Path) -> str:
+    """The last lines of the child's stderr; when faulthandler wrote a crash report, start at its first line."""
     try:
-        lines = path.read_text(errors="replace").strip().splitlines()[-10:]
+        all_lines = path.read_text(errors="replace").strip().splitlines()
     except OSError:
         return ""
-    text = "\n".join(lines)[-1000:]
+    fatal = [i for i, ln in enumerate(all_lines) if ln.startswith("Fatal Python error")]
+    if fatal:  # keep the head: "Fatal Python error: ..." and the first frames, whatever the paths' length
+        text = "\n".join(all_lines[fatal[-1]:][:12])[:1000]
+    else:
+        text = "\n".join(all_lines[-10:])[-1000:]
     return f"; stderr: {text}" if text else ""
+
+
+def _exit_text(returncode: int | None) -> str:
+    """``exited with code -11 (SIGSEGV, Segmentation fault)`` for a signal death, plain ``exited with code 3``."""
+    if returncode is not None and returncode < 0:
+        try:
+            sig = signal.Signals(-returncode)
+            return f"exited with code {returncode} ({sig.name}, {signal.strsignal(sig)})"
+        except ValueError:
+            pass
+    return f"exited with code {returncode}"
 
 
 def _read(proc: subprocess.Popen, q: queue.Queue) -> None:
@@ -110,8 +144,13 @@ def run_isolated(req: dict[str, Any], on_stage: Callable[[str], None] | None, gr
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait()
-                raise MeasureError("measurement_failed", f"the measurement process exited with code "
-                                                         f"{proc.returncode}" + _stderr_tail(stderr_path))
+                text = f"the measurement process {_exit_text(proc.returncode)}" + _stderr_tail(stderr_path)
+                if proc.returncode == AGENT_HANG_EXIT:
+                    raise ChildCrashed("measurement_failed", "the measurement process was stopped: the agent stage "
+                                       "did not finish within its time budget (a native hang)" + _stderr_tail(stderr_path))
+                if proc.returncode is not None and proc.returncode < 0:
+                    raise ChildCrashed("measurement_failed", text, signal_number=-proc.returncode)
+                raise MeasureError("measurement_failed", text)
     finally:
         if proc is not None and proc.poll() is None:
             proc.kill()

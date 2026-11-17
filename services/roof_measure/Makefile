@@ -5,7 +5,7 @@ PY := $(VENV)/bin/python
 # real sites: local/sites.json
 ADDR ?= 100 Example Ave, Sampletown, CA 90000
 
-.PHONY: setup test lint measure serve fixtures
+.PHONY: setup test lint measure serve fixtures eval
 setup:  # always the module venv, never the root fallback
 	uv venv .venv --python 3.12 --seed >/dev/null || python3 -m venv .venv
 	uv pip install --python .venv/bin/python -e ".[dev,service,render]" || .venv/bin/pip install -e ".[dev,service,render]"
@@ -14,7 +14,7 @@ test:
 	$(PY) -m pytest -q
 
 lint:
-	$(VENV)/bin/ruff check roof_measure tests
+	$(VENV)/bin/ruff check roof_measure tests tools
 
 measure:
 	$(VENV)/bin/roof-measure measure "$(ADDR)" --out out/
@@ -27,3 +27,8 @@ serve:
 # Regenerate the synthetic fixtures and the four 0.2 envelopes in ../../fixtures (deterministic).
 fixtures:
 	$(PY) -m roof_measure.synth_envelopes
+
+# Offline rule-method evaluation of saved LiDAR block files: `make eval BLOCKS=<file-or-dir> [ARGS="--json f.json --svg dir"]`
+eval:
+	@test -n "$(BLOCKS)" || { echo "usage: make eval BLOCKS=<file-or-dir> [ARGS=...]"; exit 2; }
+	$(PY) -m tools.eval_blocks $(BLOCKS) $(ARGS)

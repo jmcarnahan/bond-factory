@@ -2,7 +2,7 @@
 
 Role: library (`roof_measure.measure`) and private async job API. Address -> footprint chain + LiDAR (+ Solar, + LLM verifier) -> envelope
 `bond.roof_model/0.2` (model `bond.roof_model/0.1`). Python 3.12, FastAPI, port $PORT (8011). The one deployed
-module: Dockerfile (context = repo root), railway.toml. Contract: docs/contract-0.2.md, docs/contracts/roof_model.md.
+module: Dockerfile (context = repo root), railway.toml. Contract: docs/contract-0.2.md + docs/contract-0.3.md (additive), docs/contracts/roof_model.md.
 
 ## Key files (roof_measure/)
 - library.py facade (measure, MeasureError); _isolate.py/_child.py child process; config.py Runtime (authoritative when set, env otherwise); text.py (slug, ft_in); fixtures.py

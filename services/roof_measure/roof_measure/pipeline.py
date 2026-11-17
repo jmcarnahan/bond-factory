@@ -15,11 +15,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from shapely.errors import ShapelyError
+
 from . import cache, config
 from .classify import BlockSet, Classification, RoofBlock, classify_blocks
-from .deadline import Deadline
+from .deadline import Deadline, DeadlineExceeded
 from .envelope import build_envelope, cap_verification, totals_from_model
-from .model import build_model, write_model
+from .model import ModelError, build_model, write_model
 from .pipeline_notes import collect_warnings
 from .pipeline_stages import (  # noqa: F401
     SOLAR_KEY_ENV,
@@ -35,6 +37,9 @@ log = logging.getLogger("roof_measure.pipeline")
 
 METHODS = ("lidar_skeleton", "lidar_agent", "solar_agent")
 FALLBACK_ERRORS = ("LidarError", "LidarTooSparse")  # class names: no_lidar_coverage / lidar_too_sparse
+AGENT_METHODS = ("lidar_agent", "solar_agent")
+AGENT_BUDGET_SHARE = 0.6  # of the time left, so a stuck agent leaves time for the rule result
+AGENT_FELL_BACK = "agent_failed_fell_back"
 
 
 @dataclass
@@ -159,6 +164,7 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     deadline.check("model")
     on_stage("model")
     transcript: dict[str, Any] | None = None
+    agent_fell_back: str | None = None  # one-line cause when the agent failed and the rules answered
     source: dict[str, Any] = {"method": method}
     model_blockset = base
     classification: Classification
@@ -183,31 +189,59 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
             classification = classify_blocks(model_blockset, **kw)
             classification.notes.append("Deterministic path (no agent): segment boxes classified by rules.")
         else:
-            res = _run_agent(agent_mod, base, evidence, "solar", client, max_rounds, meta, deadline)
-            classification = Classification(blocks=res.blocks, notes=res.notes + agent_mod.agent_notes(res),
-                                            warnings=res.warnings, gap_filled_pct=res.filled_pct)
-            transcript = _transcript(res)
-            source["agent"] = {"model": res.model, "api_calls": res.api_calls}
+            res, cause = _try_agent(agent_mod, base, evidence, "solar", client, max_rounds, meta, deadline)
+            if res is None:  # the agent failed: the rules answer on the same segment boxes
+                agent_fell_back = cause
+                classification = classify_blocks(model_blockset, **kw)
+                classification.notes.append(f"The agent failed ({cause}); segment boxes classified by rules.")
+            else:
+                classification = Classification(blocks=res.blocks, notes=res.notes + agent_mod.agent_notes(res),
+                                                warnings=res.warnings, gap_filled_pct=res.filled_pct)
+                transcript = _transcript(res)
+                source["agent"] = {"model": res.model, "api_calls": res.api_calls}
         roof_blocks = classification.blocks
     elif method == "lidar_agent" and not no_agent:
-        res = _run_agent(agent_mod, base, None, "lidar", client, max_rounds, None, deadline)
-        classification = Classification(blocks=res.blocks, notes=res.notes + agent_mod.agent_notes(res),
-                                        warnings=res.warnings, gap_filled_pct=res.filled_pct)
-        roof_blocks = res.blocks
-        transcript = _transcript(res)
-        source["agent"] = {"model": res.model, "api_calls": res.api_calls}
+        res, cause = _try_agent(agent_mod, base, None, "lidar", client, max_rounds, None, deadline)
+        if res is None:  # the agent failed: the rules answer, and the result says so
+            agent_fell_back = cause
+            classification = classify_blocks(base, **kw)
+            classification.notes.append(f"The agent failed ({cause}); LiDAR blocks classified by rules.")
+            roof_blocks = classification.blocks
+            method, source["method"] = "lidar_skeleton", "lidar_skeleton"  # the caller sees what it really got
+        else:
+            classification = Classification(blocks=res.blocks, notes=res.notes + agent_mod.agent_notes(res),
+                                            warnings=res.warnings, gap_filled_pct=res.filled_pct)
+            roof_blocks = res.blocks
+            transcript = _transcript(res)
+            source["agent"] = {"model": res.model, "api_calls": res.api_calls}
     else:
         classification = classify_blocks(base, **kw)
         roof_blocks = classification.blocks
         if method == "lidar_agent":
             classification.notes.append("Deterministic path (no agent): LiDAR blocks classified by rules.")
-    model = build_model(model_blockset, roof_blocks, source, classification)
+    try:
+        model = build_model(model_blockset, roof_blocks, source, classification)
+    except (ModelError, ShapelyError) as exc:
+        if method not in AGENT_METHODS or no_agent or agent_fell_back:
+            raise
+        # the agent's blocks built a roof the model rejects (a sliver facet): the rules answer instead
+        agent_fell_back = _cause(exc)
+        classification = classify_blocks(model_blockset if method == "solar_agent" else base, **kw)
+        roof_blocks = classification.blocks
+        classification.notes.append(f"The agent's blocks did not build ({agent_fell_back}); classified by rules.")
+        source.pop("agent", None)
+        if method == "lidar_agent":
+            method, source["method"] = "lidar_skeleton", "lidar_skeleton"
+        model = build_model(model_blockset, roof_blocks, source, classification)
 
     # 3. verifier, then outputs from the FINAL model
     deadline.check("verify")
     model, verification, verifier_transcript = _verify(model, verify, client, deadline, on_stage)
     on_stage("render")
     extra_warnings: list[tuple[str, str]] = []
+    if agent_fell_back:
+        text = f"The roof agent could not finish ({agent_fell_back}); the rule-based measurement was used instead."
+        extra_warnings.append((AGENT_FELL_BACK, text))
     paths = {"blocks": out / f"{tag}_blocks.json", "model": out / f"{tag}_model.json",
              "png": out / f"{tag}_model.png"}
     base.extra.pop("_geo", None)
@@ -236,14 +270,65 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     density = ((model.get("source") or {}).get("lidar") or {}).get("density_per_m2")
     verification = cap_verification(verification, fpinfo["source"])  # final verdict before the warnings
     warnings, codes = collect_warnings(model, fpinfo, verification, density, fallback_from, method, extra_warnings)
+    assessment = _assess(base, model, codes) if method != "solar_agent" else None
     envelope = build_envelope(model, method_used=method, footprint_source=fpinfo["source"], verification=verification,
-                              warnings=warnings, warning_codes=codes, density_pts_m2=density)
+                              warnings=warnings, warning_codes=codes, density_pts_m2=density, assessment=assessment)
+    if assessment:
+        write_model(model, paths["model"])  # the file on disk carries the same optional keys as the envelope
     log.info("pipeline done method=%s footprint_source=%s verdict=%s ms=%d", method, fpinfo["source"],
              envelope["verification"]["verdict"], int((time.monotonic() - started) * 1000))
     return PipelineResult(model=model, blockset=base, paths=paths, agent_transcript=transcript, method_used=method,
                           footprint_source=fpinfo["source"], verification=envelope["verification"],
                           envelope=envelope, density_pts_m2=density,
                           transient=bool(fpinfo.get("transient")))
+
+
+def _assess(base: BlockSet, model: dict[str, Any], codes: list[str]) -> dict[str, Any] | None:
+    """Quality metrics and snapped planes from the LiDAR blocks.
+
+    A failure never fails the measurement: it is logged and the envelope carries ``quality`` with the reason
+    ``quality_failed`` (no planes, no plane totals), so a consumer can tell a failed check from "no LiDAR".
+    """
+    if not base.blocks:
+        return None
+    from .quality import assess, failed_assessment
+
+    try:
+        return assess(base, model, codes)
+    except Exception:
+        log.warning("quality assessment failed", exc_info=True)
+        return failed_assessment(model, codes, len(base.blocks))
+
+
+def _cause(exc: BaseException) -> str:
+    """A one-line, bounded cause for the warning: the class and the first 120 characters of its text."""
+    return f"{type(exc).__name__}: {' '.join(str(exc).split())[:120]}".rstrip(": ")
+
+
+def _try_agent(agent_mod: Any, base: BlockSet, evidence: list[dict[str, Any]] | None, kind: str, client: Any | None,
+               max_rounds: int, imagery: dict[str, Any] | None, deadline: Deadline) -> tuple[Any, str | None]:
+    """``(result, None)``, or ``(None, cause)`` when the agent failed and the rules should answer.
+
+    The agent is an upgrade, never a new way to fail: its own errors, a shapely error, a timeout of the agent
+    stage and any other ``Exception`` from its path fall back (``BaseException`` does not). The agent runs on ``AGENT_BUDGET_SHARE`` of the time left; when the whole job is out of time
+    the timeout is the answer and is raised. A missing API key and an invalid or revoked one (``agent.AgentAuthError``, a
+    ``PipelineError``) are caller errors and are raised too.
+    """
+    budget = Deadline.after(deadline.remaining() * AGENT_BUDGET_SHARE)
+    try:
+        return _run_agent(agent_mod, base, evidence, kind, client, max_rounds, imagery, budget), None
+    except PipelineError as exc:
+        cause = exc.__cause__
+        if isinstance(cause, agent_mod.AgentError):
+            return None, _cause(cause)
+        raise
+    except (ShapelyError, DeadlineExceeded) as exc:
+        if isinstance(exc, DeadlineExceeded) and (deadline.expired() or exc.stage != "agent"):
+            raise
+        return None, _cause(exc)
+    except Exception as exc:  # the agent is never a new way to fail: any bug in its path falls back
+        log.warning("agent stage failed unexpectedly (%s); using the rules", type(exc).__name__, exc_info=True)
+        return None, _cause(exc)
 
 
 def _run_agent(agent_mod: Any, base: BlockSet, evidence: list[dict[str, Any]] | None, kind: str,
