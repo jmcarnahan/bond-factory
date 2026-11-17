@@ -52,7 +52,8 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
             work_dir: str | Path | None = None, anthropic_api_key: str | None = None,
             google_solar_api_key: str | None = None, overpass_urls: Sequence[str] | None = None,
             on_stage: Callable[[str], None] | None = None, isolate: bool = True,
-            blocks_path: str | Path | None = None, solar_fixture: str | Path | None = None) -> dict[str, Any]:
+            blocks_path: str | Path | None = None, solar_fixture: str | Path | None = None,
+            include_other_buildings: bool = False) -> dict[str, Any]:
     """Measure one roof and return the ``bond.roof_model/0.2`` envelope as a dict.
 
     Blocks the calling thread for up to ``deadline_s`` plus ``KILL_GRACE_S`` (30) seconds: run it off a request
@@ -78,6 +79,11 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
     ambiguous_building, no_lidar_coverage, lidar_too_sparse, measurement_failed (also a crashed child),
     upstream_unavailable, timeout (also a killed child). ``interrupted`` is never raised here.
 
+    ``include_other_buildings=True`` also measures the other buildings of the parcel (county outlines of at least
+    120 sq ft, rule method, no agent, no verifier, inside the same deadline) and adds the optional envelope key
+    ``other_buildings`` and the ``lot_*`` totals (contract-0.3, section "Other buildings"). The default changes nothing.
+    A building that cannot be measured is recorded with ``status`` ``failed`` and never fails the main result.
+
     ``blocks_path`` and ``solar_fixture`` are test hooks: they replace LiDAR/Solar with a fixture file, so the
     call needs no network (verify=False) and no real address.
     """
@@ -92,6 +98,7 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
         req: dict[str, Any] = {
             "address": (address or "").strip(), "lat_lng": lat_lng, "method": method, "verify": bool(verify),
             "force": bool(force), "deadline_s": float(deadline_s), "work_dir": str(work),
+            "include_other_buildings": bool(include_other_buildings),
             "blocks_path": str(Path(blocks_path).resolve()) if blocks_path else None,
             "solar_fixture": str(Path(solar_fixture).resolve()) if solar_fixture else None,
             "runtime": {"cache_dir": str(cache_path), "anthropic_api_key": anthropic_api_key,
@@ -133,6 +140,8 @@ def _retry_after_crash(req: dict[str, Any], on_stage: Callable[[str], None] | No
     from . import _isolate
 
     left = req["deadline_s"] - (time.monotonic() - started)
+    if req.get("include_other_buildings") and left >= AGENT_RETRY_MIN_S:
+        return _retry_without_lot(req, on_stage, crash, left, seen, started)
     if req["method"] != "lidar_agent" or left < AGENT_RETRY_MIN_S:
         raise crash
     cause = crash.message.split("; stderr:")[0]  # "the measurement process exited with code -11 (SIGSEGV, ...)"
@@ -155,6 +164,33 @@ def _retry_after_crash(req: dict[str, Any], on_stage: Callable[[str], None] | No
     quality = (env.get("model") or {}).get("quality")
     if isinstance(quality, dict) and "agent_failed_fell_back" not in quality.get("reasons", []):
         quality["reasons"] = [*quality.get("reasons", []), "agent_failed_fell_back"]
+    return env
+
+
+def _retry_without_lot(req: dict[str, Any], on_stage: Callable[[str], None] | None, crash: MeasureError, left: float,
+                       seen: Sequence[str], started: float) -> dict[str, Any]:
+    """A child that died while ``include_other_buildings`` was on is retried once without it (the extra buildings
+    are an addition, never a new way to fail); the result says so with an ``other`` warning. When that retry crashes
+    too and the method is ``lidar_agent``, the usual rule-method retry follows (the crash was the agent's, not the
+    extra buildings'). Any other failing retry raises the first crash."""
+    from . import _isolate
+
+    done = set(seen)
+
+    def fresh(name: str) -> None:
+        if name not in done and on_stage is not None:
+            on_stage(name)
+
+    try:
+        env = _isolate.run_isolated({**req, "include_other_buildings": False, "deadline_s": left}, fresh,
+                                    grace=KILL_GRACE_S)
+    except _isolate.ChildCrashed:
+        env = _retry_after_crash({**req, "include_other_buildings": False}, on_stage, crash, started, seen)
+    except MeasureError as retry_error:
+        raise crash from retry_error
+    env["warnings"] = [*env.get("warnings", []),
+                       "The other buildings on the parcel could not be measured (the measurement process crashed)."]
+    env["warning_codes"] = [*env.get("warning_codes", []), "other"]
     return env
 
 
@@ -229,7 +265,8 @@ def _run_in_process(req: dict[str, Any], on_stage: Callable[[str], None] | None)
             res = run_pipeline(req["address"], req["work_dir"], req["method"], blocks_path=req["blocks_path"],
                                solar_fixture=req["solar_fixture"], deadline=Deadline.after(req["deadline_s"]),
                                lat_lng=tuple(req["lat_lng"]) if req["lat_lng"] else None, on_stage=stage,
-                               verify=req["verify"], render=False)
+                               verify=req["verify"], render=False,
+                               include_other_buildings=bool(req.get("include_other_buildings")))
         try:
             json.dumps(res.envelope, allow_nan=False)
         except ValueError:

@@ -34,6 +34,7 @@ class Footprint:
     area_sqft: float
     parcel_id: str | None
     other_buildings: list[Polygon] = field(default_factory=list)
+    other_info: list[dict] = field(default_factory=list)  # parallel to other_buildings: {"id", "area_sqft"} (county only)
     match: str = "exact"  # exact | street | nearest: how well the address matched the chosen parcel/building
     warnings: list[str] = field(default_factory=list)
     warning_codes: list[str] = field(default_factory=list)  # parallel to warnings (closed list, see envelope)

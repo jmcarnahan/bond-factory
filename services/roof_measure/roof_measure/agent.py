@@ -24,6 +24,10 @@ from shapely.errors import ShapelyError
 from shapely.geometry import Polygon
 
 from . import config
+from .agent_draft import capture_gables, remap_gables
+from .agent_partition import tidy_tiling
+from .agent_prompt import BLOCK_SCHEMA, SYSTEM_PROMPT, TOOLS  # noqa: F401 - re-exported
+from .agent_repair import advice, repair_blocks, unbuildable
 from .agent_tools import NUMBER_TOL, Workspace, _numbers, _r  # noqa: F401 - re-exported
 from .classify import BlockSet, RoofBlock, complete_tiling
 from .deadline import Deadline
@@ -38,82 +42,6 @@ MAX_TOKENS = 12000  # thinking counts inside max_tokens; 6000 left too little ro
 THINKING = {"type": "between_tools"}  # explicit, like the verifier: behaviour must not depend on a model default
 # a tool may fail in these ways on bad model input; the model reads the message and retries (never a crash)
 TOOL_ERRORS = (KeyError, ValueError, TypeError, AttributeError, IndexError, ArithmeticError, RuntimeError, ShapelyError)
-
-SYSTEM_PROMPT = """You are a roof-geometry analyst. You receive a building footprint (vertices in feet, x east, \
-y north), an EVIDENCE table of roof segments placed on that footprint (Google Solar API segments, or LiDAR \
-surface blocks), and tools. Decide, for each part of the roof, its form (flat, hip, gable, shed) and, for \
-gables, which polygon edges are the gable ends. Tools produce every number.
-
-HARD RULES
-1. Never estimate, convert, round or compute a length, area, angle, pitch or coordinate yourself. Polygons exist \
-only in the registry and are referred to by polygon_id ("footprint", "p1", ...). Every pitch_rise and aspect_deg \
-you pass to finalize must be copied exactly from the evidence table or a tool result.
-2. Form from evidence. Look at sloped segments (form_hint sloped / kind sloped) in each spatial cluster and count \
-distinct azimuths: about 4 azimuths 90 deg apart = hip; 2 azimuths 180 deg apart = gable (the gable ends are the \
-polygon edges whose outward bearing is perpendicular to the azimuths; use measure to read edge bearings); 1 azimuth \
-= shed. Pitch under 2 deg = flat. A sloped segment whose centre is outside the footprint (inside_footprint false) \
-or small and low beside the outline is an awning: a separate shed block.
-3. Locate a block with region_from_segments (polygon of the segments' extent), then clean it with rect_fit when \
-the outline has small jogs, or cut it with propose_split. Verify with the tool's area numbers that the block's \
-plan area is within about 5 percent of the segments' ground area; if not, adjust and retry at most twice.
-4. Get the pitch with pitch_rise_from_segments over the segments of the block.
-5. Check a hip or gable with hip_roof_edges before finalizing.
-6. You need not list flat roofs: the harness turns footprint area you do not claim into flat blocks. List one only \
-to override.
-7. If the evidence is ambiguous (3 or more than 4 azimuths, area mismatch over 8 percent), keep your best guess, \
-set confidence low and say exactly what is uncertain in warnings. Do not invent features (dormers, chimneys, \
-parapet heights).
-8. Be efficient: call independent tools in the same turn. You have at most 12 rounds, finish in about 4. \
-End by calling finalize exactly once."""
-
-TOOLS: list[dict[str, Any]] = [
-    {"name": "measure", "description": "Area, perimeter, bounds and per-edge index, length and outward compass "
-     "bearing of a registered polygon.",
-     "input_schema": {"type": "object", "properties": {"polygon_id": {"type": "string"}},
-                      "required": ["polygon_id"]}},
-    {"name": "propose_split", "description": "Split a registered polygon by the infinite line through two points "
-     "(feet). Registers the parts as new polygons (largest first) and returns their ids and areas.",
-     "input_schema": {"type": "object", "properties": {
-         "polygon_id": {"type": "string"},
-         "line_ft": {"type": "array", "items": {"type": "array", "items": {"type": "number"}, "minItems": 2,
-                                                  "maxItems": 2}, "minItems": 2, "maxItems": 2}},
-         "required": ["polygon_id", "line_ft"]}},
-    {"name": "region_from_segments", "description": "Register the polygon covering the given evidence segment "
-     "ids (their union, clipped to the footprint unless the segments are awnings outside it). Returns polygon "
-     "id(s) with area and the segments' summed ground area for the 5 percent check.",
-     "input_schema": {"type": "object", "properties": {"segment_ids": {"type": "array", "items": {"type": "string"}}},
-                      "required": ["segment_ids"]}},
-    {"name": "rect_fit", "description": "Register the minimum rotated rectangle of a polygon (removes jogs under "
-     "2 ft). Returns the new id, its sides and area.",
-     "input_schema": {"type": "object", "properties": {"polygon_id": {"type": "string"}},
-                      "required": ["polygon_id"]}},
-    {"name": "pitch_rise_from_segments", "description": "Area-weighted mean pitch (inches of rise per 12) of the "
-     "given evidence segments, with min, max and spread.",
-     "input_schema": {"type": "object", "properties": {"segment_ids": {"type": "array", "items": {"type": "string"}}},
-                      "required": ["segment_ids"]}},
-    {"name": "hip_roof_edges", "description": "Straight-skeleton roof over a registered polygon at uniform pitch. "
-     "gable_edges are polygon edge indices that are gable ends. Returns eave, rake, ridge, hip and valley lengths "
-     "(feet) and the true roof area.",
-     "input_schema": {"type": "object", "properties": {
-         "polygon_id": {"type": "string"}, "pitch_rise": {"type": "number"},
-         "gable_edges": {"type": "array", "items": {"type": "integer"}}},
-         "required": ["polygon_id", "pitch_rise"]}},
-    {"name": "finalize", "description": "Submit the decision. One entry per roof block you claim (hip, gable, "
-     "shed awnings, optional flat overrides).",
-     "input_schema": {"type": "object", "properties": {
-         "blocks": {"type": "array", "items": {"type": "object", "properties": {
-             "polygon_id": {"type": "string"},
-             "form": {"type": "string", "enum": ["flat", "hip", "gable", "shed"]},
-             "pitch_rise": {"type": "number"},
-             "gable_edges": {"type": "array", "items": {"type": "integer"}},
-             "aspect_deg": {"type": "number", "description": "shed only: the segment azimuth, copied from evidence"},
-             "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
-             "evidence": {"type": "array", "items": {"type": "string"}}},
-             "required": ["polygon_id", "form", "confidence", "evidence"]}},
-         "warnings": {"type": "array", "items": {"type": "string"}}},
-         "required": ["blocks"]}},
-]
-
 
 class AgentError(RuntimeError):
     """The agent did not produce an acceptable answer."""
@@ -159,6 +87,7 @@ def lidar_evidence_rows(bs: BlockSet) -> list[dict[str, Any]]:
         p = b.poly
         rows.append(_r({"id": b.id, "kind": b.kind, "pitch_rise": b.pitch_rise, "azimuth_deg": b.aspect_deg,
                         "ground_area_sqft": b.plan_area_sqft, "mean_z_ft": b.mean_z_ft,
+                        "height_ft": b.height_above_ground_ft,
                         "bbox_ft": list(p.bounds), "center_ft": [p.centroid.x, p.centroid.y],
                         "inside_footprint": bool(bs.footprint.contains(p.centroid)),
                         "form_hint": "flat" if b.kind == "flat" else "sloped",
@@ -234,7 +163,7 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
     else:
         rows = lidar_evidence_rows(blockset)
         seg_polys = {b.id: b.poly for b in blockset.blocks}
-    ws = Workspace(blockset.footprint_ft, rows, seg_polys)
+    ws = Workspace(blockset.footprint_ft, rows, seg_polys, blockset if kind == "lidar" else None)
     if client is None:
         client = (anthropic.Anthropic(api_key=config.anthropic_key(), timeout=30.0, max_retries=0) if deadline
                   else anthropic.Anthropic(api_key=config.anthropic_key()))
@@ -251,7 +180,9 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
                                  "outward_bearing_deg": round(e["outward_bearing_deg"], 1)} for e in m["edges"]]},
         "evidence_table": rows,
     }
-    messages: list[dict[str, Any]] = [{"role": "user", "content": json.dumps(user)}]
+    # the evidence is resent every round: one cache breakpoint after it makes rounds 2.. read it from the cache
+    messages: list[dict[str, Any]] = [{"role": "user", "content": [
+        {"type": "text", "text": json.dumps(user), "cache_control": {"type": "ephemeral"}}]}]
     transcript: list[dict[str, Any]] = [{"role": "user", "content": user}]
     usage = {"input_tokens": 0, "output_tokens": 0}
     api_calls = 0
@@ -273,6 +204,10 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
         if u is not None:
             usage["input_tokens"] += getattr(u, "input_tokens", 0) or 0
             usage["output_tokens"] += getattr(u, "output_tokens", 0) or 0
+            for k in ("cache_creation_input_tokens", "cache_read_input_tokens"):  # only when the API reports them
+                n = getattr(u, k, 0)
+                if isinstance(n, int) and n:
+                    usage[k] = usage.get(k, 0) + n
         _check_stop(resp)
         content = [_block_dict(b) for b in resp.content]
         messages.append({"role": "assistant", "content": content})
@@ -306,7 +241,24 @@ def run_agent(blockset: BlockSet, evidence: list[dict[str, Any]] | None = None, 
                             "is_error": is_err})
         if accepted is not None:
             blocks, decisions, warnings = accepted
+            pid_of = {id(rb): d["polygon_id"] for rb, d in zip(blocks, decisions, strict=True)}
+            captured = capture_gables(blocks)
             done, pct, notes = complete_tiling(blocks, blockset)
+            remap_gables(done, captured)  # tiling re-rings the blocks: keep the gable ends the agent chose
+            notes = [*notes, *tidy_tiling(done, blockset)]  # one partition: higher block wins, outlines simple
+            bad = unbuildable(done)  # the builder's own check, on the blocks as they will be built
+            if bad and rnd < max_rounds:  # tell the agent while it can still act on it
+                text = advice([(rb, why, pid_of.get(id(rb), "?")) for rb, why in bad])
+                for res_row, tr in zip(results, entry["tool_results"], strict=True):
+                    if tr.get("name") == "finalize":
+                        tr["result"] = {"error": text}
+                        res_row.update(content=json.dumps({"error": text}), is_error=True)
+                messages.append({"role": "user", "content": results})
+                continue
+            if bad:  # out of rounds: repair block by block, then the pipeline's own fallbacks answer
+                repaired = repair_blocks(done)
+                notes = [*notes, *repaired]
+                warnings = [*warnings, *repaired]
             return AgentResult(blocks=done, notes=notes, warnings=warnings, decisions=decisions,
                                transcript=transcript, api_calls=api_calls, filled_pct=pct, model=model, usage=usage)
         remaining = max_rounds - rnd

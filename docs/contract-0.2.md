@@ -11,7 +11,7 @@ Base URL is wherever the service is deployed. JSON in, JSON out. Every route exc
 `Authorization: Bearer <ROOF_MEASURE_TOKEN>`. The token lives in the calling app's backend only; a Flutter client
 never holds it.
 
-- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.3.1"}`. It touches neither disk nor network and
+- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.4.0"}`. It touches neither disk nor network and
   needs no token.
 - `POST /v1/measurements` body
   `{"address": str (at most 200 characters), "lat"?: float, "lng"?: float,
@@ -140,6 +140,7 @@ for anything not listed.
 | `solar_segments_only` | geometry comes from Solar segments, not LiDAR |
 | `agent_failed_fell_back` | a `lidar_agent` or `solar_agent` measurement could not finish (agent error, truncated reply, timeout of the agent stage, blocks the model builder rejected) and the rule-based result is returned; a `lidar_agent` child killed by a signal is retried once as `lidar_skeleton` and gets the same code (a `solar_agent` crash still fails the job). `method_used` is then `lidar_skeleton` (`solar_agent` keeps its name); never emitted for `auto` or `lidar_skeleton`; an invalid or revoked API key is an error, not this code |
 | `model_failed` | the simple roof diagram could not be built (the model failed validation, or no roof block survived) but LiDAR planes were measured: the envelope carries the planes only, see contract-0.3.md "Planes-only result" (`method_used` unchanged; never emitted for `solar_agent`) |
+| `model_from_planes` | the diagram was built directly from the measured roof planes (one facet per plane) because the block or agent model was poor and the partition planes tile the roof: see contract-0.3.md "Model from the measured planes" (`method_used` unchanged; `model.source.from_planes` true; never emitted for `solar_agent`) |
 | `flat_roof_assumed` | reserved, not emitted yet |
 | `other` | anything else |
 
@@ -151,7 +152,7 @@ placeholder address. Copy it as an app's mock fixture.
 ```json
 {
  "contract": "bond.roof_model/0.2",
- "pipeline_version": "0.3.1",
+ "pipeline_version": "0.4.0",
  "method_used": "lidar_skeleton",
  "footprint_source": "osm",
  "generated_at": "2026-11-10T00:00:00Z",

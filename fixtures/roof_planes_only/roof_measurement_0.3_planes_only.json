@@ -1,6 +1,6 @@
 {
  "contract": "bond.roof_model/0.2",
- "pipeline_version": "0.3.1",
+ "pipeline_version": "0.4.0",
  "method_used": "lidar_skeleton",
  "footprint_source": "lariac",
  "generated_at": "2026-11-10T00:00:00Z",
@@ -86,153 +86,157 @@
     "id": "k0",
     "polygon": [
      [
-      12.0,
-      12.0
-     ],
-     [
-      0.85,
-      0.84
-     ],
-     [
-      0.85,
+      40.0,
       0.0
      ],
      [
-      39.15,
-      0.0
+      40.0,
+      1.11
      ],
      [
-      39.15,
-      0.84
-     ],
-     [
-      28.0,
+      29.11,
       12.0
+     ],
+     [
+      10.89,
+      12.0
+     ],
+     [
+      0.0,
+      1.11
+     ],
+     [
+      0.0,
+      0.0
      ]
     ],
     "pitch_rise": 4.0,
     "aspect_deg": 180.0,
-    "plan_area_sqft": 335.2,
-    "surface_area_sqft": 353.3,
+    "plan_area_sqft": 361.4,
+    "surface_area_sqft": 381.0,
     "height_ft": 12.6,
     "rms_ft": 0.1,
-    "filled_pct": 6.8
+    "filled_pct": 13.6,
+    "straightened": true,
+    "raw_plan_area_sqft": 312.4,
+    "straighten_method": "envelope",
+    "section": 0,
+    "plane_eq": [
+     -0.0,
+     0.33333,
+     10.764
+    ]
    },
    {
     "id": "k1",
     "polygon": [
      [
-      40.0,
-      0.0
-     ],
-     [
-      40.0,
-      23.15
-     ],
-     [
-      39.16,
-      23.15
-     ],
-     [
-      28.0,
+      29.11,
       12.0
      ],
      [
-      39.15,
-      0.84
+      40.0,
+      1.11
      ],
      [
-      39.15,
-      0.0
+      40.0,
+      22.89
      ]
     ],
     "pitch_rise": 4.0,
     "aspect_deg": 90.0,
-    "plan_area_sqft": 144.0,
-    "surface_area_sqft": 151.8,
+    "plan_area_sqft": 118.6,
+    "surface_area_sqft": 125.0,
     "height_ft": 12.6,
     "rms_ft": 0.1,
-    "filled_pct": 9.8
+    "filled_pct": 10.7,
+    "straightened": true,
+    "raw_plan_area_sqft": 130.0,
+    "straighten_method": "envelope",
+    "section": 0,
+    "plane_eq": [
+     -0.33333,
+     -0.0,
+     24.467
+    ]
    },
    {
     "id": "k2",
     "polygon": [
      [
+      0.0,
+      22.89
+     ],
+     [
+      10.89,
+      12.0
+     ],
+     [
+      29.11,
+      12.0
+     ],
+     [
+      40.0,
+      22.89
+     ],
+     [
       40.0,
       24.0
      ],
      [
       0.0,
       24.0
-     ],
-     [
-      0.0,
-      23.15
-     ],
-     [
-      0.84,
-      23.15
-     ],
-     [
-      12.0,
-      12.0
-     ],
-     [
-      28.0,
-      12.0
-     ],
-     [
-      39.16,
-      23.15
-     ],
-     [
-      40.0,
-      23.15
      ]
     ],
     "pitch_rise": 4.0,
     "aspect_deg": 0.0,
-    "plan_area_sqft": 336.8,
-    "surface_area_sqft": 355.1,
+    "plan_area_sqft": 361.4,
+    "surface_area_sqft": 381.0,
     "height_ft": 12.6,
     "rms_ft": 0.1,
-    "filled_pct": 7.3
+    "filled_pct": 13.6,
+    "straightened": true,
+    "raw_plan_area_sqft": 312.4,
+    "straighten_method": "envelope",
+    "section": 0,
+    "plane_eq": [
+     -0.0,
+     -0.33333,
+     18.764
+    ]
    },
    {
     "id": "k3",
     "polygon": [
      [
       0.0,
-      23.15
+      22.89
      ],
      [
       0.0,
-      0.0
+      1.11
      ],
      [
-      0.85,
-      0.0
-     ],
-     [
-      0.85,
-      0.84
-     ],
-     [
-      12.0,
+      10.89,
       12.0
-     ],
-     [
-      0.84,
-      23.15
      ]
     ],
     "pitch_rise": 4.0,
     "aspect_deg": 270.0,
-    "plan_area_sqft": 144.0,
-    "surface_area_sqft": 151.8,
+    "plan_area_sqft": 118.6,
+    "surface_area_sqft": 125.0,
     "height_ft": 12.6,
     "rms_ft": 0.1,
-    "filled_pct": 9.7
+    "filled_pct": 10.7,
+    "straightened": true,
+    "raw_plan_area_sqft": 130.0,
+    "straighten_method": "envelope",
+    "section": 0,
+    "plane_eq": [
+     0.33333,
+     0.0,
+     11.133
+    ]
    }
   ]
  },

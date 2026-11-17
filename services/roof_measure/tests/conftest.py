@@ -85,3 +85,12 @@ def net(monkeypatch):
     return n
 
 
+
+
+@pytest.fixture
+def no_planes_model(monkeypatch):
+    """Keep the block model: for tests that pin what the block (skeleton) model does on a poor roof, or the
+    planes-only net. The planes model (planes_model.replace_if_bad) would otherwise redraw those roofs."""
+    from roof_measure import planes_model
+
+    monkeypatch.setattr(planes_model, "replace_if_bad", lambda *a, **k: None)

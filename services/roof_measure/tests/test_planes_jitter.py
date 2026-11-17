@@ -90,3 +90,27 @@ def test_a_weld_that_fails_keeps_the_plane_unwelded_and_says_so(monkeypatch, cap
     assert len(planes) == 4 and all(p.shape().is_valid for p in planes)
     assert any("kept unwelded" in r.message for r in caplog.records)
     assert max(p.shape().intersection(q.shape()).area for p in planes for q in planes if p is not q) <= 0.5
+
+
+@pytest.mark.parametrize("name", sorted(FIXTURES))
+def test_jittered_copies_with_the_envelope_partition_on_keep_a_valid_tiling(name):
+    """The default path (planes_envelope may replace the straightened planes): no exception, planes tile, none overlap."""
+    bs = BlockSet.load(FIXTURES[name])
+    for seed in range(5):
+        j = jittered(bs, 0.2, seed)
+        res = snap_with_stats(j, clip_to_footprint=True)
+        assert not res.failed and res.planes
+        assert not [p for p in invariant_problems(j, res.planes) if "overlap" in p or "union" in p or "valid" in p]
+
+
+def test_a_gap_is_split_between_planes_even_when_one_plane_is_in_two_pieces():
+    """A cluster with a bare patch can reach the gap splitter as a MultiPolygon: it used to raise AttributeError."""
+    from shapely.geometry import MultiPolygon, Polygon
+
+    from roof_measure import planes_gaps
+
+    left = MultiPolygon([Polygon([(0, 0), (4, 0), (4, 4), (0, 4)]), Polygon([(0, 6), (4, 6), (4, 10), (0, 10)])])
+    right = Polygon([(6, 0), (10, 0), (10, 10), (6, 10)])
+    gap = Polygon([(4, 0), (6, 0), (6, 10), (4, 10)])
+    out = planes_gaps._split_by_nearest(gap, [left, right], [0, 1])
+    assert set(out) == {0, 1} and abs(sum(g.area for g in out.values()) - gap.area) < 0.5

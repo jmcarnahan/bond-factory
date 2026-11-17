@@ -156,7 +156,7 @@ def test_the_eave_strip_round_the_whole_roof_does_not_make_a_ring_plane():
 def test_plane_dict_has_exactly_the_documented_keys():
     p = snap_planes(hip_rectangle(), clip_to_footprint=True)[0].to_dict()
     assert set(p) == {"id", "polygon", "pitch_rise", "aspect_deg", "plan_area_sqft", "surface_area_sqft", "height_ft",
-                      "rms_ft", "filled_pct"}
+                      "rms_ft", "filled_pct", "straightened", "raw_plan_area_sqft", "plane_eq", "straighten_method", "section"}  # the last five are additive (0.4.0)
 
 
 @pytest.mark.parametrize("make", [

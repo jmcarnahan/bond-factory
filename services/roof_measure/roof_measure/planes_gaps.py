@@ -67,10 +67,10 @@ def _split_by_nearest(gap: Polygon, cur: list[Polygon | None], ids: list[int]) -
     pts: list[Point] = []
     owner: list[int] = []
     for i in ids:
-        ring = segmentize(cur[i].exterior, SAMPLE_FT)  # type: ignore[union-attr]
-        for x, y in ring.coords:
-            pts.append(Point(x, y))
-            owner.append(i)
+        for poly in polygons_of(cur[i]):  # a jittered cluster with a bare patch can be two pieces
+            for x, y in segmentize(poly.exterior, SAMPLE_FT).coords:
+                pts.append(Point(x, y))
+                owner.append(i)
     cells = voronoi_diagram(MultiPoint(pts), envelope=gap.buffer(5.0).envelope)
     tree = STRtree(pts)
     by_owner: dict[int, list[BaseGeometry]] = {}

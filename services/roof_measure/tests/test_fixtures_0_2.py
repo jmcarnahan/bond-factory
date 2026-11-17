@@ -34,7 +34,7 @@ def test_size_and_placeholder_data(name):
 @pytest.mark.parametrize("verdict", VERDICTS)
 def test_envelope_shape(verdict):
     e = load(f"roof_measurement_0.2_{verdict}")
-    assert e["contract"] == "bond.roof_model/0.2" and e["pipeline_version"] == "0.3.1"
+    assert e["contract"] == "bond.roof_model/0.2" and e["pipeline_version"] == "0.4.0"
     assert e["generated_at"] == "2026-11-10T00:00:00Z" and e["footprint_source"] in ("lariac", "osm")
     assert e["method_used"] == "lidar_skeleton"
     m = e["model"]

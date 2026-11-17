@@ -63,6 +63,12 @@ def run(tmp_path, method="lidar_agent", client=None, **kw):
 
 
 @pytest.fixture
+def agent_wins(monkeypatch):
+    """The agent is never worse than the rules in the test (the comparison itself is tested in test_agent_pick.py)."""
+    monkeypatch.setattr(pipeline.agent_pick, "rules_if_not_worse", lambda *a, **k: None)
+
+
+@pytest.fixture
 def rules(tmp_path):
     """The rule result the fallback must equal."""
     return run(tmp_path / "rules", "lidar_skeleton")
@@ -163,7 +169,9 @@ def test_shapely_error_while_building_agent_blocks_falls_back(tmp_path, rules, m
 
 
 # ----------------------------------------------------------------------------- what must NOT fall back
-def test_a_working_agent_is_not_replaced_and_has_no_code(tmp_path):
+def test_a_working_agent_is_not_replaced_and_has_no_code(tmp_path, agent_wins):
+    """Rewritten for 0.4.0: a flat-only answer is worse than the rule roof and is now replaced (test_agent_pick.py),
+    so this test makes the agent win the comparison and checks that a winning agent is left alone."""
     res = run(tmp_path, client=Client([("finalize", FLAT_FINAL)]))
     assert res.method_used == "lidar_agent" and CODE not in res.envelope["warning_codes"]
     assert res.model["debug"]["agent"]["api_calls"] == 1 and res.agent_transcript is not None
@@ -227,7 +235,7 @@ def test_base_exceptions_are_not_swallowed(tmp_path, monkeypatch):
         run(tmp_path, client=Client([]))
 
 
-def test_an_overflowing_finalize_is_handled_inside_the_loop_and_the_agent_still_wins(tmp_path):
+def test_an_overflowing_finalize_is_handled_inside_the_loop_and_the_agent_still_wins(tmp_path, agent_wins):
     """The adversary's input: gable_edges [1e999, 0]. The loop tells the model; the next finalize is accepted."""
     bad = json.loads('{"blocks": [{"polygon_id": "footprint", "form": "gable", "pitch_rise": 4.0, '
                      '"gable_edges": [1e999, 0], "confidence": "low", "evidence": []}]}')

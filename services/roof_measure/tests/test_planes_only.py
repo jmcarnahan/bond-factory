@@ -21,6 +21,8 @@ from roof_measure.model import ModelError, validate
 from roof_measure.planes_only import WARNING
 from roof_measure.version import PIPELINE_VERSION
 
+pytestmark = pytest.mark.usefixtures("no_planes_model")  # these tests pin the block model, see conftest
+
 KW = {"lat": 1.0, "lng": 1.0, "verify": False, "isolate": False}
 PLANE_TOTALS = {"planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "plane_count"}
 

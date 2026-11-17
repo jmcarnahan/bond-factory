@@ -7,6 +7,8 @@ from quality_helpers import HERE
 
 from roof_measure.library import measure
 
+pytestmark = pytest.mark.usefixtures("no_planes_model")  # these tests pin the block model, see conftest
+
 FIX = HERE / "fixtures"
 
 

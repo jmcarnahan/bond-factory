@@ -17,11 +17,11 @@ from typing import Any
 
 from shapely.errors import ShapelyError
 
-from . import cache, config, planes_only
+from . import agent_pick, cache, config, planes_model, planes_only
 from .classify import BlockSet, Classification, RoofBlock, classify_blocks
 from .deadline import Deadline, DeadlineExceeded
 from .envelope import TOTALS_KEYS, build_envelope, cap_verification, totals_from_model
-from .model import ModelError, build_model, write_model
+from .model import build_model, write_model
 from .pipeline_notes import collect_warnings
 from .pipeline_stages import (  # noqa: F401
     SOLAR_KEY_ENV,
@@ -94,21 +94,29 @@ def run_pipeline(address: str, out_dir: str | Path, method: str = "lidar_skeleto
                  no_agent: bool = False, max_rounds: int = 12, merge_flats: bool = False,
                  client: Any | None = None, deadline: Deadline | None = None,
                  lat_lng: tuple[float, float] | None = None, on_stage: Callable[[str], None] | None = None,
-                 verify: bool = True, render: bool = True) -> PipelineResult:
+                 verify: bool = True, render: bool = True,
+                 include_other_buildings: bool = False) -> PipelineResult:
     """Run the whole pipeline for one address; writes ``<slug>_{blocks,model}.json`` and ``.png`` into ``out_dir``.
 
     ``method="auto"`` is D12: ``lidar_skeleton``, falling back to ``solar_agent`` when LiDAR is missing or too
     thin and both the Solar and Anthropic keys are set (the envelope then carries ``method_fallback``).
     """
     if method == "auto":
-        return _run_auto(address, out_dir, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
-                         max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline,
-                         lat_lng=lat_lng, on_stage=on_stage, verify=verify, render=render)
-    if method not in METHODS:
-        raise PipelineError(f"method must be one of {METHODS + ('auto',)}")
-    return _run(address, out_dir, method, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
-                max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline, lat_lng=lat_lng,
-                on_stage=on_stage or _noop, verify=verify, render=render, fallback_from=None)
+        res = _run_auto(address, out_dir, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
+                        max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline,
+                        lat_lng=lat_lng, on_stage=on_stage, verify=verify, render=render)
+    else:
+        if method not in METHODS:
+            raise PipelineError(f"method must be one of {METHODS + ('auto',)}")
+        res = _run(address, out_dir, method, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
+                   max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline, lat_lng=lat_lng,
+                   on_stage=on_stage or _noop, verify=verify, render=render, fallback_from=None)
+    if include_other_buildings:  # lot.py: the other buildings on the parcel, measured by the rules (additive keys)
+        from .lot import add_other_buildings
+
+        add_other_buildings(res, address=address, lat_lng=lat_lng, deadline=deadline, out_dir=out_dir,
+                            blocks_path=blocks_path)
+    return res
 
 
 def _run_auto(address: str, out_dir: str | Path, *, on_stage: Callable[[str], None] | None, **kw: Any) -> PipelineResult:
@@ -223,7 +231,7 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     try:
         planes_only.need_roof_blocks(roof_blocks, base, fpinfo)
         model = build_model(model_blockset, roof_blocks, source, classification)
-    except (ModelError, ShapelyError) as exc:
+    except (ValueError, ShapelyError) as exc:
         try:
             if method not in AGENT_METHODS or no_agent or agent_fell_back:
                 raise
@@ -237,13 +245,31 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
                 method, source["method"] = "lidar_skeleton", "lidar_skeleton"
             planes_only.need_roof_blocks(roof_blocks, base, fpinfo)
             model = build_model(model_blockset, roof_blocks, source, classification)
-        except (ModelError, ShapelyError) as final:
+        except (ValueError, ShapelyError) as final:
             net_exc = final
             model = planes_only.model_or_raise(final, base, source, fpinfo, _cause(final))
 
+    if net_exc is None and method == "lidar_agent" and not no_agent and not agent_fell_back:
+        better = agent_pick.rules_if_not_worse(base, model, fpinfo["codes"], **kw)
+        if better is not None:  # the agent drew a roof that fits the planes worse than the rules' roof
+            classification, roof_blocks, agent_fell_back = better
+            classification.notes.append(f"The agent's roof was not used: {agent_fell_back}.")
+            source.pop("agent", None)
+            method, source["method"] = "lidar_skeleton", "lidar_skeleton"
+            model = build_model(model_blockset, roof_blocks, source, classification)  # the transcript stays on disk
+
+    from_planes, was_planes_only, old_metrics = False, False, {}  # the block model is poor but the measured planes tile the roof: draw those instead
+    if method != "solar_agent":
+        was_planes_only = net_exc is not None
+        drawn = planes_model.replace_if_bad(base, model, source, was_planes_only, fpinfo["codes"])
+        if drawn is not None:
+            (model, old_metrics), net_exc, from_planes = drawn, None, True
+
     # 3. verifier, then outputs from the FINAL model
     deadline.check("verify")
-    if net_exc is None:
+    if from_planes:  # never read a planes model as verified
+        verification, verifier_transcript = _no_verification(model, planes_model.NOT_VERIFIED), []
+    elif net_exc is None:
         model, verification, verifier_transcript = _verify(model, verify, client, deadline, on_stage)
     else:  # a planes-only result has no edges to verify
         verification, verifier_transcript = _no_verification(model, planes_only.NOT_VERIFIED), []
@@ -252,8 +278,14 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     if net_exc is not None:
         extra_warnings.append((planes_only.CODE, planes_only.WARNING))
         render = False  # the debug picture draws facets
+    if from_planes:
+        extra_warnings.append((planes_model.CODE, planes_model.WARNING))
+        if was_planes_only:
+            extra_warnings.append((planes_only.CODE, planes_only.WARNING))
     if agent_fell_back:
-        text = f"The roof agent could not finish ({agent_fell_back}); the rule-based measurement was used instead."
+        text = (f"The roof agent's roof was not used ({agent_fell_back}); the rule-based measurement was used instead."
+                if agent_fell_back.startswith("its roof")
+                else f"The roof agent could not finish ({agent_fell_back}); the rule-based measurement was used instead.")
         extra_warnings.append((AGENT_FELL_BACK, text))
     paths = {"blocks": out / f"{tag}_blocks.json", "model": out / f"{tag}_model.json",
              "png": out / f"{tag}_model.png"}
@@ -284,6 +316,9 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     verification = cap_verification(verification, fpinfo["source"])  # final verdict before the warnings
     warnings, codes = collect_warnings(model, fpinfo, verification, density, fallback_from, method, extra_warnings)
     assessment = _assess(base, model, codes) if method != "solar_agent" else None
+    if from_planes and assessment and assessment.get("quality"):
+        assessment["quality"]["reasons"].insert(0, planes_model.REASON)  # first: a planes model is never "verified"
+        assessment["quality"].update(old_metrics)  # what the replaced block model scored
     if net_exc is not None:
         assessment = planes_only.assessment_or_raise(assessment, net_exc)
         verification = {**verification, "original_totals": {k: v for k, v in planes_only.planes_only_totals(
