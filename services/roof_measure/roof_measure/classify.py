@@ -554,6 +554,7 @@ def classify_blocks(blockset: BlockSet, *, merge_flats: bool = False,
             form, gable = "hip", []
             notes.append("Outline too ragged for a skeleton; replaced by its rectangle.")
             geom = block_geometry(form, ring, pitch, gable, aspect)
+        notes.extend(n for n in geom.get("notes", []) if n not in notes)  # e.g. a shortened gable extension
         rb = RoofBlock(id="", form=form, polygon=ring, pitch_rise=pitch, aspect_deg=aspect, gable_edges=gable,
                        ridge_azimuth_deg=ridge_azimuth(form, ring, aspect, geom),
                        source_blocks=[b.id for b in g], notes=notes + extra,

@@ -2,6 +2,7 @@
 
 - contracts/roof_model.md — the `bond.roof_model/0.1` wire contract shared by bond_roof and roof_measure
 - contract-0.2.md — the `bond.roof_model/0.2` job API and envelope (`result.model` is the 0.1 roof model)
+- contract-0.3.md — additive to 0.2 (pipeline 0.3.0): `model.planes`, `model.quality`, four totals, `parcel_street_match`, agent fallback
 - decisions/2026-11-07-roof-poc-summary.md — what the roof POC proved and what was decided
 - decisions/2026-11-10-roof-module-v1.md — roof module v1 decisions D1 to D18, GPL-3 licence (licence section superseded by 2026-11-11-licence-mit.md), hygiene gate, history rewrite runbook
 - decisions/2026-11-11-roof-dart-packages-mit.md — MIT for bond_roof and bond_roof_ui, roof_measure importable as a library, library-first default (repository licence superseded by 2026-11-11-licence-mit.md)

@@ -9,9 +9,9 @@ from typing import Any
 from .version import CONTRACT, PIPELINE_VERSION
 
 WARNING_CODES = ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
-                 "other_buildings_on_parcel", "low_point_density", "method_fallback", "verifier_unverified",
+                 "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "method_fallback", "verifier_unverified",
                  "verifier_adjusted", "verifier_failed", "verifier_timeout", "solar_segments_only",
-                 "flat_roof_assumed", "other")
+                 "agent_failed_fell_back", "flat_roof_assumed", "other")
 TOTALS_KEYS = ("area_sqft", "squares", "eave_ft", "rake_ft", "ridge_ft", "hip_ft", "valley_ft", "step_flashing_ft",
                "predominant_pitch", "facets", "drip_edge_eave_ft", "drip_edge_eave_rake_ft", "ridge_cap_ridge_ft",
                "ridge_cap_ridge_hip_ft")
@@ -65,8 +65,12 @@ def cap_verification(verification: dict[str, Any], footprint_source: str) -> dic
 
 def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source: str, verification: dict[str, Any],
                    warnings: list[str], warning_codes: list[str], density_pts_m2: float | None = None,
-                   generated_at: str | None = None) -> dict[str, Any]:
-    """Assemble the 0.2 result. Degraded footprints (solar, lidar_hull) can be at most ``adjusted``."""
+                   generated_at: str | None = None, assessment: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Assemble the 0.2 result. Degraded footprints (solar, lidar_hull) can be at most ``adjusted``.
+
+    ``assessment`` (``quality.assess``) adds the optional 0.3 keys: ``model.quality``, ``model.planes`` and four
+    extra totals. Without it the envelope is exactly the 0.2 one.
+    """
     if len(warnings) != len(warning_codes):
         raise ValueError("warnings and warning_codes must have the same length")
     verification = cap_verification(verification, footprint_source)
@@ -74,6 +78,12 @@ def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source:
     if verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {VERDICTS}")
     codes = [c if c in WARNING_CODES else "other" for c in warning_codes]
+    totals = totals_from_model(model)
+    if assessment:
+        model["quality"] = assessment["quality"]
+        if "planes" in assessment:  # absent when the assessment failed
+            model["planes"] = assessment["planes"]
+        totals.update(assessment.get("totals", {}))
     return {
         "contract": CONTRACT,
         "pipeline_version": PIPELINE_VERSION,
@@ -81,7 +91,7 @@ def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source:
         "footprint_source": footprint_source,
         "generated_at": generated_at or dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "model": model,
-        "totals": totals_from_model(model),
+        "totals": totals,
         "verification": verification,
         "confidence": confidence_score(model, footprint_source, verdict, density_pts_m2),
         "warnings": list(warnings),

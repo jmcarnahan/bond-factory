@@ -110,7 +110,7 @@ def fetch_county(lat: float, lng: float, address: Address) -> tuple[Footprint | 
     if match != "exact":
         text = (f"Address {address.line1} has no exact parcel match; used parcel "
                 f"{parcel['properties'].get('SitusAddress')} ({match} match).")
-        warnings.append(("other", text))
+        warnings.append(("parcel_street_match", text))
     parcel_poly = as_polygon(parcel["geometry"])
     bq = {"f": "geojson", "inSR": 4326, "spatialRel": "esriSpatialRelIntersects", "outFields": "*",
           "outSR": 4326, "returnGeometry": "true", "geometryType": "esriGeometryPolygon",

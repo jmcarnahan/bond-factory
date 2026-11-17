@@ -24,6 +24,8 @@ from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import linemerge, polygonize, unary_union
 from shapely.ops import split as shp_split
 
+from .skeleton_guard import check_ring, safe_extension
+
 log = logging.getLogger(__name__)
 
 Pt = tuple[float, float]
@@ -105,7 +107,7 @@ def hip_roof_edges(polygon_ft: list[Any], pitch_rise: float, gable_edges: set[in
     edges (edge i = vertex i to i+1) that are gable ends: they get no eave and no facet and the
     sloped boundary of the facets along them is a rake.
 
-    Returns ``{slope_factor, pitch_rise, facets, edges, totals}``. Each facet has ``polygon_xy``,
+    Returns ``{slope_factor, pitch_rise, facets, edges, totals, notes}`` (``notes``: sentences about changes made). Each facet has ``polygon_xy``,
     ``polygon_xyz`` (z = height above the eave plane), ``plan_area``, ``area`` (true),
     ``aspect_deg`` (compass downslope), ``edge_index`` and ``plane`` (z = c0 + c1 x + c2 y).
     Each edge has ``type`` (eave|rake|ridge|hip|valley), a two point ``polyline_xyz``,
@@ -126,11 +128,17 @@ def hip_roof_edges(polygon_ft: list[Any], pitch_rise: float, gable_edges: set[in
     gab = {inv[g] for g in gable if g in inv}
     s = pitch_rise / 12.0
     sf = math.sqrt(1 + s * s)
+    check_ring(rpts, "outline")  # a bad ring is undefined behaviour in CGAL: refuse it here
     orig = Polygon(rpts)
 
     big = extend_ft if extend_ft is not None else 4 * max(orig.bounds[2] - orig.bounds[0],
                                                           orig.bounds[3] - orig.bounds[1])
-    work = _extend_for_gables(rpts, gab, big) if gab else rpts
+    work, used = safe_extension(rpts, gab, big, _extend_for_gables) if gab else (rpts, big)
+    notes: list[str] = []
+    if used != big:  # a silent change of geometry is not allowed: say it
+        notes.append(f"Gable ends were extended by {used:.0f} ft instead of {big:.0f} ft because the sides next to "
+                     "them converge; check the rakes.")
+    check_ring(work, "skeleton input")  # the only native call below must never see an invalid ring
     verts, idx, skel_edges, _ = interior_straight_skeleton([[x, y, 0.0] for x, y in work], as_graph=False)
     row = {int(i): k for k, i in enumerate(idx)}
     segs = [LineString([verts[row[int(a)]][:2], verts[row[int(b)]][:2]]) for a, b in skel_edges]
@@ -200,7 +208,8 @@ def hip_roof_edges(polygon_ft: list[Any], pitch_rise: float, gable_edges: set[in
     totals = {f"{k}s_ft": v for k, v in tot.items()}
     totals["facet_area_sqft"] = sum(f["area"] for f in facets)
     totals["plan_area_sqft"] = sum(f["plan_area"] for f in facets)
-    return {"slope_factor": sf, "pitch_rise": pitch_rise, "facets": facets, "edges": edges, "totals": totals}
+    return {"slope_factor": sf, "pitch_rise": pitch_rise, "facets": facets, "edges": edges, "totals": totals,
+            "notes": notes}
 
 
 def _interior_edges(meta: list[dict[str, Any]], s: float) -> list[dict[str, Any]]:

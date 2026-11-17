@@ -1,0 +1,188 @@
+{
+ "schema": "bond.roof_blocks/0.1",
+ "address": {},
+ "origin": {
+  "lat": 0.0,
+  "lng": 0.0
+ },
+ "frame": {
+  "epsg": 32631,
+  "x0_m": 0.0,
+  "y0_m": 0.0
+ },
+ "footprint_ft": [
+  [
+   0,
+   0
+  ],
+  [
+   54,
+   0
+  ],
+  [
+   54,
+   14
+  ],
+  [
+   40,
+   14
+  ],
+  [
+   40,
+   30
+  ],
+  [
+   0,
+   30
+  ],
+  [
+   0,
+   0
+  ]
+ ],
+ "footprint_meta": {
+  "provider": "synthetic",
+  "id": "simple_gable_house",
+  "area_sqft": 1396.0,
+  "height_ft": 18.0
+ },
+ "lidar": {
+  "project": "synthetic",
+  "points_on_roof": 3500,
+  "density_per_m2": 16.0,
+  "ground_z_m": 0.0,
+  "epsg": 32631
+ },
+ "blocks": [
+  {
+   "id": "k0",
+   "kind": "sloped",
+   "polygon_ft": [
+    [
+     40.0,
+     0.6
+    ],
+    [
+     0.6,
+     0.6
+    ],
+    [
+     0.6,
+     15.0
+    ],
+    [
+     39.4,
+     15.0
+    ],
+    [
+     39.4,
+     13.4
+    ],
+    [
+     40.0,
+     13.4
+    ]
+   ],
+   "plan_area_sqft": 566.4,
+   "mean_z_ft": 16.0,
+   "height_above_ground_ft": 15.6,
+   "pitch_rise": 6.0,
+   "aspect_deg": 180.0,
+   "rms_ft": 0.08,
+   "n_cells": 809
+  },
+  {
+   "id": "k1",
+   "kind": "sloped",
+   "polygon_ft": [
+    [
+     0.6,
+     15.0
+    ],
+    [
+     0.6,
+     29.4
+    ],
+    [
+     39.4,
+     29.4
+    ],
+    [
+     39.4,
+     15.0
+    ]
+   ],
+   "plan_area_sqft": 558.7,
+   "mean_z_ft": 16.0,
+   "height_above_ground_ft": 15.6,
+   "pitch_rise": 6.0,
+   "aspect_deg": 0.0,
+   "rms_ft": 0.08,
+   "n_cells": 798
+  },
+  {
+   "id": "k2",
+   "kind": "sloped",
+   "polygon_ft": [
+    [
+     40.0,
+     7.0
+    ],
+    [
+     53.4,
+     7.0
+    ],
+    [
+     53.4,
+     0.6
+    ],
+    [
+     40.0,
+     0.6
+    ]
+   ],
+   "plan_area_sqft": 85.8,
+   "mean_z_ft": 11.0,
+   "height_above_ground_ft": 10.6,
+   "pitch_rise": 4.0,
+   "aspect_deg": 180.0,
+   "rms_ft": 0.08,
+   "n_cells": 122
+  },
+  {
+   "id": "k3",
+   "kind": "sloped",
+   "polygon_ft": [
+    [
+     40.0,
+     7.0
+    ],
+    [
+     40.0,
+     13.4
+    ],
+    [
+     53.4,
+     13.4
+    ],
+    [
+     53.4,
+     7.0
+    ]
+   ],
+   "plan_area_sqft": 85.8,
+   "mean_z_ft": 11.0,
+   "height_above_ground_ft": 10.6,
+   "pitch_rise": 4.0,
+   "aspect_deg": 0.0,
+   "rms_ft": 0.08,
+   "n_cells": 122
+  }
+ ],
+ "borders": [],
+ "outline_edges": [],
+ "extra": {
+  "_synthetic": true,
+  "note": "Hand-built ordinary house, invented coordinates. Not LiDAR output."
+ }
+}

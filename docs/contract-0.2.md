@@ -11,7 +11,7 @@ Base URL is wherever the service is deployed. JSON in, JSON out. Every route exc
 `Authorization: Bearer <ROOF_MEASURE_TOKEN>`. The token lives in the calling app's backend only; a Flutter client
 never holds it.
 
-- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.2.0"}`. It touches neither disk nor network and
+- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.3.0"}`. It touches neither disk nor network and
   needs no token.
 - `POST /v1/measurements` body
   `{"address": str (at most 200 characters), "lat"?: float, "lng"?: float,
@@ -130,6 +130,7 @@ for anything not listed.
 | `source_unreachable` | a data source could not be reached and the footprint came from another link; treat the result as degraded |
 | `parcel_without_building` | the parcel matched but the county layer has no building |
 | `other_buildings_on_parcel` | more than one building outline on the parcel; the largest was measured |
+| `parcel_street_match` | no exact parcel match: the parcel came from the street name or was only the nearest one, so the footprint may be a neighbour's |
 | `low_point_density` | LiDAR density below 8 points per square metre (the job fails below 4) |
 | `method_fallback` | LiDAR failed and `solar_agent` was used under `auto` |
 | `verifier_unverified` | the verifier did not review the result |
@@ -137,6 +138,7 @@ for anything not listed.
 | `verifier_failed` | the verifier's fail rule tripped |
 | `verifier_timeout` | reserved, not emitted yet (a verifier timeout is reported as `verifier_unverified`) |
 | `solar_segments_only` | geometry comes from Solar segments, not LiDAR |
+| `agent_failed_fell_back` | a `lidar_agent` or `solar_agent` measurement could not finish (agent error, truncated reply, timeout of the agent stage, blocks the model builder rejected) and the rule-based result is returned; a `lidar_agent` child killed by a signal is retried once as `lidar_skeleton` and gets the same code (a `solar_agent` crash still fails the job). `method_used` is then `lidar_skeleton` (`solar_agent` keeps its name); never emitted for `auto` or `lidar_skeleton`; an invalid or revoked API key is an error, not this code |
 | `flat_roof_assumed` | reserved, not emitted yet |
 | `other` | anything else |
 
@@ -148,7 +150,7 @@ placeholder address. Copy it as an app's mock fixture.
 ```json
 {
  "contract": "bond.roof_model/0.2",
- "pipeline_version": "0.2.0",
+ "pipeline_version": "0.3.0",
  "method_used": "lidar_skeleton",
  "footprint_source": "osm",
  "generated_at": "2026-11-10T00:00:00Z",
