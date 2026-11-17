@@ -252,6 +252,20 @@ def test_snapping_straightens_by_default_and_the_flag_turns_it_off():
     no_gap_no_overlap(on, Polygon(sq))
 
 
+def _corners(ring) -> int:
+    """Vertices where the outline turns (more than 0.05 ft off the line through the neighbours)."""
+    pts = [tuple(q) for q in ring]
+    if len(pts) > 1 and pts[0] == pts[-1]:
+        pts = pts[:-1]
+    n, count = len(pts), 0
+    for i in range(n):
+        (ax, ay), (bx, by), (cx, cy) = pts[i - 1], pts[i], pts[(i + 1) % n]
+        base = ((cx - ax) ** 2 + (cy - ay) ** 2) ** 0.5
+        off = abs((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / base if base > 1e-9 else 1.0
+        count += off > 0.05
+    return count
+
+
 @pytest.mark.parametrize("name", ["site1", "two_level", "handmade", "hip", "simple_gable", "simple_hip", "plain_gable"])
 def test_every_committed_blocks_fixture_straightens_within_the_bounds(name, monkeypatch):
     monkeypatch.setattr("roof_measure.planes_envelope.envelope_planes", lambda *a, **k: None)  # this tests the in-place method
@@ -268,7 +282,9 @@ def test_every_committed_blocks_fixture_straightens_within_the_bounds(name, monk
     assert all(p.straightened for p in on), "a committed fixture fell back to the unstraightened planes"
     assert invariant_problems(bs, on) == []
     drift_ok(off, on)
-    assert sum(len(p.polygon) for p in on) <= sum(len(p.polygon) for p in off)  # never more vertices
+    # never more corners; a vertex lying on a straight edge (a T junction with a neighbour) is not a corner, and
+    # whether GEOS keeps one there differs between its versions
+    assert sum(_corners(p.polygon) for p in on) <= sum(_corners(p.polygon) for p in off)
     for p in on:
         assert p.raw_plan_area_sqft is not None and p.raw_plan_area_sqft > 0
 
