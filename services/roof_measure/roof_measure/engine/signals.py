@@ -75,7 +75,7 @@ def _fit_shares(facets: list[Facet], pts: np.ndarray, p: EngineParams) -> tuple[
     fit_all: share within ``fit_tol_m`` of the plane of the facet they fall in (a return outside every facet counts as
     a miss). fit_covered: the same over the returns inside a facet. Canopy: a return more than ``canopy_above_m`` ABOVE
     the surface under it (inside a facet, or outside one but within 2 m of it: the surface there is that facet's
-    plane): trees over the eaves, not roof. fit_clear is fit_all with the canopy left out of the count; tree_cover_pct
+    plane): trees over the eaves, not roof. fit_clear is fit_all with the canopy left out of the count (reported, not part of the verdict); tree_cover_pct
     the canopy's share of all returns. Returns far BELOW the surface or off it stay misses."""
     n = len(pts)
     assigned = np.full(n, -1)
@@ -128,8 +128,9 @@ def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygo
         reasons.append("low_density")
     if cover < p.mismatch_lo or cover > p.mismatch_hi or shift >= p.mismatch_shift:
         reasons.append("outline_mismatch")
-    if ((fit_clear is not None and fit_clear < p.fit_floor) or (supported_pct is not None and supported_pct < p.supported_floor)
-            or (tree_cover is not None and tree_cover > p.canopy_max_pct)):
+    # fit_clear and tree_cover_pct are REPORTED only: a wrong drawn surface (flat over a slope, a merged plane) puts the
+    # real roof returns "above" it, so a canopy-free fit would hide exactly the roofs the verdict must catch
+    if (fit_all is not None and fit_all < p.fit_floor) or (supported_pct is not None and supported_pct < p.supported_floor):
         reasons.append("poor_fit")
     if parcel_match in ("street", "nearest"):
         reasons.append("not_exact_parcel")

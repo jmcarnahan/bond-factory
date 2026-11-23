@@ -277,8 +277,7 @@ class EngineParams:
     stub_min_len_m: float = 1.0  # m: a level change shorter than this is absorbed (clutter) ...
     stub_jump_m: float = 0.45  # m: ... as is one with a jump under this ...
     stub_len_m: float = 2.0  # m: ... and shorter than this
-    canopy_max_pct: float = 35.0  # percent: more canopy than this of the returns and the surface is too hidden to call right
-    canopy_above_m: float = 0.5  # m: a return this far ABOVE the surface under it is canopy, left out of the fit verdict
+    canopy_above_m: float = 0.5  # m: a return this far ABOVE the surface under it is canopy, reported as tree_cover_pct (not in the verdict)
     borderline_area_share: float = 0.05  # ratio of roof area that makes a borderline facet matter
     borderline_sigma: float = 2.0  # sigmas of the pitch fit around the flat cut
     supported_step_m: float = 0.25  # m: sampling step of the supported-area estimate

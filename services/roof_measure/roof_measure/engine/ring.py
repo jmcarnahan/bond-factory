@@ -20,7 +20,6 @@ def ring_filter(crop: np.ndarray, wall: Polygon, p: EngineParams, diag: dict[str
     crown: a roof has one height per place). Points inside the footprint are never touched."""
     if not p.ring_filter or len(crop) < 20:
         return crop
-    inside = shapely.contains_xy(wall, crop[:, 0], crop[:, 1])
     outside = ~shapely.contains_xy(wall.buffer(p.ring_guard_m), crop[:, 0], crop[:, 1])  # only beyond the guard
     inside = shapely.contains_xy(wall, crop[:, 0], crop[:, 1])
     if inside.sum() < p.ring_k or not outside.any():

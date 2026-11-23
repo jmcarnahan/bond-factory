@@ -284,3 +284,15 @@ def test_a_level_change_stub_is_absorbed_and_reported(length, jump, kept):
         assert absorbed[0]["facets"] == ["a", "b"] and absorbed[0]["jump_ft"] == pytest.approx(jump / 0.3048, abs=0.1)
         assert edge_diagnostics([a, b], DEFAULT)["absorbed_level_changes"]
     assert {e.type for e in edges if len(e.facets) == 1} == {"flat_edge"}  # the outline is untouched
+
+
+def test_an_empty_point_array_falls_back_to_the_plane_gap_like_no_points():
+    """jump_points can return an empty array (no wide cloud over the roof): that is 'no points', not 'every side too thin'."""
+    from roof_measure.engine.edge_measure import measured_jump
+
+    a = facet("a", [(0, 0), (6, 0), (6, 6), (0, 6)], (0, 0, 3.0))
+    b = facet("b", [(6, 0), (12, 0), (12, 6), (6, 6)], (0, 0, 3.8))
+    p0, p1 = np.array([6.0, 0.0]), np.array([6.0, 6.0])
+    assert measured_jump(a, b, p0, p1, np.zeros((0, 3))) == pytest.approx(0.8) == measured_jump(a, b, p0, p1, None)
+    assert measured_jump(a, b, p0, p1, points_on(a)) == 0.0  # points exist, side b has none: unverifiable
+    assert [e.type for e in build_edges([a, b], np.zeros((0, 3)), CTX) if len(e.facets) == 2] == ["level_change"]

@@ -33,8 +33,7 @@ example differ in that line only).
   `synth_engine_envelope.py`, `quality.assess_engine`.
 - **Fewer dashed lines**: two flat facets with no verified jump share no edge; `transition` only beside a flat facet of 8 m2 and
   5% of the roof (else the planes decide, or no edge); level-change stubs (under 1 m, or under 0.45 m high and under 2 m long)
-  are absorbed and reported in `model.debug.edge_diagnostics`. `poor_fit` tests the canopy-free fit (`fit_clear`) and a canopy
-  cap (`tree_cover_pct` above 35%). `model.quality.engine_params` and the service cache key carry the parameter hash; reasons
+  are absorbed and reported in `model.debug.edge_diagnostics`. `fit_clear` and `tree_cover_pct` are REPORTED signals only; `poor_fit` still tests `fit_all` (a canopy-free verdict hid wrong surfaces). `model.quality.engine_params` and the service cache key carry the parameter hash; reasons
   `priced_fallback` and `planes_not_found` documented.
 - **One priced area in engine envelopes**: `totals.area_sqft` and `totals.squares` are the priced area (== `planes_surface_area_sqft`
   == `roofing_pitched_sqft` + `roofing_flat_sqft`); the drawn area is `area_sqft_roof_edge`; `model.totals` stay drawn and carry a `note`.

@@ -111,16 +111,21 @@ def test_cut_up_at_7_ft_of_hip_and_valley_per_square(hv, cut):
     assert t["complexity"]["hip_valley_ft_per_square"] == pytest.approx(hv / 10, abs=0.006)
 
 
-# ----------------------------------------------------------------------------- canopy
-def test_returns_above_the_surface_are_canopy_and_do_not_fail_the_fit():
+# ----------------------------------------------------------------------------- canopy: reported, never in the verdict
+def test_canopy_is_reported_but_the_verdict_still_tests_fit_all():
     below = q(n=1000, off=100, lift=-1.0)  # a tenth of the returns 1 m under the surface
     above = q(n=1000, off=100, lift=+1.0)  # a tenth over it: trees
     assert below.fit_clear == below.fit_all == 0.9 and below.tree_cover_pct == 0.0
     assert above.fit_all == 0.9 and above.fit_clear == 1.0 and above.tree_cover_pct == 10.0
-    assert "poor_fit" not in above.reasons and above.verdict == "ok"
-    assert "poor_fit" in q(n=1000, off=500, lift=-1.0).reasons  # half the returns under the surface
-    assert "poor_fit" not in above.reasons or above.tree_cover_pct > P.canopy_max_pct
     assert above.to_dict()["tree_cover_pct"] == 10.0 and above.to_dict()["fit_clear"] == 1.0
+
+
+@pytest.mark.parametrize("lift", [-1.0, +1.0, +3.0])
+def test_a_wrong_surface_is_poor_fit_whether_the_returns_lie_below_or_above_it(lift):
+    """Half the returns off the drawn surface: poor_fit by fit_all, however high above it they are (a flat drawn over a
+    slope puts the real roof 'above' the surface: it must not pass as canopy)."""
+    got = q(n=1000, off=500, lift=lift)
+    assert got.fit_all == 0.5 and "poor_fit" in got.reasons and got.verdict == "poor_fit"
 
 
 @pytest.mark.parametrize("lift, canopy", [(0.45, False), (0.55, True)])
@@ -129,13 +134,6 @@ def test_canopy_starts_half_a_metre_above_the_surface(lift, canopy):
     assert (got.tree_cover_pct == 10.0) is canopy
 
 
-@pytest.mark.parametrize("off, poor", [(349, False), (350, False), (351, True)])
-def test_too_much_canopy_hides_the_roof_at_35_percent(off, poor):
-    got = q(n=1000, off=off, lift=+1.0)  # fit_clear is 1.0: only the canopy share can fail it
-    assert got.fit_clear == 1.0 and ("poor_fit" in got.reasons) is poor
-
-
-def test_a_poor_roof_that_is_still_poor_without_the_trees_fails():
-    got = quality([facet()], np.vstack([cloud(500, 400, lift=-1.0), cloud(500, 500, lift=+1.0)]), WALL, WALL, "exact", "lacounty",
-                  100.0, 100.0, P.overhang_scale, None, None, P)
-    assert got.tree_cover_pct == 50.0 and got.fit_clear < 0.55 and "poor_fit" in got.reasons
+def test_a_lot_of_canopy_alone_is_not_a_poor_fit():
+    got = q(n=1000, off=400, lift=+1.0)  # fit_all 0.6 (above the floor), 40% canopy
+    assert got.fit_all == 0.6 and got.tree_cover_pct == 40.0 and "poor_fit" not in got.reasons

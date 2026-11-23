@@ -41,7 +41,7 @@ def measured_jump(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, q: np.nd
     j = points_jump(q, p0, p1) if q is not None else None
     if j is not None:
         return float(j)
-    if q is not None:  # points exist but a side is too thin: the jump cannot be verified, so it is not called a level change
+    if q is not None and len(q):  # points exist but a side is too thin: the jump cannot be verified, so it is not called a level change
         return 0.0
     mid = (p0 + p1) / 2
     return abs(zat(fa.plane, *mid) - zat(fb.plane, *mid))

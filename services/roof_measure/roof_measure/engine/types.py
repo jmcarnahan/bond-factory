@@ -136,7 +136,7 @@ class Quality:
     roof_cover_of_outline: float | None = None
     extra_roof_ring_ratio: float | None = None
     tree_contact_pct: float | None = None
-    fit_clear: float | None = None  # fit_all with canopy (returns well above the surface) left out: what poor_fit tests
+    fit_clear: float | None = None  # fit_all with canopy (returns well above the surface) left out: REPORTED only, poor_fit tests fit_all
     tree_cover_pct: float | None = None  # share of the roof returns that are canopy above the surface
     error: str | None = None
     brief: bool = False  # a refusal: only the density, the reason and the verdict are reported

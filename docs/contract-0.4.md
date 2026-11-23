@@ -142,10 +142,11 @@ their 0.5/12 cut and their meaning. Keys whose value is unknown are left out.
 facet; `supported_pct` the area-weighted share of each facet that has points under it. The 0.3 keys stay, with engine
 analogues: `plane_mismatch_pct` = 100 x (1 - `fit_covered`), `outline_covered_pct` = roof-point support over the outline,
 `model_uncovered_pct` = share of points outside every facet, `level_spread_ft`, `planes_lidar` (distinct planes used) and
-`facets_model`. `tree_cover_pct` is the share of roof returns more than 0.5 m ABOVE the surface under them (canopy over the eaves);
-`fit_clear` is `fit_all` with that canopy left out of the count, and `poor_fit` tests `fit_clear` (below 0.55), the supported
-share (below 70%) and the canopy itself (above 35% of the returns: the roof is too hidden to call). Returns far BELOW the
-surface stay misses. `reasons` lists every verdict condition that holds (first = `verdict`), plus `low_slope_confirm` when facets
+`facets_model`. `tree_cover_pct` is the share of roof returns more than 0.5 m ABOVE the surface under them (canopy over the eaves) and
+`fit_clear` is `fit_all` with that canopy left out of the count. Both are REPORTED only: the verdict does not use them
+(a wrong drawn surface, such as a flat drawn over a slope, puts the real roof "above" it, so a canopy-free fit would hide
+exactly the roofs `poor_fit` must catch). `poor_fit` tests `fit_all` (below 0.55, over ALL the engine's quality points) and
+the supported share (below 70%). `reasons` lists every verdict condition that holds (first = `verdict`), plus `low_slope_confirm` when facets
 are borderline and the parcel reasons (`parcel_street_match`, `other_buildings_on_parcel`, `not_exact_parcel`).
 `quality_label` in adopting apps keeps its three wire values `good | rough | unchecked`.
 
@@ -153,7 +154,8 @@ are borderline and the parcel reasons (`parcel_street_match`, `other_buildings_o
 |---|---|
 | `low_density` | 4 <= points on the roof per m2 < 6 (dense is 8 or more; under 4 is refused) |
 | `outline_mismatch` | roof-point support covers under 70% or over 130% of the reference outline |
-| `poor_fit` | `fit_all` below the tuned floor, or planar support under 70% |
+| `poor_fit` | `fit_all` below 0.55 (over all the engine's quality points; canopy is NOT left out), or planar support under 70% |
+| `unknown` | the quality signals could not be computed, or the priced roof edge fell back to the drawn one (`priced_fallback`): never `ok` |
 | `priced_fallback` (reason, not a verdict) | the priced roof edge could not be built, so the priced totals are the drawn ones; such a result is never `ok` (verdict `unknown`) |
 | `planes_not_found` (reason) | (almost) no plane explains the roof points: verdict `poor_fit` |
 | `not_exact_parcel` | `parcel_match` is `street` or `nearest` and the user did not choose the building |
