@@ -1,0 +1,295 @@
+{
+ "_note": "Plan section 3.7a, encoded exactly; thresholds may not be loosened without John. Price (gate 8) and the outside-outline share are report-only. Gate 4 and 5 (blind) are graded by roof-blind-score, not here.",
+ "compare": {
+  "area_pct": 3.0,
+  "facets": 2,
+  "fit_all_drop": 0.05,
+  "overlap_sqft": 1.0,
+  "flag_share": 0.05,
+  "median_area_pct": 1.0
+ },
+ "gates": [
+  {
+   "name": "1 automation: exact parcel, density >= 6, not thinned",
+   "metric": "automation_ok",
+   "agg": "rate",
+   "op": ">=",
+   "value": 0.9,
+   "where": [
+    "parcel_match=exact",
+    "density_pts_m2>=6",
+    "flags!=derived_thin"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "2a fit_covered >= 0.80 on >= 60% of ok houses",
+   "metric": "fit_covered",
+   "agg": "share",
+   "op": ">=",
+   "value": 0.6,
+   "require": [
+    "automation_ok"
+   ],
+   "pred": {
+    "op": ">=",
+    "value": 0.8
+   },
+   "min_n": 10
+  },
+  {
+   "name": "2b fit_all >= 0.60 on >= 85% of ok houses",
+   "metric": "fit_all",
+   "agg": "share",
+   "op": ">=",
+   "value": 0.85,
+   "require": [
+    "automation_ok"
+   ],
+   "pred": {
+    "op": ">=",
+    "value": 0.6
+   },
+   "min_n": 10
+  },
+  {
+   "name": "2c coverage median >= 0.90",
+   "metric": "coverage",
+   "agg": "median",
+   "op": ">=",
+   "value": 0.9,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "2d coverage >= 0.85 on >= 85% of ok houses",
+   "metric": "coverage",
+   "agg": "share",
+   "op": ">=",
+   "value": 0.85,
+   "require": [
+    "automation_ok"
+   ],
+   "pred": {
+    "op": ">=",
+    "value": 0.85
+   },
+   "min_n": 10
+  },
+  {
+   "name": "2e overlap <= 0.1% of union area (worst house)",
+   "metric": "overlap_share",
+   "agg": "max",
+   "op": "<=",
+   "value": 0.001,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "2f tiling gap <= 0.1% of union area (worst house)",
+   "metric": "tiling_gap_share",
+   "agg": "max",
+   "op": "<=",
+   "value": 0.001,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3a no facet < 30 sqft on >= 70% of houses",
+   "metric": "facets_lt_30sqft",
+   "agg": "share",
+   "op": ">=",
+   "value": 0.7,
+   "require": [
+    "automation_ok"
+   ],
+   "pred": {
+    "op": "==",
+    "value": 0
+   },
+   "min_n": 10
+  },
+  {
+   "name": "3b never more than 3 facets < 30 sqft",
+   "metric": "facets_lt_30sqft",
+   "agg": "max",
+   "op": "<=",
+   "value": 3,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3c edges < 3 ft: median share <= 15%",
+   "metric": "edges_lt_3ft_share",
+   "agg": "median",
+   "op": "<=",
+   "value": 0.15,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3d edges < 3 ft: p90 share <= 27%",
+   "metric": "edges_lt_3ft_share",
+   "agg": "p90",
+   "op": "<=",
+   "value": 0.27,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3e controllable off-axis length: median <= 10%",
+   "metric": "offaxis_controllable_share",
+   "agg": "median",
+   "op": "<=",
+   "value": 0.1,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3f controllable off-axis length: p90 <= 26%",
+   "metric": "offaxis_controllable_share",
+   "agg": "p90",
+   "op": "<=",
+   "value": 0.26,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3g facets per 1000 sqft: p90 <= 5.5",
+   "metric": "facets_per_1000sqft",
+   "agg": "p90",
+   "op": "<=",
+   "value": 5.5,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3h facet count ratio within 0.5-2.0 on >= 90% of houses with an INDEPENDENT reference (facet_count_src vision_label, vendor or manual)",
+   "metric": "facet_count_ratio",
+   "agg": "share",
+   "op": ">=",
+   "value": 0.9,
+   "require": [
+    "automation_ok"
+   ],
+   "pred": {
+    "op": "between",
+    "value": [
+     0.5,
+     2.0
+    ]
+   },
+   "valued_only": true,
+   "min_n": 10,
+   "where": [
+    "facet_count_src=vision_label,vendor,manual"
+   ]
+  },
+  {
+   "name": "3i mergeable neighbour share: median <= 0.02",
+   "metric": "mergeable_neighbour_share",
+   "agg": "median",
+   "op": "<=",
+   "value": 0.02,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3j mergeable neighbour share: p90 <= 0.08",
+   "metric": "mergeable_neighbour_share",
+   "agg": "p90",
+   "op": "<=",
+   "value": 0.08,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3k unsupported facet area share: median <= 0.08",
+   "metric": "unsupported_facet_area_share",
+   "agg": "median",
+   "op": "<=",
+   "value": 0.08,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "3l false + unmarked level changes pooled <= 2.5% of edge length",
+   "metric": "false_unmarked_ft",
+   "agg": "ratio",
+   "op": "<=",
+   "value": 0.025,
+   "require": [
+    "automation_ok"
+   ],
+   "denominator": "edge_len_ft",
+   "min_n": 10
+  },
+  {
+   "name": "5 invalid or crashed results = 0",
+   "metric": "invalid_or_crashed",
+   "agg": "sum",
+   "op": "==",
+   "value": 0
+  },
+  {
+   "name": "7a T3: 90% interval of the median ratio contains 1.00",
+   "agg": "t3_contains",
+   "op": ">=",
+   "value": 1.0,
+   "require": [
+    "automation_ok"
+   ],
+   "min_n": 10
+  },
+  {
+   "name": "7b T3: ratio IQR <= 1.35 x the library baseline's",
+   "agg": "t3_iqr_ratio",
+   "op": "<=",
+   "value": 1.35,
+   "require": [
+    "automation_ok"
+   ],
+   "baseline": "library-0.4.0",
+   "min_n": 10
+  },
+  {
+   "name": "6 T2: mean two-sided facet IoU >= 0.60 (>= 10 labelled houses)",
+   "metric": "truth.T2.facet_iou.mean_iou",
+   "agg": "mean",
+   "op": ">=",
+   "value": 0.6,
+   "require": [
+    "automation_ok"
+   ],
+   "where": [
+    "tiers=T2"
+   ],
+   "min_n": 10,
+   "on_insufficient": "skip"
+  }
+ ]
+}

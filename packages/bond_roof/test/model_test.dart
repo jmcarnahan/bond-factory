@@ -173,7 +173,7 @@ void main() {
       expect(t.predominantPitchAreaSqft, 200.0);
       expect(t.predominantPitchRise, closeTo(4.0, 1e-9));
       expect(t.pitchedAreaSqft, 300.0);
-      expect(t.lengthsFt.length, 10);
+      expect(t.lengthsFt.length, EdgeType.values.length);
     });
   });
 

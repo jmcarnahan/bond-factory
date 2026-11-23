@@ -105,7 +105,7 @@ def test_real_hip_is_a_four_facet_rectangle_near_truth(site1_blocks_path):
 
 
 def test_ragged_gable_house_gets_two_gable_ends():
-    """Live regression (1528 W 223rd St): a ragged union must not turn every short edge into a gable end."""
+    """Live regression (a real ragged roof): a ragged union must not turn every short edge into a gable end."""
     ring = [(0, 0), (2, -1), (30, 0), (31, 2), (30, 40), (14, 42), (6, 41), (0, 38), (1, 20)]
     bs = BlockSet(address={}, origin={"lat": 0, "lng": 0}, frame={}, footprint_ft=ring)
     bs.blocks = [

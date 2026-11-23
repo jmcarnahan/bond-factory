@@ -16,6 +16,8 @@ hand-written. No network access.
 | | `RoofTotalsVariants.of(totals)` | Takes the model's `RoofTotals` (`measurement.model.totals`) and returns drip edge (eave / eave + rake) and ridge cap (ridge / ridge + hip) from the ten length totals. `RoofEnvelopeTotals` carries the same four values as fields (`dripEdgeEaveFt`, `dripEdgeEaveRakeFt`, `ridgeCapRidgeFt`, `ridgeCapRidgeHipFt`) and a `.variants` getter. |
 | | `RoofLabels` | Every user-visible string with English defaults; `RoofLabels.fromMap(map)` overrides by `RoofLabels.keys`, `{name}` placeholders in templates. |
 | | `ReportLayout` | `wide` (1600 x 1000, 3-column legend) or `compact` (400 x 500, 2 columns, text sized for a phone card) for the three builders. |
+| | Envelope 0.4 (`docs/contract-0.4.md`) | Optional, all nullable, and absent in old envelopes: facet `roofType` / `pitchFit` / `pitchSigma` / `borderline` / `supportedPct` / `points` / `rmsFt` / `planEq`; edge types `flatEdge` and `levelChange` (`RoofEdge.jumpFt`); `RoofEnvelopeTotals.engine` (`RoofEngineTotals`: flat and pitched roofing, wall-line and roof-edge numbers, `complexity`); `RoofModel.quality` and `RoofModel.building`. A missing key means "not available", never zero. |
+| | `Scene.regions`, `Scene.facetAt(point)` | Facet outlines in scene pixels (not drawn) so a host can map a tap to a facet id. |
 | | `RoofModel.recomputeTotals()` | Totals from facets and edges, same rules as the contract. |
 | | `RoofModel.bounds` | Bounding box of all geometry, feet. |
 | | `feetInches`, `wholeFeet`, `sqft`, `pitchLabel` | Number formats: `209ft 8in`, `35`, `2,121`, `Flat` / `4/12` / `4.5/12`. |
@@ -29,6 +31,18 @@ hand-written. No network access.
 
 `Scene.hiddenLabels` counts length labels (or facet labels) left off; `Scene.placedLabels` counts
 the ones drawn.
+
+### Hosts: reading envelope 0.4
+
+- Draw nothing yourself for flat roofs: a facet with `roofType == 'flat'` is hatched by the scenes, a `borderline` one is outlined
+  in orange (area diagram: a third line from the `low_slope_marker` label, when it fits). All text comes from `RoofLabels`; pass your
+  translations for the new keys (`low_slope_marker`, `level_change_jump`, `legend_flat_edge`, `legend_level_change`,
+  `totals_roofing_pitched`, `totals_roofing_flat`, `totals_low_slope_confirm`).
+- `lengthsFt` has twelve entries now. Code that switches over `EdgeType` must handle `flatEdge` and `levelChange`; use
+  `EdgeType.legacy` for "the ten old ones".
+- Prices come from the envelope totals (`engine.planesSurfaceAreaSqft` etc.), not from the model facets.
+- A user's flat / pitched correction is the host's business: tap a facet (see `bond_roof_ui`), show inline controls, send the change
+  to the service, and draw the next measurement.
 
 ### Label placement
 

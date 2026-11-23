@@ -1,3 +1,4 @@
+import 'engine_totals.dart';
 import 'json_util.dart';
 import 'model_parts.dart';
 
@@ -11,9 +12,10 @@ class RoofTotals {
     required this.squares,
     required this.lengthsFt,
     this.extraLengths = const {},
+    this.engine,
   });
 
-  /// Tolerant: a `lengths_ft` key that is not one of the ten edge types is kept in
+  /// Tolerant: a `lengths_ft` key that is not one of the edge types is kept in
   /// [extraLengths] and noted in [notes] instead of throwing.
   factory RoofTotals.fromJson(Map<String, dynamic> j, [String path = 'totals', List<String>? notes]) {
     final raw = j['lengths_ft'] == null ? <String, dynamic>{} : asMap(j['lengths_ft'], '$path.lengths_ft');
@@ -36,6 +38,7 @@ class RoofTotals {
           t: raw[t.json] == null ? 0.0 : asNum(raw[t.json], '$path.lengths_ft.${t.json}'),
       },
       extraLengths: extra,
+      engine: RoofEngineTotals.fromJson(j, path),
     );
   }
 
@@ -83,11 +86,14 @@ class RoofTotals {
 
   final double totalAreaSqft, pitchedAreaSqft, flatAreaSqft, predominantPitchRise, predominantPitchAreaSqft, squares;
 
-  /// Always holds all ten edge types, zero when absent.
+  /// Always holds every [EdgeType], zero when absent.
   final Map<EdgeType, double> lengthsFt;
 
   /// `lengths_ft` keys this package does not know (a newer service may add edge types).
   final Map<String, double> extraLengths;
+
+  /// The envelope 0.4 keys, when the model's `totals` carries any (null otherwise).
+  final RoofEngineTotals? engine;
 
   Map<String, dynamic> toJson() => {
         'total_area_sqft': totalAreaSqft,
@@ -96,6 +102,12 @@ class RoofTotals {
         'predominant_pitch_rise': predominantPitchRise,
         'predominant_pitch_area_sqft': predominantPitchAreaSqft,
         'squares': squares,
-        'lengths_ft': {for (final t in EdgeType.values) t.json: lengthsFt[t] ?? 0.0, ...extraLengths},
+        // The two 0.4 types are written only when they are not zero, so a 0.2 or 0.3 model round-trips as it came.
+        'lengths_ft': {
+          for (final t in EdgeType.values)
+            if (!t.isNew04 || (lengthsFt[t] ?? 0.0) != 0.0) t.json: lengthsFt[t] ?? 0.0,
+          ...extraLengths,
+        },
+        ...?engine?.toJson(),
       };
 }

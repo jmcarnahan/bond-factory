@@ -95,27 +95,49 @@ def run_pipeline(address: str, out_dir: str | Path, method: str = "lidar_skeleto
                  client: Any | None = None, deadline: Deadline | None = None,
                  lat_lng: tuple[float, float] | None = None, on_stage: Callable[[str], None] | None = None,
                  verify: bool = True, render: bool = True,
-                 include_other_buildings: bool = False) -> PipelineResult:
+                 include_other_buildings: bool = False, building_outline_id: str | None = None,
+                 pinned: bool = True, engine: str = "blocks", points_path: str | Path | None = None) -> PipelineResult:
     """Run the whole pipeline for one address; writes ``<slug>_{blocks,model}.json`` and ``.png`` into ``out_dir``.
 
     ``method="auto"`` is D12: ``lidar_skeleton``, falling back to ``solar_agent`` when LiDAR is missing or too
     thin and both the Solar and Anthropic keys are set (the envelope then carries ``method_fallback``).
+
+    ``building_outline_id``: measure exactly that county outline (``FootprintError`` when it does not exist).
+    ``pinned``: a given ``lat_lng`` is the caller's rooftop point (default), so the parcel and outline that hold it are
+    chosen; False when it is only a street geocode (the job service passes the geocoder's point that way).
+    ``points_path``: offline hook of ``engine="planes"``: a regression-set house folder (``points_wide.npy``,
+    ``footprint.json``, ``meta.json``) read instead of the geocoder, footprint chain and LiDAR fetch.
+    ``engine``: ``"blocks"`` (the rectangle-and-skeleton path, default) or ``"planes"`` (``pipeline_engine``: the plane
+    engine; method ``auto`` or ``lidar_skeleton`` only, no agent, no verifier, no fallback to the block path).
     """
-    if method == "auto":
+    if engine not in ("blocks", "planes"):
+        raise PipelineError(f"engine must be 'blocks' or 'planes', got {engine!r}")
+    if points_path and engine != "planes":
+        raise PipelineError("points_path is the offline hook of the plane engine (engine='planes')")
+    if engine == "planes":
+        if method not in ("auto", "lidar_skeleton") or blocks_path or solar_fixture:
+            raise PipelineError("the plane engine runs on live LiDAR with method 'auto' or 'lidar_skeleton'")
+        from .pipeline_engine import run_planes
+
+        res = run_planes(address, out_dir, deadline=deadline, lat_lng=lat_lng, on_stage=on_stage or _noop,
+                         building_outline_id=building_outline_id, pinned=pinned, points_path=points_path)
+    elif method == "auto":
         res = _run_auto(address, out_dir, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
                         max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline,
-                        lat_lng=lat_lng, on_stage=on_stage, verify=verify, render=render)
+                        lat_lng=lat_lng, on_stage=on_stage, verify=verify, render=render,
+                        outline_id=building_outline_id, pinned=pinned)
     else:
         if method not in METHODS:
             raise PipelineError(f"method must be one of {METHODS + ('auto',)}")
         res = _run(address, out_dir, method, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
                    max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline, lat_lng=lat_lng,
-                   on_stage=on_stage or _noop, verify=verify, render=render, fallback_from=None)
+                   on_stage=on_stage or _noop, verify=verify, render=render, fallback_from=None,
+                   outline_id=building_outline_id, pinned=pinned)
     if include_other_buildings:  # lot.py: the other buildings on the parcel, measured by the rules (additive keys)
         from .lot import add_other_buildings
 
         add_other_buildings(res, address=address, lat_lng=lat_lng, deadline=deadline, out_dir=out_dir,
-                            blocks_path=blocks_path)
+                            blocks_path=blocks_path, pinned=pinned, engine=engine)
     return res
 
 
@@ -145,7 +167,8 @@ def _run(address: str, out_dir: str | Path, method: str, **kw: Any) -> PipelineR
 def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: str | Path | None,
          solar_fixture: str | Path | None, no_agent: bool, max_rounds: int, merge_flats: bool, client: Any | None,
          deadline: Deadline | None, lat_lng: tuple[float, float] | None, on_stage: Callable[[str], None],
-         verify: bool, fallback_from: str | None, render: bool = True) -> PipelineResult:
+         verify: bool, fallback_from: str | None, render: bool = True, outline_id: str | None = None,
+         pinned: bool = True) -> PipelineResult:
     from . import agent as agent_mod
     from . import solar
 
@@ -160,9 +183,9 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     if blocks_path:
         base = BlockSet.load(blocks_path)
     elif method == "solar_agent":
-        base = _stage_footprint(address, lat_lng, deadline, on_stage)
+        base = _stage_footprint(address, lat_lng, deadline, on_stage, outline_id, pinned)
     else:
-        base = _stage_blocks(address, out, tag, lat_lng, deadline, on_stage)
+        base = _stage_blocks(address, out, tag, lat_lng, deadline, on_stage, outline_id, pinned)
     if not base.address.get("formatted"):
         base.address = {"line1": address, "city": "", "state": "", "zip": "", "formatted": address}
     fpinfo = base.extra.pop("_fp", None) or {"source": "lariac" if base.footprint_meta.get(
@@ -287,6 +310,8 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
                 if agent_fell_back.startswith("its roof")
                 else f"The roof agent could not finish ({agent_fell_back}); the rule-based measurement was used instead.")
         extra_warnings.append((AGENT_FELL_BACK, text))
+    if fpinfo.get("building"):  # contract 0.4: which building was measured (additive key)
+        model.setdefault("source", {})["building"] = fpinfo["building"]
     paths = {"blocks": out / f"{tag}_blocks.json", "model": out / f"{tag}_model.json",
              "png": out / f"{tag}_model.png"}
     base.extra.pop("_geo", None)
@@ -319,6 +344,8 @@ def _run_inner(address: str, out_dir: str | Path, method: str, *, blocks_path: s
     if from_planes and assessment and assessment.get("quality"):
         assessment["quality"]["reasons"].insert(0, planes_model.REASON)  # first: a planes model is never "verified"
         assessment["quality"].update(old_metrics)  # what the replaced block model scored
+    if fpinfo.get("match") and assessment and isinstance(assessment.get("quality"), dict):
+        assessment["quality"]["parcel_match"] = fpinfo["match"]  # contract 0.4; exact | street | nearest | given
     if net_exc is not None:
         assessment = planes_only.assessment_or_raise(assessment, net_exc)
         verification = {**verification, "original_totals": {k: v for k, v in planes_only.planes_only_totals(

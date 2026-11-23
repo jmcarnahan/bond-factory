@@ -3,7 +3,8 @@
 ``python -m roof_measure.synth_envelopes [fixtures_dir]`` (or ``make fixtures``) rewrites
 ``roof_measurement_0.2_{pass,adjusted,unverified,fail}.json``, ``synthetic_flat_curbs.json``,
 ``synthetic_hip_zigzag.json`` and ``synthetic_solar_response.json``, and ``roof_planes_only/
-roof_measurement_0.3_planes_only.json`` (an envelope without a roof diagram; its own folder).
+roof_measurement_0.3_planes_only.json`` (an envelope without a roof diagram; its own folder), and ``roof_engine/
+roof_measurement_0.4_engine.json`` (the plane engine on a synthetic roof; its own folder).
 
 The ``verification`` block of ``pass``, ``adjusted`` and ``unverified`` is what ``verify.verify`` emits: the
 LLM turns come from a scripted fake client (no network, no key) and ``unverified`` runs with the key removed.
@@ -37,6 +38,8 @@ OSM_WARNING = "Footprint from OpenStreetMap; parcel data unavailable outside Los
 LLM = "claude-sonnet-5-5"
 PLANES_ONLY_DIR = "roof_planes_only"
 PLANES_ONLY_NAME = "roof_measurement_0.3_planes_only"
+ENGINE_DIR = "roof_engine"
+ENGINE_NAME = "roof_measurement_0.4_engine"
 
 
 class ScriptedClient:
@@ -164,6 +167,12 @@ def generate_all(out_dir: Path = FIXTURES) -> dict[str, int]:
     sub.mkdir(parents=True, exist_ok=True)
     write_json(sub / f"{PLANES_ONLY_NAME}.json", planes_only_envelope())
     sizes[f"{PLANES_ONLY_DIR}/{PLANES_ONLY_NAME}"] = (sub / f"{PLANES_ONLY_NAME}.json").stat().st_size
+    from .synth_engine_envelope import engine_envelope
+
+    sub = out_dir / ENGINE_DIR  # the plane engine's example: contract-0.4 keys, flat + pitched + a level change
+    sub.mkdir(parents=True, exist_ok=True)
+    write_json(sub / f"{ENGINE_NAME}.json", engine_envelope())
+    sizes[f"{ENGINE_DIR}/{ENGINE_NAME}"] = (sub / f"{ENGINE_NAME}.json").stat().st_size
     return sizes
 
 

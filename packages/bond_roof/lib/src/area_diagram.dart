@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'facet_draw.dart';
 import 'format.dart';
 import 'labels.dart';
 import 'layout.dart';
@@ -91,12 +92,7 @@ class AreaDiagram {
     final polys = [for (final f in m.facets) fit.mapAll(f.polygon)];
     final holes = [for (final h in m.holes) fit.mapAll(h.polygon)];
     for (final (i, f) in m.facets.indexed) {
-      prims.add(PolyPrim(
-        pts: polys[i],
-        fill: f.kind == FacetKind.flat ? style.flatFill : style.slopedFill,
-        stroke: 0xFF455A64,
-        width: 1.8 * k,
-      ));
+      addFacetPrims(prims, f, polys[i], style, stroke: 0xFF455A64, strokeWidth: 1.8 * k, k: k);
     }
     for (final h in m.holes) {
       prims.add(PolyPrim(
@@ -114,50 +110,31 @@ class AreaDiagram {
     var hidden = 0, placed = 0;
     final labelPrims = <Prim>[];
     for (final (i, f) in m.facets.indexed) {
-      final pole = polylabel([polys[i]], precision: 0.5 * k);
       final line1 = pitchLabel(f.kind == FacetKind.flat ? 0 : f.pitchRise, labels: labels);
       final line2 = sqft(f.areaSqft);
-      double? chosen;
-      var at = pole.point;
-      // Candidate centres: the pole first, then a grid of points inside the facet, nearest first.
-      List<Pt>? grid;
-      search:
-      for (var s = maxSize; s >= minSize; s -= 0.5) {
-        final hw = (math.max(textWidth(line1, s, bold: true), textWidth(line2, s)) + 4) / 2;
-        final hh = s * 2.35 / 2;
-        if (_labelFits(polys[i], holes, pole.point, hw, hh)) {
-          chosen = s;
-          at = pole.point;
-          break;
-        }
-        grid ??= _grid(polys[i], pole.point, 5 * k);
-        for (final c in grid) {
-          if (_labelFits(polys[i], holes, c, hw, hh)) {
-            chosen = s;
-            at = c;
-            break search;
-          }
-        }
-      }
-      if (chosen == null) {
+      // A borderline facet gets a third line, "Low slope"; when that does not fit, the two-line
+      // label is used and the orange outline alone carries the flag.
+      final withMarker = f.isBorderline;
+      final fit2 = _placeLabel(polys[i], holes, [line1, line2, if (withMarker) labels.lowSlopeMarker], maxSize, minSize, k) ??
+          (withMarker ? _placeLabel(polys[i], holes, [line1, line2], maxSize, minSize, k) : null);
+      if (fit2 == null) {
         hidden++;
         continue;
       }
       placed++;
-      labelPrims
-        ..add(TextPrim(
-          at: (x: at.x, y: at.y - chosen * 0.62),
-          text: line1,
-          size: chosen,
-          color: style.textColor,
-          bold: true,
-        ))
-        ..add(TextPrim(
-          at: (x: at.x, y: at.y + chosen * 0.62),
-          text: line2,
-          size: chosen,
-          color: style.textColor,
+      final (:at, :size, :lines) = fit2;
+      const pitch = 1.24;
+      for (final (n, text) in lines.indexed) {
+        final dy = (n - (lines.length - 1) / 2) * pitch * size;
+        final marker = withMarker && lines.length == 3 && n == 2;
+        labelPrims.add(TextPrim(
+          at: (x: at.x, y: at.y + dy),
+          text: text,
+          size: marker ? size * 0.9 : size,
+          color: marker ? style.borderlineStroke : style.textColor,
+          bold: n == 0 || marker,
         ));
+      }
     }
     prims.addAll(labelPrims);
 
@@ -172,7 +149,31 @@ class AreaDiagram {
       hiddenLabels: hidden,
       placedLabels: placed,
       title: labels.areaCaption,
+      regions: [for (final (i, f) in m.facets.indexed) SceneRegion(id: f.id, pts: polys[i])],
     );
+  }
+
+  /// Finds the largest text size (from [maxSize] down to [minSize] in half steps) at which the
+  /// label [lines] fit inside [poly] and clear of [holes], centred on the pole of inaccessibility
+  /// or, failing that, on the nearest grid point inside. Null when it never fits.
+  static ({Pt at, double size, List<String> lines})? _placeLabel(
+      List<Pt> poly, List<List<Pt>> holes, List<String> lines, double maxSize, double minSize, double k) {
+    final pole = polylabel([poly], precision: 0.5 * k);
+    List<Pt>? grid;
+    for (var s = maxSize; s >= minSize; s -= 0.5) {
+      var w = 0.0;
+      for (final (n, t) in lines.indexed) {
+        w = math.max(w, textWidth(t, s, bold: n != 1));
+      }
+      final hw = (w + 4) / 2;
+      final hh = s * (lines.length == 2 ? 2.35 : 1.24 * (lines.length - 1) + 1.11) / 2;
+      if (_labelFits(poly, holes, pole.point, hw, hh)) return (at: pole.point, size: s, lines: lines);
+      grid ??= _grid(poly, pole.point, 5 * k);
+      for (final c in grid) {
+        if (_labelFits(poly, holes, c, hw, hh)) return (at: c, size: s, lines: lines);
+      }
+    }
+    return null;
   }
 
   /// Grid points inside [poly] at least a few steps from its outline, nearest to [near] first.

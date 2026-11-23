@@ -27,10 +27,13 @@ from roof_measure.street_names import normalize_street, same_street, street_key
     ("7 Oak Trl", "7 OAK TRAIL"),
     ("7 Oak Sq", "7 OAK SQUARE"),
     ("7   Oak   St", "7 Oak St"),
-    ("20 W 182nd St", "20 WEST 182ND STREET"),
+    ("20 W 100th St", "20 WEST 100TH STREET"),
     ("20 Main St NW", "20 MAIN STREET NORTHWEST"),
     ("20 N Main St", "20 NORTH MAIN STREET"),
     ("20 First St", "20 1st St"),
+    ("7 Second Pl", "7 2ND PLACE"),
+    ("5 W 122nd Ter", "5 WEST 122ND TERRACE"),
+    ("20 99th Ave", "20 99TH AVENUE"),
     ("20 Tenth Ave", "20 10TH AVENUE"),
     ("20 Oak St Apt 5", "20 Oak Street"),
     ("20 Oak St Unit B", "20 Oak Street"),
@@ -87,7 +90,7 @@ def test_different_streets_stay_different():
 
 
 def test_same_street_tolerances():
-    assert same_street(street_key("1418 W 182nd St"), street_key("182ND STREET"))  # direction missing on one side
+    assert same_street(street_key("1400 W 100th St"), street_key("100TH STREET"))  # direction missing on one side
     assert not same_street(street_key("1 N Main St"), street_key("1 S Main St"))
     assert same_street(street_key("1 Oak"), street_key("1 Oak Street"))  # type missing on one side
     assert not same_street(street_key("1 Oak Dr"), street_key("1 Oak Street"))
@@ -111,7 +114,7 @@ def test_abbreviation_only_difference_scores_as_exact():
 
 
 def test_direction_in_its_own_situs_field_still_matches():
-    assert footprint_county.score_parcel(_props(street="182ND ST", direction="W"), _addr("100 W 182nd St")) >= 8
+    assert footprint_county.score_parcel(_props(street="100TH ST", direction="W"), _addr("100 W 100th St")) >= 8
 
 
 def test_different_number_or_name_is_not_exact():

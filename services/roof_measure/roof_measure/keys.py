@@ -15,11 +15,20 @@ def _method_slot(req: dict[str, Any]) -> str:
     return req["method"] if not any(extra) else "|".join([req["method"], *(str(x) for x in extra)])
 
 
+def _engine_params(req: dict[str, Any]) -> str | None:
+    """The stable hash of the engine's parameters for an engine request (None for the block path)."""
+    if req.get("engine", "blocks") == "blocks":
+        return None
+    from .engine.params import DEFAULT
+
+    return DEFAULT.stable_hash()
+
+
 def _key(place: str | None, req: dict[str, Any]) -> str:
     solar, anthropic = keys_present()
     return cache_key(normalized_address=place, lat=req.get("lat"), lng=req.get("lng"), method=_method_slot(req),
                      verify=req["verify"], pipeline_version=PIPELINE_VERSION, solar_key=solar,
-                     anthropic_key=anthropic)
+                     anthropic_key=anthropic, engine=req.get("engine", "blocks"), engine_params=_engine_params(req))
 
 
 def request_key(req: dict[str, Any]) -> str | None:

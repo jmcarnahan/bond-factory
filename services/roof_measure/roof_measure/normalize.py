@@ -34,8 +34,10 @@ def normalize_address(matched: str) -> str:
 
 
 def cache_key(*, normalized_address: str | None, lat: float | None, lng: float | None, method: str, verify: bool,
-              pipeline_version: str, solar_key: bool, anthropic_key: bool) -> str:
-    """sha256 hex of ``[place, method, verify, pipeline_version, solar_key, anthropic_key]``.
+              pipeline_version: str, solar_key: bool, anthropic_key: bool, engine: str = "blocks",
+              engine_params: str | None = None) -> str:
+    """sha256 hex of ``[place, method, verify, pipeline_version, solar_key, anthropic_key]`` (+ ``engine`` unless it is
+    the default ``"blocks"``, so the block path's keys do not depend on this argument).
 
     ``place`` is the normalised address, or ``ll:<lat>,<lng>`` (5 dp) when no address was geocoded.
     """
@@ -46,4 +48,7 @@ def cache_key(*, normalized_address: str | None, lat: float | None, lng: float |
     else:
         raise ValueError("cache_key needs a normalized address or lat and lng")
     payload = [place, method, bool(verify), pipeline_version, bool(solar_key), bool(anthropic_key)]
+    if engine != "blocks":
+        payload.append(engine)
+        payload.append(engine_params)  # the hash of every engine tunable: a tuned engine never answers from old results
     return hashlib.sha256(json.dumps(payload).encode()).hexdigest()

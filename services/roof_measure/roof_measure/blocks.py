@@ -33,6 +33,7 @@ from shapely.geometry import MultiPolygon, Polygon, box
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
+from .engine.points import roof_points
 from .frame import FT_PER_M, M_PER_FT, Frame
 from .lidar import MIN_ROOF_DENSITY, LidarTooSparse, PointCloud, acquired_range
 
@@ -253,15 +254,6 @@ def _merge_coplanar(lab: np.ndarray, flab: np.ndarray, val: np.ndarray, gx_: np.
         planes[p] = plane_for(p)
 
 
-def _local_ground(ground_tree: cKDTree | None, ground_z: np.ndarray, xy: np.ndarray, fallback: float) -> np.ndarray:
-    """Median z of the 8 nearest class-2 points; the fallback when there is no ground at all."""
-    if ground_tree is None:
-        return np.full(len(xy), fallback)
-    k = min(8, len(ground_z))
-    _, ii = ground_tree.query(xy, k=k)
-    return np.median(ground_z[np.atleast_2d(ii.reshape(len(xy), -1))], axis=1)
-
-
 def _snap_to_outline(poly, outline: Polygon, tol: float):
     """Move vertices within `tol` of the outline onto it; vertices farther away stay (overhangs)."""
     ext = outline.exterior
@@ -302,36 +294,19 @@ def segment_blocks(points: PointCloud, footprint_m: Polygon, frame: Frame, *, ce
     """Segment the roof under `footprint_m` (metres in `frame.epsg`) into blocks."""
     cell = cell_m
     fpl = orient(affinity.translate(footprint_m, -frame.x0_m, -frame.y0_m), 1.0)
-    x = np.asarray(points.x) - frame.x0_m
-    y = np.asarray(points.y) - frame.y0_m
-    z = np.asarray(points.z)
-    cls = np.asarray(points.classification)
-    is_ground = cls == 2
-
-    # ---- ground and height above ground
-    g_xy = np.column_stack([x[is_ground], y[is_ground]])
-    g_z = z[is_ground]
-    gtree = cKDTree(g_xy) if len(g_xy) >= 3 else None
-    ring = contains_xy(fpl.buffer(8.0), x[is_ground], y[is_ground]) & ~contains_xy(fpl.buffer(0.5), x[is_ground], y[is_ground])
-    ground_z_site = float(np.median(g_z[ring])) if ring.any() else float(np.median(g_z) if len(g_z) else np.percentile(z, 2))
     # a fixed 0.6 m would add 50% to an 8 m2 shed; scale the overhang with the building, capped at 0.6 m
     overhang = min(OVERHANG_M, 0.08 * float(np.sqrt(fpl.area)))
     reach0 = fpl.buffer(overhang)
     # points beyond the clip distance still feed the per-cell plane fits of cells at the clip edge
-    near = contains_xy(fpl.buffer(overhang + PLANE_RADIUS_M), x, y)
-    hag = np.full(len(z), np.nan)
-    if near.any():
-        hag[near] = z[near] - _local_ground(gtree, g_z, np.column_stack([x[near], y[near]]), ground_z_site)
-    sel = near & ~is_ground & (hag > MIN_HAG_M)
-    pp = np.column_stack([x[sel], y[sel], z[sel]])
+    rp = roof_points(np.column_stack([np.asarray(points.x) - frame.x0_m, np.asarray(points.y) - frame.y0_m,
+                                      np.asarray(points.z), np.asarray(points.classification)]),
+                     fpl, overhang_m=overhang, min_height_m=MIN_HAG_M, plane_radius_m=PLANE_RADIUS_M)
+    pp, ground_z_site, roof_density, points_on_roof = rp.xyz, rp.ground_z, rp.density, rp.n_on_roof
+    g_xy, g_z = rp.ground_xyz[:, :2], rp.ground_xyz[:, 2]
     if len(pp) < 30:
         raise BlocksError("Too few LiDAR roof points inside the footprint to segment.")
-    roof_mask = contains_xy(reach0, x, y) & ~is_ground & (hag > MIN_HAG_M)  # nan hag compares False
-    inside_pts = int((contains_xy(fpl, x, y) & ~is_ground & (hag > MIN_HAG_M)).sum())
-    roof_density = inside_pts / fpl.area if fpl.area else 0.0
     if roof_density < MIN_ROOF_DENSITY:
         raise LidarTooSparse(points.meta.get("project"), points.meta.get("year"), roof_density, MIN_ROOF_DENSITY)
-    points_on_roof = int(roof_mask.sum())
 
     # ---- 1. robust raster
     minx, miny, maxx, maxy = reach0.bounds
@@ -504,7 +479,7 @@ def segment_blocks(points: PointCloud, footprint_m: Polygon, frame: Frame, *, ce
         raise BlocksError("No roof block survived segmentation (roof density "
                           f"{roof_density:.1f} points/m2); the LiDAR may be too thin or the footprint wrong.")
     fp_area_m2 = fpl.area
-    acq = acquired_range(np.asarray(points.gps_time)[roof_mask]) or points.meta.get("acquired")
+    acq = acquired_range(np.asarray(points.gps_time)[rp.on_roof]) or points.meta.get("acquired")
     lidar = {"project": points.meta.get("project"), "acquired": acq, "year": points.meta.get("year"),
              "points_on_roof": points_on_roof, "density_per_m2": round(points_on_roof / fp_area_m2, 1),
              "ground_z_m": round(ground_z_site, 2), "epsg": frame.epsg}

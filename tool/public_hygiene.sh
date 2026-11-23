@@ -139,6 +139,9 @@ scan "coordinate pair" '\b3[34]\.[0-9]{4,}[ ,]+-11[78]\.[0-9]{4,}\b'
 scan "coordinate pair" '-11[78]\.[0-9]{4,}[ ,]+3[34]\.[0-9]{4,}\b'
 scan "coordinate" '(lat|lng|lon)[a-z]*["'"'"' :=]+-?[0-9]{1,3}\.[0-9]{5,}' -i
 
+# Ids of houses in an adopter's private evaluation set ("h-" + 8 hex). Placeholders h-0000000x are allowed.
+scan "private evaluation house id" '\bh-([1-9a-f][0-9a-f]{7}|0[1-9a-f][0-9a-f]{6}|00[1-9a-f][0-9a-f]{5}|000[1-9a-f][0-9a-f]{4}|0000[1-9a-f][0-9a-f]{3}|00000[1-9a-f][0-9a-f]{2}|000000[1-9a-f][0-9a-f])\b'
+
 # Fixtures larger than 100 KB.
 big=0
 while IFS= read -r f; do

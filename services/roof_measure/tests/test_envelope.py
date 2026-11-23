@@ -113,7 +113,8 @@ def test_warning_code_list_matches_the_contract():
     assert WARNING_CODES == ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
                              "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "method_fallback",
                              "verifier_unverified", "verifier_adjusted", "verifier_failed", "verifier_timeout",
-                             "solar_segments_only", "agent_failed_fell_back", "flat_roof_assumed", "model_failed", "model_from_planes", "other")
+                             "solar_segments_only", "agent_failed_fell_back", "flat_roof_assumed", "model_failed", "model_from_planes",
+                             "low_slope_confirm", "outline_mismatch", "poor_fit", "low_density", "other")  # 0.5.0 added four
 
 
 def test_source_unreachable_code_survives_build_envelope():

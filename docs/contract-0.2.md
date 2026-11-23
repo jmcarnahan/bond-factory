@@ -11,7 +11,7 @@ Base URL is wherever the service is deployed. JSON in, JSON out. Every route exc
 `Authorization: Bearer <ROOF_MEASURE_TOKEN>`. The token lives in the calling app's backend only; a Flutter client
 never holds it.
 
-- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.4.0"}`. It touches neither disk nor network and
+- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.5.0"}`. It touches neither disk nor network and
   needs no token.
 - `POST /v1/measurements` body
   `{"address": str (at most 200 characters), "lat"?: float, "lng"?: float,
@@ -142,6 +142,10 @@ for anything not listed.
 | `model_failed` | the simple roof diagram could not be built (the model failed validation, or no roof block survived) but LiDAR planes were measured: the envelope carries the planes only, see contract-0.3.md "Planes-only result" (`method_used` unchanged; never emitted for `solar_agent`) |
 | `model_from_planes` | the diagram was built directly from the measured roof planes (one facet per plane) because the block or agent model was poor and the partition planes tile the roof: see contract-0.3.md "Model from the measured planes" (`method_used` unchanged; `model.source.from_planes` true; never emitted for `solar_agent`) |
 | `flat_roof_assumed` | reserved, not emitted yet |
+| `low_slope_confirm` | plane engine only (`engine="planes"`, contract-0.4.md): part of the roof is close to flat (about 2/12); confirm the roof type at the site |
+| `outline_mismatch` | plane engine only: the roof points do not match the building outline (support under 70% or over 130% of it, or shifted); the outline may be another building |
+| `poor_fit` | plane engine only: the planes fit the roof points poorly (fit under 0.55 or supported area under 70%) |
+| `low_density` | plane engine only: 4 to 6 LiDAR points per m2 on the roof (under 4 is refused as `lidar_too_sparse`) |
 | `other` | anything else |
 
 ### 2.4 Example
@@ -152,7 +156,7 @@ placeholder address. Copy it as an app's mock fixture.
 ```json
 {
  "contract": "bond.roof_model/0.2",
- "pipeline_version": "0.4.0",
+ "pipeline_version": "0.5.0",
  "method_used": "lidar_skeleton",
  "footprint_source": "osm",
  "generated_at": "2026-11-10T00:00:00Z",

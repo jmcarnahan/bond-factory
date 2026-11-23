@@ -1,0 +1,9 @@
+{
+  "_note": "FAKE example prices for tests and wiring checks only. The real unit prices are passed in by the caller (price-rules JSON).",
+  "per_square": {"pitched": 400.0, "flat": 650.0},
+  "pitch_multiplier": [{"min_pitch": 0.0, "mult": 1.0}, {"min_pitch": 7.0, "mult": 1.1}, {"min_pitch": 10.0, "mult": 1.25}],
+  "drip_edge_per_lf": 3.0,
+  "ridge_cap_per_lf": 6.0,
+  "waste_pct": {"simple": 8.0, "cut_up": 12.0},
+  "cut_up": {"min_facets": 14, "min_hip_valley_ft_per_square": 9.0}
+}

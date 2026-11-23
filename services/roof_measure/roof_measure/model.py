@@ -30,18 +30,30 @@ from shapely.ops import unary_union
 
 from .classify import WALL_STEP_FT, BlockSet, Classification, RoofBlock, assign_levels
 from .model_cleanup import clean_facets
-from .skeleton import block_geometry
+from .ringgeom import block_geometry
 
 log = logging.getLogger(__name__)
 
 SCHEMA = "bond.roof_model/0.1"
-EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "parapet",
-              "transition", "unspecified")
+CORE_EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "parapet",
+                   "transition", "unspecified")  # the closed ten of contract 0.2: always in totals.lengths_ft
+NEW_EDGE_TYPES = ("flat_edge", "level_change")  # contract 0.4 (engine): a result without them reads as zero
+EDGE_TYPES = CORE_EDGE_TYPES + NEW_EDGE_TYPES
 FORMS = ("flat", "hip", "gable", "shed")
 METHODS = ("lidar_skeleton", "lidar_agent", "solar_agent", "manual", "fixture")
 NEIGHBOUR_TOL_FT = 0.8  # blocks closer than this share a boundary
 MIN_PIECE_FT = 1.2  # a neighbour must run this far along an edge to split it
 MIN_EDGE_FT = 0.5  # shorter edges are numerical debris and are dropped
+
+
+def origin_of(blockset: Any) -> dict[str, Any]:
+    """``model.origin``: the frame origin as lat/lng, plus ``epsg`` (the projected CRS of the local frame, contract 0.4)
+    when the frame is known, so a point can be moved between WGS84 and the model's feet."""
+    out = dict(blockset.origin)
+    epsg = (getattr(blockset, "frame", None) or {}).get("epsg")
+    if epsg:
+        out["epsg"] = int(epsg)
+    return out
 
 
 class ModelError(ValueError):
@@ -336,12 +348,15 @@ def predominant_pitch(facets: list[dict[str, Any]]) -> tuple[float, float]:
     return best
 
 
-def _totals(facets: list[dict[str, Any]], edges: list[dict[str, Any]]) -> dict[str, Any]:
+def _totals(facets: list[dict[str, Any]], edges: list[dict[str, Any]], *, engine: bool = False) -> dict[str, Any]:
+    """Model totals. ``lengths_ft`` has the ten 0.2 keys; ``flat_edge`` and ``level_change`` (0.4) appear for an
+    engine model (``engine=True``) and for any model that has such an edge, so the block path's output is unchanged."""
     total = sum(f["area_sqft"] for f in facets)
     pitched = sum(f["area_sqft"] for f in facets if f["kind"] == "sloped")
     flat = sum(f["area_sqft"] for f in facets if f["kind"] == "flat")
     pred = predominant_pitch(facets)
-    lengths = {k: 0.0 for k in EDGE_TYPES}
+    lengths = {k: 0.0 for k in (EDGE_TYPES if engine or any(e["type"] in NEW_EDGE_TYPES for e in edges)
+                                else CORE_EDGE_TYPES)}
     for e in edges:
         lengths[e["type"]] += e["length_ft"]
     return {"total_area_sqft": total, "pitched_area_sqft": pitched, "flat_area_sqft": flat,
@@ -456,9 +471,11 @@ def validate(model: dict[str, Any]) -> None:
             ang = math.degrees(math.acos(max(-1.0, min(1.0, (v1[0] * v2[0] + v1[1] * v2[1]) / (l1 * l2)))))
             need(ang >= 10.0, f"facet {f['id']} has a spike ({ang:.1f} deg) at vertex {i}")
     t = model["totals"]
-    need(set(t["lengths_ft"]) == set(EDGE_TYPES), "totals.lengths_ft must have all ten keys")
-    for k in EDGE_TYPES:
-        need(abs(t["lengths_ft"][k] - lengths[k]) <= 0.05, f"totals.lengths_ft.{k} does not match the edges")
+    have = set(t["lengths_ft"])
+    need(set(CORE_EDGE_TYPES) <= have <= set(EDGE_TYPES),
+         "totals.lengths_ft must have the ten keys of contract 0.2 (and may add flat_edge and level_change)")
+    for k in EDGE_TYPES:  # a missing 0.4 key counts as zero (results stored before the engine)
+        need(abs(t["lengths_ft"].get(k, 0.0) - lengths[k]) <= 0.05, f"totals.lengths_ft.{k} does not match the edges")
     total = sum(f["area_sqft"] for f in model["facets"])
     need(abs(t["total_area_sqft"] - total) <= 0.5, "total_area_sqft does not match the facets")
     need(abs(t["squares"] - t["total_area_sqft"] / 100.0) <= 1e-4, "squares must be total_area_sqft / 100")

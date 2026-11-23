@@ -1,0 +1,35 @@
+{
+ "frame_deg": 0.0,
+ "theta_deg": 0.0,
+ "n_crop_points": 1307,
+ "assigned_pct": 100.0,
+ "planes": [
+  {
+   "a": 0.0004,
+   "b": 0.0006,
+   "c": 3.0,
+   "n_points": 531,
+   "pitch_rise": 0.01,
+   "aspect_deg": 215.4,
+   "rms_m": 0.028
+  },
+  {
+   "a": 0.0002,
+   "b": -0.5007,
+   "c": 6.66,
+   "n_points": 397,
+   "pitch_rise": 6.01,
+   "aspect_deg": 360.0,
+   "rms_m": 0.03
+  },
+  {
+   "a": -0.0,
+   "b": 0.4994,
+   "c": 3.002,
+   "n_points": 379,
+   "pitch_rise": 5.99,
+   "aspect_deg": 180.0,
+   "rms_m": 0.03
+  }
+ ]
+}

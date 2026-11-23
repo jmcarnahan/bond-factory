@@ -26,7 +26,7 @@ from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
-from .skeleton import Pt, block_geometry, measure, open_ring, rect_fit, signed_area
+from .ringgeom import Pt, block_geometry, measure, open_ring, rect_fit, signed_area
 
 log = logging.getLogger(__name__)
 

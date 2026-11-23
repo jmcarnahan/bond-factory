@@ -11,7 +11,13 @@ const _defaultEdgeColors = <EdgeType, int>{
   EdgeType.parapet: 0xFFFB8C00,
   EdgeType.transition: 0xFFD81B60,
   EdgeType.unspecified: 0xFF26A69A,
+  EdgeType.flatEdge: 0xFF00838F,
+  EdgeType.levelChange: 0xFF37474F,
 };
+
+/// Stroke width factor per edge type (1.0 when absent): a level change is drawn heavier so it
+/// reads as a step, not as another edge.
+const _defaultEdgeWidth = <EdgeType, double>{EdgeType.levelChange: 1.8};
 
 const _defaultDashed = <EdgeType>{EdgeType.stepFlashing, EdgeType.wallFlashing};
 
@@ -21,6 +27,7 @@ class DiagramStyle {
   const DiagramStyle({
     Map<EdgeType, int>? edgeColors,
     Set<EdgeType>? dashedTypes,
+    Map<EdgeType, double>? edgeWidthScale,
     this.flatFill = 0xFFE3F2FD,
     this.slopedFill = 0xFFFFF8E1,
     this.holeStroke = 0xFF1E88E5,
@@ -29,7 +36,11 @@ class DiagramStyle {
     this.strokeWidth = 3,
     this.textColor = 0xFF212121,
     this.background = 0xFFFFFFFF,
+    this.flatRoofFill = 0xFFECEFF1,
+    this.hatchColor = 0xFF78909C,
+    this.borderlineStroke = 0xFFEF6C00,
   })  : edgeColors = edgeColors ?? _defaultEdgeColors,
+        edgeWidthScale = edgeWidthScale ?? _defaultEdgeWidth,
         dashedTypes = dashedTypes ?? _defaultDashed;
 
   /// The contract palette.
@@ -37,7 +48,12 @@ class DiagramStyle {
 
   final Map<EdgeType, int> edgeColors;
   final Set<EdgeType> dashedTypes;
+  final Map<EdgeType, double> edgeWidthScale;
   final int flatFill, slopedFill, holeStroke;
+
+  /// Envelope 0.4: a facet typed `flat` gets this neutral fill and a [hatchColor] hatch; a
+  /// borderline ("low slope, confirm") facet is outlined in [borderlineStroke].
+  final int flatRoofFill, hatchColor, borderlineStroke;
   final double fontSize;
 
   /// Edges shorter than this many pixels (at 1600 px wide) never get a length label. Longer
@@ -47,4 +63,6 @@ class DiagramStyle {
   final int textColor, background;
 
   int colorOf(EdgeType t) => edgeColors[t] ?? 0xFF607D8B;
+
+  double widthScaleOf(EdgeType t) => edgeWidthScale[t] ?? 1.0;
 }

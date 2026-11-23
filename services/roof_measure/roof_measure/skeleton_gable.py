@@ -17,7 +17,7 @@ from typing import Any
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import linemerge
 
-from .skeleton import Pt, open_ring, signed_area
+from .ringgeom import Pt, open_ring, signed_area
 
 NOTE = "Gable drawn from its ridge line because the outline's sides converge toward the gable ends."
 TOL_FT = 1e-4

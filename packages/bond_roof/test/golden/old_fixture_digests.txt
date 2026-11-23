@@ -1,0 +1,43 @@
+from_planes_model ReportLayout.wide len 85e97025452b528 area 360af686b235150e sum 5bbaa79f969035a2
+from_planes_model ReportLayout.compact len e370a302412d789 area 79971bcee142031f sum 120239e00a85b13d
+from_planes_model json 6a6530c26943217a
+minimal_hip ReportLayout.wide len 44de02ec3a8e50fd area 355d29aeaf199c00 sum 33162eb4aefe554d
+minimal_hip ReportLayout.compact len 3dc93518c58a207c area 4500c5d7f4913d93 sum 13805b8c732d9159
+minimal_hip json 68fbb39d86cdfb75
+mixed_flat_hip ReportLayout.wide len e9606b8654e323 area f5178414a206e8c sum 65c2f319ab661378
+mixed_flat_hip ReportLayout.compact len 23925889811ad5c5 area 43a21460d16ef3fe sum 49dc43c183853b9f
+mixed_flat_hip json 63ce7f26df6b8746
+roof_measurement_0.2_adjusted ReportLayout.wide len 4979b5e91b0bb8d5 area 51715bd1dfca176a sum 26913e29449eac42
+roof_measurement_0.2_adjusted ReportLayout.compact len 1625288411591b3c area 7c5e889dbe7447fb sum 7e76fb1a2f7152b0
+roof_measurement_0.2_adjusted json 47f65b8af180bc07
+roof_measurement_0.2_fail ReportLayout.wide len 4979b5e91b0bb8d5 area 51715bd1dfca176a sum 26913e29449eac42
+roof_measurement_0.2_fail ReportLayout.compact len 1625288411591b3c area 7c5e889dbe7447fb sum 7e76fb1a2f7152b0
+roof_measurement_0.2_fail json 45ca8efb95e429f6
+roof_measurement_0.2_pass ReportLayout.wide len 4979b5e91b0bb8d5 area 51715bd1dfca176a sum 26913e29449eac42
+roof_measurement_0.2_pass ReportLayout.compact len 1625288411591b3c area 7c5e889dbe7447fb sum 7e76fb1a2f7152b0
+roof_measurement_0.2_pass json 45ca8efb95e429f6
+roof_measurement_0.2_unverified ReportLayout.wide len 5a286695f72c5700 area 5ce22ee415caa25e sum 781627bf4ae0e9ef
+roof_measurement_0.2_unverified ReportLayout.compact len 2bee44f93322dbb9 area 7c6564bf164e86f sum 6b3a690b9ee91da5
+roof_measurement_0.2_unverified json 6cbc70a34b22d03c
+site1_lidar ReportLayout.wide len 626f0d8a9c7dfc03 area 6f71e1a4792a6d40 sum c1d7568d0a9a139
+site1_lidar ReportLayout.compact len 193dcdd443cd20b2 area 446470708b793405 sum 67b9fc71c94ff6fa
+site1_lidar json f5ac657f3d3b824
+synthetic_flat_curbs ReportLayout.wide len 44d1449db65a31dc area 5b253874a061011 sum 35f9dcc38c8ae63e
+synthetic_flat_curbs ReportLayout.compact len 2206abf1c3f4fd44 area 1244187b777b5cd5 sum 4534e3dd3665d27
+synthetic_flat_curbs json 2116882ca5ce5e3a
+synthetic_flat_parapet ReportLayout.wide len 319c0ab5228276ea area 6b3c5e9a17f74998 sum 53a73b7805ab2b51
+synthetic_flat_parapet ReportLayout.compact len 1da1f9ffaebdb668 area 62fa99713177a688 sum 39078a46a2dd97bf
+synthetic_flat_parapet json 7bde6afc7aed9844
+synthetic_gable ReportLayout.wide len 5d820871ab1f21f area 3a47559b1f6c306d sum 32eb19bc8088bbe1
+synthetic_gable ReportLayout.compact len 2aeca3e6b3e33806 area 3f84fb3359a7bf52 sum 26bc534d188d17bf
+synthetic_gable json 2225f9360368bc33
+synthetic_hip ReportLayout.wide len 2cf27f1043eace9c area 1692b70d409b43b5 sum 3b661e59d79fca06
+synthetic_hip ReportLayout.compact len 79b363d26549d251 area 55df3be3ad907b92 sum 3ed5847432e6a324
+synthetic_hip json 488ce08d06547135
+synthetic_hip_zigzag ReportLayout.wide len 7d713502d6469dd7 area 176f965e5939d142 sum 42fa27c0769bd85c
+synthetic_hip_zigzag ReportLayout.compact len 6228276c6ac71dd8 area 6f09c586290445de sum 6ff3ccc2b80432de
+synthetic_hip_zigzag json f841d613b5536ff
+roof_measurement_0.2_adjusted env 4014a287ecb6fc01
+roof_measurement_0.2_fail env 71e88cf3131ff334
+roof_measurement_0.2_pass env 3a4ebb8a253c21f5
+roof_measurement_0.2_unverified env 483072c633af655c

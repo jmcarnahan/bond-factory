@@ -31,8 +31,28 @@ class RoofTotalsTable extends StatelessWidget {
     final theme = Theme.of(context);
     final t = measurement.totals;
     String ft(double v) => feetInches(v, labels: labels);
+    String area(double sqftValue, double? squares) =>
+        '${sqft(sqftValue)} ${labels.unitSqft}${squares == null ? '' : '  (${squares.toStringAsFixed(2)} ${labels.unitSquares})'}';
+    Iterable<(String, String)> roofingRows(RoofEngineTotals? e) sync* {
+      if (e == null || !e.hasRoofing) return;
+      final pitched = e.roofingPitchedSqft ?? (e.roofingPitchedSquares ?? 0) * 100;
+      final flat = e.roofingFlatSqft ?? (e.roofingFlatSquares ?? 0) * 100;
+      yield (labels.totalsRoofingPitched, area(pitched, e.roofingPitchedSquares ?? pitched / 100));
+      yield (labels.totalsRoofingFlat, area(flat, e.roofingFlatSquares ?? flat / 100));
+      final low = e.lowSlopeConfirmSqft;
+      if (low != null && low > 0) yield (labels.totalsLowSlopeConfirm, area(low, null));
+    }
+
     final rows = <(String, String)>[
-      (labels.totalArea, '${sqft(t.areaSqft)} ${labels.unitSqft}  (${t.squares.toStringAsFixed(2)} ${labels.unitSquares})'),
+      // With the 0.4 priced area the headline is that area (it equals pitched + flat below); the drawn
+      // area follows on its own row so the two are never mixed up.
+      if (t.engine case final e? when e.hasRoofing && e.planesSurfaceAreaSqft != null) ...[
+        (labels.totalsPricedArea, area(e.planesSurfaceAreaSqft!, e.planesSurfaceAreaSqft! / 100)),
+        (labels.totalsAsDrawn, area(e.areaSqftRoofEdge ?? t.areaSqft, null)),
+      ] else
+        (labels.totalArea, '${sqft(t.areaSqft)} ${labels.unitSqft}  (${t.squares.toStringAsFixed(2)} ${labels.unitSquares})'),
+      // Envelope 0.4: pitched and flat roofing on separate rows. Nothing is added without the keys.
+      ...roofingRows(t.engine),
       (labels.predominantPitch, pitchLabel(t.predominantPitch, labels: labels)),
       (labels.facets, '${t.facets}'),
       (labels.legendEave, ft(t.eaveFt)),

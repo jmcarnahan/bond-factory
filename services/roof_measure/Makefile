@@ -32,3 +32,47 @@ fixtures:
 eval:
 	@test -n "$(BLOCKS)" || { echo "usage: make eval BLOCKS=<file-or-dir> [ARGS=...]"; exit 2; }
 	$(PY) -m tools.eval_blocks $(BLOCKS) $(ARGS)
+
+# ---- roof regression harness (tools/roof_eval; the data root is $ROOF_EVAL_DATA, never in this repo) ----
+# roof-eval [SPLIT=tuning|demo|heldout|all] [ENGINE=library|results-dir:<dir>|"<cmd> {house_dir} {out_json}"] [BASELINE=name]
+#           [JOBS=n] [GATES=gates.json] [PRICE=rules.json] [TWICE=1] [OUT=dir] [ARGS="--where roof_class=flat --limit 5"]
+.PHONY: roof-reference roof-eval roof-baseline roof-blind roof-blind-score roof-sweep roof-eval-test
+roof-eval:
+	$(PY) -m tools.roof_eval eval --split $(if $(SPLIT),$(SPLIT),tuning) $(if $(ENGINE),--engine "$(ENGINE)") \
+	  $(if $(BASELINE),--baseline $(BASELINE)) $(if $(JOBS),--jobs $(JOBS)) $(if $(GATES),--gates $(GATES)) \
+	  $(if $(PRICE),--price-rules $(PRICE)) $(if $(OUT),--out $(OUT)) $(if $(TWICE),--twice) $(if $(NO_GATES),--no-gates) $(ARGS)
+
+# roof-baseline NAME=x CONFIRM=1 [RUN=out/roof-eval/<run>]: freeze metrics + results under <data>/baselines/x
+roof-baseline:
+	@test -n "$(NAME)" || { echo "usage: make roof-baseline NAME=x CONFIRM=1 [RUN=dir]"; exit 2; }
+	$(PY) -m tools.roof_eval baseline --name $(NAME) $(if $(filter 1,$(CONFIRM)),--confirm) $(if $(RUN),--run $(RUN))
+
+# roof-blind N=20 SEED=1 CAND="a=<dir> b=baseline:x" OUT=<images dir> KEY=<key.json outside OUT> [SPLIT=heldout]
+roof-blind:
+	@test -n "$(OUT)" -a -n "$(KEY)" -a -n "$(CAND)" || { echo "usage: make roof-blind N= SEED= CAND=\"a=dir b=baseline:x\" OUT=dir KEY=file [SPLIT=heldout]"; exit 2; }
+	$(PY) -m tools.roof_eval blind --split $(if $(SPLIT),$(SPLIT),heldout) --n $(if $(N),$(N),20) --seed $(if $(SEED),$(SEED),1) \
+	  $(foreach c,$(CAND),--cand $(c)) --out $(OUT) --key-out $(KEY) $(ARGS)
+
+# roof-blind-score GRADES=grades.tsv KEY=key.json [GRADERS=a,b]
+roof-blind-score:
+	@test -n "$(GRADES)" -a -n "$(KEY)" || { echo "usage: make roof-blind-score GRADES=grades.tsv KEY=key.json"; exit 2; }
+	$(PY) -m tools.roof_eval blind-score --grades $(GRADES) --key $(KEY) $(if $(GRADERS),--graders $(GRADERS))
+
+# roof-sweep HOUSES=<dir of house dirs | list file> ENGINE=... [JOBS=n]: truth-free automation / verdict / failure table
+roof-sweep:
+	@test -n "$(HOUSES)" || { echo "usage: make roof-sweep HOUSES=dir ENGINE=..."; exit 2; }
+	$(PY) -m tools.roof_eval sweep --houses $(HOUSES) $(if $(ENGINE),--engine "$(ENGINE)") $(if $(JOBS),--jobs $(JOBS)) $(if $(OUT),--out $(OUT)) $(ARGS)
+
+# roof-reference [REBUILD=1]: check (exit 1 when stale) or rebuild the frozen reference points, rule ref-v1 + parameter hash
+roof-reference:
+	$(PY) -m tools.roof_eval reference $(if $(REBUILD),--rebuild)
+
+roof-eval-test:
+	$(PY) -m pytest -q tests/test_roof_eval_*.py
+
+# roof-synth ENGINE=... [ONLY=gable] [JOBS=n] [GATES=g.json]: gate 9 over the synthetic roofs. ENGINE=oracle exits 1 by design
+# (the oracle answers below 4 pts/m2); `make roof-synth ENGINE=oracle ARGS=--selftest` is the scorer self-test (exit 0 iff only those fail)
+.PHONY: roof-synth
+roof-synth:
+	$(PY) -m tools.roof_eval synth $(if $(ENGINE),--engine "$(ENGINE)") $(if $(JOBS),--jobs $(JOBS)) $(if $(OUT),--out $(OUT)) \
+	  $(foreach o,$(ONLY),--only $(o)) $(if $(GATES),--gates $(GATES)) $(ARGS)

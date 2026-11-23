@@ -1,10 +1,13 @@
 import 'dart:math' as math;
 
 import 'json_util.dart';
+import 'quality.dart';
 import 'model_parts.dart';
 import 'totals.dart';
 
+export 'engine_totals.dart';
 export 'model_parts.dart';
+export 'quality.dart';
 export 'totals.dart';
 
 class RoofModel {
@@ -113,6 +116,13 @@ class RoofModel {
             if (!const {'generated_at', 'origin', 'north_deg', 'units'}.contains(e.key)) e.key: e.value
         },
       };
+
+  /// The `quality` block of envelope 0.4 (null when the model has none), read from [extra].
+  RoofEngineQuality? get quality => extra['quality'] is Map ? RoofEngineQuality.fromJson(asMap(extra['quality'], 'quality')) : null;
+
+  /// The `source.building` block of envelope 0.4 (null when absent).
+  RoofBuilding? get building =>
+      source.raw['building'] is Map ? RoofBuilding.fromJson(asMap(source.raw['building'], 'source.building')) : null;
 
   /// Recomputes the totals from facets and edges with the contract's rules (see
   /// [RoofTotals.recompute]).

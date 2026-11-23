@@ -1,4 +1,5 @@
 import 'model.dart';
+import 'polylabel.dart' show pointInPolygon;
 
 /// Device-independent drawing primitives. Scenes are in logical pixels, y DOWN, colours ARGB.
 sealed class Prim {
@@ -43,6 +44,14 @@ class TextPrim extends Prim {
   final bool bold;
 }
 
+/// A facet's outline in scene pixels, so a host can find the facet under a tap (see [Scene.facetAt]).
+/// It is not drawn.
+class SceneRegion {
+  const SceneRegion({required this.id, required this.pts});
+  final String id;
+  final List<Pt> pts;
+}
+
 class Scene {
   const Scene({
     required this.width,
@@ -52,6 +61,7 @@ class Scene {
     this.hiddenLabels = 0,
     this.placedLabels = 0,
     this.title = '',
+    this.regions = const [],
   });
   final double width, height;
   final int background;
@@ -63,4 +73,16 @@ class Scene {
   /// Labels that were drawn.
   final int placedLabels;
   final String title;
+
+  /// One outline per facet, in scene pixels (empty for the summary page).
+  final List<SceneRegion> regions;
+
+  /// The id of the facet whose outline contains [p] (scene pixels), or null. The topmost (last
+  /// listed) facet wins where outlines touch.
+  String? facetAt(Pt p) {
+    for (final r in regions.reversed) {
+      if (pointInPolygon(p, r.pts)) return r.id;
+    }
+    return null;
+  }
 }

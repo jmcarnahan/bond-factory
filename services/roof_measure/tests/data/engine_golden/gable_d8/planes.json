@@ -1,0 +1,26 @@
+{
+ "frame_deg": 0.0,
+ "theta_deg": 0.0,
+ "n_crop_points": 874,
+ "assigned_pct": 100.0,
+ "planes": [
+  {
+   "a": -0.0001,
+   "b": -0.4991,
+   "c": 6.959,
+   "n_points": 439,
+   "pitch_rise": 5.99,
+   "aspect_deg": 0.0,
+   "rms_m": 0.03
+  },
+  {
+   "a": 0.0006,
+   "b": 0.5004,
+   "c": 2.994,
+   "n_points": 435,
+   "pitch_rise": 6.0,
+   "aspect_deg": 180.1,
+   "rms_m": 0.031
+  }
+ ]
+}

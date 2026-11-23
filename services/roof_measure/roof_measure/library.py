@@ -20,6 +20,7 @@ STAGES = ("geocode", "footprint", "lidar", "blocks", "model", "verify", "render"
 KILL_GRACE_S = 30.0
 AGENT_RETRY_MIN_S = 30.0  # a crashed lidar_agent child is retried as lidar_skeleton only with this much time left
 METHODS = ("lidar_skeleton", "lidar_agent", "solar_agent", "auto")  # pipeline.METHODS + "auto"
+ENGINES = ("blocks", "planes")  # "blocks" = the rectangle-and-skeleton path (default); "planes" = the plane engine
 
 
 class MeasureError(Exception):
@@ -53,7 +54,8 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
             google_solar_api_key: str | None = None, overpass_urls: Sequence[str] | None = None,
             on_stage: Callable[[str], None] | None = None, isolate: bool = True,
             blocks_path: str | Path | None = None, solar_fixture: str | Path | None = None,
-            include_other_buildings: bool = False) -> dict[str, Any]:
+            include_other_buildings: bool = False, building_outline_id: str | None = None,
+            engine: str = "blocks", points_path: str | Path | None = None) -> dict[str, Any]:
     """Measure one roof and return the ``bond.roof_model/0.2`` envelope as a dict.
 
     Blocks the calling thread for up to ``deadline_s`` plus ``KILL_GRACE_S`` (30) seconds: run it off a request
@@ -84,11 +86,27 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
     ``other_buildings`` and the ``lot_*`` totals (contract-0.3, section "Other buildings"). The default changes nothing.
     A building that cannot be measured is recorded with ``status`` ``failed`` and never fails the main result.
 
+    ``lat``/``lng`` is taken as the roof's own point: the county parcel that contains it, and the outline on that
+    parcel that contains or is nearest to it, are measured. ``building_outline_id`` (a county outline id from an
+    earlier result's ``model.source.building.outline_id``) measures exactly that outline instead; an unknown id raises
+    ``MeasureError`` ``no_footprint`` and the chain never substitutes another building.
+
+    ``engine`` picks the modelling step: ``"blocks"`` (default, unchanged) or ``"planes"`` (the plane engine: facets
+    from the measured planes, flat and pitched told apart at 2/12, contract-0.4 totals and quality signals). The plane
+    engine needs live LiDAR (no ``blocks_path`` or ``solar_fixture``) and ``method`` "auto" or "lidar_skeleton"; it
+    has no agent, no verifier and no fallback to the block path: when it refuses or fails the same error codes are
+    raised and the caller decides. ``include_other_buildings`` measures the other buildings with the same engine.
+
+    ``points_path`` is the plane engine's offline test hook (like ``blocks_path`` for the old path): a house folder with
+    ``points_wide.npy`` (x, y, z, ASPRS class in a local metric frame, z absolute), ``footprint.json`` (``{"polygon":
+    [[x, y], ...]}`` in the same frame) and ``meta.json`` (``frame`` {crs_epsg, x0_m, y0_m}, ``outline_source``,
+    ``parcel_match``, ``lidar``). It needs ``engine="planes"``; no network is used and ``address`` may be blank.
+
     ``blocks_path`` and ``solar_fixture`` are test hooks: they replace LiDAR/Solar with a fixture file, so the
     call needs no network (verify=False) and no real address.
     """
     lat_lng = _check(address, lat, lng, method, deadline_s, blocks_path, solar_fixture, overpass_urls,
-                     work_dir, cache_dir)
+                     work_dir, cache_dir, engine, points_path)
     cache_path = Path(cache_dir).resolve()  # absolute: the child must not depend on its working directory
     cache_path.mkdir(parents=True, exist_ok=True)
     own_dir = work_dir is None
@@ -99,6 +117,8 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
             "address": (address or "").strip(), "lat_lng": lat_lng, "method": method, "verify": bool(verify),
             "force": bool(force), "deadline_s": float(deadline_s), "work_dir": str(work),
             "include_other_buildings": bool(include_other_buildings),
+            "building_outline_id": str(building_outline_id).strip() if building_outline_id else None,
+            "engine": engine, "points_path": str(Path(points_path).resolve()) if points_path else None,
             "blocks_path": str(Path(blocks_path).resolve()) if blocks_path else None,
             "solar_fixture": str(Path(solar_fixture).resolve()) if solar_fixture else None,
             "runtime": {"cache_dir": str(cache_path), "anthropic_api_key": anthropic_api_key,
@@ -207,9 +227,20 @@ def purge_cache(cache_dir: str | Path, days: float = 30.0) -> int:
 def _check(address: str | None, lat: float | None, lng: float | None, method: str, deadline_s: float,
            blocks_path: str | Path | None, solar_fixture: str | Path | None,
            overpass_urls: Sequence[str] | None = None, work_dir: str | Path | None = None,
-           cache_dir: str | Path | None = None) -> list[float] | None:
+           cache_dir: str | Path | None = None, engine: str = "blocks",
+           points_path: str | Path | None = None) -> list[float] | None:
     if method not in METHODS:
         raise ValueError(f"method must be one of {METHODS}, got {method!r}")
+    if engine not in ENGINES:
+        raise ValueError(f"engine must be one of {ENGINES}, got {engine!r}")
+    if points_path:
+        if engine != "planes" or blocks_path or solar_fixture:
+            raise ValueError("points_path needs engine 'planes' and no blocks_path or solar_fixture")
+        if not (Path(points_path) / "points_wide.npy").is_file() or not (Path(points_path) / "footprint.json").is_file():
+            raise ValueError(f"points_path must be a house folder with points_wide.npy and footprint.json: {points_path}")
+    if engine == "planes" and (method in ("lidar_agent", "solar_agent") or blocks_path or solar_fixture):
+        raise ValueError("engine 'planes' needs live LiDAR and method 'auto' or 'lidar_skeleton' "
+                         "(no agent, no blocks_path, no solar_fixture)")
     if address is not None and not isinstance(address, str):
         raise ValueError("address must be a string")
     if isinstance(overpass_urls, str):
@@ -227,7 +258,7 @@ def _check(address: str | None, lat: float | None, lng: float | None, method: st
         if not (math.isfinite(flat) and math.isfinite(flng) and -90 <= flat <= 90 and -180 <= flng <= 180):
             raise ValueError("lat must be finite in -90..90 and lng finite in -180..180")
         lat_lng = [flat, flng]
-    elif not (address or "").strip():
+    elif not (address or "").strip() and not points_path:
         raise ValueError("address must not be blank when lat/lng are not given")
     if isinstance(deadline_s, bool) or not (isinstance(deadline_s, (int, float)) and math.isfinite(deadline_s)
                                             and deadline_s > 0):
@@ -266,7 +297,9 @@ def _run_in_process(req: dict[str, Any], on_stage: Callable[[str], None] | None)
                                solar_fixture=req["solar_fixture"], deadline=Deadline.after(req["deadline_s"]),
                                lat_lng=tuple(req["lat_lng"]) if req["lat_lng"] else None, on_stage=stage,
                                verify=req["verify"], render=False,
-                               include_other_buildings=bool(req.get("include_other_buildings")))
+                               include_other_buildings=bool(req.get("include_other_buildings")),
+                               building_outline_id=req.get("building_outline_id"),
+                               engine=req.get("engine", "blocks"), points_path=req.get("points_path"))
         try:
             json.dumps(res.envelope, allow_nan=False)
         except ValueError:

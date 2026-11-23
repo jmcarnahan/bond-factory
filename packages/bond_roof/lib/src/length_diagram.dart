@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'facet_draw.dart';
 import 'format.dart';
 import 'labels.dart';
 import 'layout.dart';
@@ -63,11 +64,17 @@ class LengthDiagram {
       ));
     final cols = layout.legendColumns;
     final colW = (width - 2 * sp.margin) / cols;
-    final perCol = layout.legendRows;
+    // The ten edge types of contract 0.2 always; the 0.4 types only when the model has them.
+    final legendTypes = [
+      ...EdgeType.legacy,
+      for (final t in EdgeType.values)
+        if (t.isNew04 && (m.edges.any((e) => e.type == t) || (m.totals.lengthsFt[t] ?? 0) > 0)) t,
+    ];
+    final perCol = layout.legendRowsFor(legendTypes.length);
     var idx = 0;
     for (var c = 0; c < cols; c++) {
       for (var r = 0; r < perCol[c]; r++) {
-        final t = EdgeType.values[idx++];
+        final t = legendTypes[idx++];
         final x0 = sp.margin + c * colW, y = sp.legendTop + r * sp.legendPitch;
         final value = feetInches(m.totals.lengthsFt[t] ?? 0, labels: labels);
         final valueX = x0 + colW - sp.legendValueInset;
@@ -107,13 +114,11 @@ class LengthDiagram {
     final area = (l: sp.planSide, t: legendBottom, r: width - sp.planSide, b: height - bottomReserve);
     final fit = PlanFit(m,
         left: area.l + sp.planInsetX, top: area.t + sp.planInsetTop, right: area.r - sp.planInsetX, bottom: area.b - sp.planInsetBottom);
+    final regions = <SceneRegion>[];
     for (final f in m.facets) {
-      prims.add(PolyPrim(
-        pts: fit.mapAll(f.polygon),
-        fill: f.kind == FacetKind.flat ? style.flatFill : style.slopedFill,
-        stroke: 0xFFE0E0E0,
-        width: 1,
-      ));
+      final pts = fit.mapAll(f.polygon);
+      regions.add(SceneRegion(id: f.id, pts: pts));
+      addFacetPrims(prims, f, pts, style, stroke: 0xFFE0E0E0, strokeWidth: 1, k: k);
     }
     for (final h in m.holes) {
       prims.add(PolyPrim(
@@ -129,7 +134,7 @@ class LengthDiagram {
         a: segs[i].a,
         b: segs[i].b,
         color: style.colorOf(e.type),
-        width: style.strokeWidth * k,
+        width: style.strokeWidth * k * style.widthScaleOf(e.type),
         dashed: style.dashedTypes.contains(e.type),
       ));
     }
@@ -148,7 +153,11 @@ class LengthDiagram {
       // Opening outlines are drawn dashed but carry no length label. They are neither placed
       // nor counted as hidden.
       if (onHole[i]) continue;
-      final text = wholeFeet(m.edges[i].lengthFt);
+      final e = m.edges[i];
+      // A level change shows its jump (the step height) instead of its length.
+      final text = e.type == EdgeType.levelChange && e.jumpFt != null
+          ? RoofLabels.fill(labels.levelChangeJump, {'ft': feetInches(e.jumpFt!, labels: labels)})
+          : wholeFeet(e.lengthFt);
       Obb? box;
       if (segs[i].length >= style.minLabelPx * k) {
         box = placer.placeAlong(segs[i], textWidth(text, size, bold: true), size, centroid,
@@ -180,6 +189,7 @@ class LengthDiagram {
       hiddenLabels: hidden,
       placedLabels: edgeLabels.length,
       title: labels.lengthCaption,
+      regions: regions,
     );
   }
 }

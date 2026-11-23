@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'json_util.dart';
 
 export 'json_util.dart' show Pt;
+export 'model_facet.dart';
 
 enum EdgeType {
   eave('eave'),
@@ -14,20 +15,27 @@ enum EdgeType {
   wallFlashing('wall_flashing'),
   parapet('parapet'),
   transition('transition'),
-  unspecified('unspecified');
+  unspecified('unspecified'),
+
+  /// Perimeter of a flat facet (envelope 0.4).
+  flatEdge('flat_edge'),
+
+  /// A height jump of 0.3 m or more between facets (envelope 0.4); the edge carries [RoofEdge.jumpFt].
+  levelChange('level_change');
 
   const EdgeType(this.json);
 
   /// The name used in the JSON contract.
   final String json;
-}
 
-enum FacetKind {
-  flat('flat'),
-  sloped('sloped');
+  /// The ten types of contract 0.2 and 0.3, in their fixed order. The legend of an old envelope
+  /// lists exactly these; [flatEdge] and [levelChange] join it only when a model has them.
+  static const List<EdgeType> legacy = [
+    eave, rake, ridge, hip, valley, stepFlashing, wallFlashing, parapet, transition, unspecified,
+  ];
 
-  const FacetKind(this.json);
-  final String json;
+  /// True for the two types added by envelope 0.4.
+  bool get isNew04 => this == flatEdge || this == levelChange;
 }
 
 enum BlockForm {
@@ -142,58 +150,6 @@ class RoofBlock {
       };
 }
 
-class RoofFacet {
-  const RoofFacet({
-    required this.id,
-    required this.block,
-    required this.kind,
-    required this.polygon,
-    required this.pitchRise,
-    this.aspectDeg,
-    required this.planAreaSqft,
-    required this.areaSqft,
-  });
-
-  factory RoofFacet.fromJson(Map<String, dynamic> j, String path, [List<String>? notes]) {
-    final area = asNum(j['area_sqft'], '$path.area_sqft');
-    final pitch = numOr(j, 'pitch_rise', path, 0);
-    final kindText = asStr(j['kind'], '$path.kind');
-    var kind = enumOrNull(kindText, FacetKind.values, (v) => v.json);
-    if (kind == null) {
-      kind = pitch > 0 ? FacetKind.sloped : FacetKind.flat;
-      notes?.add('$path.kind: unknown value "$kindText", read as ${kind.json} from the pitch');
-    }
-    return RoofFacet(
-      id: asStr(j['id'], '$path.id'),
-      block: strOr(j, 'block', path, ''),
-      kind: kind,
-      polygon: asPoly(j['polygon'], '$path.polygon'),
-      pitchRise: pitch,
-      aspectDeg: numOrNull(j, 'aspect_deg', path),
-      planAreaSqft: numOr(j, 'plan_area_sqft', path, area),
-      areaSqft: area,
-    );
-  }
-
-  final String id, block;
-  final FacetKind kind;
-  final List<Pt> polygon;
-  final double pitchRise;
-  final double? aspectDeg;
-  final double planAreaSqft, areaSqft;
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'block': block,
-        'kind': kind.json,
-        'polygon': polyJson(polygon),
-        'pitch_rise': pitchRise,
-        'aspect_deg': aspectDeg,
-        'plan_area_sqft': planAreaSqft,
-        'area_sqft': areaSqft,
-      };
-}
-
 class RoofEdge {
   const RoofEdge({
     required this.id,
@@ -202,6 +158,7 @@ class RoofEdge {
     required this.b,
     required this.lengthFt,
     this.facets = const [],
+    this.jumpFt,
   });
 
   factory RoofEdge.fromJson(Map<String, dynamic> j, String path, [List<String>? notes]) {
@@ -222,6 +179,7 @@ class RoofEdge {
       b: b,
       lengthFt: numOr(j, 'length_ft', path, math.sqrt(math.pow(b.x - a.x, 2) + math.pow(b.y - a.y, 2))),
       facets: strList(j['facets'], '$path.facets'),
+      jumpFt: numOrNull(j, 'jump_ft', path),
     );
   }
 
@@ -231,13 +189,31 @@ class RoofEdge {
   final double lengthFt;
   final List<String> facets;
 
+  /// The height step in feet of a [EdgeType.levelChange] edge (envelope 0.4); null otherwise.
+  final double? jumpFt;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'type': type.json,
         'points': [ptJson(a), ptJson(b)],
         'length_ft': lengthFt,
         'facets': facets,
+        if (jumpFt != null) 'jump_ft': jumpFt,
       };
+
+  @override
+  bool operator ==(Object other) =>
+      other is RoofEdge &&
+      other.id == id &&
+      other.type == type &&
+      other.a == a &&
+      other.b == b &&
+      other.lengthFt == lengthFt &&
+      listEq(other.facets, facets) &&
+      other.jumpFt == jumpFt;
+
+  @override
+  int get hashCode => Object.hash(id, type, a, b, lengthFt, Object.hashAll(facets), jumpFt);
 }
 
 class RoofHole {

@@ -7,6 +7,24 @@ import 'tokens.dart';
 
 Color _argb(int v) => Color(v);
 
+/// How a scene of [scene] size is placed in a box of [size]: uniform scale and the offset of its
+/// top-left corner. Shared by the painter and the tap hit test so they always agree.
+({double k, double dx, double dy}) sceneFit(Scene scene, Size size, BoxFit fit) {
+  final sx = size.width / scene.width;
+  final sy = size.height / scene.height;
+  final k = fit == BoxFit.cover ? math.max(sx, sy) : math.min(sx, sy);
+  return (k: k, dx: (size.width - scene.width * k) / 2, dy: (size.height - scene.height * k) / 2);
+}
+
+/// The id of the facet under [local] (a point in the box of [size] the scene is painted in), or
+/// null (outside the scene, or on no facet).
+String? facetIdAt(Scene scene, Size size, Offset local, {BoxFit fit = BoxFit.contain}) {
+  if (scene.width <= 0 || scene.height <= 0 || size.isEmpty) return null;
+  final f = sceneFit(scene, size, fit);
+  if (f.k <= 0) return null;
+  return scene.facetAt((x: (local.dx - f.dx) / f.k, y: (local.dy - f.dy) / f.k));
+}
+
 /// Paints a [Scene] with the canvas. Scene y is down; the scene is scaled
 /// uniformly to fit the available size and centred.
 class ScenePainter extends CustomPainter {
@@ -18,11 +36,7 @@ class ScenePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (scene.width <= 0 || scene.height <= 0) return;
-    final sx = size.width / scene.width;
-    final sy = size.height / scene.height;
-    final k = fit == BoxFit.cover ? math.max(sx, sy) : math.min(sx, sy);
-    final dx = (size.width - scene.width * k) / 2;
-    final dy = (size.height - scene.height * k) / 2;
+    final (:k, :dx, :dy) = sceneFit(scene, size, fit);
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     canvas.translate(dx, dy);
@@ -117,20 +131,40 @@ class ScenePainter extends CustomPainter {
 }
 
 /// Draws a [Scene] scaled to the available size.
+///
+/// With [onFacetTap] a tap on a facet reports its id (the scene must have been built from a model
+/// with facets; the summary page has none). The package draws nothing on tap: the host attaches
+/// its own inline controls.
 class RoofDiagramView extends StatelessWidget {
-  const RoofDiagramView(this.scene, {super.key, this.fit = BoxFit.contain});
+  const RoofDiagramView(this.scene, {super.key, this.fit = BoxFit.contain, this.onFacetTap});
 
   final Scene scene;
   final BoxFit fit;
 
+  /// Called with the id of the tapped facet. A tap outside every facet is ignored.
+  final void Function(String facetId)? onFacetTap;
+
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
+    final paint = RepaintBoundary(
       child: CustomPaint(
         painter: ScenePainter(scene, fit: fit),
         size: Size.infinite,
         isComplex: true,
       ),
     );
+    final tap = onFacetTap;
+    if (tap == null) return paint;
+    return LayoutBuilder(builder: (context, constraints) {
+      final size = constraints.biggest;
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapUp: (d) {
+          final id = facetIdAt(scene, size, d.localPosition, fit: fit);
+          if (id != null) tap(id);
+        },
+        child: paint,
+      );
+    });
   }
 }

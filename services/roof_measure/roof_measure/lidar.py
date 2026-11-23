@@ -62,6 +62,8 @@ class LidarTooSparse(LidarError):
                          f"at least {needed:.0f} are needed.")
 
 
+DENSE_ENOUGH = 8.0  # expected points/m2 from which a survey is good enough to prefer the newest of them
+MAX_CANDIDATES = 3  # projects tried for one building (each costs LiDAR tile downloads), best expected density first
 MIN_ROOF_DENSITY = 4.0  # points per m2 inside the footprint below which the job fails (plan D17); below 8 warns
 
 
@@ -75,6 +77,25 @@ class LidarProject:
     count: int = 0
     srs_epsg: int = 3857
     ept: dict = field(default_factory=dict, repr=False)
+
+
+def rank_projects(projects: list[LidarProject]) -> list[LidarProject]:
+    """Dense-enough surveys (``DENSE_ENOUGH``) newest first; then surveys of unknown density, newest first; then the
+    known-thin ones, densest first (newest the tie-break).
+
+    WHY: a thin new survey (5 points/m2) cannot draw a roof that an older 13 points/m2 survey can, but among surveys
+    that are dense enough the newest wins: roofs change (re-roofs, additions), so a 2016 survey at 20 points/m2 must not
+    beat a 2023 one at 15. A listing without a point count (density 0) is unknown, not thin: it is tried before the
+    known-thin ones. Density is the project-wide average (a proxy, compared to 0.1 points/m2);
+    ``fetch_best_points`` checks the density on the roof itself.
+    """
+    def key(lp: LidarProject) -> tuple[int, float, float]:
+        d, y = round(lp.density, 1), float(lp.year or 0)
+        if d >= DENSE_ENOUGH:
+            return (0, -y, -d)
+        return (1, -y, 0.0) if d <= 0 else (2, -d, -y)
+
+    return sorted(projects, key=key)
 
 
 @dataclass
@@ -188,7 +209,7 @@ def _quick_bbox_contains(geom: dict, lng: float, lat: float) -> bool:
 
 
 def select_project(lat: float, lng: float) -> list[LidarProject]:
-    """All 3DEP projects covering the point, newest acquisition first, then densest."""
+    """All 3DEP projects covering the point, dense-enough surveys newest first, then the rest densest first (``rank_projects``)."""
     out: list[LidarProject] = []
     pt = Point(lng, lat)
     for f in _load_resources():
@@ -208,7 +229,7 @@ def select_project(lat: float, lng: float) -> list[LidarProject]:
         count = int(p.get("count") or 0)
         out.append(LidarProject(name=name, ept_url=url, year=project_year(name),
                                 density=count / area_m2 if area_m2 else 0.0, span_m=float(span), count=count))
-    out.sort(key=lambda lp: (-(lp.year or 0), -lp.density))
+    out = rank_projects(out)
     for lp in out:
         try:
             lp.ept = cache.fetch_json(lp.ept_url, max_age_s=30 * cache.DAY, check=_ept_check)
@@ -218,8 +239,7 @@ def select_project(lat: float, lng: float) -> list[LidarProject]:
                 lp.year = sample_year(lp.ept_url, lp.ept)
         except (*cache.NET_ERRORS, LidarError) as e:  # keep the project listed; fetch_points will fail loudly
             log.warning("could not read an EPT project: %s", cache.describe_error(e))
-    out.sort(key=lambda lp: (-(lp.year or 0), -lp.density))  # again: sampled years may have changed ranks
-    return out
+    return rank_projects(out)  # again: sampled years may have changed the tie-breaks
 
 
 def _ept_check(obj: object) -> None:
@@ -350,11 +370,14 @@ def footprint_density(pc: PointCloud, footprint_m: Polygon) -> float:
 
 def fetch_best_points(lat: float, lng: float, half_size_m: float, epsg_out: int, min_points: int = 2000,
                       footprint_m: Polygon | None = None) -> PointCloud:
-    """Try ranked projects (newest first) until one has enough points on the roof.
+    """Try ranked projects (``rank_projects``; at most ``MAX_CANDIDATES``) until one has enough points on the roof.
 
     With `footprint_m` (metres in `epsg_out`) the test is roof density inside the footprint, so ground and
-    trees in the box cannot make a thin survey pass; otherwise `min_points` counts the whole box.
-    `meta['fallback_used']` is True when a newer project failed or was too thin and an older one was used.
+    trees in the box cannot make a thin survey pass; otherwise `min_points` counts the whole box. A survey that passes
+    but gives under ``DENSE_ENOUGH`` points/m2 ON THE ROOF does not end the search while candidates remain: the next is
+    fetched and the cloud with the higher roof density wins (a project average of 9 can mean 5 on one roof).
+    `meta['fallback_used']` is True when the winner was not the first-ranked project; `meta['roof_density']` and
+    `meta['choice']` say what it gave and why it won.
     """
     try:
         projects = select_project(lat, lng)
@@ -364,10 +387,14 @@ def fetch_best_points(lat: float, lng: float, half_size_m: float, epsg_out: int,
         raise kind(f"Could not list USGS 3DEP projects ({cache.describe_error(e)}).") from e
     if not projects:
         raise LidarError("No USGS 3DEP LiDAR project covers this address.")
+    projects = rank_projects(projects)[:MAX_CANDIDATES]  # whoever listed them, the order and the bound are ours
     reasons: list[str] = []
     net_failures = 0
     thin: tuple[LidarProject, float] | None = None
+    best: tuple[PointCloud, float, int, LidarProject] | None = None  # (cloud, roof density, rank, project)
     for i, p in enumerate(projects):
+        if best is not None and best[1] >= DENSE_ENOUGH:
+            break
         try:
             pc = fetch_points(p, lat, lng, half_size_m, epsg_out)
         except (*cache.NET_ERRORS, LidarError) as e:
@@ -385,8 +412,22 @@ def fetch_best_points(lat: float, lng: float, half_size_m: float, epsg_out: int,
         elif len(pc) < min_points:
             reasons.append(f"{p.name}: only {len(pc)} points")
             continue
+        else:
+            dens = float("inf")  # no footprint, no roof density: the first survey with enough points is the answer
+        if best is None or dens > best[1]:
+            if best is not None:
+                reasons.append(f"{best[3].name}: {best[1]:.1f} points/m2 on the roof, beaten by {p.name}")
+            best = (pc, dens, i, p)
+        else:
+            reasons.append(f"{p.name}: {dens:.1f} points/m2 on the roof, below {best[3].name}")
+    if best is not None:
+        pc, dens, i, p = best
         pc.meta["fallback_used"] = i > 0
         pc.meta["skipped"] = reasons
+        if dens != float("inf"):
+            pc.meta["roof_density"] = round(dens, 1)
+            pc.meta["choice"] = (f"{p.name} gives {dens:.1f} points/m2 on the roof"
+                                 + ("" if dens >= DENSE_ENOUGH else f" (the best of the surveys tried; under {DENSE_ENOUGH:g})"))
         return pc
     if thin is not None:
         raise LidarTooSparse(thin[0].name, thin[0].year, thin[1], MIN_ROOF_DENSITY)

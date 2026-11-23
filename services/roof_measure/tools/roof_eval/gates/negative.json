@@ -1,0 +1,20 @@
+{
+ "_note": "Negative set: no house may get a result labelled ok (an engine that refuses everything passes); crashes and malformed results still fail.",
+ "gates": [
+  {
+   "name": "no negative house labelled ok",
+   "metric": "automation_ok",
+   "agg": "rate",
+   "op": "<=",
+   "value": 0.0,
+   "min_n": 1
+  },
+  {
+   "name": "invalid or crashed results = 0",
+   "metric": "invalid_or_crashed",
+   "agg": "sum",
+   "op": "==",
+   "value": 0
+  }
+ ]
+}

@@ -54,13 +54,25 @@ def _with_notes(fp: Footprint | None, notes: list[tuple[str, str]]) -> Footprint
 
 
 def fetch_footprint(lat: float, lng: float, address: Address, *, deadline: Deadline | None = None,
-                    use_solar: bool = True, use_hull: bool = True) -> Footprint:
-    """First building found by the chain; ``FootprintError`` (or ``AmbiguousBuilding``) when none has one."""
+                    use_solar: bool = True, use_hull: bool = True, point_given: bool = False,
+                    building_outline_id: str | None = None) -> Footprint:
+    """First building found by the chain; ``FootprintError`` (or ``AmbiguousBuilding``) when none has one.
+
+    ``point_given``: the point is the caller's rooftop pin (the county link then picks the parcel and outline that
+    hold it). ``building_outline_id``: exactly that county outline or an error: the chain never substitutes another
+    building for the one the caller chose."""
     cap = config.footprint_stage_s() or FOOTPRINT_STAGE_S
     stage = Deadline.after(min(cap, deadline.remaining())) if deadline else Deadline.after(cap)
-    fp, notes, unreachable = fetch_county(lat, lng, address)  # unreachable: first link that could not be reached
+    county_kw = {"point_given": True} if point_given else {}
+    if building_outline_id is not None:
+        county_kw["building_outline_id"] = building_outline_id
+    fp, notes, unreachable = fetch_county(lat, lng, address, **county_kw)  # unreachable: first link not reached
     if fp is not None:
         return fp
+    if building_outline_id is not None:
+        if unreachable:
+            raise FootprintUnavailable(unreachable[:300])
+        raise FootprintError("The county building outline was not found.")
     hull_reason = ""
 
     def down(text: str, what: str) -> None:

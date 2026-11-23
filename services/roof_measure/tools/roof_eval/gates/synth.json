@@ -1,0 +1,17 @@
+{
+ "_note": "Gate 9 tolerances (plan 3.7, 3.7a), data not code.",
+ "synth_gates": {
+  "area_pct": 2.0,
+  "length_pct": 5.0,
+  "thin_area_pct": 10.0,
+  "thin_length_pct": 10.0,
+  "length_floor_ft": 1.0,
+  "dense_density": 8,
+  "thin_density": 4,
+  "min_iou": 0.9,
+  "facet_count_tol": 1,
+  "facet_count_tol_complex": 2,
+  "min_flat_pitched": 0.95
+ },
+ "gates": []
+}

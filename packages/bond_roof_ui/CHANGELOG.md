@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Envelope 0.4: `RoofDiagramView(scene, {fit, onFacetTap})` and `RoofReportStrip(..., onFacetTap)` report the id of a tapped
+  facet (the package draws nothing in response; the host attaches inline controls). New `sceneFit` and `facetIdAt`.
+  Flat facets are painted hatched and borderline facets outlined (the scene carries it, see `bond_roof`).
+- `RoofTotalsTable`: with the 0.4 `roofing_*` totals and `planes_surface_area_sqft` the headline is the PRICED area ("Total roofing area", equals pitched + flat) and the drawn area is its own row ("As drawn (to the roof edge)"). Old envelopes keep "Total area".
+- `RoofTotalsTable` lists "Pitched roofing" and "Flat roofing" (square feet and squares) on separate rows, and
+  "Low slope, confirm" when there is such area, only when the envelope carries the `roofing_*` totals; nothing changes without them.
 - Licence: MIT (LICENSE file added). It was GPL-3.0-or-later with the rest of the repository;
   no code changes.
 

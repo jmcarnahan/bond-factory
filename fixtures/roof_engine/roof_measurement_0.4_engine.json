@@ -1,0 +1,683 @@
+{
+ "contract": "bond.roof_model/0.2",
+ "pipeline_version": "0.5.0",
+ "method_used": "lidar_skeleton",
+ "footprint_source": "lariac",
+ "generated_at": "2026-11-22T00:00:00Z",
+ "model": {
+  "schema": "bond.roof_model/0.1",
+  "generated_at": "2026-11-22T00:00:00Z",
+  "address": {
+   "line1": "100 Example Ave",
+   "city": "Sampletown",
+   "state": "CA",
+   "zip": "90000",
+   "formatted": "100 Example Ave, Sampletown, CA 90000"
+  },
+  "origin": {
+   "lat": 0.0,
+   "lng": 0.0,
+   "epsg": 32631
+  },
+  "north_deg": 0,
+  "units": "ft",
+  "source": {
+   "method": "lidar_skeleton",
+   "footprint": {
+    "provider": "lacounty_lariac_2020",
+    "id": "SYNTH-B1",
+    "area_sqft": 1600.0
+   },
+   "lidar": {
+    "project": "SYNTHETIC",
+    "acquired": "2026-01-01",
+    "points_on_roof": 1307,
+    "density_per_m2": 8.0
+   },
+   "solar": null,
+   "from_planes": true,
+   "engine": "planes/1",
+   "engine_params": "d751360995048b1fdbbcf738dfbd9051c4cb3898166e0d4a75cd1b1db3348436",
+   "building": {
+    "parcel_id": "SYNTH-P1",
+    "outline_id": "SYNTH-B1",
+    "outline_centroid": [
+     0.0,
+     0.0
+    ],
+    "chosen_by": "auto"
+   }
+  },
+  "blocks": [
+   {
+    "id": "b1",
+    "form": "shed",
+    "polygon": [
+     [
+      41.05547,
+      25.03936
+     ],
+     [
+      -1.03866,
+      25.03936
+     ],
+     [
+      -1.03866,
+      11.99803
+     ],
+     [
+      41.05547,
+      12.01444
+     ]
+    ],
+    "pitch_rise": 6.01277,
+    "ridge_azimuth_deg": null,
+    "gable_edges": [],
+    "plan_area_sqft": 548.61818,
+    "eave_height_ft": 9.31057,
+    "aspect_deg": 359.97702
+   },
+   {
+    "id": "b2",
+    "form": "shed",
+    "polygon": [
+     [
+      41.05547,
+      12.01444
+     ],
+     [
+      -1.03866,
+      11.99803
+     ],
+     [
+      -1.03866,
+      -0.01641
+     ],
+     [
+      41.05547,
+      -0.11483
+     ]
+    ],
+    "pitch_rise": 5.99795,
+    "ridge_azimuth_deg": null,
+    "gable_edges": [],
+    "plan_area_sqft": 508.15409,
+    "eave_height_ft": 9.78322,
+    "aspect_deg": 179.97921
+   },
+   {
+    "id": "b3",
+    "form": "flat",
+    "polygon": [
+     [
+      -1.03866,
+      -17.04238
+     ],
+     [
+      41.05547,
+      -17.04238
+     ],
+     [
+      41.05547,
+      -0.11483
+     ],
+     [
+      -1.03866,
+      -0.01641
+     ]
+    ],
+    "pitch_rise": 0.0,
+    "ridge_azimuth_deg": null,
+    "gable_edges": [],
+    "plan_area_sqft": 714.62222,
+    "eave_height_ft": 11.80252
+   }
+  ],
+  "facets": [
+   {
+    "id": "f1",
+    "block": "b1",
+    "kind": "sloped",
+    "polygon": [
+     [
+      41.05547,
+      25.03936
+     ],
+     [
+      -1.03866,
+      25.03936
+     ],
+     [
+      -1.03866,
+      11.99803
+     ],
+     [
+      41.05547,
+      12.01444
+     ]
+    ],
+    "pitch_rise": 6.01277,
+    "aspect_deg": 359.97702,
+    "plan_area_sqft": 548.61818,
+    "area_sqft": 613.635,
+    "roof_type": "pitched",
+    "pitch_fit": 6.02,
+    "pitch_sigma": 0.02,
+    "borderline": false,
+    "supported_pct": 100.0,
+    "points": 404,
+    "rms_ft": 0.099,
+    "plane_eq": [
+     0.0002,
+     -0.50106,
+     21.857
+    ]
+   },
+   {
+    "id": "f2",
+    "block": "b2",
+    "kind": "sloped",
+    "polygon": [
+     [
+      41.05547,
+      12.01444
+     ],
+     [
+      -1.03866,
+      11.99803
+     ],
+     [
+      -1.03866,
+      -0.01641
+     ],
+     [
+      41.05547,
+      -0.11483
+     ]
+    ],
+    "pitch_rise": 5.99795,
+    "aspect_deg": 179.97921,
+    "plan_area_sqft": 508.15409,
+    "area_sqft": 568.09474,
+    "roof_type": "pitched",
+    "pitch_fit": 6.0,
+    "pitch_sigma": 0.02,
+    "borderline": false,
+    "supported_pct": 100.0,
+    "points": 377,
+    "rms_ft": 0.224,
+    "plane_eq": [
+     -0.00018,
+     0.49983,
+     9.848
+    ]
+   },
+   {
+    "id": "f3",
+    "block": "b3",
+    "kind": "flat",
+    "polygon": [
+     [
+      -1.03866,
+      -17.04238
+     ],
+     [
+      41.05547,
+      -17.04238
+     ],
+     [
+      41.05547,
+      -0.11483
+     ],
+     [
+      -1.03866,
+      -0.01641
+     ]
+    ],
+    "pitch_rise": 0.0,
+    "aspect_deg": null,
+    "plan_area_sqft": 714.62222,
+    "area_sqft": 714.62222,
+    "roof_type": "flat",
+    "pitch_fit": 0.01,
+    "pitch_sigma": 0.0,
+    "borderline": false,
+    "supported_pct": 100.0,
+    "points": 526,
+    "rms_ft": 0.092,
+    "plane_eq": [
+     0.00046,
+     -6e-05,
+     11.803
+    ]
+   }
+  ],
+  "edges": [
+   {
+    "id": "e1",
+    "type": "ridge",
+    "points": [
+     [
+      41.05547,
+      12.01444
+     ],
+     [
+      -1.03866,
+      11.99803
+     ]
+    ],
+    "length_ft": 42.09414,
+    "facets": [
+     "f1",
+     "f2"
+    ]
+   },
+   {
+    "id": "e2",
+    "type": "rake",
+    "points": [
+     [
+      -1.03866,
+      12.00131
+     ],
+     [
+      -1.03866,
+      25.03936
+     ]
+    ],
+    "length_ft": 14.58319,
+    "facets": [
+     "f1"
+    ]
+   },
+   {
+    "id": "e3",
+    "type": "rake",
+    "points": [
+     [
+      41.05547,
+      25.03936
+     ],
+     [
+      41.05547,
+      12.01772
+     ]
+    ],
+    "length_ft": 14.56484,
+    "facets": [
+     "f1"
+    ]
+   },
+   {
+    "id": "e4",
+    "type": "eave",
+    "points": [
+     [
+      -1.03866,
+      25.03936
+     ],
+     [
+      41.05547,
+      25.03936
+     ]
+    ],
+    "length_ft": 42.09413,
+    "facets": [
+     "f1"
+    ]
+   },
+   {
+    "id": "e5",
+    "type": "level_change",
+    "points": [
+     [
+      41.05547,
+      -0.11483
+     ],
+     [
+      -1.03866,
+      -0.01641
+     ]
+    ],
+    "length_ft": 42.09429,
+    "facets": [
+     "f2",
+     "f3"
+    ],
+    "jump_ft": 1.98
+   },
+   {
+    "id": "e6",
+    "type": "rake",
+    "points": [
+     [
+      -1.03866,
+      -0.01313
+     ],
+     [
+      -1.03866,
+      11.99475
+     ]
+    ],
+    "length_ft": 13.4243,
+    "facets": [
+     "f2"
+    ]
+   },
+   {
+    "id": "e7",
+    "type": "rake",
+    "points": [
+     [
+      41.05547,
+      12.01115
+     ],
+     [
+      41.05547,
+      -0.11155
+     ]
+    ],
+    "length_ft": 13.55266,
+    "facets": [
+     "f2"
+    ]
+   },
+   {
+    "id": "e8",
+    "type": "flat_edge",
+    "points": [
+     [
+      41.05547,
+      -0.11811
+     ],
+     [
+      41.05547,
+      -17.04238
+     ]
+    ],
+    "length_ft": 16.92427,
+    "facets": [
+     "f3"
+    ]
+   },
+   {
+    "id": "e9",
+    "type": "flat_edge",
+    "points": [
+     [
+      41.05547,
+      -17.04238
+     ],
+     [
+      -1.03866,
+      -17.04238
+     ]
+    ],
+    "length_ft": 42.09414,
+    "facets": [
+     "f3"
+    ]
+   },
+   {
+    "id": "e10",
+    "type": "flat_edge",
+    "points": [
+     [
+      -1.03866,
+      -17.04238
+     ],
+     [
+      -1.03866,
+      -0.01969
+     ]
+    ],
+    "length_ft": 17.02269,
+    "facets": [
+     "f3"
+    ]
+   }
+  ],
+  "holes": [],
+  "totals": {
+   "total_area_sqft": 1896.35196,
+   "pitched_area_sqft": 1181.72974,
+   "flat_area_sqft": 714.62222,
+   "predominant_pitch_rise": 6.0,
+   "predominant_pitch_area_sqft": 1181.72974,
+   "squares": 18.96352,
+   "lengths_ft": {
+    "eave": 42.09413,
+    "rake": 56.12499,
+    "ridge": 42.09414,
+    "hip": 0.0,
+    "valley": 0.0,
+    "step_flashing": 0.0,
+    "wall_flashing": 0.0,
+    "parapet": 0.0,
+    "transition": 0.0,
+    "unspecified": 0.0,
+    "flat_edge": 76.04111,
+    "level_change": 42.09429
+   },
+   "note": "These totals describe the DRAWN roof (the facets of this model, at the measured roof edge). The envelope's totals are the priced ones."
+  },
+  "confidence": {
+   "overall": "medium",
+   "notes": [
+    "Drawn from the measured roof planes by the plane engine: one facet per plane, edges typed from geometry."
+   ]
+  },
+  "warnings": [],
+  "debug": {
+   "coplanar_seams": [],
+   "edge_diagnostics": {
+    "mergeable": [],
+    "kinks": [],
+    "small_flat": [],
+    "absorbed_level_changes": []
+   },
+   "area_check": {
+    "drawn": 1896.4,
+    "priced": 1803.9,
+    "wall_line": 1713.8,
+    "between": true
+   }
+  },
+  "quality": {
+   "engine": "planes/1",
+   "engine_params": "d751360995048b1fdbbcf738dfbd9051c4cb3898166e0d4a75cd1b1db3348436",
+   "verdict": "ok",
+   "fit_covered": 0.997,
+   "fit_all": 0.997,
+   "fit_clear": 1.0,
+   "tree_cover_pct": 0.3,
+   "coverage": 1.0,
+   "supported_pct": 100.0,
+   "density_pts_m2": 7.9,
+   "parcel_match": "exact",
+   "outline_source": "lacounty_lariac_2020",
+   "overhang_scale": 0.5,
+   "outline_shift": 0.001,
+   "plane_mismatch_pct": 0.3,
+   "outline_covered_pct": 100.0,
+   "model_uncovered_pct": 0.0,
+   "level_spread_ft": 1.0,
+   "planes_lidar": 3,
+   "facets_model": 3,
+   "reasons": []
+  },
+  "planes": [
+   {
+    "id": "f1",
+    "polygon": [
+     [
+      41.05547,
+      25.03936
+     ],
+     [
+      -1.03866,
+      25.03936
+     ],
+     [
+      -1.03866,
+      11.99803
+     ],
+     [
+      41.05547,
+      12.01444
+     ]
+    ],
+    "pitch_rise": 6.01,
+    "aspect_deg": 359.97702,
+    "plan_area_sqft": 548.61818,
+    "surface_area_sqft": 613.635,
+    "height_ft": 12.58,
+    "rms_ft": 0.099,
+    "filled_pct": 0.0,
+    "plane_eq": [
+     0.0002,
+     -0.50106,
+     21.857
+    ],
+    "straighten_method": "engine"
+   },
+   {
+    "id": "f2",
+    "polygon": [
+     [
+      41.05547,
+      12.01444
+     ],
+     [
+      -1.03866,
+      11.99803
+     ],
+     [
+      -1.03866,
+      -0.01641
+     ],
+     [
+      41.05547,
+      -0.11483
+     ]
+    ],
+    "pitch_rise": 6.0,
+    "aspect_deg": 179.97921,
+    "plan_area_sqft": 508.15409,
+    "surface_area_sqft": 568.09474,
+    "height_ft": 12.83,
+    "rms_ft": 0.224,
+    "filled_pct": 0.0,
+    "plane_eq": [
+     -0.00018,
+     0.49983,
+     9.848
+    ],
+    "straighten_method": "engine"
+   },
+   {
+    "id": "f3",
+    "polygon": [
+     [
+      -1.03866,
+      -17.04238
+     ],
+     [
+      41.05547,
+      -17.04238
+     ],
+     [
+      41.05547,
+      -0.11483
+     ],
+     [
+      -1.03866,
+      -0.01641
+     ]
+    ],
+    "pitch_rise": 0.01,
+    "aspect_deg": null,
+    "plan_area_sqft": 714.62222,
+    "surface_area_sqft": 714.62222,
+    "height_ft": 11.81,
+    "rms_ft": 0.092,
+    "filled_pct": 0.0,
+    "plane_eq": [
+     0.00046,
+     -6e-05,
+     11.803
+    ],
+    "straighten_method": "engine"
+   }
+  ]
+ },
+ "totals": {
+  "area_sqft": 1804.0,
+  "squares": 18.04,
+  "eave_ft": 42.094,
+  "rake_ft": 56.125,
+  "ridge_ft": 42.094,
+  "hip_ft": 0.0,
+  "valley_ft": 0.0,
+  "step_flashing_ft": 0.0,
+  "predominant_pitch": 6.0,
+  "facets": 3,
+  "drip_edge_eave_ft": 42.094,
+  "drip_edge_eave_rake_ft": 98.219,
+  "ridge_cap_ridge_ft": 42.094,
+  "ridge_cap_ridge_hip_ft": 41.0,
+  "planes_surface_area_sqft": 1804.0,
+  "planes_pitch_weighted": 6.01,
+  "outline_perimeter_ft": 170.0,
+  "roofing_pitched_sqft": 1128.5,
+  "roofing_flat_sqft": 675.5,
+  "roofing_pitched_squares": 11.29,
+  "roofing_flat_squares": 6.75,
+  "low_slope_confirm_sqft": 0,
+  "area_sqft_wall_line": 1713.8,
+  "outline_perimeter_wall_ft": 160.0,
+  "overhang_ft_median": 1.05,
+  "flat_edge_ft": 74.0,
+  "level_change_ft": 41.0,
+  "complexity": {
+   "facets": 3,
+   "hip_valley_ft_per_square": 0.0,
+   "hint": "simple"
+  },
+  "area_sqft_roof_edge": 1896.4,
+  "plane_count": 3
+ },
+ "verification": {
+  "verdict": "unverified",
+  "notes": [
+   "The diagram comes straight from the measured planes; the verifier does not run on it."
+  ],
+  "adjustments": [],
+  "original_totals": {
+   "area_sqft": 1896.352,
+   "squares": 18.964,
+   "eave_ft": 42.094,
+   "rake_ft": 56.125,
+   "ridge_ft": 42.094,
+   "hip_ft": 0.0,
+   "valley_ft": 0.0,
+   "step_flashing_ft": 0.0,
+   "predominant_pitch": 6.0,
+   "facets": 3,
+   "drip_edge_eave_ft": 42.094,
+   "drip_edge_eave_rake_ft": 98.219,
+   "ridge_cap_ridge_ft": 42.094,
+   "ridge_cap_ridge_hip_ft": 42.094
+  },
+  "model": null,
+  "rounds": 0,
+  "usage": {
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  "skipped": "engine"
+ },
+ "confidence": 0.6,
+ "warnings": [],
+ "warning_codes": []
+}

@@ -36,6 +36,7 @@ class RoofEnvelopeTotals {
     required this.dripEdgeEaveRakeFt,
     required this.ridgeCapRidgeFt,
     required this.ridgeCapRidgeHipFt,
+    this.engine,
   });
 
   /// The totals computed from [m], used for a bare 0.1 model and for any key an envelope omits.
@@ -58,6 +59,7 @@ class RoofEnvelopeTotals {
       dripEdgeEaveRakeFt: v.dripEdgeEaveRakeFt,
       ridgeCapRidgeFt: v.ridgeCapRidgeFt,
       ridgeCapRidgeHipFt: v.ridgeCapRidgeHipFt,
+      engine: t.engine,
     );
   }
 
@@ -80,12 +82,17 @@ class RoofEnvelopeTotals {
       dripEdgeEaveRakeFt: n('drip_edge_eave_rake_ft', d.dripEdgeEaveRakeFt),
       ridgeCapRidgeFt: n('ridge_cap_ridge_ft', d.ridgeCapRidgeFt),
       ridgeCapRidgeHipFt: n('ridge_cap_ridge_hip_ft', d.ridgeCapRidgeHipFt),
+      engine: RoofEngineTotals.fromJson(j, path) ?? d.engine,
     );
   }
 
   final double areaSqft, squares, eaveFt, rakeFt, ridgeFt, hipFt, valleyFt, stepFlashingFt, predominantPitch;
   final int facets;
   final double dripEdgeEaveFt, dripEdgeEaveRakeFt, ridgeCapRidgeFt, ridgeCapRidgeHipFt;
+
+  /// The envelope 0.4 keys (flat and pitched roofing, roof-edge and wall-line numbers, complexity);
+  /// null when the envelope has none. Each field inside is nullable too.
+  final RoofEngineTotals? engine;
 
   /// The paired variants as a [RoofTotalsVariants].
   RoofTotalsVariants get variants => RoofTotalsVariants(
@@ -110,6 +117,7 @@ class RoofEnvelopeTotals {
         'drip_edge_eave_rake_ft': dripEdgeEaveRakeFt,
         'ridge_cap_ridge_ft': ridgeCapRidgeFt,
         'ridge_cap_ridge_hip_ft': ridgeCapRidgeHipFt,
+        ...?engine?.toJson(),
       };
 }
 
