@@ -199,6 +199,7 @@ def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[s
         "warnings": [], "debug": {}}
     diag = edge_diagnostics(res.facets, params)  # heights from the planes: no points here
     model["debug"]["coplanar_seams"] = diag["mergeable"]  # kept key: facets with no line between them
+    diag["seam_points_only"] = sum(1 for e in res.edges if e.type == "flat_seam")  # points show a step, the planes agree
     model["debug"]["edge_diagnostics"] = diag
     model["debug"]["area_check"] = priced_area_check(res)
     if res.diagnostics.get("priced_clip_error"):

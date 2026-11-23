@@ -35,6 +35,37 @@ def points_jump(q: np.ndarray, p0: np.ndarray, p1: np.ndarray) -> float | None:
     return abs(z_line[0] - z_line[1])
 
 
+# Seam rule constants (0.5.1). They are OUTSIDE the params hash: a retune MUST bump PIPELINE_VERSION (it keys the result cache).
+# The 0.3 m offset is the same quantity as ``EngineParams.level_change_m`` (a height difference that makes a level change); the
+# typer passes that value in, ``SEAM_LEVEL_M`` is only the default of a direct call.
+SEAM_STEP_M, SEAM_MIN_STATIONS = 0.5, 12  # stations along a flat/flat seam: at most this far apart, at least this many
+SEAM_LEVEL_M, SEAM_LEVEL_SHARE = 0.30, 0.70  # plane offset at or above this on at least this share of the stations
+
+
+def seam_offsets(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray) -> np.ndarray:
+    """The PLANE OFFSET d(p) = |zA(p) - zB(p)| (m) of the two facets' fitted planes (tilt included) at stations along the
+    seam p0-p1: at least ``SEAM_MIN_STATIONS`` of them, never more than ``SEAM_STEP_M`` apart (the typer absorbs seams under
+    1 m before this matters)."""
+    ln = float(np.hypot(*(p1 - p0)))
+    n = max(SEAM_MIN_STATIONS, int(np.ceil(ln / SEAM_STEP_M)) + 1)
+    pts = p0 + np.linspace(0.0, 1.0, n)[:, None] * (p1 - p0)
+    return np.array([abs(zat(fa.plane, x, y) - zat(fb.plane, x, y)) for x, y in pts])
+
+
+def seam_is_level(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, level_m: float | None = None) -> tuple[bool, float]:
+    """(is it a real step, median plane offset in m) for a seam between two FLAT facets. A real step has the two fitted
+    planes offset everywhere: ``level_change`` when the offset is at least ``level_m`` (``SEAM_LEVEL_M``) at
+    ``SEAM_LEVEL_SHARE`` of the stations; otherwise (a gently falling deck cut in flat pieces: the planes nearly meet at the
+    seam) ``flat_seam``. The points are not used: sampled jumps beside a tall wall are too noisy to judge a step by. A
+    non-finite station counts as "not offset"; a seam with no finite station is a flat seam with median 0."""
+    d = seam_offsets(fa, fb, p0, p1)
+    ok = np.isfinite(d)
+    if not ok.any():
+        return False, 0.0
+    lim = (SEAM_LEVEL_M if level_m is None else level_m) - 1e-9
+    return bool(((d >= lim) & ok).mean() >= SEAM_LEVEL_SHARE), float(np.median(d[ok]))
+
+
 def measured_jump(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, q: np.ndarray | None) -> float:
     """Height jump (m) across p0-p1: measured from the points (``points_jump``); when a side has too few points to
     measure, the gap between the two planes at the middle of the line."""

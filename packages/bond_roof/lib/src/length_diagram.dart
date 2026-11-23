@@ -23,6 +23,15 @@ bool isHoleOutlineEdge(RoofModel m, RoofEdge e) {
   return false;
 }
 
+/// A level change shows its length like every other edge ("24"); a jump of [levelChangeStepMinFt] or more
+/// is added ("24, 5 ft step").
+String _levelChangeText(RoofEdge e, RoofLabels labels) {
+  final len = wholeFeet(e.lengthFt);
+  final jump = e.jumpFt;
+  if (jump == null || !(jump >= levelChangeStepMinFt)) return len;
+  return RoofLabels.fill(labels.levelChangeStep, {'len': len, 'jump': '${wholeFeet(jump)} ${labels.unitFt}'});
+}
+
 /// Plan view with every edge coloured by type, a whole-foot label on each edge that has room,
 /// a legend of totals at the top (three columns wide, two compact), a compass rose and the
 /// rounding footer. All text comes from [labels]; [layout] picks the page geometry (the
@@ -68,7 +77,7 @@ class LengthDiagram {
     final legendTypes = [
       ...EdgeType.legacy,
       for (final t in EdgeType.values)
-        if (t.isNew04 && (m.edges.any((e) => e.type == t) || (m.totals.lengthsFt[t] ?? 0) > 0)) t,
+        if (t.isNew04 && t != EdgeType.flatSeam && (m.edges.any((e) => e.type == t) || (m.totals.lengthsFt[t] ?? 0) > 0)) t,
     ];
     final perCol = layout.legendRowsFor(legendTypes.length);
     var idx = 0;
@@ -118,7 +127,8 @@ class LengthDiagram {
     for (final f in m.facets) {
       final pts = fit.mapAll(f.polygon);
       regions.add(SceneRegion(id: f.id, pts: pts));
-      addFacetPrims(prims, f, pts, style, stroke: 0xFFE0E0E0, strokeWidth: 1, k: k);
+      addFacetPrims(prims, f, pts, style,
+          stroke: 0xFFE0E0E0, strokeWidth: 1, k: k, flatStroke: style.edgeColors[EdgeType.flatSeam], flatStrokeWidth: flatSeamStrokePx * k);
     }
     for (final h in m.holes) {
       prims.add(PolyPrim(
@@ -134,7 +144,7 @@ class LengthDiagram {
         a: segs[i].a,
         b: segs[i].b,
         color: style.colorOf(e.type),
-        width: style.strokeWidth * k * style.widthScaleOf(e.type),
+        width: e.type == EdgeType.flatSeam ? flatSeamStrokePx * k : style.strokeWidth * k * style.widthScaleOf(e.type),
         dashed: style.dashedTypes.contains(e.type),
       ));
     }
@@ -154,10 +164,9 @@ class LengthDiagram {
       // nor counted as hidden.
       if (onHole[i]) continue;
       final e = m.edges[i];
-      // A level change shows its jump (the step height) instead of its length.
-      final text = e.type == EdgeType.levelChange && e.jumpFt != null
-          ? RoofLabels.fill(labels.levelChangeJump, {'ft': feetInches(e.jumpFt!, labels: labels)})
-          : wholeFeet(e.lengthFt);
+      if (e.type == EdgeType.flatSeam) continue; // drawn thin, never labelled
+      // A level change shows its length, plus the step height when the jump is tall.
+      final text = e.type == EdgeType.levelChange ? _levelChangeText(e, labels) : wholeFeet(e.lengthFt);
       Obb? box;
       if (segs[i].length >= style.minLabelPx * k) {
         box = placer.placeAlong(segs[i], textWidth(text, size, bold: true), size, centroid,

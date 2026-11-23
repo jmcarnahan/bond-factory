@@ -184,7 +184,7 @@ def test_gate_files_encode_the_plan_and_heldout_differs_only_in_on_insufficient(
     assert len(tuning["gates"]) == 23 and not (GATES.parent / "gates.example.json").exists()
     strip = lambda spec: [{k: v for k, v in g.items() if k != "on_insufficient"} for g in spec["gates"]]
     assert strip(tuning) == strip(held) and tuning["compare"] == held["compare"]
-    assert [g.get("on_insufficient") for g in tuning["gates"] if "on_insufficient" in g] == ["skip"]
+    assert [g.get("on_insufficient") for g in tuning["gates"] if "on_insufficient" in g] == []  # too few houses fails everywhere
     assert [g.get("on_insufficient") for g in held["gates"] if "on_insufficient" in g] == ["fail"]
     byname = {g["name"][:2]: g for g in tuning["gates"]}
     assert byname["1 "]["value"] == 0.90 and byname["1 "]["where"] == ["parcel_match=exact", "density_pts_m2>=6", "flags!=derived_thin"]

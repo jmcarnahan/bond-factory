@@ -13,11 +13,18 @@ const _defaultEdgeColors = <EdgeType, int>{
   EdgeType.unspecified: 0xFF26A69A,
   EdgeType.flatEdge: 0xFF00838F,
   EdgeType.levelChange: 0xFF37474F,
+  EdgeType.flatSeam: 0xFF5A5A5A,
 };
 
 /// Stroke width factor per edge type (1.0 when absent): a level change is drawn heavier so it
 /// reads as a step, not as another edge.
 const _defaultEdgeWidth = <EdgeType, double>{EdgeType.levelChange: 1.8};
+
+/// Flat-roof seams are thin lines: 1.2 px at the 1600 px scene width (the base stroke is 3).
+const double flatSeamStrokePx = 1.2;
+
+/// A level change's label names the step only when the jump is at least this many feet.
+const double levelChangeStepMinFt = 3.0;
 
 const _defaultDashed = <EdgeType>{EdgeType.stepFlashing, EdgeType.wallFlashing};
 

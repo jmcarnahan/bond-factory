@@ -219,7 +219,7 @@ def engine_quality(res: Any, model: dict[str, Any], warning_codes: Iterable[str]
         "engine": "planes/1", "engine_params": res.params_hash, "verdict": q.verdict, "fit_covered": q.fit_covered, "fit_all": q.fit_all,
         "fit_clear": q.fit_clear, "tree_cover_pct": q.tree_cover_pct, "coverage": q.coverage, "supported_pct": q.supported_pct, "density_pts_m2": q.density,
         "parcel_match": q.parcel_match, "outline_source": q.outline_source, "overhang_scale": q.overhang_scale,
-        "outline_shift": q.outline_shift,
+        "outline_shift": q.outline_shift, "flat_share": q.flat_share,
         "plane_mismatch_pct": None if q.fit_covered is None else round(100.0 * (1.0 - q.fit_covered), 1),
         "outline_covered_pct": None if q.roof_cover_of_outline is None else round(min(100.0, 100.0 * q.roof_cover_of_outline), 1),
         "model_uncovered_pct": None if q.coverage is None else round(100.0 * (1.0 - q.coverage), 1),

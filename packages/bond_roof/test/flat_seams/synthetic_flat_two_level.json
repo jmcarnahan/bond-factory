@@ -1,0 +1,450 @@
+{
+ "contract": "bond.roof_model/0.2",
+ "pipeline_version": "0.5.1",
+ "method_used": "lidar_skeleton",
+ "footprint_source": "lariac",
+ "generated_at": "2026-11-22T12:00:00Z",
+ "model": {
+  "schema": "bond.roof_model/0.2",
+  "address": {
+   "line1": "2 Example Way",
+   "city": "Testville",
+   "state": "CA",
+   "zip": "90000",
+   "formatted": "2 Example Way, Testville, CA 90000"
+  },
+  "source": {
+   "method": "lidar_skeleton",
+   "building": {
+    "parcel_id": "0000000000",
+    "outline_id": "B-0001",
+    "outline_centroid": [
+     34.0000001,
+     -118.0000001
+    ],
+    "chosen_by": "auto"
+   }
+  },
+  "blocks": [],
+  "facets": [
+   {
+    "id": "f1",
+    "block": "b1",
+    "kind": "flat",
+    "polygon": [
+     [
+      0,
+      0
+     ],
+     [
+      30,
+      0
+     ],
+     [
+      30,
+      34
+     ],
+     [
+      0,
+      34
+     ]
+    ],
+    "pitch_rise": 0.0,
+    "aspect_deg": null,
+    "plan_area_sqft": 1020.0,
+    "area_sqft": 1020.0,
+    "roof_type": "flat",
+    "pitch_fit": 0.2,
+    "pitch_sigma": 0.15,
+    "borderline": false,
+    "supported_pct": 91.0,
+    "points": 4200,
+    "rms_ft": 0.05,
+    "plane_eq": [
+     0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "id": "f2",
+    "block": "b2",
+    "kind": "flat",
+    "polygon": [
+     [
+      30,
+      0
+     ],
+     [
+      60,
+      0
+     ],
+     [
+      60,
+      34
+     ],
+     [
+      30,
+      34
+     ]
+    ],
+    "pitch_rise": 0.0,
+    "aspect_deg": null,
+    "plan_area_sqft": 1020.0,
+    "area_sqft": 1020.0,
+    "roof_type": "flat",
+    "pitch_fit": 0.2,
+    "pitch_sigma": 0.15,
+    "borderline": false,
+    "supported_pct": 91.0,
+    "points": 4200,
+    "rms_ft": 0.05,
+    "plane_eq": [
+     0,
+     0.0,
+     -5.0
+    ]
+   },
+   {
+    "id": "f3",
+    "block": "b3",
+    "kind": "flat",
+    "polygon": [
+     [
+      60,
+      0
+     ],
+     [
+      90,
+      0
+     ],
+     [
+      90,
+      34
+     ],
+     [
+      60,
+      34
+     ]
+    ],
+    "pitch_rise": 0.0,
+    "aspect_deg": null,
+    "plan_area_sqft": 1020.0,
+    "area_sqft": 1020.0,
+    "roof_type": "flat",
+    "pitch_fit": 0.2,
+    "pitch_sigma": 0.15,
+    "borderline": false,
+    "supported_pct": 91.0,
+    "points": 4200,
+    "rms_ft": 0.05,
+    "plane_eq": [
+     0,
+     0.0,
+     -6.5
+    ]
+   }
+  ],
+  "edges": [
+   {
+    "id": "e1",
+    "type": "level_change",
+    "points": [
+     [
+      30,
+      0
+     ],
+     [
+      30,
+      24
+     ]
+    ],
+    "length_ft": 24.0,
+    "facets": [
+     "f1",
+     "f2"
+    ],
+    "jump_ft": 5.0
+   },
+   {
+    "id": "e2",
+    "type": "flat_seam",
+    "points": [
+     [
+      30,
+      24
+     ],
+     [
+      30,
+      34
+     ]
+    ],
+    "length_ft": 10.0,
+    "facets": [
+     "f1",
+     "f2"
+    ]
+   },
+   {
+    "id": "e3",
+    "type": "level_change",
+    "points": [
+     [
+      60,
+      0
+     ],
+     [
+      60,
+      10
+     ]
+    ],
+    "length_ft": 10.0,
+    "facets": [
+     "f2",
+     "f3"
+    ],
+    "jump_ft": 1.5
+   },
+   {
+    "id": "e4",
+    "type": "flat_seam",
+    "points": [
+     [
+      60,
+      10
+     ],
+     [
+      60,
+      34
+     ]
+    ],
+    "length_ft": 24.0,
+    "facets": [
+     "f2",
+     "f3"
+    ]
+   },
+   {
+    "id": "e5",
+    "type": "flat_edge",
+    "points": [
+     [
+      0,
+      0
+     ],
+     [
+      30,
+      0
+     ]
+    ],
+    "length_ft": 30.0,
+    "facets": [
+     "f1"
+    ]
+   },
+   {
+    "id": "e6",
+    "type": "flat_edge",
+    "points": [
+     [
+      0,
+      34
+     ],
+     [
+      30,
+      34
+     ]
+    ],
+    "length_ft": 30.0,
+    "facets": [
+     "f1"
+    ]
+   },
+   {
+    "id": "e7",
+    "type": "flat_edge",
+    "points": [
+     [
+      30,
+      0
+     ],
+     [
+      60,
+      0
+     ]
+    ],
+    "length_ft": 30.0,
+    "facets": [
+     "f2"
+    ]
+   },
+   {
+    "id": "e8",
+    "type": "flat_edge",
+    "points": [
+     [
+      30,
+      34
+     ],
+     [
+      60,
+      34
+     ]
+    ],
+    "length_ft": 30.0,
+    "facets": [
+     "f2"
+    ]
+   },
+   {
+    "id": "e9",
+    "type": "flat_edge",
+    "points": [
+     [
+      60,
+      0
+     ],
+     [
+      90,
+      0
+     ]
+    ],
+    "length_ft": 30.0,
+    "facets": [
+     "f3"
+    ]
+   },
+   {
+    "id": "e10",
+    "type": "flat_edge",
+    "points": [
+     [
+      60,
+      34
+     ],
+     [
+      90,
+      34
+     ]
+    ],
+    "length_ft": 30.0,
+    "facets": [
+     "f3"
+    ]
+   },
+   {
+    "id": "e11",
+    "type": "flat_edge",
+    "points": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      34
+     ]
+    ],
+    "length_ft": 34.0,
+    "facets": [
+     "f1"
+    ]
+   },
+   {
+    "id": "e12",
+    "type": "flat_edge",
+    "points": [
+     [
+      90,
+      0
+     ],
+     [
+      90,
+      34
+     ]
+    ],
+    "length_ft": 34.0,
+    "facets": [
+     "f3"
+    ]
+   }
+  ],
+  "holes": [],
+  "totals": {
+   "total_area_sqft": 3060.0,
+   "pitched_area_sqft": 0.0,
+   "flat_area_sqft": 3060.0,
+   "predominant_pitch_rise": 0.0,
+   "predominant_pitch_area_sqft": 3060.0,
+   "squares": 30.6,
+   "lengths_ft": {
+    "eave": 0.0,
+    "rake": 0.0,
+    "ridge": 0.0,
+    "hip": 0.0,
+    "valley": 0.0,
+    "step_flashing": 0.0,
+    "wall_flashing": 0.0,
+    "parapet": 0.0,
+    "transition": 0.0,
+    "unspecified": 0.0,
+    "flat_edge": 248.0,
+    "level_change": 34.0
+   },
+   "roofing_pitched_sqft": 0.0,
+   "roofing_flat_sqft": 3060.0
+  },
+  "confidence": {
+   "overall": "medium",
+   "notes": [
+    "synthetic example for tests"
+   ]
+  },
+  "warnings": [
+   "low_slope_confirm"
+  ],
+  "quality": {
+   "engine": "planes/1",
+   "fit_covered": 0.9,
+   "fit_all": 0.82,
+   "coverage": 0.93,
+   "supported_pct": 90.0,
+   "density_pts_m2": 9.5,
+   "parcel_match": "exact",
+   "outline_source": "county",
+   "overhang_scale": 0.5,
+   "verdict": "ok"
+  }
+ },
+ "totals": {
+  "total_area_sqft": 3060.0,
+  "pitched_area_sqft": 0.0,
+  "flat_area_sqft": 3060.0,
+  "predominant_pitch_rise": 0.0,
+  "predominant_pitch_area_sqft": 3060.0,
+  "squares": 30.6,
+  "lengths_ft": {
+   "eave": 0.0,
+   "rake": 0.0,
+   "ridge": 0.0,
+   "hip": 0.0,
+   "valley": 0.0,
+   "step_flashing": 0.0,
+   "wall_flashing": 0.0,
+   "parapet": 0.0,
+   "transition": 0.0,
+   "unspecified": 0.0,
+   "flat_edge": 248.0,
+   "level_change": 34.0
+  },
+  "roofing_pitched_sqft": 0.0,
+  "roofing_flat_sqft": 3060.0
+ },
+ "verification": {
+  "verdict": "unverified",
+  "notes": [],
+  "adjustments": [],
+  "model": null
+ },
+ "confidence": 0.7
+}

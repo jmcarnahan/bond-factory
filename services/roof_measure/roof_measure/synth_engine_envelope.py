@@ -42,7 +42,9 @@ def engine_envelope() -> dict[str, Any]:
                   "density_per_m2": 8.0, "ground_z_m": 0.0, "epsg": EPSG}
     fpinfo = {"source": "lariac", "warnings": [], "codes": [], "other_buildings": 0, "match": "exact",
               "building": {"parcel_id": "SYNTH-P1", "outline_id": "SYNTH-B1", "outline_centroid": [0.0, 0.0],
-                           "chosen_by": "auto"}}
+                           "chosen_by": "auto"},
+              "nearby_buildings": [{"outline_id": "SYNTH-B2", "area_sqft": 420.0, "distance_m": 14.2, "on_matched_parcel": True},
+                                   {"outline_id": "SYNTH-B3", "area_sqft": 1180.0, "distance_m": 41.0, "on_matched_parcel": False}]}
     with tempfile.TemporaryDirectory() as tmp:
         env = build_result(res, rp.ground_z, lidar_meta, base, fpinfo, Path(tmp), "synthetic").envelope
     env["generated_at"] = env["model"]["generated_at"] = STAMP

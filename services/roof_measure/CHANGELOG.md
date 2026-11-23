@@ -1,5 +1,37 @@
 # roof_measure changelog
 
+## 0.5.1 (pipeline version; flat roofs read right, nearby buildings; contract in ../../docs/contract-0.4.md)
+
+`PIPELINE_VERSION` 0.5.0 to 0.5.1 (keys the result cache: cached results are recomputed). Additive: one new edge type, two new
+keys, one changed county query. A pitched roof's measurement is unchanged; the examples in `fixtures/` differ in the version
+string and the new keys only.
+
+- **New edge type `flat_seam`.** A seam between two FLAT facets stays a `level_change` only when the two facets' fitted planes
+  (tilt included) are at least 0.3 m apart at 70% of the stations along it (at least 12, at most 0.5 m apart; 3 under 1 m); its
+  `jump_ft` is the median offset. Otherwise it is a `flat_seam`: drawn, no `jump_ft`, never priced, length in no total
+  (`model.totals.lengths_ft` and `level_change_ft` leave it out). Sampled jumps were tried first and rejected: beside a tall wall
+  they swing (a straight 3.5 m step read 0.6 to 2.7 m) and deleted most real steps. Tuning numbers: 289 distinct flat/flat
+  candidates, 224 (2587 ft) stay level changes, 65 (529 ft) become flat seams; no seam with a median plane offset over 0.6 m is lost.
+  A gently falling lower deck that the partition cut into flat pieces no longer produces 1-3 ft "steps". The thresholds are
+  module constants in `edge_measure.py` (the 0.3 m is `EngineParams.level_change_m`); a retune must bump `PIPELINE_VERSION` (`keys.py:30` keys the cache). The drawn and the priced pass share one verdict per seam. `model.debug.edge_diagnostics.seam_points_only` counts flat seams. 48 of 160 tuning houses change, only in
+  `level_change` / `flat_seam` lengths (and `jump_m` of level changes between flat facets). `model.UNPRICED_EDGE_TYPES` /
+  `VALID_EDGE_TYPES` carry the type (an absorbed stub in `absorbed_level_changes` now has a `type`) (`EDGE_TYPES` stays the twelve length keys); `validate` and `_totals` skip it in the length sums.
+- **New `model.quality.flat_share`** (0..1, UNROUNDED so a reader's `>= 0.90` line is exact): flat priced area over the total priced area. For readers that want a different
+  "good" rule for flat roofs (their `fit_all` runs lower).
+- **Adopter note:** a reader without `flat_seam` support (bond_roof before this release) shows an unknown edge type as `unspecified`, labelled and counted; adopt library 0.5.1 and the bond_roof that knows `flat_seam` together.
+- **New `envelope.nearby_buildings`** (county footprints): `[{outline_id, area_sqft, distance_m, on_matched_parcel}]`, up to 8,
+  nearest first, within 60 m of the lookup point, the measured building left out. No new network request in the normal case: the county outline
+  query now asks for the parcel grown by 60 m (was: the parcel; the buffer grows from the parcel, not the point); at the layer's record cap it is repeated for the parcel alone and no neighbours are listed, and the parcel rule is applied to the rows as before.
+  `Footprint.nearby`; absent for other sources.
+- Synthetic flat roofs for the tests: `synth_points.flat_two_level` and `flat_step` (not in `SHAPES`: the synthetic gate is unchanged).
+- Tests changed on purpose: the `0.5.0` version assertions (`test_fixtures_0_2`, `test_envelope_quality`, `test_pipeline_engine`)
+  now say 0.5.1; `test_building_selection::test_a_pin_in_the_neighbour_parcel_measures_that_parcels_building` fed the outline query
+  the parcel's rings and picked the answer by them; the query now covers the parcel plus 60 m, so the fake returns both outlines
+  (the assertions about the chosen building are unchanged, one about `nearby` is added). The fixtures and the embedded example
+  in `docs/contract-0.2.md` carry the new version string. `test_engine_edges::test_a_real_jump_is_a_level_change_whatever_the_planes_say_at_the_line`
+  (renamed `..._when_the_planes_show_it_too`) and `test_two_flat_facets_with_no_verified_jump_are_one_membrane_whatever_their_tilt`
+  had flat facets with equal planes over points 0.8 m apart; a flat/flat step now needs the fitted planes apart too, so the planes follow the points.
+
 ## 0.5.0 (pipeline version; the plane engine, contract in ../../docs/contract-0.4.md)
 
 `PIPELINE_VERSION` 0.4.0 to 0.5.0 (changes since 0.4.0, released as 0.5.0; the 0.4.1 section below was only a working label for the preparation and was never released) (keys the result cache: cached results are recomputed; the service's cache key also takes

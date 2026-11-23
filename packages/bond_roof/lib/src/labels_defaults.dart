@@ -13,6 +13,7 @@ const Map<String, String> roofLabelDefaults = {
   'legend_unspecified': 'Unspecified',
   'legend_flat_edge': 'Flat roof edges',
   'legend_level_change': 'Level changes',
+  'legend_flat_seam': 'Flat roof seams',
   // Diagram titles and captions.
   'length_title': 'Roof length diagram',
   'length_caption': 'Length diagram',
@@ -41,6 +42,8 @@ const Map<String, String> roofLabelDefaults = {
   // Envelope 0.4: flat and pitched roofing, low slope marker, level change. {ft} is a feet-and-inches length.
   'low_slope_marker': 'Low slope',
   'level_change_jump': 'Step {ft}',
+  // A level change's label: its length, then the jump when it is 3 ft or more. {len} is the bare whole-feet length like every edge label, {jump} the step with its unit, e.g. "24, 5 ft step".
+  'level_change_step': '{len}, {jump} step',
   'totals_roofing_pitched': 'Pitched roofing',
   'totals_roofing_flat': 'Flat roofing',
   'totals_low_slope_confirm': 'Low slope, confirm',

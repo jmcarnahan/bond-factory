@@ -196,6 +196,9 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     facets, edges, tot, o_p = facets_stage(run, best, q, o, theta)
     t = run.tick("facets", t)
     quality_ = quality_stage(run, facets, o, crop, plab)
+    flat_sq, pitched_sq = tot.get("roofing_flat_sqft"), tot.get("roofing_pitched_sqft")
+    if flat_sq is not None and pitched_sq is not None and flat_sq + pitched_sq > 0:  # the PRICED split (0.5.1)
+        quality_.flat_share = flat_sq / (flat_sq + pitched_sq)  # UNROUNDED: round(0.8996, 3) would cross a 0.90 line
     res = assemble(run, facets, edges, tot, o, o_p, best, q, best.qlab, quality_)
     run.tick("finish", t)
     return res, stages

@@ -108,7 +108,7 @@ class Facet:
 class Edge:
     """A typed edge between two facets (or a facet and the outside); p0, p1 are (x, y, z) in metres."""
 
-    type: str  # eave rake ridge hip valley flat_edge level_change transition (and "step" inside the engine)
+    type: str  # eave rake ridge hip valley flat_edge level_change flat_seam transition (and "step" inside the engine)
     p0: tuple[float, float, float]
     p1: tuple[float, float, float]
     length_ft: float
@@ -138,6 +138,7 @@ class Quality:
     tree_contact_pct: float | None = None
     fit_clear: float | None = None  # fit_all with canopy (returns well above the surface) left out: REPORTED only, poor_fit tests fit_all
     tree_cover_pct: float | None = None  # share of the roof returns that are canopy above the surface
+    flat_share: float | None = None  # flat (under 2/12) priced area / total priced area, 0..1 (0.5.1)
     error: str | None = None
     brief: bool = False  # a refusal: only the density, the reason and the verdict are reported
 
@@ -154,7 +155,8 @@ class Quality:
                 "overhang_scale": self.overhang_scale, "roof_cover_of_outline": self.roof_cover_of_outline,
                 "extra_roof_ring_ratio": self.extra_roof_ring_ratio, "tree_contact_pct": self.tree_contact_pct,
                 "fit_clear": self.fit_clear, "tree_cover_pct": self.tree_cover_pct,
-                "outline_shift": self.outline_shift, "reasons": list(self.reasons), "verdict": self.verdict}
+                "outline_shift": self.outline_shift, "reasons": list(self.reasons), "verdict": self.verdict,
+                "flat_share": self.flat_share}
 
 
 @dataclass

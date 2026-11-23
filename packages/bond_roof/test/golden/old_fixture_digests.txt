@@ -37,7 +37,7 @@ synthetic_hip json 488ce08d06547135
 synthetic_hip_zigzag ReportLayout.wide len 7d713502d6469dd7 area 176f965e5939d142 sum 42fa27c0769bd85c
 synthetic_hip_zigzag ReportLayout.compact len 6228276c6ac71dd8 area 6f09c586290445de sum 6ff3ccc2b80432de
 synthetic_hip_zigzag json f841d613b5536ff
-roof_measurement_0.2_adjusted env 4014a287ecb6fc01
-roof_measurement_0.2_fail env 71e88cf3131ff334
-roof_measurement_0.2_pass env 3a4ebb8a253c21f5
-roof_measurement_0.2_unverified env 483072c633af655c
+roof_measurement_0.2_adjusted env 2dca6ae7fccf5fe4
+roof_measurement_0.2_fail env 5a11cdd79f01c23f
+roof_measurement_0.2_pass env 7ce0bd9b25596e0e
+roof_measurement_0.2_unverified env 2f67b92498bd47f1

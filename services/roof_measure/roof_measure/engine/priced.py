@@ -42,7 +42,7 @@ def priced_clip(facets: list[Facet], edges: list[Edge], outline: Polygon, q: np.
             g_ = max(parts, key=lambda g: g.area)
             cosv = 1.0 / math.sqrt(1 + (f.pitch_rise / 12.0) ** 2)
             out.append(replace(f, polygon=g_, plan_area_sqft=g_.area * SQM2SQFT, area_sqft=g_.area * SQM2SQFT / cosv))
-        return out, build_edges(out, q if jump_pts is None else jump_pts, ctx), clip
+        return out, build_edges(out, q if jump_pts is None else jump_pts, ctx, reuse_verdicts=True), clip
     except EngineTimeout:
         raise
     except Exception as ex:  # noqa: BLE001 - the drawn result stands; the failure is reported, not raised

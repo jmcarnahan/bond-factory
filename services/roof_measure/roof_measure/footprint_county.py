@@ -36,6 +36,8 @@ BUILDING_URL = ("https://services.arcgis.com/RmCCgQtiZLDCtblq/arcgis/rest/servic
 # The parcel layer covers LA County only: elsewhere skip the call (a county outage must not cost a national address time).
 LA_BBOX = (33.7, 34.83, -118.95, -117.65)  # lat min/max, lng min/max
 MIN_PARCEL_OVERLAP = 0.5  # a building counts for a parcel when at least this share of it lies inside
+NEARBY_RADIUS_M = 60.0  # buildings this close to the lookup point are reported as ``nearby`` (the parcel query's own radius)
+NEARBY_MAX = 8
 
 Note = tuple[str, str]  # (warning code, text)
 
@@ -151,6 +153,25 @@ def _outline_lookup(outline_id: str) -> Polygon | None:
     return None
 
 
+def _nearby(scored: list[tuple], ok: list[tuple], chosen: tuple, lookup_m: Point) -> list[dict]:
+    """The other county outlines within ``NEARBY_RADIUS_M`` of the lookup point, nearest first, at most ``NEARBY_MAX``:
+    ``{"outline_id", "area_sqft", "distance_m", "on_matched_parcel"}``. An outline with no layer id is left out (it
+    cannot be named in a later request). ``distance_m`` runs from the lookup point to the outline (0 inside it)."""
+    out = []
+    seen = {_real_id(chosen[2])}  # a building split across tiles comes back twice: one row per id
+    for t in scored:
+        if t is chosen or _real_id(t[2]) is None or _real_id(t[2]) in seen:
+            continue
+        seen.add(_real_id(t[2]))
+        d = float(t[4].distance(lookup_m))
+        if d <= NEARBY_RADIUS_M:
+            info = _building_info(t[2], t[3])
+            out.append({"outline_id": info["id"], "area_sqft": round(float(info["area_sqft"]), 1),
+                        "distance_m": round(d, 1), "on_matched_parcel": any(t is o for o in ok)})
+    out.sort(key=lambda r: (r["distance_m"], r["outline_id"]))
+    return out[:NEARBY_MAX]
+
+
 def _choose_outline(ok: list[tuple], point_m: Point | None) -> tuple:
     """The outline on the parcel for the caller's point: the one containing it, else the nearest, else the largest.
 
@@ -216,20 +237,36 @@ def fetch_county(lat: float, lng: float, address: Address, *, point_given: bool 
                 f"{parcel['properties'].get('SitusAddress')} ({match} match).")
         warnings.append(("parcel_street_match", text))
     parcel_poly = as_polygon(parcel["geometry"])
+    c = parcel_poly.centroid
+    epsg = utm_epsg_for(c.x, c.y)
+    parcel_m = project_geometry(parcel_poly, 4326, epsg)
+    # WHY the parcel grown by the radius: ONE request answers both "which buildings are on the parcel" and "which
+    # others stand within the radius of the point" (``nearby_buildings``, 0.5.1); a second query would cost a round trip
+    # per measurement. The parcel rule below (overlap with the parcel) is applied to every row exactly as before.
+    reach = project_geometry(parcel_m.buffer(NEARBY_RADIUS_M, 4).simplify(0.5), epsg, 4326)
+    ring = list(reach.exterior.coords)
+    if reach.exterior.is_ccw != parcel_poly.exterior.is_ccw:  # the winding the parcel's own ring had (the layer accepts it)
+        ring.reverse()
     bq = {"f": "geojson", "inSR": 4326, "spatialRel": "esriSpatialRelIntersects", "outFields": "*",
           "outSR": 4326, "returnGeometry": "true", "geometryType": "esriGeometryPolygon",
-          "geometry": json.dumps({"rings": _esri_rings(parcel_poly), "spatialReference": {"wkid": 4326}})}
+          "geometry": json.dumps({"rings": [[list(p) for p in ring]], "spatialReference": {"wkid": 4326}})}
     try:
-        feats = cache.fetch_json(BUILDING_URL, method="POST", data=bq, check=_arcgis_check).get("features", [])
+        resp = cache.fetch_json(BUILDING_URL, method="POST", data=bq, check=_arcgis_check)
+        capped = bool(resp.get("exceededTransferLimit") or (resp.get("properties") or {}).get("exceededTransferLimit"))
+        if capped:  # the widened query hit the layer's record cap: answer from the parcel alone, list no neighbours
+            log.info("LA County building query exceeded the transfer limit; parcel-only query")
+            bq["geometry"] = json.dumps({"rings": _esri_rings(parcel_poly), "spatialReference": {"wkid": 4326}})
+            resp = cache.fetch_json(BUILDING_URL, method="POST", data=bq, check=_arcgis_check)
+        feats = resp.get("features", [])
     except cache.NET_ERRORS as e:
         log.info("LA County building query failed: %s", cache.describe_error(e))
         text = (f"The LA County building layer could not be queried ({cache.describe_error(e)}); "
                 "footprint taken from another source.")
         return None, [*warnings, ("source_unreachable", text)], "LA County building layer unreachable"
-    c = parcel_poly.centroid
-    epsg = utm_epsg_for(c.x, c.y)
-    parcel_m = project_geometry(parcel_poly, 4326, epsg)
-    point_m = project_geometry(Point(lng, lat), 4326, epsg) if point_given else None
+    if capped:
+        warnings.append(("other", "Buildings near the parcel were not listed: the county layer returned too many outlines."))
+    lookup_m = project_geometry(Point(lng, lat), 4326, epsg)
+    point_m = lookup_m if point_given else None
     scored = []
     for f in feats:
         if not f.get("geometry"):
@@ -268,6 +305,7 @@ def fetch_county(lat: float, lng: float, address: Address, *, point_given: bool 
         area_sqft=float(area) if area else area_sqft(main),
         parcel_id=str(parcel["properties"].get("AIN")) if parcel["properties"].get("AIN") else None,
         other_buildings=[t[3] for t in ok[1:]], match=match, source="lariac",
+        nearby=[] if capped else _nearby(scored, ok, ok[0], lookup_m),
         other_info=[_building_info(t[2], t[3]) for t in ok[1:]])
     if not _real_id(main_f):
         warnings.append(("other", "The county outline has no id; a geometry-based id was used, so it cannot be named later."))

@@ -36,9 +36,9 @@ the ones drawn.
 
 - Draw nothing yourself for flat roofs: a facet with `roofType == 'flat'` is hatched by the scenes, a `borderline` one is outlined
   in orange (area diagram: a third line from the `low_slope_marker` label, when it fits). All text comes from `RoofLabels`; pass your
-  translations for the new keys (`low_slope_marker`, `level_change_jump`, `legend_flat_edge`, `legend_level_change`,
+  translations for the new keys (`low_slope_marker`, `level_change_jump`, `legend_flat_edge`, `legend_level_change`, `legend_flat_seam`, `level_change_step`,
   `totals_roofing_pitched`, `totals_roofing_flat`, `totals_low_slope_confirm`).
-- `lengthsFt` has twelve entries now. Code that switches over `EdgeType` must handle `flatEdge` and `levelChange`; use
+- `lengthsFt` has thirteen entries now. Code that switches over `EdgeType` must handle `flatEdge`, `levelChange` and `flatSeam`; use
   `EdgeType.legacy` for "the ten old ones".
 - Prices come from the envelope totals (`engine.planesSurfaceAreaSqft` etc.), not from the model facets.
 - A user's flat / pitched correction is the host's business: tap a facet (see `bond_roof_ui`), show inline controls, send the change

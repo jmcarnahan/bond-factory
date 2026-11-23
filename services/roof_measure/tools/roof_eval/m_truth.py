@@ -130,6 +130,15 @@ def merge_tier(items: list[dict[str, Any]]) -> dict[str, float]:
     return out
 
 
+def t2_confidence(files: list[dict[str, Any]]) -> str | None:
+    """The label confidence of a house's T2 truth: ``medium`` if any T2 file says medium, ``high`` if all valued files say
+    high, None when no T2 file carries a confidence of high or medium (older labels): such houses count in "all" only."""
+    cs = [f.get("confidence") for f in files if f.get("tier") == "T2" and f.get("confidence") in ("high", "medium")]
+    if not cs:
+        return None
+    return "medium" if "medium" in cs else "high"
+
+
 def t3_aggregate(rows: list[dict[str, Any]], key: str = "ratio") -> dict[str, Any] | None:
     """The T3 aggregate over per-house records (``key`` "ratio" = priced, "ratio_drawn" = drawn): median of result/contractor squares with a bootstrap 90% interval.
     Only T3 files whose confidence is medium or high count, one ratio per house; never a per-house verdict."""

@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- Flat seams (roof_measure 0.5.1): `EdgeType.flatSeam` (`flat_seam`), a seam between two flat sections at one level. Drawn
+  as a thin dark line (1.2 px, `0xFF5A5A5A`), never labelled, never in the legend, `lengths_ft` or the edge total
+  (`RoofTotals.recompute` skips it). Flat-typed facets are outlined in the same stroke on the length diagram (was light grey,
+  1 px); other facets draw as before, and every 0.2 and 0.3 envelope draws as before; a 0.4 envelope's flat facets gain the seam-coloured outline. BREAKING only for hosts that `switch` over `EdgeType` without a
+  default.
+- A `level_change` edge is labelled with its length like every other edge ("24"), plus the step when the jump is 3 ft or
+  more ("24, 5 ft step"). The old label that replaced the length with "Step <jump>" is gone; its key `level_change_jump`
+  stays for adopters but is no longer used. New `RoofLabels` keys `legend_flat_seam` and `level_change_step` (93 keys now).
 - Envelope 0.4 (`docs/contract-0.4.md`), additive: old 0.2 and 0.3 envelopes parse, write back and draw exactly as before
   (scene digests of every shipped fixture are identical to the previous commit).
   - BREAKING for hosts that `switch` over `EdgeType` without a default (it has two more values) and for code that assumes

@@ -8,7 +8,7 @@ codes and the engine's verdict names. A reader that ignores unknown keys needs n
 the keys: **a missing key means "not available", never "checked and fine"**.
 
 Status column: **now** = emitted for every county result since `0.5.0`, whatever the engine; **engine** = emitted when the result was measured
-with `engine="planes"` (see "Choosing the engine"). Every key in this document is emitted by `0.5.0`.
+with `engine="planes"` (see "Choosing the engine"). Every key in this document is emitted by `0.5.0`, except the ones marked `0.5.1` (`flat_seam`, `model.quality.flat_share`, `nearby_buildings`).
 
 ## Choosing the engine
 
@@ -20,7 +20,7 @@ pitched told apart at 2/12, the totals and quality below. It needs live LiDAR an
 (`lidar_too_sparse` under 4 points/m2 on the roof, `no_footprint`, `timeout`, `measurement_failed`) and decides. The result
 carries `method_used` `lidar_skeleton` (a validated name; renamed deliberately in a later release) and
 `model.quality.engine` `"planes/1"`. `include_other_buildings` measures the other buildings with the same engine. The
-service's result cache key includes the engine (and `PIPELINE_VERSION` 0.5.0).
+service's result cache key includes the engine (and `PIPELINE_VERSION` 0.5.1).
 
 Verification on an engine result: the LLM verifier never runs (not for any `verify` value, not with a key present).
 `verification` is the usual shape with `verdict` `"unverified"`, `rounds` 0, zero usage and the extra key
@@ -78,11 +78,16 @@ MEASURED roof edge (overhang scale 1.0 on county wall-line outlines, 0.25 on oth
 `model.blocks[]` are one `shed` (or `flat`) block per facet, as for any model built from planes.
 
 Edge types: the closed list of ten (`eave rake ridge hip valley step_flashing wall_flashing parapet transition
-unspecified`) gains exactly `flat_edge` (perimeter of a flat facet) and `level_change` (a height jump of 0.3 m or more
-between facets, MEASURED FROM THE POINTS on both sides, not from the planes; the edge carries `jump_ft`, runs at the lower
-roof's height and has both facets). `model.totals.lengths_ft` always has the ten 0.2 keys and gains `flat_edge` and
-`level_change` for an engine model (a model without them reads as zero; any other key is invalid). `step_flashing` and
-`wall_flashing` keep their wall meaning and the engine does not emit them.
+unspecified`) gains `flat_edge` (perimeter of a flat facet) and `level_change` (a height jump of 0.3 m or more
+between facets; the edge carries `jump_ft`, runs at the lower roof's height and has both facets). The jump is MEASURED FROM
+THE POINTS on both sides, except between two FLAT facets (0.5.1): there the points only nominate the seam and the fitted
+PLANES decide (below), and `jump_ft` is the median offset of the planes. `model.totals.lengths_ft` always has the ten 0.2 keys
+and gains `flat_edge` and `level_change` for an engine model (a model without them reads as zero; `flat_seam` never appears
+in it; any other key is invalid). `step_flashing` and
+`wall_flashing` keep their wall meaning and the engine does not emit them. 0.5.1 adds one more type, `flat_seam`
+(below), which belongs to no total. ADOPTER NOTE: a reader without `flat_seam` support (bond_roof before 0.5.1 support) maps
+an unknown edge type to `unspecified`, draws and labels it and counts its length; library 0.5.1 and a bond_roof that knows
+`flat_seam` must be adopted together.
 
 How the engine types an edge (one typer, `roof_measure/engine/edges.py`; lengths are 3D feet, collinear pieces of one
 type between the same facets are one edge):
@@ -94,6 +99,8 @@ type between the same facets are one edge):
 | outline of a pitched facet, along its slope | `rake` |
 | outline of a pitched facet, level, at the top of its slope (a shed or lean-to side) | `rake` with `high_edge: true`; never a `ridge` |
 | two facets, jump from points 0.3 m or more | `level_change` (+ `jump_ft`), unless it is a stub (below) |
+| two flat facets (under 2/12), jump from points 0.3 m or more, AND the two facets' fitted planes at least 0.3 m apart at 70% of the stations along the seam (at least 12, never more than 0.5 m apart) | `level_change` (+ `jump_ft` = the median plane offset) |
+| two flat facets, a measured jump but the fitted planes nearly meet at the seam (a gently falling deck cut in flat pieces, or the deck's own roughness) | `flat_seam` (0.5.1): drawn, never priced, in no total |
 | two flat facets (under 2/12), no verified jump | no edge: one membrane in two pieces |
 | two facets, both fall away from the shared line | `ridge` (level) or `hip` |
 | two facets, both rise towards it | `valley` |
@@ -103,10 +110,42 @@ type between the same facets are one edge):
 | coplanar facets, or two flat facets with no verified jump | no edge (listed in `model.debug.coplanar_seams`: they should have been merged) |
 
 A `level_change` shorter than 1.0 m, or under 0.45 m high and shorter than 2 m, is clutter: it is not drawn as an edge
-(the neighbouring chains carry on) and is listed in `model.debug.edge_diagnostics.absorbed_level_changes`. Everything the
+(the neighbouring chains carry on) and is listed in `model.debug.edge_diagnostics.absorbed_level_changes` (each entry has a `type`, `level_change` or `flat_seam`: a short flat seam is absorbed the same way). Everything the
 typer left out is in `model.debug.edge_diagnostics`: `mergeable`, `kinks`, `small_flat`, `absorbed_level_changes`.
 
 `model.edges[]` entries may carry `jump_ft` (`level_change` only) and `high_edge` (`true`, outline `rake` only).
+
+`flat_seam` (0.5.1, a new edge type): the seam between two FLAT facets where the points show a height difference but it is
+not a step. The test uses the two facets' FITTED planes (tilt included), not sampled jumps (the points beside a tall wall are
+too noisy: on real roofs a straight 3.5 m step sampled 0.6 to 2.7 m). At stations along the seam (at least 12, never more than
+0.5 m apart) the plane offset d = |zA - zB| is taken; the seam is a `level_change` when d is at least
+0.3 m at 70% of the stations (`jump_ft` is the median d) and a `flat_seam` otherwise. A real step has planes offset everywhere;
+a sloped deck cut into flat pieces has planes that nearly meet at the seam. A `flat_seam` is a drawn line for the diagram (thin,
+dark, no label) and nothing else (`model.debug.edge_diagnostics.seam_points_only` counts them; a short one is listed in
+`absorbed_level_changes` like a short level change): it carries no `jump_ft`, its length is in no total (`model.totals.lengths_ft` has no
+`flat_seam` key, `level_change_ft` does not count it) and the cost sheet must not price it. The constants live in `engine/edge_measure.py` (the 0.3 m is `EngineParams.level_change_m`); a retune must bump `PIPELINE_VERSION`,
+which keys the result cache (`keys.py:30`). The two passes (drawn, priced) give one verdict per seam. Tuning split, 289 distinct flat/flat seam candidates: 224 (2587 ft) stay
+`level_change`, 65 (529 ft) become `flat_seam`; by median plane offset (m): 0-0.3: 57 seams, 0 stay; 0.3-0.6: 38, 30 stay;
+0.6-1.2: 43, 43 stay; 1.2-2: 18, 18 stay; over 2: 133, 133 stay.
+
+`model.quality.flat_share` (0.5.1, engine): the flat (under 2/12) priced area over the total priced area
+(`roofing_flat_sqft / (roofing_flat_sqft + roofing_pitched_sqft)`), 0 to 1 (a result without the key has not been checked: it
+is not "0"). A flat roof's `fit_all` runs lower than a pitched roof's (drainage falls, parapets, equipment), so a reader may use
+the share to pick its own threshold. It is UNROUNDED (0.8996 stays 0.8996), so a reader's own `>= 0.90` line is exact.
+
+### `nearby_buildings` (0.5.1, county footprints only)
+
+`envelope.nearby_buildings`: a list (empty when nothing else stands near; at most 8, nearest first) of
+`{"outline_id": str, "area_sqft": float, "distance_m": float, "on_matched_parcel": bool}`: the county outlines within 60 m
+of the lookup point, other than the measured one. `distance_m` runs from the lookup point to the outline (0 when the
+point is inside it); `on_matched_parcel` is true when at least half of the outline lies on the matched parcel. An outline the
+layer gave no id is left out, because a later `building_outline_id` request could not name it. The key is present on every
+plane-engine result whose footprint came from the county layer (even when the list is empty) and absent for OSM, Solar and
+LiDAR-hull footprints and for results of earlier versions: absent means "not asked", `[]` means "asked, nothing there". It
+costs no extra request: the county outline query that was already made now asks for the parcel grown by 60 m (the buffer grows from the PARCEL, not
+from the lookup point) instead of the parcel, and the parcel rule is applied to the rows exactly as before. If the layer's
+record cap is hit (`exceededTransferLimit`) the query is repeated for the parcel alone (one extra request, only then),
+`nearby_buildings` is `[]` and an `other` warning says nearby buildings were not listed. Outlines with equal ids are listed once.
 
 ### Totals and the cost-sheet key map
 
@@ -136,7 +175,7 @@ their 0.5/12 cut and their meaning. Keys whose value is unknown are left out.
 ### `model.quality` additions (engine)
 
 `engine` (`"planes/1"`), `engine_params` (the hash of every engine tunable, also part of the service's result cache key),
-`fit_covered`, `fit_all`, `fit_clear`, `tree_cover_pct`, `coverage`, `supported_pct`, `density_pts_m2`, `outline_source`,
+`fit_covered`, `fit_all`, `fit_clear`, `tree_cover_pct`, `flat_share` (0.5.1), `coverage`, `supported_pct`, `density_pts_m2`, `outline_source`,
 `overhang_scale`, `outline_shift`, `verdict`, and `reasons`. `fit_all` / `fit_covered` are the share of roof points within
 0.15 m of their facet's plane (of all points / of the points inside a facet); `coverage` the share of roof points inside a
 facet; `supported_pct` the area-weighted share of each facet that has points under it. The 0.3 keys stay, with engine

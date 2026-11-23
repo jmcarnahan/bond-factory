@@ -5,6 +5,8 @@ edges. Types come from geometry only:
   * interior, jump measured FROM THE REFERENCE POINTS on both sides >= 0.3 m: level_change (below 0.3 m the edge is a crease);
     fewer than 5 points on a side: the jump cannot be measured, the edge is ``level_change_unverified`` when the two planes
     differ by 0.3 m or more there (reported separately, never counted as a verified level change);
+  * flat/flat interior seam: strip medians of the raw returns (seam_check.strip_step), not the recipe above: step >= 0.3 m at
+    >= 70 % of 12 stations = level_change, no step = crease, not evaluable = level_change_unverified (gap >= 0.3) or crease;
   * crease: both facets fall away from the edge = ridge (horizontal) or hip; both rise = valley; else transition (a seam
     inside one surface: also the mergeable pairs below);
   * outline: flat facet = flat_edge; pitched facet = eave (level, the facet rises away from it), rake (sloped, or the level HIGH
@@ -27,6 +29,7 @@ from shapely.strtree import STRtree
 
 from .geom import Edge, Facet, Roof
 from .m_fit import FALSE_JUMP_M, edge_jump_m
+from .seam_check import strip_step
 
 SHARE_TOL_M = 0.05
 MIN_SEG_M = 0.3
@@ -132,7 +135,21 @@ def recompute(roof: Roof, ref: np.ndarray) -> Recomputed:
                 gap = max(abs(p.z_at(*a) - q.z_at(*a)), abs(p.z_at(*b) - q.z_at(*b)))
                 jump = edge_jump_m(ref, (*a, 0.0), (*b, 0.0))
                 fids = [p.id, q.id]
-                if jump is not None and jump >= FALSE_JUMP_M:
+                step = strip_step(ref, p.poly, q.poly, a, b) if p.is_flat and q.is_flat else None
+                if p.is_flat and q.is_flat and step is not None:
+                    # flat/flat seam: judged from strip medians of the raw returns, independent of the engine's rule
+                    if step:
+                        edges.append(_edge3(lo, a, b, "level_change", fids))
+                    else:
+                        edges.append(_edge3(p, a, b, _crease(p, q, a, b), fids))
+                elif p.is_flat and q.is_flat:
+                    # not evaluable from the points: never a verified level change
+                    if gap >= FALSE_JUMP_M:
+                        edges.append(_edge3(lo, a, b, "level_change_unverified", fids))
+                        unver += edges[-1].length_ft
+                    else:
+                        edges.append(_edge3(p, a, b, _crease(p, q, a, b), fids))
+                elif jump is not None and jump >= FALSE_JUMP_M:
                     edges.append(_edge3(lo, a, b, "level_change", fids))
                 elif jump is None and gap >= FALSE_JUMP_M:
                     edges.append(_edge3(lo, a, b, "level_change_unverified", fids))

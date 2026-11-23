@@ -280,16 +280,20 @@ void main() {
         expect(_texts(s), isNot(contains('Low slope')));
       });
 
-      test('the legend lists the two new edge types with their lengths; level changes show their jump', () {
+      test('the legend lists the two new edge types with their lengths; level changes keep their length and name a big step', () {
         final t = _texts(length);
         expect(t, containsAll(['Flat roof edges', 'Level changes', '40ft 0in', '48ft 0in']));
-        // The jump text replaces the length on a level change edge, when the label has room.
-        final jumps = t.where((x) => RegExp(r'^Step \d').hasMatch(x)).toList();
+        // A level change is labelled with its length ("N"); a jump of 3 ft or more is appended. This fixture's level
+        // changes all jump under 3 ft, so only the bare length shows here; the "24, 5 ft step" case is in flat_seams_test.dart.
         if (layout == ReportLayout.wide) {
-          expect(jumps, contains('Step 2ft 6in'));
+          for (final e in m.model.edges.where((e) => e.type == EdgeType.levelChange)) {
+            final jump = e.jumpFt;
+            final want = jump != null && jump >= 3 ? '${wholeFeet(e.lengthFt)}, ${wholeFeet(jump)} ft step' : wholeFeet(e.lengthFt);
+            expect(t, contains(want), reason: 'level change ${e.id}');
+          }
         }
-        for (final j in jumps) {
-          expect(j, matches(RegExp(r'^Step \d+ft \d+in$')));
+        for (final j in t.where((x) => RegExp(r'^Step \d').hasMatch(x))) {
+          fail('the old "Step <jump>" label must be gone: $j');
         }
       });
 

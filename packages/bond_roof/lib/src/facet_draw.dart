@@ -14,9 +14,15 @@ void addFacetPrims(
   required int stroke,
   required double strokeWidth,
   required double k,
+  int? flatStroke,
+  double? flatStrokeWidth,
 }) {
-  final outline = f.isBorderline ? style.borderlineStroke : stroke;
-  final outlineW = f.isBorderline ? strokeWidth * 1.8 + 1 : strokeWidth;
+  // A flat roof facet may be outlined differently (the length diagram's thin dark seam line).
+  final isFlat = f.isFlatRoofType;
+  final baseStroke = isFlat ? (flatStroke ?? stroke) : stroke;
+  final baseW = isFlat ? (flatStrokeWidth ?? strokeWidth) : strokeWidth;
+  final outline = f.isBorderline ? style.borderlineStroke : baseStroke;
+  final outlineW = f.isBorderline ? strokeWidth * 1.8 + 1 : baseW;
   if (!f.isFlatRoofType) {
     prims.add(PolyPrim(
       pts: pts,

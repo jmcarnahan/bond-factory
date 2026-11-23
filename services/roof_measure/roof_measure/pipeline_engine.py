@@ -132,6 +132,8 @@ def build_result(res: Any, ground_z: float, lidar_meta: dict[str, Any], base: Bl
     assessment = assess_engine(res, model, codes)
     envelope = build_envelope(model, method_used=METHOD, footprint_source=fpinfo["source"], verification=verification,
                               warnings=warnings, warning_codes=codes, density_pts_m2=density, assessment=assessment)
+    if fpinfo.get("nearby_buildings") is not None:  # 0.5.1: from the county outline query already made; absent elsewhere
+        envelope["nearby_buildings"] = list(fpinfo["nearby_buildings"])
     out.mkdir(parents=True, exist_ok=True)
     paths = {"model": out / f"{tag}_model.json", "engine": out / f"{tag}_engine.json"}
     write_model(model, paths["model"])  # validated again: the file carries the quality and planes keys too

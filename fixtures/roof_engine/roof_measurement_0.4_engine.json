@@ -1,6 +1,6 @@
 {
  "contract": "bond.roof_model/0.2",
- "pipeline_version": "0.5.0",
+ "pipeline_version": "0.5.1",
  "method_used": "lidar_skeleton",
  "footprint_source": "lariac",
  "generated_at": "2026-11-22T00:00:00Z",
@@ -474,7 +474,8 @@
     "mergeable": [],
     "kinks": [],
     "small_flat": [],
-    "absorbed_level_changes": []
+    "absorbed_level_changes": [],
+    "seam_points_only": 0
    },
    "area_check": {
     "drawn": 1896.4,
@@ -498,6 +499,7 @@
    "outline_source": "lacounty_lariac_2020",
    "overhang_scale": 0.5,
    "outline_shift": 0.001,
+   "flat_share": 0.37445,
    "plane_mismatch_pct": 0.3,
    "outline_covered_pct": 100.0,
    "model_uncovered_pct": 0.0,
@@ -679,5 +681,19 @@
  },
  "confidence": 0.6,
  "warnings": [],
- "warning_codes": []
+ "warning_codes": [],
+ "nearby_buildings": [
+  {
+   "outline_id": "SYNTH-B2",
+   "area_sqft": 420.0,
+   "distance_m": 14.2,
+   "on_matched_parcel": true
+  },
+  {
+   "outline_id": "SYNTH-B3",
+   "area_sqft": 1180.0,
+   "distance_m": 41.0,
+   "on_matched_parcel": false
+  }
+ ]
 }

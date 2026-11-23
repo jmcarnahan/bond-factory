@@ -198,7 +198,7 @@ def test_the_model_file_carries_the_same_keys(tmp_path):
 def test_pipeline_version_is_0_5_0_and_the_contract_name_is_unchanged():
     from roof_measure.version import CONTRACT
 
-    assert PIPELINE_VERSION == "0.5.0" and CONTRACT == "bond.roof_model/0.2"
+    assert PIPELINE_VERSION == "0.5.1" and CONTRACT == "bond.roof_model/0.2"
 
 
 def test_street_match_note_is_a_reason_code(tmp_path, monkeypatch):

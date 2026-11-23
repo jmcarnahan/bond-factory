@@ -38,7 +38,9 @@ SCHEMA = "bond.roof_model/0.1"
 CORE_EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "parapet",
                    "transition", "unspecified")  # the closed ten of contract 0.2: always in totals.lengths_ft
 NEW_EDGE_TYPES = ("flat_edge", "level_change")  # contract 0.4 (engine): a result without them reads as zero
-EDGE_TYPES = CORE_EDGE_TYPES + NEW_EDGE_TYPES
+EDGE_TYPES = CORE_EDGE_TYPES + NEW_EDGE_TYPES  # the twelve keys of totals.lengths_ft
+UNPRICED_EDGE_TYPES = ("flat_seam",)  # 0.5.1: drawn between two flat pieces of one deck, never priced, in no total
+VALID_EDGE_TYPES = EDGE_TYPES + UNPRICED_EDGE_TYPES  # what an edge may be typed
 FORMS = ("flat", "hip", "gable", "shed")
 METHODS = ("lidar_skeleton", "lidar_agent", "solar_agent", "manual", "fixture")
 NEIGHBOUR_TOL_FT = 0.8  # blocks closer than this share a boundary
@@ -358,7 +360,8 @@ def _totals(facets: list[dict[str, Any]], edges: list[dict[str, Any]], *, engine
     lengths = {k: 0.0 for k in (EDGE_TYPES if engine or any(e["type"] in NEW_EDGE_TYPES for e in edges)
                                 else CORE_EDGE_TYPES)}
     for e in edges:
-        lengths[e["type"]] += e["length_ft"]
+        if e["type"] not in UNPRICED_EDGE_TYPES:
+            lengths[e["type"]] += e["length_ft"]
     return {"total_area_sqft": total, "pitched_area_sqft": pitched, "flat_area_sqft": flat,
             "predominant_pitch_rise": pred[0], "predominant_pitch_area_sqft": pred[1],
             "squares": total / 100.0, "lengths_ft": lengths}
@@ -448,12 +451,13 @@ def validate(model: dict[str, Any]) -> None:
     for e in model["edges"]:
         need(e["id"] not in ids, f"duplicate edge id {e['id']}")
         ids.add(e["id"])
-        need(e["type"] in EDGE_TYPES, f"edge {e['id']}: bad type {e['type']!r}")
+        need(e["type"] in VALID_EDGE_TYPES, f"edge {e['id']}: bad type {e['type']!r}")
         need(len(e["points"]) == 2, f"edge {e['id']}: must be a two point segment")
         need(1 <= len(e["facets"]) <= 2 and all(i in facets for i in e["facets"]), f"edge {e['id']}: bad facets")
         need(e["length_ft"] + 1e-6 >= math.dist(*e["points"]) - 0.05 - 0.01 * e["length_ft"],
              f"edge {e['id']}: length_ft shorter than its plan length")
-        lengths[e["type"]] += e["length_ft"]
+        if e["type"] not in UNPRICED_EDGE_TYPES:
+            lengths[e["type"]] += e["length_ft"]
     for e in model["edges"]:  # every edge lies on the boundary of one of its facets (hole outlines excepted)
         if e["type"] == "wall_flashing" and model["holes"]:
             continue

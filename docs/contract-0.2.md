@@ -11,7 +11,7 @@ Base URL is wherever the service is deployed. JSON in, JSON out. Every route exc
 `Authorization: Bearer <ROOF_MEASURE_TOKEN>`. The token lives in the calling app's backend only; a Flutter client
 never holds it.
 
-- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.5.0"}`. It touches neither disk nor network and
+- `GET /healthz` returns 200 `{"status": "ok", "pipeline_version": "0.5.1"}`. It touches neither disk nor network and
   needs no token.
 - `POST /v1/measurements` body
   `{"address": str (at most 200 characters), "lat"?: float, "lng"?: float,
@@ -156,7 +156,7 @@ placeholder address. Copy it as an app's mock fixture.
 ```json
 {
  "contract": "bond.roof_model/0.2",
- "pipeline_version": "0.5.0",
+ "pipeline_version": "0.5.1",
  "method_used": "lidar_skeleton",
  "footprint_source": "osm",
  "generated_at": "2026-11-10T00:00:00Z",

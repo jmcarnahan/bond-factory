@@ -71,6 +71,7 @@ class RoofTotals {
     }
     final lengths = {for (final t in EdgeType.values) t: 0.0};
     for (final e in edges) {
+      if (e.type == EdgeType.flatSeam) continue; // a seam is drawn, never measured
       lengths[e.type] = lengths[e.type]! + e.lengthFt;
     }
     return RoofTotals(

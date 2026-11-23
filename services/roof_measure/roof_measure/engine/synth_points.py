@@ -105,6 +105,23 @@ def two_level(length_ft=26.0, width_ft=24.0, step_m=1.2, pitch=6.0, eave_m=EAVE_
     return _roof("two_level", w, rotation_deg, step_m=step_m, pitch=pitch)
 
 
+def flat_two_level(length_ft=36.0, width_ft=26.0, lower_ft=22.0, step_m=1.8, fall=0.5, eave_m=EAVE_M,
+                   overhang_m=OVERHANG_M, rotation_deg=0.0):
+    """Two flat decks side by side: an upper one and a lower one ``step_m`` below it that falls gently (``fall`` per 12,
+    far under the 2/12 flat cut) towards its far edge, so a partition may cut it in several flat pieces. One real step."""
+    w = [_wing((0, 0, length_ft, width_ft), "", 0.0, eave_m + step_m, overhang_m, no_ovh="E"),
+         _wing((length_ft, 0, length_ft + lower_ft, width_ft), "E", fall, eave_m, overhang_m, no_ovh="W")]
+    return _roof("flat_two_level", w, rotation_deg, step_m=step_m)
+
+
+def flat_step(length_ft=40.0, width_ft=30.0, step_m=2.26, step_ft=16.0, eave_m=EAVE_M, overhang_m=OVERHANG_M,
+              rotation_deg=0.0):
+    """A flat roof with one ``step_m`` (about 7.4 ft) step: a higher deck over part of it."""
+    w = [_wing((0, 0, length_ft, width_ft), "", 0.0, eave_m, overhang_m),
+         _wing((0, 0, step_ft, width_ft), "", 0.0, eave_m + step_m, overhang_m, no_ovh="E")]
+    return _roof("flat_step", w, rotation_deg, step_m=step_m)
+
+
 def complex_hip(pitch=6.0, eave_m=EAVE_M, overhang_m=OVERHANG_M, rotation_deg=0.0):
     """Main hip + two hip wings + bays + small hip porches: many small real facets."""
     o, e = overhang_m, eave_m
