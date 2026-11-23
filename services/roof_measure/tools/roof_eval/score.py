@@ -73,4 +73,5 @@ def score_house(res: dict[str, Any] | None, ref: np.ndarray, foot: Polygon, trut
         by_tier.setdefault(str(f.get("tier")), []).append(f)
     rec["truth"] = {k: m_truth.merge_tier(v) for k, v in sorted(by_tier.items())}
     rec["t2_labels"] = m_shape.label_agreement(truths)
+    rec["t2_confidence"] = m_truth.t2_confidence(files)
     return rec

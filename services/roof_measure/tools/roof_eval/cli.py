@@ -100,6 +100,9 @@ def main(argv: list[str] | None = None) -> int:
             print((cfg.out_dir / "tables.md").read_text())
             if cfg.gates_file is None:
                 print("NO GATES EVALUATED (NO_GATES=1)")
+            for g in s_.get("gates", []):
+                if g.get("skipped"):
+                    print(f"GATE SKIPPED (not a pass): {g['name']}: {g['note']}")
             print(f"{'OK' if s_['ok'] else 'FAIL'}: results in {cfg.out_dir}")
             return 0 if s_["ok"] else 1
         if a.cmd == "baseline":

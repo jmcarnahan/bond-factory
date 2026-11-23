@@ -70,3 +70,28 @@ are set from tuning percentiles, and `fit_covered` and `coverage` are always rep
   root); otherwise ship `baselines/library-0.4.0/metrics.json` (made by `roof-baseline` on that root).
 - The price table says EXAMPLE RULES when the fake example file is used; pass real rules with `PRICE=<file>`.
 - T2: `truth.llm_vision*.json` files; two label runs of a house get an IoU agreement and a `disagree` flag below 0.60 (kept, not dropped).
+
+## Labels, the shape gate and `flat_seam` (roof-tidy, 2026-11-23)
+- **Label tool** (`tools/roof_eval/label/`, a port of the labelling code with no address handling): houses are opaque ids; a work
+  folder holds `houses.tsv` (columns `id`, `folder`, optional `split`, `strata`), `runs/<id>/<tag>/`, `truth/<id>/`, `spend.tsv`,
+  `labels.tsv`. `python -m tools.roof_eval.label compare|relax --work-dir D` never touch the network. `run` and `one` SPEND
+  money on the Anthropic API and refuse to start without BOTH `--spend-cap USD` (a total over the whole ledger, earlier runs
+  included) and `--confirm-spend`; the key is read only from the environment (`ANTHROPIC_API_KEY`), children get a minimal
+  environment. `one --render-only` and `--dump-request` spend nothing. No aerial-photo fetch exists any more.
+- **Agreement rule (plan D4):** two runs per house; accepted when areas differ <= 8 % and the two-sided facet IoU is >= 0.6;
+  `accepted_high` when both runs have >= 85 % of in-facet returns within 12 cm, else `accepted_medium`; else
+  `rejected_disagree`. The merged `truth.llm_vision.json` carries `confidence` and `fit12_pct: [r1, r2]`. The fit figure is a
+  tag, never a pass/fail. (The old "a run was not self-corrected" reason is gone: only the two numbers decide.)
+- **Shape gate (gate 6, agg `t2_shape`):** reports the mean two-sided facet IoU on `high`, on `medium` and on `all` labels, GATES
+  on `all` (>= 0.60, `min_n` 10), and FAILS LOUDLY when high and medium differ by more than 0.15 (`max_conf_gap`). Below
+  `min_n` it FAILS on both tuning and held-out (a dropout must never turn it into a silent pass; the generic `on_insufficient: skip`
+  mechanism still exists for other gates and prints SKIPPED, NOT EVALUATED). Labels with no confidence tag count in `all` only.
+- **`flat_seam` edges** (library 0.5.1): a known edge type, drawn but never counted. `Roof.counted_edges` drops it; lengths,
+  the false level-change share (numerator and total) and cleanliness edge counts ignore it.
+- **Shape-gate confidence gap needs n >= 3** in BOTH the high and the medium group; below that the note says "confidence gap not
+  evaluated (n_high=.., n_medium=..)" and the gate decides on "all" alone (`min_group_n`).
+- **Flat/flat seams in gate 3l** are judged by `seam_check.strip_step` (strip medians of the raw returns at 12 stations, 0.4-2.5 m
+  from the seam, step = medians differ >= 0.3 m at >= 70 % of usable stations; fewer than 4 usable stations = not evaluable, counted
+  in no numerator), never by the engine's own rule: UNMARKED = step by strip medians while the engine did not type level_change;
+  FALSE = engine level_change with no step by strip medians. Other seams keep the point-jump recipe.
+- Label decisions (area difference, facet IoU, the 85 % tag) use UNROUNDED values; the displayed columns in `labels.tsv` are rounded.

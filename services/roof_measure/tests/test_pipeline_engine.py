@@ -4,6 +4,7 @@ codes, and never falls back to the blocks silently."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import numpy as np
@@ -113,7 +114,7 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     w = world(main="flat_pitched_step_d8")
     stages: list[str] = []
     env = run(w, tmp_path, on_stage=stages.append)
-    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.5.0"
+    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.5.1"
     assert env["method_used"] == "lidar_skeleton" and env["footprint_source"] == "lariac"
     assert env["verification"]["verdict"] == "unverified"
     m, t = env["model"], env["totals"]
@@ -131,6 +132,18 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     assert m["totals"]["lengths_ft"]["level_change"] > 0 and m["planes"] and "model_from_planes" not in env["warning_codes"]
     assert "lidar" in stages and "model" in stages and "blocks" not in stages
     json.dumps(env, allow_nan=False)
+
+
+def test_nearby_buildings_reach_the_envelope_for_a_county_footprint_and_only_then(world, tmp_path, monkeypatch):
+    w = world()
+    rows = [{"outline_id": "N1", "area_sqft": 410.0, "distance_m": 12.5, "on_matched_parcel": True}]
+    base_fp = w.fp
+    monkeypatch.setattr(footprint, "fetch_footprint", lambda *a, **k: dataclasses.replace(base_fp(), nearby=rows))
+    assert run(w, tmp_path)["nearby_buildings"] == rows
+    monkeypatch.setattr(footprint, "fetch_footprint", lambda *a, **k: dataclasses.replace(base_fp(), nearby=[]))
+    assert run(w, tmp_path / "b")["nearby_buildings"] == []  # present and empty: the county was asked, nothing stands near
+    monkeypatch.setattr(footprint, "fetch_footprint", lambda *a, **k: dataclasses.replace(base_fp(), source="osm", provider="osm"))
+    assert "nearby_buildings" not in run(w, tmp_path / "c")
 
 
 def test_the_work_dir_keeps_the_model_and_the_engine_result(world, tmp_path):

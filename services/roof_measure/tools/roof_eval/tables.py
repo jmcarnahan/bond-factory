@@ -120,7 +120,7 @@ def render(summary: dict[str, Any], recs: list[dict[str, Any]]) -> str:
     if "gates" in summary:
         lines += ["", "## gates", "", "| gate | n (with value) | value | need | result |", "|---|---|---|---|---|"]
         lines += [f"| {g['name']} | {g['n']} ({g['n_value']}) | {_f(g['value'])} | {g['op']} {g['threshold']} | "
-                  f"{'PASS' if g['passed'] else 'FAIL'} {g['note']} |" for g in summary["gates"]]
+                  f"{'SKIP' if g.get('skipped') else 'PASS' if g['passed'] else 'FAIL'} {g['note']} |" for g in summary["gates"]]
     bad = [r for r in recs if r["engine"]["status"] != "ok" or r.get("status") == "score_error"]
     if bad:
         lines += ["", "## houses without a result", ""]

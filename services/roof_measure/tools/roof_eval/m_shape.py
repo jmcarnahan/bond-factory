@@ -46,7 +46,7 @@ def axis_aligned_share(roof: Roof, foot: Polygon, tol: float = AXIS_TOL_DEG) -> 
     if ax is None:
         return None
     num = den = 0.0
-    for e in roof.edges:
+    for e in roof.counted_edges:
         ln = e.plan_m
         if ln < 0.05:
             continue
@@ -64,7 +64,7 @@ def offaxis_controllable_share(roof: Roof, foot: Polygon, tol: float = AXIS_TOL_
     if ax is None:
         return None
     off = den = 0.0
-    for e in roof.edges:
+    for e in roof.counted_edges:
         ln = e.plan_m
         if ln < 0.05:
             continue
@@ -82,9 +82,9 @@ def cleanliness(roof: Roof, foot: Polygon) -> dict[str, Any]:
     """Facet count, facets under 30 sqft (surface), edges under 3 ft (3D), axis-aligned share of edge length."""
     return {"facets": len(roof.facets),
             "facets_lt_30sqft": sum(1 for f in roof.facets if f.area_sqft < SMALL_FACET_SQFT),
-            "edges": len(roof.edges),
-            "edges_lt_3ft": sum(1 for e in roof.edges if e.length_ft < SHORT_EDGE_FT),
-            "edges_lt_3ft_share": (sum(1 for e in roof.edges if e.length_ft < SHORT_EDGE_FT) / len(roof.edges)) if roof.edges else None,
+            "edges": len(roof.counted_edges),
+            "edges_lt_3ft": sum(1 for e in roof.counted_edges if e.length_ft < SHORT_EDGE_FT),
+            "edges_lt_3ft_share": (sum(1 for e in roof.counted_edges if e.length_ft < SHORT_EDGE_FT) / len(roof.counted_edges)) if roof.counted_edges else None,
             "offaxis_controllable_share": offaxis_controllable_share(roof, foot),
             "axis_share_7deg": axis_aligned_share(roof, foot)}
 

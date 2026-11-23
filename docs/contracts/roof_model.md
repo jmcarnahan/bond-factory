@@ -79,7 +79,8 @@ Rules:
   polygons tile the block polygon (holes excluded).
 - `edges[].type` is one of `eave | rake | ridge | hip | valley | step_flashing |
   wall_flashing | parapet | transition | unspecified`, plus `flat_edge | level_change` in a model from the plane
-  engine (contract-0.4.md; an edge with `level_change` carries `jump_ft`). Every edge is a straight segment
+  engine (contract-0.4.md; an edge with `level_change` carries `jump_ft`), and `flat_seam` since pipeline 0.5.1 (a drawn line
+  between two flat facets, never priced, in no total). Every edge is a straight segment
   (two points). Polylines are split into segments. `facets` lists the 1 or 2 facet ids
   the edge bounds.
 - `totals.lengths_ft` has ALL ten keys of the first list above, zero when absent; a model from the plane engine

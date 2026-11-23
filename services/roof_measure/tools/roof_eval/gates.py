@@ -9,7 +9,11 @@ truth path (``truth.T2.facet_iou.mean_iou``). ``agg``: rate (share of houses whe
 houses whose value satisfies ``pred`` {op, value}, op also ``between`` with a [lo, hi] value; a missing value fails it
 unless ``valued_only``), median, mean, p90, min, max, sum, count, ratio (pooled sum of ``metric`` over sum of
 ``denominator``), t3_contains (the 90% interval of the T3 median ratio contains ``target``, default 1.0) and t3_iqr_ratio
-(T3 ratio IQR over the IQR of ``baseline``'s).
+(T3 ratio IQR over the IQR of ``baseline``'s), and t2_shape (the shape gate, plan 3.5).
+``t2_shape``: ``metric`` (default truth.T2.facet_iou.mean_iou) is averaged over the population and reported three ways: on houses
+whose T2 label has confidence ``high``, on ``medium``, and on ``all`` (labels without a confidence count in ``all`` only). The gate
+value and pass/fail are the ``all`` mean; it ALSO fails, loudly, when the high and medium means differ by more than
+``max_conf_gap`` (default 0.15, only when both groups have a house): the numbers are reported and the director decides.
 ``where``: manifest filters (``key=a,b`` / ``key!=a``); ``require``: flags that must be true for a house to count.
 ``min_n`` counts the houses of the population that have a numeric value for the metric (``n_value``; ``n`` is the whole
 population). Fewer than ``min_n`` fails the gate unless ``"on_insufficient": "skip"``.
@@ -80,6 +84,39 @@ def aggregate(vals: list[Any], agg: str, pred: dict[str, Any] | None = None, val
     return fn(nums)
 
 
+def t2_shape(g: dict[str, Any], pop: list[dict[str, Any]]) -> dict[str, Any]:
+    """The shape gate's three numbers (mean IoU on high, medium, all), the confidence gap and whether it is loud."""
+    path = g.get("metric", "truth.T2.facet_iou.mean_iou")
+    groups: dict[str, list[float]] = {"high": [], "medium": [], "all": []}
+    for r in pop:
+        v = metric(r, path)
+        if not isinstance(v, (int, float)) or isinstance(v, bool):
+            continue
+        groups["all"].append(float(v))
+        if r.get("t2_confidence") in ("high", "medium"):
+            groups[r["t2_confidence"]].append(float(v))
+    mean = {k: (sum(x) / len(x) if x else None) for k, x in groups.items()}
+    min_group = g.get("min_group_n", 3)
+    both = len(groups["high"]) >= min_group and len(groups["medium"]) >= min_group
+    gap = abs(mean["high"] - mean["medium"]) if both else None
+    limit = g.get("max_conf_gap", 0.15)
+    return {"iou_high": mean["high"], "iou_medium": mean["medium"], "iou_all": mean["all"],
+            "n_high": len(groups["high"]), "n_medium": len(groups["medium"]), "n_all": len(groups["all"]),
+            "gap": gap, "gap_evaluated": both, "min_group_n": min_group, "loud": gap is not None and gap > limit, "max_conf_gap": limit}
+
+
+def _shape_note(s: dict[str, Any]) -> str:
+    def f(x):
+        return "n/a" if x is None else f"{x:.3f}"
+    note = f"IoU high {f(s['iou_high'])} (n={s['n_high']}), medium {f(s['iou_medium'])} (n={s['n_medium']}), all {f(s['iou_all'])} (n={s['n_all']})"
+    if not s["gap_evaluated"]:
+        note += f"; confidence gap not evaluated (n_high={s['n_high']}, n_medium={s['n_medium']}; needs {s['min_group_n']} each)"
+    if s["loud"]:
+        note += (f"; LOUD FAILURE: high and medium differ by {s['gap']:.3f} (> {s['max_conf_gap']:g}): "
+                 "the label confidence tag predicts engine agreement, report to the director")
+    return note
+
+
 def _t3_gate(g: dict[str, Any], pop: list[dict[str, Any]], baseline_t3) -> tuple[float | None, int]:
     t3 = m_truth.t3_aggregate(pop)
     if t3 is None:
@@ -96,6 +133,8 @@ def _value(g: dict[str, Any], pop: list[dict[str, Any]], baseline_t3) -> tuple[f
     """(gate value, number of houses that have the metric) for one gate over its population."""
     if g["agg"] in ("t3_contains", "t3_iqr_ratio"):
         return _t3_gate(g, pop, baseline_t3)
+    if g["agg"] == "t2_shape":
+        return None, t2_shape(g, pop)["n_all"]
     vals = [metric(r, g["metric"]) for r in pop]
     if g["agg"] == "ratio":  # pooled: sum(metric) / sum(denominator)
         den = sum(metric(r, g["denominator"]) or 0.0 for r in pop)
@@ -113,10 +152,20 @@ def evaluate(spec: dict[str, Any], recs: list[dict[str, Any]], baseline_t3=None)
         pop = [r for r in recs if _in_population(r, g)]
         v, nv = _value(g, pop, baseline_t3)
         res = {"name": g["name"], "n": len(pop), "n_value": nv, "op": g["op"], "threshold": g["value"], "value": None,
-               "passed": False, "note": ""}
+               "passed": False, "skipped": False, "note": ""}
         if nv < g.get("min_n", 1):
-            res["note"] = f"insufficient houses with a value ({nv} of {len(pop)} < {g.get('min_n', 1)})"
-            res["passed"] = g.get("on_insufficient") == "skip"
+            skip = g.get("on_insufficient") == "skip"
+            res["note"] = (f"SKIPPED, NOT EVALUATED: only {nv} houses with a value (need {g.get('min_n', 1)}); "
+                           "this is not a pass" if skip else
+                           f"insufficient houses with a value ({nv} of {len(pop)} < {g.get('min_n', 1)})")
+            res["passed"] = skip
+            res["skipped"] = skip
+        elif g["agg"] == "t2_shape":
+            s = t2_shape(g, pop)
+            res["value"] = s["iou_all"]
+            res["shape"] = s
+            res["passed"] = s["iou_all"] is not None and OPS[g["op"]](s["iou_all"], g["value"]) and not s["loud"]
+            res["note"] = _shape_note(s)
         else:
             if g["agg"] not in ("t3_contains", "t3_iqr_ratio", "ratio"):
                 v = aggregate([metric(r, g["metric"]) for r in pop], g["agg"], g.get("pred"), g.get("valued_only", False))

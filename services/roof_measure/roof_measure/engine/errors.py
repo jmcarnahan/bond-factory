@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .params import EngineParams
 
@@ -30,6 +30,7 @@ class Ctx:
 
     p: EngineParams
     deadline: float | None = None
+    seam_memo: dict = field(default_factory=dict, compare=False, repr=False)  # flat/flat seam verdicts of the drawn pass
 
     def check(self) -> None:
         """Raise EngineTimeout once the deadline has passed (no-op without a deadline)."""

@@ -105,10 +105,11 @@ def test_a_plane_gap_the_points_do_not_show_is_not_a_level_change():
     assert "level_change" not in by_type(edges)
 
 
-def test_a_real_jump_is_a_level_change_whatever_the_planes_say_at_the_line():
+def test_a_real_jump_is_a_level_change_when_the_planes_show_it_too():
+    # 0.5.1: a flat/flat step also needs the fitted planes apart along the seam (planes that agree make a flat_seam)
     a = facet("f1", [(0, 0), (6, 0), (6, 6), (0, 6)], (0, 0, 3.0))
-    b = facet("f2", [(6, 0), (12, 0), (12, 6), (6, 6)], (0, 0, 3.0))  # planes agree ...
-    q = np.vstack([points_on(a), points_on(b, seed=1, offset=0.8)])  # ... the points are 0.8 m apart
+    b = facet("f2", [(6, 0), (12, 0), (12, 6), (6, 6)], (0, 0, 3.8))  # planes 0.8 m apart ...
+    q = np.vstack([points_on(a), points_on(b, seed=1, offset=0.0)])  # ... and so are the points
     lc = [e for e in build_edges([a, b], q, CTX) if e.type == "level_change"]
     assert len(lc) == 1 and lc[0].jump_ft == pytest.approx(0.8 * M2FT, abs=0.15 * M2FT)
 
@@ -256,7 +257,8 @@ def test_two_flat_facets_with_no_verified_jump_are_one_membrane_whatever_their_t
     edges = build_edges([a, b], None, CTX)
     assert not [e for e in edges if len(e.facets) == 2]
     assert [m["facets"] for m in edge_diagnostics([a, b], DEFAULT)["mergeable"]] == [["a", "b"]]
-    q = np.vstack([points_on(a), points_on(b, seed=1, offset=0.8)])  # a verified jump makes it a level change
+    b = facet("b", [(6, 0), (12, 0), (12, 6), (6, 6)], (0.05, 0.0, 2.7 + 0.8))  # planes 0.8 m apart: a verified jump
+    q = np.vstack([points_on(a), points_on(b, seed=1)])  # makes it a level change
     assert [e.type for e in build_edges([a, b], q, CTX) if len(e.facets) == 2] == ["level_change"]
 
 

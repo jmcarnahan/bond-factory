@@ -41,6 +41,8 @@ def _footprint_info(fp: Any) -> dict[str, Any]:
     c = fp.polygon_wgs84.representative_point()  # always inside the outline (a centroid can miss an L or U shape)
     return {"source": fp.source, "warnings": list(fp.warnings), "codes": list(fp.warning_codes),
             "other_buildings": len(fp.other_buildings), "transient": fp.transient,
+            # county outlines within 60 m of the lookup point (envelope ``nearby_buildings``); None for any other source
+            "nearby_buildings": list(getattr(fp, "nearby", None) or []) if fp.source == "lariac" else None,
             # which building was measured (contract 0.4 ``model.source.building``); the match only means something for
             # a county parcel, so other sources carry none
             "match": fp.match if fp.source == "lariac" else None,

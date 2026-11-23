@@ -97,16 +97,14 @@ def test_a_pin_between_outlines_takes_the_nearest(net):
 
 def test_a_pin_in_the_neighbour_parcel_measures_that_parcels_building(net):
     mine, theirs = outline("MINE", 1, 1, 2), outline("THEIRS", 1, 6, 2)
-
-    def by_parcel(url, kw):  # the outline query carries the chosen parcel's rings
-        rings = json.loads(kw["data"]["geometry"])["rings"][0]
-        return {"features": [mine if min(x for x, _ in rings) < LNG + 4 * D else theirs]}
-
+    # the one outline query asks for the parcel grown by 60 m (0.5.1): a spatial query answers with both outlines, and
+    # the parcel rule (overlap with the chosen parcel) still picks the neighbour's
     net.routes["LACounty_Parcel"] = {"features": [A, B]}
-    net.routes["Countywide_Building_Outlines"] = by_parcel
+    net.routes["Countywide_Building_Outlines"] = {"features": [mine, theirs]}
     fp = footprint.fetch_footprint(*pt(2, 7), ADDR, point_given=True)
     assert fp.id == "THEIRS" and fp.parcel_id == "P-B" and fp.match == "nearest"
     assert "parcel_street_match" in fp.warning_codes  # the caller still hears that the text did not match
+    assert [(n["outline_id"], n["on_matched_parcel"]) for n in fp.nearby] == [("MINE", False)]
 
 
 # ---- (b) an outline by id

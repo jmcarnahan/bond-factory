@@ -110,7 +110,7 @@ class SummaryBlock {
         '${pitchLabel(t.predominantPitchRise, labels: labels)}  (${sq(t.predominantPitchAreaSqft)})'
       ),
       (labels.facets, '${m.facets.length}'),
-      (labels.edgeTotal, feetInches(t.lengthsFt.values.fold(0.0, (a, b) => a + b), labels: labels)),
+      (labels.edgeTotal, feetInches(t.lengthsFt.entries.fold(0.0, (a, e) => e.key == EdgeType.flatSeam ? a : a + e.value), labels: labels)),
       (labels.confidence, m.confidence.overall),
     ];
     final cols = layout.figureColumns;

@@ -21,7 +21,11 @@ enum EdgeType {
   flatEdge('flat_edge'),
 
   /// A height jump of 0.3 m or more between facets (envelope 0.4); the edge carries [RoofEdge.jumpFt].
-  levelChange('level_change');
+  levelChange('level_change'),
+
+  /// A seam between two flat sections at the same level (roof_measure 0.5.1): drawn as a thin dark
+  /// line, never labelled, never priced, and its length is in no total or legend.
+  flatSeam('flat_seam');
 
   const EdgeType(this.json);
 
@@ -34,8 +38,8 @@ enum EdgeType {
     eave, rake, ridge, hip, valley, stepFlashing, wallFlashing, parapet, transition, unspecified,
   ];
 
-  /// True for the two types added by envelope 0.4.
-  bool get isNew04 => this == flatEdge || this == levelChange;
+  /// True for the types added after contract 0.3 (written to JSON only when non-zero).
+  bool get isNew04 => this == flatEdge || this == levelChange || this == flatSeam;
 }
 
 enum BlockForm {

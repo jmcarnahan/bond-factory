@@ -9,6 +9,9 @@ Rules (plan 3.1 / contract 0.4):
     on both sides is 0.3 m or more, a ``transition`` where pitched meets flat at one height, else a ridge, hip or
     valley from the two planes; coplanar facets (flat membrane included) share no edge (``coplanar_seams`` lists them:
     those facets should have been merged);
+  * a ``level_change`` between two FLAT facets must also hold along the seam (``edge_measure.seam_is_level``: the
+    two facets' fitted planes are at least 0.3 m apart at 70% of the stations along the seam, and ``jump_ft`` is their median offset); otherwise it is a ``flat_seam``: drawn,
+    never priced, in no total (0.5.1);
   * collinear pieces of one type between the same facets are one edge.
 """
 
@@ -20,7 +23,7 @@ import numpy as np
 import shapely
 from shapely.ops import unary_union
 
-from .edge_measure import measured_jump, ridge_check, seg_split
+from .edge_measure import measured_jump, ridge_check, seam_is_level, seg_split
 from .errors import Ctx
 from .params import EngineParams
 from .plane_math import zat
@@ -223,15 +226,44 @@ def _refine_step(t: str, facets: list[Facet], fs: tuple, p0: np.ndarray, p1: np.
     return t
 
 
-def build_edges(facets: list[Facet], q: np.ndarray | None, ctx: Ctx, absorbed: list | None = None) -> list[Edge]:
+def _seam_verdict(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, ctx: Ctx, reuse: bool) -> tuple[bool, float]:
+    """``seam_is_level`` for one flat/flat chain, remembered per facet-id pair (drawn pass) or looked up there (priced pass:
+    the drawn chain of the same pair within 0.5 m of this chain's middle; none: judged afresh)."""
+    key = (fa.id, fb.id)
+    mid = (p0 + p1) / 2
+    if reuse:
+        best = None
+        for a, b, verdict in ctx.seam_memo.get(key, ()):
+            d = shapely.distance(shapely.LineString([a, b]), shapely.Point(*mid))
+            if d <= 0.5 and (best is None or d < best[0]):
+                best = (d, verdict)
+        if best is not None:
+            return best[1]
+    verdict = seam_is_level(fa, fb, p0, p1, ctx.p.level_change_m)
+    if not reuse:
+        ctx.seam_memo.setdefault(key, []).append((p0.copy(), p1.copy(), verdict))
+    return verdict
+
+
+def build_edges(facets: list[Facet], q: np.ndarray | None, ctx: Ctx, absorbed: list | None = None,
+                reuse_verdicts: bool = False) -> list[Edge]:
     """All typed edges of the facet partition. ``q`` are the points jumps and ridge checks are measured from.
     A level change that is clutter (shorter than ``stub_min_len_m``, or under ``stub_jump_m`` and shorter than
-    ``stub_len_m``) is not an edge: the neighbouring chains carry on; it is appended to ``absorbed`` when given."""
+    ``stub_len_m``) is not an edge: the neighbouring chains carry on; it is appended to ``absorbed`` when given.
+    Flat/flat seam verdicts are remembered in ``ctx.seam_memo``; the priced pass (``reuse_verdicts``) re-uses the drawn
+    pass's verdict for the same facet pair at the same place, so a seam cannot be a level change in the drawing and a
+    flat seam in the priced totals."""
     ctx.check()
     edges = []
     for t, fs, p0, p1 in _chains(_raw_segments(facets, q, ctx.p), ctx.p):
-        z0, z1 = _end_heights(t, facets, fs, p0, p1)
+        z0, z1 = _end_heights(t, facets, fs, p0, p1)  # (heights of the typer's first answer: kept as they were before 0.5.1)
         t = _refine_step(t, facets, fs, p0, p1, q)
+        plane_gap = None
+        if t == "level_change" and len(fs) == 2 and facets[fs[0]].roof_type == "flat" and facets[fs[1]].roof_type == "flat":
+            level, plane_gap = _seam_verdict(facets[fs[0]], facets[fs[1]], p0, p1, ctx, reuse_verdicts)
+            if not level:
+                t = "flat_seam"  # two flat pieces of one deck: a drawn line, never priced (the fitted planes nearly meet)
+                plane_gap = None
         high = t == HIGH_EDGE
         t = "rake" if high else t
         length = math.sqrt((p1[0] - p0[0]) ** 2 + (p1[1] - p0[1]) ** 2 + (z1 - z0) ** 2) * M2F
@@ -241,10 +273,12 @@ def build_edges(facets: list[Facet], q: np.ndarray | None, ctx: Ctx, absorbed: l
                 jm = round(float(measured_jump(facets[fs[0]], facets[fs[1]], p0, p1, q)), 3)
             except (ValueError, IndexError):
                 jm = None
+        if plane_gap is not None:
+            jm = round(plane_gap, 3)  # a flat/flat level change: its height is the median offset of the two fitted planes
         plan_m = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
-        if t == "level_change" and (plan_m < ctx.p.stub_min_len_m or ((jm or 0.0) < ctx.p.stub_jump_m and plan_m < ctx.p.stub_len_m)):
+        if t in ("level_change", "flat_seam") and (plan_m < ctx.p.stub_min_len_m or ((jm or 0.0) < ctx.p.stub_jump_m and plan_m < ctx.p.stub_len_m)):
             if absorbed is not None:
-                absorbed.append({"facets": [facets[k].id for k in fs], "length_ft": round(length, 1),
+                absorbed.append({"type": t, "facets": [facets[k].id for k in fs], "length_ft": round(length, 1),
                                  "jump_ft": None if jm is None else round(jm / 0.3048, 2)})
             continue
         edges.append(Edge(type=t, p0=(float(p0[0]), float(p0[1]), float(z0)), p1=(float(p1[0]), float(p1[1]), float(z1)),
@@ -297,7 +331,8 @@ def totals_of(facets: list[Facet], edges: list[Edge]) -> dict:
     tot["facet_count"] = len(facets)
     lengths = {k: 0.0 for k in ("eave", "rake", "ridge", "hip", "valley", "level_change", "flat_edge", "transition")}
     for e in edges:
-        lengths[e.type] = lengths.get(e.type, 0.0) + e.length_ft
+        if e.type != "flat_seam":  # drawn, never priced: in no total
+            lengths[e.type] = lengths.get(e.type, 0.0) + e.length_ft
     tot["lengths_ft"] = {k: round(v, 1) for k, v in lengths.items()}
     for k in ("area_sqft", "pitched_area_sqft", "flat_area_sqft", "squares"):
         tot[k] = round(tot[k], 1)

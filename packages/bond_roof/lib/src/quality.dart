@@ -10,6 +10,7 @@ class RoofEngineQuality {
     this.coverage,
     this.supportedPct,
     this.densityPtsM2,
+    this.flatShare,
     this.parcelMatch,
     this.outlineSource,
     this.verdict,
@@ -25,6 +26,7 @@ class RoofEngineQuality {
       coverage: numOrNull(j, 'coverage', path),
       supportedPct: numOrNull(j, 'supported_pct', path),
       densityPtsM2: numOrNull(j, 'density_pts_m2', path),
+      flatShare: numOrNull(j, 'flat_share', path),
       parcelMatch: s('parcel_match'),
       outlineSource: s('outline_source'),
       verdict: s('verdict'),
@@ -46,6 +48,9 @@ class RoofEngineQuality {
 
   /// Roof points per square metre.
   final double? densityPtsM2;
+
+  /// Flat priced area over total priced area, 0..1 (roof_measure 0.5.1; null on older rows).
+  final double? flatShare;
 
   /// `exact`, `street`, `nearest` or `given`.
   final String? parcelMatch;

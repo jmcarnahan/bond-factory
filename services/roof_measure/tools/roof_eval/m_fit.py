@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from .geom import M2_TO_SQFT, Roof, surface_points
+from .geom import M2_TO_SQFT, UNCOUNTED_EDGE_TYPES, Roof, surface_points
+from .seam_check import strip_step
 
 FIT_TOL_M = 0.15
 FALSE_JUMP_M = 0.3  # contract-0.4: a level_change is a jump >= 0.3 m, so a measured jump below this is false
@@ -107,12 +108,22 @@ def false_level_change(roof: Roof, ref: np.ndarray) -> dict[str, float | int | N
     """The ENGINE'S level_change edges whose jump, measured from the points on both sides, is under 0.3 m (the contract
     threshold). ``share`` = their length over the total engine edge length; ``false_ft`` their feet; ``unverified`` counts
     edges with too few points to measure (not counted as false and not as correct)."""
-    total = sum(e.length_ft for e in roof.engine_edges)
+    total = sum(e.length_ft for e in roof.engine_edges if e.type not in UNCOUNTED_EDGE_TYPES)
     bad_len, bad, unver, n = 0.0, 0, 0, 0
+    fl = {f.id: f for f in roof.facets}
     for e in roof.engine_edges:
         if e.type != "level_change":
             continue
         n += 1
+        pair = [fl[i] for i in e.facets if i in fl][:2] if len(e.facets) >= 2 else []
+        if len(pair) == 2 and all(f.is_flat for f in pair):  # flat/flat: strip medians, independent of the engine's rule
+            step = strip_step(ref, pair[0].poly, pair[1].poly, e.p0, e.p1)
+            if step is None:
+                unver += 1
+            elif not step:
+                bad += 1
+                bad_len += e.length_ft
+            continue
         j = edge_jump_m(ref, e.p0, e.p1)
         if j is None:
             unver += 1

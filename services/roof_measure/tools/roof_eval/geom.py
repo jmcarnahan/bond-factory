@@ -21,7 +21,10 @@ FLAT_BAND = 0.5  # +- band around FLAT_RISE inside which flat/pitched is indeter
 PERIMETER_TYPES = ("eave", "rake", "flat_edge")
 RIDGE_HIP_TYPES = ("ridge", "hip")
 EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "parapet",
-              "transition", "flat_edge", "level_change", "unspecified")
+              "transition", "flat_edge", "level_change", "flat_seam", "unspecified")
+# drawn, never priced, never counted: a seam between two flat facets that is not a real level change (contract 0.4 / 0.5.1).
+# Harness metrics that walk edges (lengths, the false level-change share, cleanliness edge counts) must ignore it.
+UNCOUNTED_EDGE_TYPES = ("flat_seam",)
 
 
 @dataclass
@@ -99,9 +102,14 @@ class Roof:
     def area_where(self, flat: bool) -> float:
         return sum(f.area_sqft for f in self.facets if f.is_flat == flat)
 
+    @property
+    def counted_edges(self) -> list[Edge]:
+        """The edges metrics may count: every edge except the drawn-only types (``flat_seam``)."""
+        return [e for e in self.edges if e.type not in UNCOUNTED_EDGE_TYPES]
+
     def length_by_type(self) -> dict[str, float]:
         out: dict[str, float] = {}
-        for e in self.edges:
+        for e in self.counted_edges:
             out[e.type] = out.get(e.type, 0.0) + e.length_ft
         return out
 

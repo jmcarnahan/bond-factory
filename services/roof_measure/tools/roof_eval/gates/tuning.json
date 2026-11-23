@@ -277,19 +277,19 @@
    "min_n": 10
   },
   {
-   "name": "6 T2: mean two-sided facet IoU >= 0.60 (>= 10 labelled houses)",
+   "name": "6 T2 shape: mean two-sided facet IoU on all labels >= 0.60 (>= 10 labelled houses); fails loudly when high and medium confidence differ by > 0.15",
    "metric": "truth.T2.facet_iou.mean_iou",
-   "agg": "mean",
+   "agg": "t2_shape",
    "op": ">=",
    "value": 0.6,
+   "max_conf_gap": 0.15,
    "require": [
     "automation_ok"
    ],
    "where": [
     "tiers=T2"
    ],
-   "min_n": 10,
-   "on_insufficient": "skip"
+   "min_n": 10
   }
  ]
 }

@@ -24,7 +24,7 @@ from .geom import FLAT_RISE, load_roof, rings_of
 EDGE_STYLE = {"ridge": ("#d62728", "-"), "hip": ("#ff7f0e", "-"), "valley": ("#1f77b4", "-"), "eave": ("#111111", "-"),
               "rake": ("#2ca02c", "-"), "step_flashing": ("#e377c2", "--"), "wall_flashing": ("#e377c2", "--"),
               "level_change": ("#8c564b", "--"), "flat_edge": ("#7f7f7f", "-"), "transition": ("#9467bd", "--"),
-              "parapet": ("#7f7f7f", "-")}
+              "parapet": ("#7f7f7f", "-"), "flat_seam": ("#5a5a5a", "-")}
 CELL_M = 0.25
 MAX_CELLS = 1600
 
