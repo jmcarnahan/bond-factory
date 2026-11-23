@@ -7,7 +7,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "numpy>=2.0",
     "scipy>=1.14",
-    "shapely>=2.0",
+    "shapely>=2.1",
     "pyproj>=3.6",
     "laspy[lazrs]>=2.5",
     "requests>=2.32",

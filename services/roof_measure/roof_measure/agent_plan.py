@@ -17,7 +17,7 @@ from shapely.ops import unary_union
 
 from .agent_draft import score_draft
 from .classify import polygons_of
-from .skeleton import split_footprint
+from .ringgeom import split_footprint
 
 LEVEL_GAP_FT = 1.5  # sorted segment heights closer than this belong to one level (a hip's faces differ by < 1 ft)
 CUT_ANGLES_DEG = tuple(range(-12, 13, 3))  # tilts tried either side of each of the building's two main directions

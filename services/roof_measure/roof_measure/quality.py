@@ -23,6 +23,8 @@ LOW_COVERAGE_PCT = 70.0
 MISSES_AREA_PCT = 10.0  # model_uncovered_pct at or above this gives model_misses_roof_area
 LEVEL_MIN_SHARE = 0.05  # a plane counts for level_spread_ft when it covers this share of the planes' area
 FLAT_RISE = 0.5  # a plane or facet under this pitch (rise over 12) counts as flat
+ENGINE_REASONS = ("low_density", "outline_mismatch", "poor_fit", "not_exact_parcel", "low_slope_confirm",
+                  "priced_fallback", "planes_not_found")  # plane engine (contract 0.4); priced_fallback: priced totals are the drawn ones
 REASONS = ("multi_plane_simplified", "low_outline_coverage", "sparse_lidar", "parcel_street_match",
            "other_buildings_on_parcel", "agent_failed_fell_back", "bad_lidar_block", "model_misses_roof_area", "quality_failed")
 COPIED = ("parcel_street_match", "other_buildings_on_parcel", "agent_failed_fell_back")  # warning codes passed on
@@ -183,3 +185,52 @@ def assess(blockset: BlockSet, model: dict[str, Any], warning_codes: Iterable[st
     if not snap.planes:
         return {"quality": quality, "planes": [], "totals": {}}
     return {"quality": quality, "planes": [p.to_dict() for p in snap.planes], "totals": plane_totals(snap.planes)}
+
+
+# ----------------------------------------------------------------------------- the plane engine (contract 0.4)
+ENGINE_COPIED = (*COPIED, "not_exact_parcel")
+
+
+def engine_quality(res: Any, model: dict[str, Any], warning_codes: Iterable[str] = ()) -> dict[str, Any]:
+    """``model.quality`` of an engine result: the contract-0.4 signals, and the older keys with their engine analogues.
+
+    New keys: ``engine``, ``fit_covered``, ``fit_all``, ``coverage``, ``supported_pct``, ``density_pts_m2``,
+    ``parcel_match``, ``outline_source``, ``overhang_scale``, ``verdict``, ``outline_shift`` and ``reasons``.
+    Old keys, so a reader that knows only 0.3 still gets numbers: ``plane_mismatch_pct`` = share of roof points off
+    their facet's plane (100 x (1 - fit_covered)), ``outline_covered_pct`` = roof-point support over the outline,
+    ``model_uncovered_pct`` = share of roof points outside every facet, ``level_spread_ft``, ``planes_lidar`` (planes
+    used) and ``facets_model``.
+    """
+    q = res.quality
+    codes = set(warning_codes)
+    facets = model.get("facets", [])
+    big = [f for f in facets if f["plan_area_sqft"] >= LEVEL_MIN_SHARE * sum(g["plan_area_sqft"] for g in facets)]
+    heights = [sum(f["plane_eq"][0] * x + f["plane_eq"][1] * y + f["plane_eq"][2] for x, y in f["polygon"]) / len(f["polygon"])
+               for f in big]
+
+    def pct(v: float | None) -> float | None:
+        return None if v is None else round(100.0 * v, 1)
+
+    reasons = [r for r in q.reasons if r != "lidar_too_sparse"]
+    if res.totals.get("low_slope_confirm_sqft"):
+        reasons.append("low_slope_confirm")
+    reasons += [c for c in ENGINE_COPIED if c in codes and c not in reasons]
+    return {
+        "engine": "planes/1", "engine_params": res.params_hash, "verdict": q.verdict, "fit_covered": q.fit_covered, "fit_all": q.fit_all,
+        "fit_clear": q.fit_clear, "tree_cover_pct": q.tree_cover_pct, "coverage": q.coverage, "supported_pct": q.supported_pct, "density_pts_m2": q.density,
+        "parcel_match": q.parcel_match, "outline_source": q.outline_source, "overhang_scale": q.overhang_scale,
+        "outline_shift": q.outline_shift,
+        "plane_mismatch_pct": None if q.fit_covered is None else round(100.0 * (1.0 - q.fit_covered), 1),
+        "outline_covered_pct": None if q.roof_cover_of_outline is None else round(min(100.0, 100.0 * q.roof_cover_of_outline), 1),
+        "model_uncovered_pct": None if q.coverage is None else round(100.0 * (1.0 - q.coverage), 1),
+        "level_spread_ft": round(max(heights) - min(heights), 1) if heights else None,
+        "planes_lidar": len({f.label for f in res.facets}),
+        "facets_model": len(facets), "reasons": reasons}
+
+
+def assess_engine(res: Any, model: dict[str, Any], warning_codes: Iterable[str] = ()) -> dict[str, Any]:
+    """The assessment ``envelope.build_envelope`` takes for an engine result: ``{"quality", "planes", "totals"}``."""
+    from .engine.adapter import engine_planes, engine_totals
+
+    return {"quality": engine_quality(res, model, warning_codes), "planes": engine_planes(model),
+            "totals": engine_totals(res)}

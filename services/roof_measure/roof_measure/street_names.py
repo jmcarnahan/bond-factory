@@ -108,7 +108,7 @@ def _split_direction(key: str) -> tuple[str, str]:
 def same_street(a: str, b: str) -> bool:
     """True when two street keys (``street_key``) name the same street.
 
-    A missing directional on one side is tolerated ("182ND STREET" vs "W 182ND STREET"); a street type missing on one
+    A missing directional on one side is tolerated ("100TH STREET" vs "W 100TH STREET"); a street type missing on one
     side is tolerated only when the other side's name is otherwise identical and has exactly one type word.
     """
     if not a or not b:

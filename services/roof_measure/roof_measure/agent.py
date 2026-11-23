@@ -32,7 +32,7 @@ from .agent_tools import NUMBER_TOL, Workspace, _numbers, _r  # noqa: F401 - re-
 from .classify import BlockSet, RoofBlock, complete_tiling
 from .deadline import Deadline
 from .pipeline_stages import PipelineError
-from .skeleton import measure
+from .ringgeom import measure
 
 log = logging.getLogger(__name__)
 

@@ -6,15 +6,17 @@ printable three-page report (length diagram, area diagram, summary). Pure drawin
 
 ## Public API (`package:bond_roof_ui/bond_roof_ui.dart`)
 
-- `RoofDiagramView(scene, {fit})`: a widget that paints a `Scene` with `ScenePainter`
+- `RoofDiagramView(scene, {fit, onFacetTap})`: a widget that paints a `Scene` with `ScenePainter`
   (a `CustomPainter`), scaled to fit. Text is baked into the scene, so labels are chosen when the
-  scene is built.
-- `RoofReportStrip({model | measurement, labels, filename, showActions, showTotals, onStatus})`:
+  scene is built. `onFacetTap(String facetId)` reports the facet under a tap (scenes of the length and
+  area diagrams carry the facet outlines); the widget draws no overlay, so a host shows its own inline control
+  (for example a Flat | Pitched choice under the diagram). `sceneFit` and `facetIdAt` expose the hit test.
+- `RoofReportStrip({model | measurement, labels, filename, showActions, showTotals, onStatus, onFacetTap})`:
   Print, Save PDF and Share PDF buttons with inline status, the totals table, then the length
   diagram, area diagram and summary. Under 600 px wide it builds the compact (400 x 500)
   scenes. Scenes are cached per model, labels and layout. No dialogs, snackbars or tooltips.
 - `RoofTotalsTable(measurement, {labels})`: inline text rows for the totals, both drip edge and
-  both ridge cap variants, the verification verdict with its first note, and the generated time.
+  both ridge cap variants, pitched and flat roofing on separate rows when the envelope has the 0.4 `roofing_*` totals, the verification verdict with its first note, and the generated time.
 - `RoofReport.pages(model, {style, labels, layout})`, `pdfBytes`, `printReport`, `saveReport`,
   `shareReport`: the scenes, the PDF (Letter landscape) and the hand-off to the OS print
   dialog or share sheet through package `printing`. Both are OS-owned surfaces, so they are

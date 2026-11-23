@@ -48,7 +48,7 @@ class Candidate:
 
 # ----------------------------------------------------------------------------- finding the buildings
 def find_candidates(res: Any, address: str, lat_lng: tuple[float, float] | None, deadline: Deadline,
-                    blocks_path: str | Path | None = None) -> list[Candidate]:
+                    blocks_path: str | Path | None = None, pinned: bool = True) -> list[Candidate]:
     """The other outlines of the main building's footprint, largest first (``[]`` when there are none).
 
     Runs the footprint chain again for the same point: every request is in the fetch cache from the main run, so
@@ -61,7 +61,10 @@ def find_candidates(res: Any, address: str, lat_lng: tuple[float, float] | None,
 
     try:
         lat, lng, parts, _ = _locate(address, lat_lng)
-        fp = fp_mod.fetch_footprint(lat, lng, parts, deadline=deadline)
+        chosen = ((getattr(res, "model", None) or {}).get("source") or {}).get("building") or {}
+        fp = fp_mod.fetch_footprint(  # the same choice as the measurement: the caller's pin, or the outline they named
+            lat, lng, parts, deadline=deadline, point_given=pinned and lat_lng is not None,
+            building_outline_id=chosen.get("outline_id") if chosen.get("chosen_by") == "user" else None)
     except Exception as exc:  # noqa: BLE001 - the extra buildings are an addition, never a way to fail
         log.info("other buildings: footprint lookup failed (%s)", type(exc).__name__)
         return []
@@ -117,19 +120,26 @@ def _fp_dict(cand: Candidate) -> dict[str, Any]:
 
 
 def measure_one(index: int, cand: Candidate, main_frame: dict[str, Any], address: dict[str, Any], out_dir: Path,
-                deadline: Deadline, builder: Callable[..., Any] | None = None) -> dict[str, Any]:
-    """The ``other_buildings`` entry of one outline; every failure becomes ``status`` ``failed`` plus a job code."""
+                deadline: Deadline, builder: Callable[..., Any] | None = None, engine: str = "blocks") -> dict[str, Any]:
+    """The ``other_buildings`` entry of one outline; every failure becomes ``status`` ``failed`` plus a job code.
+    ``engine="planes"`` measures it with the plane engine (the same engine as the main building)."""
     from .pipeline import run_pipeline
 
     work = out_dir / f"lot_{index}"
     try:
         work.mkdir(parents=True, exist_ok=True)
-        with cache.deadline_scope(deadline):
-            base = (builder or build_blocks)(cand, main_frame, address, work / "blocks.json")
-        deadline.check("blocks")
-        res = run_pipeline(address.get("formatted") or address.get("line1") or "lot building", work,
-                           "lidar_skeleton", blocks_path=work / "blocks.json", deadline=deadline, verify=False,
-                           render=False)
+        if engine == "planes":
+            from .pipeline_engine import run_planes_outline
+
+            res = run_planes_outline(cand, main_frame, address, work, deadline)
+            base = res.blockset
+        else:
+            with cache.deadline_scope(deadline):
+                base = (builder or build_blocks)(cand, main_frame, address, work / "blocks.json")
+            deadline.check("blocks")
+            res = run_pipeline(address.get("formatted") or address.get("line1") or "lot building", work,
+                               "lidar_skeleton", blocks_path=work / "blocks.json", deadline=deadline, verify=False,
+                               render=False)
         env = res.envelope
         planes_only = bool((env["model"].get("source") or {}).get("planes_only"))
         entry = {"index": index, "footprint": _fp_dict(cand), "offset_ft": offset_ft(main_frame, base.frame),
@@ -146,13 +156,14 @@ def measure_one(index: int, cand: Candidate, main_frame: dict[str, Any], address
 
 # ----------------------------------------------------------------------------- the envelope
 def add_other_buildings(res: Any, *, address: str, lat_lng: tuple[float, float] | None, deadline: Deadline | None,
-                        out_dir: str | Path, blocks_path: str | Path | None = None,
+                        out_dir: str | Path, blocks_path: str | Path | None = None, pinned: bool = True,
                         finder: Callable[..., list[Candidate]] | None = None,
-                        builder: Callable[..., Any] | None = None) -> None:
+                        builder: Callable[..., Any] | None = None, engine: str = "blocks") -> None:
     """Measure the other buildings of ``res`` (a ``PipelineResult``) and add the envelope keys; no-op when none."""
     deadline = deadline or Deadline.after(10_000)
     try:
-        cands = (finder or find_candidates)(res, address, lat_lng, deadline, blocks_path)
+        cands = (finder or find_candidates)(res, address, lat_lng, deadline, blocks_path,
+                                           **({} if finder else {"pinned": pinned}))
     except Exception as exc:  # noqa: BLE001 - a lookup bug must not fail the main result
         log.info("other buildings: lookup failed (%s)", type(exc).__name__)
         return
@@ -167,7 +178,7 @@ def add_other_buildings(res: Any, *, address: str, lat_lng: tuple[float, float] 
             entries.extend(_failed(i, c, TIMEOUT) for i, c in enumerate(cands[n - 1:], n))
             break
         entries.append(measure_one(n, cand, main_frame, res.blockset.address, Path(out_dir), Deadline.after(share),
-                                   builder))
+                                   builder, engine))
     try:
         _attach(res.envelope, entries)
     except Exception as exc:  # noqa: BLE001 - the lot is an addition: it never fails or pollutes the main result

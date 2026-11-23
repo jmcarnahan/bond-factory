@@ -23,6 +23,7 @@ class RoofReportStrip extends StatefulWidget {
     this.showActions = true,
     this.showTotals = true,
     this.onStatus,
+    this.onFacetTap,
   }) : assert((model == null) != (measurement == null), 'pass exactly one of model or measurement');
 
   final RoofModel? model;
@@ -42,6 +43,10 @@ class RoofReportStrip extends StatefulWidget {
 
   /// Called with each inline status text (building, done, failed).
   final void Function(String status)? onStatus;
+
+  /// Called with a facet id when the user taps a facet of the length or area diagram. The strip
+  /// draws nothing in response; the host shows its own inline controls.
+  final void Function(String facetId)? onFacetTap;
 
   @override
   State<RoofReportStrip> createState() => _RoofReportStripState();
@@ -181,7 +186,7 @@ class _RoofReportStripState extends State<RoofReportStrip> {
                 ),
                 child: AspectRatio(
                   aspectRatio: scenes[i].width / scenes[i].height,
-                  child: RoofDiagramView(scenes[i]),
+                  child: RoofDiagramView(scenes[i], onFacetTap: widget.onFacetTap),
                 ),
               ),
             ),

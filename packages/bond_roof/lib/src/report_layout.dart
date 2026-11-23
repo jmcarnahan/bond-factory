@@ -30,6 +30,22 @@ enum ReportLayout {
   /// Legend rows per column for the ten edge types (wide 4 + 3 + 3, compact 5 + 5).
   List<int> get legendRows => this == wide ? const [4, 3, 3] : const [5, 5];
 
+  /// Legend rows per column for [count] entries: the ten edge types of contract 0.2 keep their
+  /// layout; envelope 0.4 adds up to two more, filled column by column.
+  List<int> legendRowsFor(int count) {
+    if (count <= 10) return legendRows;
+    final perCol = (count + legendColumns - 1) ~/ legendColumns;
+    var left = count;
+    return [
+      for (var c = 0; c < legendColumns; c++)
+        () {
+          final n = left < perCol ? left : perCol;
+          left -= n;
+          return n;
+        }()
+    ];
+  }
+
   /// Rows needed for [count] items in [columns] columns.
   static int rowsFor(int count, int columns) => (count + columns - 1) ~/ columns;
 }

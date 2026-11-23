@@ -1,5 +1,84 @@
 # roof_measure changelog
 
+## 0.5.0 (pipeline version; the plane engine, contract in ../../docs/contract-0.4.md)
+
+`PIPELINE_VERSION` 0.4.0 to 0.5.0 (changes since 0.4.0, released as 0.5.0; the 0.4.1 section below was only a working label for the preparation and was never released) (keys the result cache: cached results are recomputed; the service's cache key also takes
+the engine). One new option, one new edge vocabulary, no behaviour change on the default path: with `engine="blocks"` the
+block pipeline's envelopes are identical to the preparation's apart from the version string (the four 0.2 examples and the planes-only
+example differ in that line only).
+
+- **New** `measure(..., engine="blocks" | "planes")` (also `run_pipeline`, the child process, the job service request
+  field `engine`, `lot.add_other_buildings`). `"planes"` runs `roof_measure/engine` (`pipeline_engine.py`): footprint chain
+  and LiDAR as before, roof points by `engine.points`, `measure_roof`, `engine.adapter`, the usual envelope. No agent, no
+  verifier (verdict `unverified`), no fallback to the block path: a refusal or failure raises the codes the block path would
+  (`lidar_too_sparse` under 4 points/m2, `no_footprint`, `timeout`, `measurement_failed`; an engine `bad_points` refusal is
+  `no_lidar_coverage`). `ValueError` for `planes` with `lidar_agent`, `solar_agent`, `blocks_path` or `solar_fixture`.
+  The other buildings of a lot are measured with the same engine. Work dir: `<slug>_model.json`, `<slug>_engine.json`
+  (the harness result); no blocks file and no PNG.
+- **New edge types** `flat_edge` and `level_change` (with `jump_ft`) in `model.EDGE_TYPES`; `totals.lengths_ft` gains both keys
+  on an engine model (and on any model that has such an edge; the block path's output keeps its ten keys); `validate` accepts
+  the ten or the twelve keys, so results stored before 0.5.0 still validate.
+- **One edge typer** (`engine/edges.py`): a pitched facet's level high side is a `rake` with `high_edge` (never a ridge);
+  a jump is a `level_change` only when the points on both sides show 0.3 m or more; crease type from the slopes of both
+  planes across the segment (a concave facet no longer turns a valley into a hip); coplanar facets and one flat membrane share
+  no edge (`coplanar_seams` reports them); shared boundaries match at 1 mm (was 2 cm: it shortened every junction). Totals:
+  `ridge_exterior_ft` is `high_edge_ft`; `area_sqft_roof_edge` is the DRAWN area (it repeated the priced one).
+- **New envelope keys** (additive, see the contract): the four cost-sheet keys with priced roof-edge values, `roofing_*`,
+  `low_slope_confirm_sqft`, `area_sqft_wall_line`, `area_sqft_roof_edge`, `outline_perimeter_wall_ft`, `overhang_ft_median`,
+  `flat_edge_ft`, `level_change_ft`, `plane_count`, `complexity`; facet keys `roof_type`, `pitch_fit`, `pitch_sigma`,
+  `borderline`, `supported_pct`, `points`, `rms_ft`, `plane_eq`; `model.quality` engine signals and verdict; `model.source.engine`,
+  `engine_params`; warning codes `low_slope_confirm`, `outline_mismatch`, `poor_fit`, `low_density`.
+- **New example** `fixtures/roof_engine/roof_measurement_0.4_engine.json` (a synthetic flat + gable + step roof through the real
+  engine; `make fixtures` writes it, deterministic). Modules: `engine/adapter.py`, `pipeline_engine.py`,
+  `synth_engine_envelope.py`, `quality.assess_engine`.
+- **Fewer dashed lines**: two flat facets with no verified jump share no edge; `transition` only beside a flat facet of 8 m2 and
+  5% of the roof (else the planes decide, or no edge); level-change stubs (under 1 m, or under 0.45 m high and under 2 m long)
+  are absorbed and reported in `model.debug.edge_diagnostics`. `fit_clear` and `tree_cover_pct` are REPORTED signals only; `poor_fit` still tests `fit_all` (a canopy-free verdict hid wrong surfaces). `model.quality.engine_params` and the service cache key carry the parameter hash; reasons
+  `priced_fallback` and `planes_not_found` documented.
+- **One priced area in engine envelopes**: `totals.area_sqft` and `totals.squares` are the priced area (== `planes_surface_area_sqft`
+  == `roofing_pitched_sqft` + `roofing_flat_sqft`); the drawn area is `area_sqft_roof_edge`; `model.totals` stay drawn and carry a `note`.
+- **`model.origin.epsg`** (engine results): the projected CRS of the model's frame, so a WGS84 point can be moved into the model's feet.
+- **No verifier on the engine path**: `verification.skipped` is `"engine"`, no `verifier_unverified` warning.
+- Tests changed on purpose: the `0.4.1` pipeline-version assertions (`test_fixtures_0_2`, `test_envelope_quality`,
+  `test_round3`) now say 0.5.0; `test_engine_synth` no longer expects `area_sqft_roof_edge` to equal the priced area.
+
+## 0.4.1 (pipeline version; roof engine preparation, contract draft in ../../docs/contract-0.4.md)
+
+`PIPELINE_VERSION` 0.4.0 to 0.4.1 (keys the result cache: cached 0.4.0 results are recomputed). Additive keys
+`model.source.building` and `model.quality.parcel_match`; building selection by point; `building_outline_id`; one
+deliberate behaviour change (LiDAR project ranking); the skeleton split changes no number. The four 0.2 example fixtures and
+the planes-only example carry the new version string (only that line changed). The engine release will be 0.5.0.
+
+- **Behaviour change: LiDAR project order.** `lidar.rank_projects`: surveys with an expected density of at least
+  `DENSE_ENOUGH` (8.0 points/m2) come first, NEWEST first (roofs change, so a 2023 survey at 15 beats a 2016 one at 20);
+  then the rest, densest first, newest the tie-break (an older 13 beats a newer 5; a 2021 at 6 beats a 2023 at 5).
+  A listing with no point count is "unknown": tried after the dense-enough ones and before the known-thin ones, newest
+  first. A survey that passes but gives under 8 points/m2 ON THE ROOF does not end the search: the next candidate is fetched
+  and the cloud with the higher roof density wins (`meta.roof_density`, `meta.choice`; a project average of 9 can mean 5
+  on one roof). At most `MAX_CANDIDATES` (3) are tried; the cap counts outages too, so when the first three surveys fail on
+  a network outage a fourth one that used to be reached is not. Before: newest first, densest second, every project tried. The 4.0 points/m2 roof
+  refusal and the fall back from a thin or failing first choice are unchanged. Test changed:
+  `test_data_lidar_blocks.py::test_select_project_ranks_by_density_rule` (was `..._newest_then_densest`).
+- **Right building.** `footprint_county.pick_parcel(..., point_given=True)` and `fetch_county(..., point_given=True)`: with the
+  caller's rooftop point (`measure(lat=, lng=)`) the parcel that contains it wins, then the outline on that parcel that
+  contains or is nearest to the point. The label stays text based: `exact` only when situs number and street match.
+  A point on no parcel never reports `exact` (it reports `street`/`nearest` and the usual street-match warning).
+  Without a point the old rule holds. The job service (`runner.py`) passes `pinned=False` for the geocoder's street point.
+- **New** `measure(..., building_outline_id=None)` (also `run_pipeline`, `fetch_footprint`, `fetch_county`): exactly that
+  county outline, `Footprint.match == "given"`, no street-match warning; an unknown id is `no_footprint`, an outage is
+  `upstream_unavailable`, and the chain never falls through to another building. The parcel is the one under the named
+  outline (an outline on no parcel is an error), and the other buildings of that parcel are still reported (`other_info`).
+- **New envelope keys** (additive): `model.source.building` `{parcel_id, outline_id, outline_centroid, chosen_by}` and
+  `model.quality.parcel_match` (`exact | street | nearest | given`, county footprints, when `model.quality` exists);
+  `outline_centroid` is a point guaranteed inside the outline; an outline without an id gets a stable `geo-<hash>` id
+  (never the text "None") and a warning.
+  `lot.py` repeats the measurement's choice when it looks for the other buildings on the parcel.
+- **Internal.** `ringgeom.py` holds the CGAL-free roof geometry (rings, `measure`, `split_footprint`, `rect_fit`, flat and
+  shed blocks, `block_geometry`); `skeleton.py` keeps only `hip_roof_edges` and imports `compas_cgal` lazily, re-exporting
+  the moved names. `model`, `planes_model` and `classify` import without CGAL. `engine/points.py` `roof_points` is the roof-point
+  selection formerly inline in `blocks.segment_blocks` (identical numbers).
+- Docs: `docs/contract-0.4.md` (draft: the keys of the engine release and which are already emitted).
+
 ## 0.4.0 (pipeline version; contract name unchanged, see ../../docs/contract-0.3.md)
 
 <!-- Sections below are merged by the director from the three builders of the roof-houses round. -->

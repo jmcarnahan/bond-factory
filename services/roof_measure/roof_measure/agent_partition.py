@@ -21,7 +21,7 @@ from shapely.ops import unary_union
 
 from .agent_draft import capture_gables, remap_gables
 from .classify import BlockSet, RoofBlock, assign_levels, clean_polygon, polygons_of, ring_of
-from .skeleton import block_geometry
+from .ringgeom import block_geometry
 
 CLOSE_FT = 1.0
 OPEN_FT = 1.0

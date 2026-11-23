@@ -347,3 +347,89 @@ def test_corrupt_project_falls_through_to_next(monkeypatch):
     monkeypatch.setattr(lidar, "fetch_points", fetch)
     pc = lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
     assert pc.meta["project"] == "old_2016" and pc.meta["fallback_used"] is True
+
+
+# ---------------------------------------------------------------- project choice by expected density (contract 0.4 prep)
+def _surveys():
+    return [lidar.LidarProject("new_2023", "u/new", 2023, 5.0, 1000.0),
+            lidar.LidarProject("old_2016", "u/old", 2016, 13.0, 1000.0)]
+
+
+def test_an_older_13_point_survey_beats_a_newer_5_point_one(monkeypatch):
+    fp = box(0, 0, 10, 10)
+    asked = []
+    monkeypatch.setattr(lidar, "select_project", lambda lat, lng: _surveys())  # listed newest first, as before
+    monkeypatch.setattr(lidar, "fetch_points", lambda p, *a: asked.append(p.name) or _cloud(1500, fp, p.name))
+    pc = lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
+    assert pc.meta["project"] == "old_2016" and pc.meta["fallback_used"] is False
+    assert asked == ["old_2016"]  # the newer, thinner survey was never fetched
+
+
+def test_equal_density_keeps_newest_first_and_a_thin_best_still_falls_back(monkeypatch):
+    fp = box(0, 0, 10, 10)
+    assert [p.name for p in lidar.rank_projects(_projects())] == ["new_2023", "old_2016"]
+    monkeypatch.setattr(lidar, "select_project", lambda lat, lng: _surveys())
+    monkeypatch.setattr(lidar, "fetch_points",
+                        lambda p, *a: _cloud(100 if p.name.startswith("old") else 1500, fp, p.name))  # the 13 is thin
+    pc = lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
+    assert pc.meta["project"] == "new_2023" and pc.meta["fallback_used"] is True and "old_2016" in pc.meta["skipped"][0]
+
+
+def test_at_most_three_candidates_are_tried_and_the_refusal_stays(monkeypatch):
+    fp = box(0, 0, 10, 10)
+    five = [lidar.LidarProject(f"p{i}_{2020 + i}", f"u/{i}", 2020 + i, 10.0 - i, 1000.0) for i in range(5)]
+    asked = []
+    monkeypatch.setattr(lidar, "select_project", lambda lat, lng: five)
+    monkeypatch.setattr(lidar, "fetch_points", lambda p, *a: asked.append(p.name) or _cloud(300, fp, p.name))  # 3.0/m2
+    with pytest.raises(LidarTooSparse):
+        lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
+    assert asked == ["p2_2022", "p1_2021", "p0_2020"]  # all dense enough: newest first and lidar.MIN_ROOF_DENSITY == 4.0
+
+
+def _lp(name, year, dens):
+    return lidar.LidarProject(name, f"u/{name}", year, dens, 1000.0)
+
+
+def test_rank_rule_dense_enough_newest_first_then_densest():
+    names = lambda ps: [p.name for p in lidar.rank_projects(ps)]
+    assert names([_lp("o16_20", 2016, 20.0), _lp("n23_15", 2023, 15.0)]) == ["n23_15", "o16_20"]
+    assert names([_lp("n23_5", 2023, 5.0), _lp("o19_13", 2019, 13.0)]) == ["o19_13", "n23_5"]
+    assert names([_lp("n23_5", 2023, 5.0), _lp("o21_6", 2021, 6.0)]) == ["o21_6", "n23_5"]
+    assert names([_lp("a", 2020, 8.0), _lp("b", 2022, 7.9), _lp("c", 2018, 30.0)]) == ["a", "c", "b"]
+    assert lidar.DENSE_ENOUGH == 8.0 and lidar.MAX_CANDIDATES == 3
+
+
+def test_unknown_density_is_tried_after_dense_before_known_thin():
+    names = lambda ps: [p.name for p in lidar.rank_projects(ps)]
+    ps = [_lp("thin_2023", 2023, 5.0), _lp("unk_2019", 2019, 0.0), _lp("unk_2021", 2021, 0.0), _lp("dense_2016", 2016, 12.0)]
+    assert names(ps) == ["dense_2016", "unk_2021", "unk_2019", "thin_2023"]
+
+
+def test_a_flattering_project_average_does_not_end_the_search_when_the_roof_is_thin(monkeypatch):
+    fp = box(0, 0, 10, 10)
+    asked = []
+    clouds = {"new_2023": 500, "old_2016": 1300}  # 5 and 13 points/m2 on THIS roof
+    monkeypatch.setattr(lidar, "select_project", lambda lat, lng: [_lp("new_2023", 2023, 9.0), _lp("old_2016", 2016, 13.0)])
+    monkeypatch.setattr(lidar, "fetch_points", lambda p, *a: asked.append(p.name) or _cloud(clouds[p.name], fp, p.name))
+    pc = lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
+    assert asked == ["new_2023", "old_2016"] and pc.meta["project"] == "old_2016"
+    assert pc.meta["fallback_used"] is True and pc.meta["roof_density"] == 13.0
+    assert "old_2016 gives 13.0" in pc.meta["choice"] and any("beaten by old_2016" in r for r in pc.meta["skipped"])
+
+
+def test_the_thin_first_roof_is_kept_when_the_next_is_no_better(monkeypatch):
+    fp = box(0, 0, 10, 10)
+    clouds = {"new_2023": 600, "old_2016": 450}
+    monkeypatch.setattr(lidar, "select_project", lambda lat, lng: [_lp("new_2023", 2023, 9.0), _lp("old_2016", 2016, 8.5)])
+    monkeypatch.setattr(lidar, "fetch_points", lambda p, *a: _cloud(clouds[p.name], fp, p.name))
+    pc = lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
+    assert pc.meta["project"] == "new_2023" and pc.meta["fallback_used"] is False and "under 8" in pc.meta["choice"]
+
+
+def test_a_dense_roof_on_the_first_survey_needs_no_second_fetch(monkeypatch):
+    fp = box(0, 0, 10, 10)
+    asked = []
+    monkeypatch.setattr(lidar, "select_project", lambda lat, lng: [_lp("new_2023", 2023, 9.0), _lp("old_2016", 2016, 13.0)])
+    monkeypatch.setattr(lidar, "fetch_points", lambda p, *a: asked.append(p.name) or _cloud(900, fp, p.name))  # 9 on the roof
+    pc = lidar.fetch_best_points(33.0, -118.0, 30, 32611, footprint_m=fp)
+    assert asked == ["new_2023"] and pc.meta["fallback_used"] is False

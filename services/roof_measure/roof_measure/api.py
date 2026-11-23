@@ -44,6 +44,7 @@ class MeasureRequest(BaseModel):
     lng: float | None = Field(default=None, ge=-180, le=180)
     method: Method | Literal["fixture"] = "auto"
     verify: bool = True
+    engine: Literal["blocks", "planes"] = "blocks"  # "planes": the plane engine (no agent, no verifier)
     force: bool = False
     blocks_fixture: str | None = None  # debug only: NAME of a blocks JSON in fixtures/
     solar_fixture: str | None = None  # debug only: NAME of a Solar insights JSON in fixtures/

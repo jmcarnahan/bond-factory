@@ -56,6 +56,8 @@ class RoofLabels {
         EdgeType.parapet => legendParapet,
         EdgeType.transition => legendTransition,
         EdgeType.unspecified => legendUnspecified,
+        EdgeType.flatEdge => legendFlatEdge,
+        EdgeType.levelChange => legendLevelChange,
       };
 
   @override
@@ -81,6 +83,15 @@ class RoofLabels {
   String get legendParapet => _m['legend_parapet']!;
   String get legendTransition => _m['legend_transition']!;
   String get legendUnspecified => _m['legend_unspecified']!;
+  String get legendFlatEdge => _m['legend_flat_edge']!;
+  String get legendLevelChange => _m['legend_level_change']!;
+  String get lowSlopeMarker => _m['low_slope_marker']!;
+  String get levelChangeJump => _m['level_change_jump']!;
+  String get totalsRoofingPitched => _m['totals_roofing_pitched']!;
+  String get totalsRoofingFlat => _m['totals_roofing_flat']!;
+  String get totalsLowSlopeConfirm => _m['totals_low_slope_confirm']!;
+  String get totalsPricedArea => _m['totals_priced_area']!;
+  String get totalsAsDrawn => _m['totals_as_drawn']!;
   String get lengthTitle => _m['length_title']!;
   String get lengthCaption => _m['length_caption']!;
   String get areaTitle => _m['area_title']!;

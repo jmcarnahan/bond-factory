@@ -14,7 +14,8 @@ from shapely.ops import unary_union
 from .agent_draft import absorb_small_gaps, capture_gables, remap_gables
 from .agent_plan import PlanTools
 from .classify import RoofBlock, polygons_of, ridge_azimuth, ring_of
-from .skeleton import block_geometry, hip_roof_edges, measure, rect_fit, signed_area, split_footprint
+from .ringgeom import block_geometry, measure, rect_fit, signed_area, split_footprint
+from .skeleton import hip_roof_edges
 
 NUMBER_TOL = 0.006
 

@@ -19,7 +19,7 @@ from collections.abc import Sequence
 
 from .classify import RoofBlock, ridge_azimuth
 from .model import ModelError
-from .skeleton import block_geometry
+from .ringgeom import block_geometry
 
 REPAIRED_NOTE = "Gable edges {edges} could not be used on this outline after fitting; drawn as a hip."
 

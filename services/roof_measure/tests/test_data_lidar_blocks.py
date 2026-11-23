@@ -51,7 +51,7 @@ def test_point_cloud_npz_round_trip(tmp_path):
     assert np.array_equal(back.x, pc.x) and back.meta == pc.meta and len(back) == 5
 
 
-def test_select_project_ranks_newest_then_densest(tmp_path, monkeypatch):
+def test_select_project_ranks_by_density_rule(tmp_path, monkeypatch):
     monkeypatch.setenv("ROOF_MEASURE_CACHE", str(tmp_path / "c"))
 
     def sq(x0, y0, x1, y1):
@@ -78,11 +78,11 @@ def test_select_project_ranks_newest_then_densest(tmp_path, monkeypatch):
     monkeypatch.setattr(cache, "_send", send)
     ranked = lidar.select_project(33.5, -118.5)
     names = [p.name for p in ranked]
-    # newest year first; within one year, densest first. The 2016 survey is last despite the highest count.
-    assert names[0] == "CA_LosAngeles_1_B23" and names[1] == "CA_OtherPlace_2020"
-    assert names[-1] == "USGS_LPC_CA_LosAngeles_2016_LAS_2018"
+    # the 2016 survey (~1/m2) is the densest of three thin ones; equal densities: newest first.
+    assert names[0] == "USGS_LPC_CA_LosAngeles_2016_LAS_2018"
+    assert names[1:] == ["CA_LosAngeles_1_B23", "CA_OtherPlace_2020"]
     assert "Elsewhere_2024" not in names
-    assert ranked[0].year == 2023 and ranked[-1].year == 2016 and ranked[0].span_m > 50_000
+    assert ranked[0].year == 2016 and ranked[1].year == 2023 and ranked[0].span_m > 50_000
 
 
 @network

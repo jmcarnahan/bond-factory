@@ -78,10 +78,13 @@ Rules:
 - `facets[].kind` is `flat | sloped`. Every facet belongs to exactly one block. Facet
   polygons tile the block polygon (holes excluded).
 - `edges[].type` is one of `eave | rake | ridge | hip | valley | step_flashing |
-  wall_flashing | parapet | transition | unspecified`. Every edge is a straight segment
+  wall_flashing | parapet | transition | unspecified`, plus `flat_edge | level_change` in a model from the plane
+  engine (contract-0.4.md; an edge with `level_change` carries `jump_ft`). Every edge is a straight segment
   (two points). Polylines are split into segments. `facets` lists the 1 or 2 facet ids
   the edge bounds.
-- `totals.lengths_ft` has ALL ten keys, zero when absent. `squares = total_area_sqft / 100`.
+- `totals.lengths_ft` has ALL ten keys of the first list above, zero when absent; a model from the plane engine
+  (and any model with a `flat_edge` or `level_change` edge) has all twelve. A reader treats a missing `flat_edge` or
+  `level_change` as zero. `squares = total_area_sqft / 100`.
 - `predominant_pitch_rise` is the half-pitch bucket (0, 0.5, 1.0, ...; flat counts as 0) whose
   facets have the largest summed `area_sqft`; ties go to the lower pitch.
 - Holes are subtracted from `plan_area_sqft` and `area_sqft` of the facet that contains them

@@ -16,6 +16,7 @@ from roof_measure.footprint_types import FootprintError, FootprintUnavailable
 from roof_measure.jobs import JobRunner, JobStore
 from roof_measure.model_cleanup import _dedupe, clean_facets
 from roof_measure.settings import Settings
+from roof_measure.version import PIPELINE_VERSION
 
 TOKEN = "t" * 32
 BODY = {"address": "100 Example Ave, Sampletown, CA 90000", "lat": 1.5, "lng": 2.5}
@@ -152,7 +153,7 @@ def test_healthz_reports_abandoned_workers_and_queued_jobs_fail_when_all_are_stu
 
     c = make(tmp_path, stuck, job_timeout_s=0.1, workers=1, queue_max=5)
     c.app.state.service.runner.grace_s = 0.1
-    assert c.get("/healthz").json() == {"status": "ok", "pipeline_version": "0.4.0", "abandoned_workers": 0}
+    assert c.get("/healthz").json() == {"status": "ok", "pipeline_version": PIPELINE_VERSION, "abandoned_workers": 0}
     a = c.post("/v1/measurements", json={**BODY, "lat": 1.0}).json()
     queued = c.post("/v1/measurements", json={**BODY, "lat": 2.0}).json()
     assert wait(c, a["id"], secs=5)["error"]["code"] == "timeout"

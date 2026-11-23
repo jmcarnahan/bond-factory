@@ -82,7 +82,8 @@ def _run_measurement(req: dict[str, Any], out_dir: Path, deadline: Deadline, on_
     try:
         res = run_pipeline(req["address"], out_dir, req["method"], blocks_path=_fixture(settings, req.get("blocks_fixture")),
                            solar_fixture=_fixture(settings, req.get("solar_fixture")), deadline=deadline,
-                           lat_lng=lat_lng, on_stage=on_stage, verify=req["verify"], no_agent=False)
+                           lat_lng=lat_lng, on_stage=on_stage, verify=req["verify"], no_agent=False,
+                           pinned=lat_lng_given, engine=req.get("engine", "blocks"))  # the geocoder's point is a street point, not a roof
     finally:
         if req.get("force"):
             cache.force_refresh(False)

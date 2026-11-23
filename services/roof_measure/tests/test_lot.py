@@ -291,3 +291,32 @@ def test_attaching_the_lot_never_raises_and_writes_no_lot_keys_on_failure(monkey
                             finder=lambda *a, **k: [cand("B2", 424.0)])
     assert not any(k.startswith("lot_") for k in env["totals"]) and "other_buildings" not in env
     assert env["warning_codes"] == ["other"]
+
+
+def _county_res(chosen):
+    return SimpleNamespace(footprint_source="lariac", model={"source": {"building": chosen}},
+                           blockset=SimpleNamespace(footprint_meta={"id": "MAIN", "provider": "lacounty_lariac_2020"}))
+
+
+def test_the_candidate_search_repeats_the_measurements_building_choice(monkeypatch):
+    from roof_measure import footprint
+
+    seen = []
+    fp = Footprint(provider="lacounty_lariac_2020", id="MAIN", polygon_wgs84=Polygon([(0, 0), (1, 0), (1, 1)]),
+                   height_ft=None, area_sqft=2000.0, parcel_id="1")
+    monkeypatch.setattr(footprint, "fetch_footprint", lambda *a, **k: seen.append(k) or fp)
+    ll = (33.0, -118.0)
+    lot.find_candidates(_county_res({"outline_id": "MAIN", "chosen_by": "user"}), ADDR, ll, Deadline.after(60))
+    assert seen[-1]["building_outline_id"] == "MAIN" and seen[-1]["point_given"] is True  # the id path
+    lot.find_candidates(_county_res({"outline_id": "MAIN", "chosen_by": "auto"}), ADDR, ll, Deadline.after(60))
+    assert seen[-1]["building_outline_id"] is None and seen[-1]["point_given"] is True  # the pin path
+    lot.find_candidates(_county_res({"outline_id": "MAIN", "chosen_by": "auto"}), ADDR, ll, Deadline.after(60),
+                        pinned=False)
+    assert seen[-1]["point_given"] is False  # a street point is not a roof pin
+
+
+def test_pinned_reaches_the_candidate_search_from_the_pipeline(tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: seen.append(k) or [])
+    call(tmp_path, include_other_buildings=True)
+    assert seen == [{"pinned": True}]
