@@ -98,6 +98,18 @@ class RoofModel {
   /// only uses known values). Not written back by [toJson].
   final List<String> parseNotes;
 
+  bool get _anyRoofType => facets.any((f) => f.roofType != null);
+
+  /// Flat area (sq ft) as the drawing hatches it: the sum over facets typed `flat` when any facet has a roof type
+  /// (envelope 0.4+), else the totals' own value (a 0.1 model, or one without roof types). The totals cut flat at 0.5/12
+  /// by contract, so a facet typed flat at a higher pitch is counted here and not there.
+  double get flatAreaSqftByRoofType =>
+      _anyRoofType ? facets.where((f) => f.isFlatRoofType).fold(0.0, (a, f) => a + f.areaSqft) : totals.flatAreaSqft;
+
+  /// Pitched area (sq ft), never below 0: the total minus [flatAreaSqftByRoofType] when facets carry roof types, else the totals' value.
+  double get pitchedAreaSqftByRoofType =>
+      _anyRoofType ? math.max(0.0, totals.totalAreaSqft - flatAreaSqftByRoofType) : totals.pitchedAreaSqft;
+
   Map<String, dynamic> toJson() => {
         'schema': schema,
         ...{for (final e in extra.entries) if (e.key == 'generated_at') e.key: e.value},

@@ -45,6 +45,18 @@ Future<List<int>> _pixels(WidgetTester tester, GlobalKey key) async {
 
 void main() {
   group('RoofTotalsTable', () {
+    testWidgets('the ridge + hip row is the drawn ridge plus hip, never smaller than ridge only', (tester) async {
+      final j = jsonDecode(File('../bond_roof/test/envelope04/synthetic_mixed_0.4.json').readAsStringSync()) as Map<String, dynamic>;
+      final t = (j['totals'] ?? (j['model'] as Map)['totals']) as Map<String, dynamic>;
+      t['ridge_ft'] = 30.0;
+      t['hip_ft'] = 12.0;
+      t['ridge_cap_ridge_ft'] = 30.0;
+      t['ridge_cap_ridge_hip_ft'] = 30.0; // the priced value, stale for the drawing
+      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(RoofMeasurement.parseAny(j)))));
+      final row = find.ancestor(of: find.text('Ridge cap (ridge + hip)'), matching: find.byType(Row)).first;
+      expect(find.descendant(of: row, matching: find.textContaining('42')), findsOneWidget);
+    });
+
     testWidgets('lists pitched and flat roofing on separate rows when the 0.4 keys are present', (tester) async {
       await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(_m04()))));
       expect(find.text('Pitched roofing'), findsOneWidget);

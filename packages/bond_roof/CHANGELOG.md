@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- `RoofModel.flatAreaSqftByRoofType` / `pitchedAreaSqftByRoofType`: the flat / pitched split as the drawing hatches it (facets
+  typed flat) when any facet has a `roof_type`, else the totals' values. The area diagram header and the summary block use
+  them, so the header agrees with the hatching. `RoofTotals` keep their 0.5/12 cut (contract).
 - Flat seams (roof_measure 0.5.1): `EdgeType.flatSeam` (`flat_seam`), a seam between two flat sections at one level. Drawn
   as a thin dark line (1.2 px, `0xFF5A5A5A`), never labelled, never in the legend, `lengths_ft` or the edge total
   (`RoofTotals.recompute` skips it). Flat-typed facets are outlined in the same stroke on the length diagram (was light grey,

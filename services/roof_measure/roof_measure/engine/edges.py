@@ -64,6 +64,15 @@ def _crease(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, p: EngineParam
     return "transition"
 
 
+def _planes_agree_pitched(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, p: EngineParams) -> bool:
+    """The ``steps=False`` hint: two PITCHED facets whose fitted planes meet (differ by less than ``level_change_m`` at the
+    segment middle) are one roof folded, whatever the points near the seam say. Never true without the hint."""
+    if p.pitched_steps or fa.roof_type != "pitched" or fb.roof_type != "pitched":
+        return False
+    # at both ends and the middle: planes crossing the seam diagonally can agree at the middle while a real step exists at the ends
+    return all(abs(zat(fa.plane, *pt) - zat(fb.plane, *pt)) < p.level_change_m for pt in (p0, (p0 + p1) / 2, p1))
+
+
 def seg_type_interior(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, q: np.ndarray | None, p: EngineParams,
                       big_flat: set[str] | None = None) -> tuple[str | None, float, str]:
     """(type or None, jump m, why) of a segment shared by two facets; ``why`` says why there is no edge (``seam``:
@@ -76,7 +85,7 @@ def seg_type_interior(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, q: n
     pa, pb = fa.plane, fb.plane
     jump = measured_jump(fa, fb, p0, p1, q)
     flat_a, flat_b = fa.roof_type == "flat", fb.roof_type == "flat"
-    if jump >= p.level_change_m:
+    if jump >= p.level_change_m and not _planes_agree_pitched(fa, fb, p0, p1, p):
         return "level_change", jump, ""
     if flat_a and flat_b:
         return None, jump, "seam"  # one membrane in two pieces: no line on the roof

@@ -53,8 +53,8 @@ class AreaDiagram {
     // A null value is "not available" (drawn grey); the cell is chosen by the null, not by text.
     final cells = <(String, String?)>[
       (labels.totalArea, sq(t.totalAreaSqft)),
-      (labels.totalPitchedArea, sq(t.pitchedAreaSqft)),
-      (labels.totalFlatArea, sq(t.flatAreaSqft)),
+      (labels.totalPitchedArea, sq(m.pitchedAreaSqftByRoofType)),
+      (labels.totalFlatArea, sq(m.flatAreaSqftByRoofType)),
       (labels.predominantPitch, pitchLabel(t.predominantPitchRise, labels: labels)),
       (labels.predominantPitchArea, sq(t.predominantPitchAreaSqft)),
       (labels.twoStoryArea, null),

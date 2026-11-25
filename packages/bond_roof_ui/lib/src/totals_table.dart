@@ -64,7 +64,7 @@ class RoofTotalsTable extends StatelessWidget {
       (labels.variantDripEdgeEave, ft(t.dripEdgeEaveFt)),
       (labels.variantDripEdgeEaveRake, ft(t.dripEdgeEaveRakeFt)),
       (labels.variantRidgeCapRidge, ft(t.ridgeCapRidgeFt)),
-      (labels.variantRidgeCapRidgeHip, ft(t.ridgeCapRidgeHipFt)),
+      (labels.variantRidgeCapRidgeHip, ft(t.ridgeFt + t.hipFt)),
       (labels.confidence, '${(measurement.confidenceScore * 100).round()}%'),
     ];
     final v = measurement.verification;

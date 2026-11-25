@@ -19,9 +19,9 @@ def _engine_params(req: dict[str, Any]) -> str | None:
     """The stable hash of the engine's parameters for an engine request (None for the block path)."""
     if req.get("engine", "blocks") == "blocks":
         return None
-    from .engine.params import DEFAULT
+    from .engine.hints import params_from_hints
 
-    return DEFAULT.stable_hash()
+    return params_from_hints(req.get("hints")).stable_hash()
 
 
 def _key(place: str | None, req: dict[str, Any]) -> str:

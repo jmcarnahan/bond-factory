@@ -50,6 +50,21 @@ Library call: `measure(..., building_outline_id="<id>")` measures exactly that c
 earlier result's `source.building.outline_id`). An id the layer does not know raises `MeasureError` with code
 `no_footprint`; a county outage raises `upstream_unavailable`. The chain never substitutes another building for a named one.
 
+## Hints (additive; the default output is unchanged)
+
+Library call: `measure(..., hints={"steps": False})` (plane engine only; `engine="blocks"` ignores hints). A hint is an
+answer a person gave. Accepted keys: `steps` (bool). `steps: false` means "no wall or step between the two parts of this
+roof": a step line (`level_change`) between two PITCHED sections whose fitted planes agree at the seam (less than
+`level_change_m`, 0.3 m, apart at the middle of the line) is typed from the planes (`valley`, `ridge` or `hip`) instead.
+A real step (the planes disagree at the seam) and every flat/flat or flat/pitched seam are unchanged. `steps: true` is today's
+behaviour. An unknown key or a value that is not a bool raises `ValueError` naming the key.
+
+- `model.source.hints`: the hints applied, e.g. `{"steps": false}`; present only when a hint changed the measurement
+  (`None`, `{}` and `{"steps": true}` leave it out).
+- The result cache key hashes the hinted engine parameters, so a hinted request never reads or writes the unhinted entry.
+- Default output unchanged: with no hint every field of the envelope and every cache key is identical to the previous release
+  (`EngineParams.stable_hash` skips a hint field at its default). No `PIPELINE_VERSION` bump.
+
 ## LiDAR project choice (behaviour change, now)
 
 Candidate 3DEP projects whose expected density (project point count over its area) is at least 8.0 points/m2 are
