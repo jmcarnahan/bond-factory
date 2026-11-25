@@ -74,11 +74,18 @@ class LengthDiagram {
     final cols = layout.legendColumns;
     final colW = (width - 2 * sp.margin) / cols;
     // The ten edge types of contract 0.2 always; the 0.4 types only when the model has them.
-    final legendTypes = [
+    final legacyTypes = [
       ...EdgeType.legacy,
       for (final t in EdgeType.values)
         if (t.isNew04 && t != EdgeType.flatSeam && (m.edges.any((e) => e.type == t) || (m.totals.lengthsFt[t] ?? 0) > 0)) t,
     ];
+    // An engine model (facets carry a roof type) lists only the types that have length: a flat roof is not shown a column of
+    // zeros. A model without roof types keeps the ten legacy rows. Never an empty legend.
+    final present = [
+      for (final t in [...EdgeType.legacy, ...EdgeType.values.where((t) => t.isNew04)])
+        if (t != EdgeType.flatSeam && (m.totals.lengthsFt[t] ?? 0) > 0) t,
+    ];
+    final legendTypes = m.facets.any((f) => f.roofType != null) && present.isNotEmpty ? present : legacyTypes;
     final perCol = layout.legendRowsFor(legendTypes.length);
     var idx = 0;
     for (var c = 0; c < cols; c++) {
