@@ -286,6 +286,8 @@ class EngineParams:
     edge_min_seg_m: float = 0.12  # m: shorter raw segments are dropped
     # ---- outputs
     fit_tol_m: float = 0.15  # m: a point fits its facet's plane within this (fit_all / fit_covered)
+    # ---- hints (caller answers; skipped from stable_hash while at their default)
+    pitched_steps: bool = True  # False: a step line between two pitched facets whose planes agree at the seam is typed from the planes
 
     def __post_init__(self) -> None:
         """Canonical values (an int where a float is declared is stored as a float, so 1 and 1.0 hash alike) and sanity
@@ -308,7 +310,11 @@ class EngineParams:
 
     def stable_hash(self) -> str:
         """sha256 of the sorted fields: the result-cache and harness key."""
-        blob = json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
+        d = asdict(self)
+        for name in HINT_FIELDS:  # a hint at its default must not change the key every cached result already has
+            if d[name] == _FIELD_DEFAULTS[name]:
+                del d[name]
+        blob = json.dumps(d, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode()).hexdigest()
 
     def replace(self, **kw: object) -> EngineParams:
@@ -317,5 +323,10 @@ class EngineParams:
 
         return replace(self, **kw)
 
+
+# Changing the DEFAULT of a hint field changes what an unhinted request means, but the hash skips defaults: it then needs a
+# PIPELINE_VERSION bump (tests/test_engine_hints.py pins the defaults).
+HINT_FIELDS = ("pitched_steps",)
+_FIELD_DEFAULTS = {f.name: f.default for f in fields(EngineParams)}
 
 DEFAULT = EngineParams()

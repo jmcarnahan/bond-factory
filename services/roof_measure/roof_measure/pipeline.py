@@ -96,7 +96,8 @@ def run_pipeline(address: str, out_dir: str | Path, method: str = "lidar_skeleto
                  lat_lng: tuple[float, float] | None = None, on_stage: Callable[[str], None] | None = None,
                  verify: bool = True, render: bool = True,
                  include_other_buildings: bool = False, building_outline_id: str | None = None,
-                 pinned: bool = True, engine: str = "blocks", points_path: str | Path | None = None) -> PipelineResult:
+                 pinned: bool = True, engine: str = "blocks", points_path: str | Path | None = None,
+                 hints: dict[str, Any] | None = None) -> PipelineResult:
     """Run the whole pipeline for one address; writes ``<slug>_{blocks,model}.json`` and ``.png`` into ``out_dir``.
 
     ``method="auto"`` is D12: ``lidar_skeleton``, falling back to ``solar_agent`` when LiDAR is missing or too
@@ -117,10 +118,14 @@ def run_pipeline(address: str, out_dir: str | Path, method: str = "lidar_skeleto
     if engine == "planes":
         if method not in ("auto", "lidar_skeleton") or blocks_path or solar_fixture:
             raise PipelineError("the plane engine runs on live LiDAR with method 'auto' or 'lidar_skeleton'")
+        from .engine.hints import clean_hints, params_from_hints
         from .pipeline_engine import run_planes
 
+        extra = {}
+        if (clean := clean_hints(hints)) is not None:  # no hint: the call is exactly what it always was
+            extra = {"params": params_from_hints(clean), "hints": clean}
         res = run_planes(address, out_dir, deadline=deadline, lat_lng=lat_lng, on_stage=on_stage or _noop,
-                         building_outline_id=building_outline_id, pinned=pinned, points_path=points_path)
+                         building_outline_id=building_outline_id, pinned=pinned, points_path=points_path, **extra)
     elif method == "auto":
         res = _run_auto(address, out_dir, blocks_path=blocks_path, solar_fixture=solar_fixture, no_agent=no_agent,
                         max_rounds=max_rounds, merge_flats=merge_flats, client=client, deadline=deadline,

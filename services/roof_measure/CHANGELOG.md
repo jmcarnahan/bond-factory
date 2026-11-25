@@ -1,5 +1,13 @@
 # roof_measure changelog
 
+## Unreleased (patch; additive; default output and cache keys unchanged)
+
+- **`measure(..., hints={"steps": False})`** (plane engine): a step line between two PITCHED sections whose fitted planes agree
+  at the seam is typed from the planes (valley, ridge or hip) instead of `level_change`. `engine/hints.py`
+  (`params_from_hints`, `clean_hints`), `EngineParams.pitched_steps` (skipped by `stable_hash` while True, so the default hash
+  and every cached result are untouched), the hinted parameters are hashed into the cache key, `model.source.hints` records
+  the hint when given. Unknown key or non-bool value: `ValueError`. Contract: `docs/contract-0.4.md` "Hints". No `PIPELINE_VERSION` bump.
+
 ## 0.5.1 (pipeline version; flat roofs read right, nearby buildings; contract in ../../docs/contract-0.4.md)
 
 `PIPELINE_VERSION` 0.5.0 to 0.5.1 (keys the result cache: cached results are recomputed). Additive: one new edge type, two new

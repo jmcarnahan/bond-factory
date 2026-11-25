@@ -113,7 +113,8 @@ def main() -> int:
                                on_stage=_stage_hook(req["method"], deadline), verify=req["verify"],
                                render=False, include_other_buildings=bool(req.get("include_other_buildings")),
                                building_outline_id=req.get("building_outline_id"),
-                               engine=req.get("engine", "blocks"), points_path=req.get("points_path"))
+                               engine=req.get("engine", "blocks"), points_path=req.get("points_path"),
+                               hints=req.get("hints"))
         _emit({"t": "ok", "envelope": res.envelope})
     except Exception as exc:
         log.warning("measurement failed: %s", type(exc).__name__)  # no traceback at WARNING: urls hold the address

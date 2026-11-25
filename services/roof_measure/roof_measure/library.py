@@ -55,7 +55,8 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
             on_stage: Callable[[str], None] | None = None, isolate: bool = True,
             blocks_path: str | Path | None = None, solar_fixture: str | Path | None = None,
             include_other_buildings: bool = False, building_outline_id: str | None = None,
-            engine: str = "blocks", points_path: str | Path | None = None) -> dict[str, Any]:
+            engine: str = "blocks", points_path: str | Path | None = None,
+            hints: dict[str, Any] | None = None) -> dict[str, Any]:
     """Measure one roof and return the ``bond.roof_model/0.2`` envelope as a dict.
 
     Blocks the calling thread for up to ``deadline_s`` plus ``KILL_GRACE_S`` (30) seconds: run it off a request
@@ -104,21 +105,28 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
 
     ``blocks_path`` and ``solar_fixture`` are test hooks: they replace LiDAR/Solar with a fixture file, so the
     call needs no network (verify=False) and no real address.
+
+    ``hints`` (plane engine only; ``engine="blocks"`` ignores them): answers a person gave that steer the measurement,
+    ``{"steps": False}`` = no wall or step between two pitched parts of the roof (a step line whose planes agree is typed
+    ``valley``/``ridge``/``hip``). Unknown key or non-bool value: ValueError. No hints: output and cache key unchanged.
+    The envelope carries the applied hints as ``model.source.hints``.
     """
     lat_lng = _check(address, lat, lng, method, deadline_s, blocks_path, solar_fixture, overpass_urls,
-                     work_dir, cache_dir, engine, points_path)
+                     work_dir, cache_dir, engine, points_path, hints)
     cache_path = Path(cache_dir).resolve()  # absolute: the child must not depend on its working directory
     cache_path.mkdir(parents=True, exist_ok=True)
     own_dir = work_dir is None
     work = Path(tempfile.mkdtemp(prefix="roof_measure_")) if own_dir else Path(work_dir).resolve()  # type: ignore[arg-type]
     try:
         work.mkdir(parents=True, exist_ok=True)
+        from .engine.hints import clean_hints
         req: dict[str, Any] = {
             "address": (address or "").strip(), "lat_lng": lat_lng, "method": method, "verify": bool(verify),
             "force": bool(force), "deadline_s": float(deadline_s), "work_dir": str(work),
             "include_other_buildings": bool(include_other_buildings),
             "building_outline_id": str(building_outline_id).strip() if building_outline_id else None,
             "engine": engine, "points_path": str(Path(points_path).resolve()) if points_path else None,
+            "hints": clean_hints(hints),
             "blocks_path": str(Path(blocks_path).resolve()) if blocks_path else None,
             "solar_fixture": str(Path(solar_fixture).resolve()) if solar_fixture else None,
             "runtime": {"cache_dir": str(cache_path), "anthropic_api_key": anthropic_api_key,
@@ -228,7 +236,10 @@ def _check(address: str | None, lat: float | None, lng: float | None, method: st
            blocks_path: str | Path | None, solar_fixture: str | Path | None,
            overpass_urls: Sequence[str] | None = None, work_dir: str | Path | None = None,
            cache_dir: str | Path | None = None, engine: str = "blocks",
-           points_path: str | Path | None = None) -> list[float] | None:
+           points_path: str | Path | None = None, hints: dict[str, Any] | None = None) -> list[float] | None:
+    from .engine.hints import clean_hints
+
+    clean_hints(hints)  # raises ValueError on an unknown key or a non-bool value
     if method not in METHODS:
         raise ValueError(f"method must be one of {METHODS}, got {method!r}")
     if engine not in ENGINES:
@@ -299,7 +310,8 @@ def _run_in_process(req: dict[str, Any], on_stage: Callable[[str], None] | None)
                                verify=req["verify"], render=False,
                                include_other_buildings=bool(req.get("include_other_buildings")),
                                building_outline_id=req.get("building_outline_id"),
-                               engine=req.get("engine", "blocks"), points_path=req.get("points_path"))
+                               engine=req.get("engine", "blocks"), points_path=req.get("points_path"),
+                               hints=req.get("hints"))
         try:
             json.dumps(res.envelope, allow_nan=False)
         except ValueError:

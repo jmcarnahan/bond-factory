@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- `RoofTotalsTable`: the "ridge + hip" row shows the drawn ridge + hip, so it is never smaller than "ridge only" (it showed the priced value).
 - Envelope 0.4: `RoofDiagramView(scene, {fit, onFacetTap})` and `RoofReportStrip(..., onFacetTap)` report the id of a tapped
   facet (the package draws nothing in response; the host attaches inline controls). New `sceneFit` and `facetIdAt`.
   Flat facets are painted hatched and borderline facets outlined (the scene carries it, see `bond_roof`).

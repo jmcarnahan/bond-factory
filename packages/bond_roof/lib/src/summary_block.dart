@@ -103,8 +103,8 @@ class SummaryBlock {
     final figs = <(String, String)>[
       (labels.totalArea, sq(t.totalAreaSqft)),
       (labels.squares, t.squares.toStringAsFixed(2)),
-      (labels.pitchedArea, sq(t.pitchedAreaSqft)),
-      (labels.flatArea, sq(t.flatAreaSqft)),
+      (labels.pitchedArea, sq(m.pitchedAreaSqftByRoofType)),
+      (labels.flatArea, sq(m.flatAreaSqftByRoofType)),
       (
         labels.predominantPitch,
         '${pitchLabel(t.predominantPitchRise, labels: labels)}  (${sq(t.predominantPitchAreaSqft)})'
