@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Length diagram legend: a model that carries roof types (an engine model) lists only the edge types that have length, so a flat roof no longer
+  shows a column of "0ft 0in" rows; a model without roof types keeps the ten legacy rows (their output is byte-identical).
+  `ReportLayout.legendRowsFor(n)` now fills column by column for any `n` other than 10.
 - `RoofModel.flatAreaSqftByRoofType` / `pitchedAreaSqftByRoofType`: the flat / pitched split as the drawing hatches it (facets
   typed flat) when any facet has a `roof_type`, else the totals' values. The area diagram header and the summary block use
   them, so the header agrees with the hatching. `RoofTotals` keep their 0.5/12 cut (contract).

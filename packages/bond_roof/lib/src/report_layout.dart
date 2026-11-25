@@ -31,9 +31,9 @@ enum ReportLayout {
   List<int> get legendRows => this == wide ? const [4, 3, 3] : const [5, 5];
 
   /// Legend rows per column for [count] entries: the ten edge types of contract 0.2 keep their
-  /// layout; envelope 0.4 adds up to two more, filled column by column.
+  /// layout; an engine model lists only the types it has (fewer or more), filled column by column.
   List<int> legendRowsFor(int count) {
-    if (count <= 10) return legendRows;
+    if (count == 10) return legendRows;
     final perCol = (count + legendColumns - 1) ~/ legendColumns;
     var left = count;
     return [
