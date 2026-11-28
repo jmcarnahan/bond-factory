@@ -1,3 +1,4 @@
+import importlib.util
 import subprocess
 import sys
 
@@ -42,8 +43,12 @@ def test_importing_the_package_does_not_load_the_seal_and_web_modules():
 
 def test_every_name_in_all_resolves_and_is_unique():
     assert len(set(bond_esign.__all__)) == len(bond_esign.__all__)
+    extra = all(importlib.util.find_spec(m) is not None for m in ("pyhanko", "cryptography"))
     for name in bond_esign.__all__:
-        assert getattr(bond_esign, name) is not None, name
+        try:
+            assert getattr(bond_esign, name) is not None, name
+        except ImportError as exc:  # only the seal names, and only where the optional extra is not installed
+            assert not extra and "seal" in str(exc).lower(), (name, exc)
 
 
 def test_stamp_is_the_function_whichever_way_the_submodule_was_imported_first():

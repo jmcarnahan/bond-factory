@@ -58,7 +58,8 @@ jobs:
         with:
           python-version: '3.12'
       # sdk_example depends on all thirteen libs, so this installs them without roof_measure's heavy geo stack.
-      - run: uv sync --locked --all-extras --package sdk_example --package legacy_host
+      # bond_esign is named so its optional `seal` extra is installed and the seal tests run here.
+      - run: uv sync --locked --all-extras --package sdk_example --package legacy_host --package bond_esign
       - run: make test-libs
       - run: make lint-libs
       - name: Postgres-marked tests (bond_jobs, bond_tasks_py, bond_notify_py, bond_push_py, bond_esign)
