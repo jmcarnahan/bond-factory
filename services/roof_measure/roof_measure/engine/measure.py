@@ -31,7 +31,8 @@ from .types import EngineResult, Quality, RoofPoints
 
 
 def is_county_outline(source: str) -> bool:
-    """County (wall-line) outlines get the measured overhang; OSM / Overture / hull outlines are already roof-edge-ish."""
+    """County outlines are wall lines (the roof edge lies up to 1.5 m out); OSM / Overture / hull outlines are already
+    near the roof edge (a tighter outward clamp)."""
     s = (source or "").lower()
     return "county" in s or "lacounty" in s or "lariac" in s
 
@@ -115,13 +116,17 @@ def _detect_stage(run: Run, thetas: list[float]) -> tuple[list, np.ndarray, np.n
     return planes, crop, plab
 
 
-def _outline_stage(run: Run, q: np.ndarray, theta: float) -> Polygon:
+def _outline_stage(run: Run, q: np.ndarray, qlab: np.ndarray, theta: float) -> Polygon:
     p = run.ctx.p
-    draw = p.overhang_scale_draw
-    scale = draw if run.county else min(draw, p.overhang_scale_roofedge)
     run.diag["outline_provider"] = run.source
-    run.diag["overhang_scale_used"] = scale
-    o, od = build_outline(q, run.wall, theta, scale, p)
+    run.diag["overhang_scale_used"] = p.overhang_scale_draw
+    wide = None
+    if run.context is not None:
+        wide = np.asarray(run.context, float)[:, :4].copy()
+        if p.s3_axis:
+            wide[:, :2] = axes.to_building_frame(wide[:, :2], run.ang)
+    o, od = build_outline(q, qlab, run.stages.planes, run.wall, theta, p.overhang_scale_draw, run.county, wide,
+                          run.pts_all, p)
     run.diag.update(od)
     if o.geom_type != "Polygon":
         o = max(o.geoms, key=lambda g: g.area)
@@ -180,7 +185,7 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     t = run.tick("planes", t)
     ok = plab >= 0
     q, qlab = crop[ok], plab[ok]
-    o = _outline_stage(run, q, theta)
+    o = _outline_stage(run, q, qlab, theta)
     stages.outline = o
     dens0 = float(shapely.contains_xy(o, pts_all[:, 0], pts_all[:, 1]).sum() / max(o.area, 1.0))
     if dens0 < p.density_refuse and p.refuse_sparse:

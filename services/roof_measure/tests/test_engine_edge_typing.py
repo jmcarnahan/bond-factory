@@ -274,9 +274,7 @@ def test_a_hip_is_the_same_type_whatever_the_outline_and_the_tree_returns_do():
             assert t[kind] == pytest.approx(base[1][kind], abs=1.0), kind
 
 
-@pytest.mark.parametrize("name", ["two_level_d8", pytest.param("dutch_gable_d8_rot45", marks=pytest.mark.xfail(
-    strict=True, reason="hip 38.8 ft against the exact 36.0 since the label raster follows the points (slice C); the partition near "
-                        "the small gable corner, not the typing: parked with the threshold re-tune"))])
+@pytest.mark.parametrize("name", ["two_level_d8", "dutch_gable_d8_rot45"])
 def test_exact_lengths_hold_under_small_translations_of_points_and_wall_together(name):
     """Slice C's relay: ridge and hip are typed from the line where two planes meet, so a junction vertex one raster cell off the
     ridge cannot turn a ridge piece into a hip. Every type within 1 ft of exact at 0.03-0.19 m moves (steps are named, so summed)."""

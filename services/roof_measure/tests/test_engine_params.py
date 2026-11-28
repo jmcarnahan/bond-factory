@@ -35,7 +35,8 @@ def test_it_is_frozen_and_replace_rejects_unknown_names():
 
 def test_the_plan_numbers_are_the_defaults():
     p = DEFAULT
-    assert (p.overhang_scale_draw, p.overhang_scale_roofedge) == (1.0, 0.25)
+    assert p.overhang_scale_draw == 1.0
+    assert (p.edge_clamp_lo_m, p.edge_clamp_hi_m, p.edge_clamp_hi_roofedge_m) == (0.6, 1.5, 0.5)
     assert (p.s2_steep_rise, p.s2_strip_width, p.s2_patch_area, p.s2_patch_rms, p.s2_patch_pitch) == (2.0, 1.5, 15.0, 0.05, 2.0)
     assert (p.s3_axis, p.s3_snap_az) == (True, 10.0)
     assert (p.s4_gentle, p.s4_keep_area, p.s4_rms, p.s4_pts) == (True, 1.5, 0.05, 12)
