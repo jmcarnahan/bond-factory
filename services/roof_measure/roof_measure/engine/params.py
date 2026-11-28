@@ -18,8 +18,7 @@ _MAY_BE_NEGATIVE = frozenset({"overhang_floor_m"})
 
 @dataclass(frozen=True)
 class EngineParams:
-    # ---- priced versus drawn roof edge (plan 3.7a)
-    overhang_scale: float = 0.5  # ratio: PRICED roof edge = measured overhang x this (cost-sheet totals)
+    # ---- the drawn roof edge (plan 3.7a)
     overhang_scale_draw: float = 1.0  # ratio: DRAWN roof edge (facets, diagram) on county (wall-line) outlines
     overhang_scale_roofedge: float = 0.25  # ratio: cap on the drawn scale when the outline is not a county wall line
     overhang_cap_m: float = 1.0  # m: per-side overhang upper clamp

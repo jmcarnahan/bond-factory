@@ -38,7 +38,7 @@ def test_the_pipeline_engine_path_equals_the_harness_cli_on_the_same_house(tmp_p
         assert got[k] == pytest.approx(want[k], rel=0.02, abs=2.0), k
     assert got["fit_all"] == pytest.approx(want["fit_all"], abs=0.02)
     assert m["quality"]["engine"] == "planes/1" and m["quality"]["outline_source"] == "lacounty_lariac_2020"
-    assert m["quality"]["overhang_scale"] == 0.5 and m["quality"]["parcel_match"] == "exact"
+    assert "overhang_scale" not in m["quality"] and m["quality"]["parcel_match"] == "exact"
 
 
 def test_the_pipeline_cuts_the_roof_points_like_the_regression_data(tmp_path, monkeypatch):

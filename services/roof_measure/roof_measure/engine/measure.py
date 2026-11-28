@@ -1,7 +1,7 @@
 """The engine pipeline: roof points + footprint in, facets / edges / totals / quality out.
 
 Stages: building frame -> plane detection -> roof-edge outline -> global labelling (partition) -> facets and edges ->
-priced edge and cost-sheet totals -> quality verdict -> back to the world frame. Metres in, feet in the totals.
+cost-sheet totals -> quality verdict -> back to the world frame. Metres in, feet in the totals.
 """
 
 from __future__ import annotations
@@ -193,12 +193,12 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     diag.update(best.diag)
     diag["beta_used"] = best.beta
     t = run.tick("partition", t)
-    facets, edges, tot, o_p = facets_stage(run, best, q, o, theta)
+    facets, edges, tot = facets_stage(run, best, q, o)
     t = run.tick("facets", t)
     quality_ = quality_stage(run, facets, o, crop, plab)
     flat_sq, pitched_sq = tot.get("roofing_flat_sqft"), tot.get("roofing_pitched_sqft")
-    if flat_sq is not None and pitched_sq is not None and flat_sq + pitched_sq > 0:  # the PRICED split (0.5.1)
+    if flat_sq is not None and pitched_sq is not None and flat_sq + pitched_sq > 0:  # the pitched / flat split of the drawn roof
         quality_.flat_share = flat_sq / (flat_sq + pitched_sq)  # UNROUNDED: round(0.8996, 3) would cross a 0.90 line
-    res = assemble(run, facets, edges, tot, o, o_p, best, q, best.qlab, quality_)
+    res = assemble(run, facets, edges, tot, o, best, q, best.qlab, quality_)
     run.tick("finish", t)
     return res, stages

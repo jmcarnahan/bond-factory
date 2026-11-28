@@ -1,4 +1,4 @@
-"""signals.quality and signals.cost_outputs at their thresholds: each verdict condition just below, at and just above
+"""signals.quality and the complexity hint of totals.roof_totals at their thresholds: each verdict condition just below, at and just above
 the limit (plan 3.9 / 3.7a values, read from EngineParams), and the complexity hint."""
 
 from __future__ import annotations
@@ -8,7 +8,8 @@ import pytest
 from shapely.geometry import box
 
 from roof_measure.engine.params import DEFAULT as P
-from roof_measure.engine.signals import cost_outputs, quality
+from roof_measure.engine.signals import quality
+from roof_measure.engine.totals import roof_totals
 from roof_measure.engine.types import Edge, Facet
 
 WALL = box(0, 0, 10, 10)  # 100 m2, sqrt = 10
@@ -33,7 +34,7 @@ def cloud(n: int, off_plane: int = 0, dx: float = 0.0, lift: float = -1.0) -> np
 
 
 def q(n=1000, off=0, dx=0.0, support=100.0, supported=100.0, match="exact", params=P, lift=-1.0):
-    return quality([facet()], cloud(n, off, dx, lift), WALL, WALL, match, "lacounty", supported, support, params.overhang_scale,
+    return quality([facet()], cloud(n, off, dx, lift), WALL, WALL, match, "lacounty", supported, support, 
                    None, None, params)
 
 
@@ -95,7 +96,7 @@ def test_not_exact_parcel(match, flagged):
 def hint(n_facets: int, hv_ft: float, total_sqft: float = 1000.0) -> str:
     facets = [facet(f"f{i}", total_sqft / n_facets) for i in range(n_facets)]
     edges = [Edge("hip", (0, 0, 0), (1, 0, 0), hv_ft, ("f0", "f1"))] if hv_ft else []
-    return cost_outputs(facets, edges, WALL, WALL, set(), [0.3], P)["complexity"]["hint"]
+    return roof_totals(facets, edges, set(), P)["complexity"]["hint"]
 
 
 @pytest.mark.parametrize("n, cut", [(13, False), (14, True), (15, True)])
@@ -105,8 +106,8 @@ def test_cut_up_at_14_facets(n, cut):
 
 @pytest.mark.parametrize("hv, cut", [(69.9, False), (70.0, True), (70.1, True)])
 def test_cut_up_at_7_ft_of_hip_and_valley_per_square(hv, cut):
-    t = cost_outputs([facet("f1", 1000.0), facet("f2", 0.0)], [Edge("valley", (0, 0, 0), (1, 0, 0), hv, ("f1", "f2"))],
-                     WALL, WALL, set(), [0.3], P)  # 10 squares
+    t = roof_totals([facet("f1", 1000.0), facet("f2", 0.0)], [Edge("valley", (0, 0, 0), (1, 0, 0), hv, ("f1", "f2"))],
+                    set(), P)  # 10 squares
     assert t["complexity"]["hint"] == ("cut_up" if cut else "simple")
     assert t["complexity"]["hip_valley_ft_per_square"] == pytest.approx(hv / 10, abs=0.006)
 

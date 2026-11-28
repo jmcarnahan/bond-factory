@@ -1,7 +1,6 @@
 """Helpers of test_engine_improve*.py: the engine on the extra synthetic roofs (synth_extra) and on the standard ones.
 
-``priced=False`` runs with the priced overhang scale equal to the drawn one, so the totals compare with the exact roof (the
-synthetic truth is the full roof edge; the default prices at half the overhang, as the cost sheet does)."""
+The totals are those of the drawn roof, the full roof edge, which is what the synthetic truth is."""
 
 from __future__ import annotations
 
@@ -10,8 +9,6 @@ from functools import cache
 from roof_measure.engine import measure_roof, synth_extra, synth_points
 from roof_measure.engine.load import roof_points_from_arrays
 from roof_measure.engine.params import DEFAULT, EngineParams
-
-FULL_EDGE = DEFAULT.replace(overhang_scale=1.0)
 
 
 @cache
@@ -43,7 +40,7 @@ def length(res, kind: str) -> float:
     return sum(e.length_ft for e in res.edges if e.type == kind)
 
 
-def measure_roof_for(roof, density: int, extra=None, params: EngineParams = FULL_EDGE, seed: int = 1):
+def measure_roof_for(roof, density: int, extra=None, params: EngineParams = DEFAULT, seed: int = 1):
     """Engine result for any SynthRoof; ``extra(roof)`` may add returns (an (n, 4) array: x, y, z, class)."""
     import numpy as np
 
