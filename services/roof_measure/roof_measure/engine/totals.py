@@ -22,7 +22,8 @@ from .edges import M2F
 from .facets import SQM2SQFT
 from .params import EngineParams
 
-LENGTH_TYPES = ("eave", "rake", "ridge", "hip", "valley", "level_change", "flat_edge", "transition")
+LENGTH_TYPES = ("eave", "rake", "ridge", "hip", "valley", "level_change", "step_flashing", "wall_flashing", "flat_edge",
+                "transition")
 OUTER_TYPES = ("eave", "rake", "flat_edge")  # the outer roof edge: an edge of one of these types with one facet
 
 

@@ -34,7 +34,7 @@ def _facet_json(f: Facet) -> dict[str, Any]:
 def _edge_json(e: Edge) -> dict[str, Any]:
     out = {"type": e.type, "p0": list(e.p0), "p1": list(e.p1), "length_ft": round(e.length_ft, 2),
            "facets": list(e.facets), "jump_m": e.jump_m}
-    if e.type == "level_change":
+    if e.type in ("level_change", "step_flashing", "wall_flashing"):
         out["jump_ft"] = e.jump_ft
     return out
 

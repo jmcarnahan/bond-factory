@@ -121,7 +121,7 @@ def _edge_dicts(res: EngineResult, kept: set[str]) -> list[dict]:
         d: dict[str, Any] = {"id": f"e{n}", "type": e.type,
                              "points": [[e.p0[0] * FT, e.p0[1] * FT], [e.p1[0] * FT, e.p1[1] * FT]],
                              "length_ft": float(e.length_ft), "facets": list(e.facets)}
-        if e.type == "level_change" and e.jump_ft is not None:
+        if e.type in ("level_change", "step_flashing", "wall_flashing") and e.jump_ft is not None:
             d["jump_ft"] = float(e.jump_ft)
         if e.high_edge:
             d["high_edge"] = True

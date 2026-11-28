@@ -37,7 +37,7 @@
    "solar": null,
    "from_planes": true,
    "engine": "planes/1",
-   "engine_params": "f21918113519719ba2224b93537d0739a1387496ff6049eea91ca797fa5de2ab",
+   "engine_params": "28ce4c3e7e9974a3aca7c4da7283c56ab2bb1db8c208f029a5d5d1d5c75f9a69",
    "building": {
     "parcel_id": "SYNTH-P1",
     "outline_id": "SYNTH-B1",
@@ -328,7 +328,7 @@
    },
    {
     "id": "e5",
-    "type": "level_change",
+    "type": "step_flashing",
     "points": [
      [
       41.05547,
@@ -451,13 +451,13 @@
     "ridge": 42.09,
     "hip": 0.0,
     "valley": 0.0,
-    "step_flashing": 0.0,
+    "step_flashing": 42.09,
     "wall_flashing": 0.0,
     "parapet": 0.0,
     "transition": 0.0,
     "unspecified": 0.0,
     "flat_edge": 75.65,
-    "level_change": 42.09
+    "level_change": 0.0
    },
    "planes_surface_area_sqft": 1897.3,
    "planes_pitch_weighted": 6.01,
@@ -470,7 +470,7 @@
    "roofing_flat_squares": 7.06,
    "low_slope_confirm_sqft": 0,
    "flat_edge_ft": 75.6,
-   "level_change_ft": 42.1,
+   "level_change_ft": 0.0,
    "area_sqft_roof_edge": 1897.3,
    "area_sqft_measured_edge": 1897.3,
    "squares_measured_edge": 18.973,
@@ -508,7 +508,7 @@
   },
   "quality": {
    "engine": "planes/1",
-   "engine_params": "f21918113519719ba2224b93537d0739a1387496ff6049eea91ca797fa5de2ab",
+   "engine_params": "28ce4c3e7e9974a3aca7c4da7283c56ab2bb1db8c208f029a5d5d1d5c75f9a69",
    "verdict": "ok",
    "fit_covered": 0.988,
    "fit_all": 0.988,
@@ -642,7 +642,7 @@
   "ridge_ft": 42.09,
   "hip_ft": 0.0,
   "valley_ft": 0.0,
-  "step_flashing_ft": 0.0,
+  "step_flashing_ft": 42.09,
   "predominant_pitch": 6.0,
   "facets": 3,
   "drip_edge_eave_ft": 42.09,
@@ -661,7 +661,7 @@
   "outline_perimeter_wall_ft": 160.0,
   "overhang_ft_median": 1.05,
   "flat_edge_ft": 75.6,
-  "level_change_ft": 42.1,
+  "level_change_ft": 0.0,
   "complexity": {
    "facets": 3,
    "hip_valley_ft_per_square": 0.0,
@@ -684,7 +684,7 @@
    "ridge_ft": 42.09,
    "hip_ft": 0.0,
    "valley_ft": 0.0,
-   "step_flashing_ft": 0.0,
+   "step_flashing_ft": 42.09,
    "predominant_pitch": 6.0,
    "facets": 3,
    "drip_edge_eave_ft": 42.09,

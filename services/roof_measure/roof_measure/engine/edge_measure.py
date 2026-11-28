@@ -7,16 +7,40 @@ import numpy as np
 import shapely
 from shapely.geometry.base import BaseGeometry
 
+from .params import EngineParams
 from .plane_math import zat
 from .types import Facet
 
 SIDE_NEAR_M, SIDE_FAR_M, SIDE_MIN_PTS = 0.2, 1.5, 5  # the harness's measurement (tools.roof_eval.m_fit.edge_jump_m)
 
 
-def points_jump(q: np.ndarray, p0: np.ndarray, p1: np.ndarray) -> float | None:
-    """Height jump across the line p0-p1 from the points alone: each side's local linear fit (z on across- and
-    along-line distance, points 0.2-1.5 m from the line, inside the segment's span) evaluated ON the line.
-    None when the segment is under 0.3 m or either side has under 5 points. Same rule as the harness."""
+def _line_height(s: np.ndarray, u: np.ndarray, z: np.ndarray, ln: float, trim_m: float) -> float | None:
+    """Height on the line (s = 0, middle of the span) of the local linear fit of z on across-line (and along-line, when the
+    returns spread over more than a metre of it) distance. A robust fit: after the first fit the returns further from it than
+    ``trim_m`` or 3 robust sigmas (a canopy that is only partly over the limit) are left out and it is fitted again."""
+    for second in (False, True):
+        if len(z) < SIDE_MIN_PTS:
+            return None
+        cols = [np.ones(len(z)), s] + ([u - ln / 2] if np.ptp(u) > 1.0 else [])
+        design = np.stack(cols, 1)
+        coef = np.linalg.lstsq(design, z, rcond=None)[0]
+        if second:
+            break
+        res = z - design @ coef
+        good = np.abs(res) <= max(trim_m, 3.0 * 1.4826 * float(np.median(np.abs(res - np.median(res)))))
+        if good.all():
+            break
+        s, u, z = s[good], u[good], z[good]
+    return float(coef[0])
+
+
+def points_jump(q: np.ndarray, p0: np.ndarray, p1: np.ndarray, plane_pos: np.ndarray, plane_neg: np.ndarray,
+                p: EngineParams) -> float | None:
+    """Height jump across the line p0-p1 from the points: each side's local linear fit (z on across- and along-line distance,
+    points 0.2-1.5 m from the line, inside the segment's span) evaluated ON the line. ``plane_pos`` is the plane of the facet
+    on the left of p0 -> p1 (the +normal side), ``plane_neg`` the other: a return more than ``p.jump_outlier_m`` off its own
+    side's plane (a tree over the seam) is not measured, and the fit is trimmed (``_line_height``). Everything is relative to
+    p0, so a roof moved as a whole gives the same answer. None when the segment is under 0.3 m or a side has under 5 returns."""
     d = p1 - p0
     ln = float(np.hypot(*d))
     if ln < 0.3 or q is None or len(q) == 0:
@@ -26,13 +50,24 @@ def points_jump(q: np.ndarray, p0: np.ndarray, p1: np.ndarray) -> float | None:
     u, s = rel @ t, rel @ n
     in_span = (u >= 0) & (u <= ln)
     z_line = []
-    for sign in (1, -1):
+    for sign, plane in ((1, plane_pos), (-1, plane_neg)):
         m = in_span & (sign * s >= SIDE_NEAR_M) & (sign * s <= SIDE_FAR_M)
         if m.sum() < SIDE_MIN_PTS:
             return None
-        cols = [np.ones(m.sum()), s[m]] + ([u[m] - ln / 2] if np.ptp(u[m]) > 1.0 else [])
-        z_line.append(np.linalg.lstsq(np.stack(cols, 1), q[m, 2], rcond=None)[0][0])
+        own = np.abs(zat(plane, q[m, 0], q[m, 1]) - q[m, 2]) <= p.jump_outlier_m
+        h = _line_height(s[m][own], u[m][own], q[m, 2][own], ln, p.jump_trim_m)
+        if h is None:
+            return None
+        z_line.append(h)
     return abs(z_line[0] - z_line[1])
+
+
+def crease_slope(plane_a: np.ndarray, plane_b: np.ndarray) -> float:
+    """Slope (rise over plan run) of the line where two planes meet: it does not depend on where a partition happens to
+    draw the shared boundary. 0 for planes with the same gradient (parallel: they meet nowhere)."""
+    (a1, b1, _), (a2, b2, _) = plane_a, plane_b
+    run = float(np.hypot(b2 - b1, a1 - a2))
+    return abs(a1 * b2 - b1 * a2) / run if run > 1e-9 else 0.0
 
 
 # Seam rule constants (0.5.1). They are OUTSIDE the params hash: a retune MUST bump PIPELINE_VERSION (it keys the result cache).
@@ -66,16 +101,36 @@ def seam_is_level(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, level_m:
     return bool(((d >= lim) & ok).mean() >= SEAM_LEVEL_SHARE), float(np.median(d[ok]))
 
 
-def measured_jump(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, q: np.ndarray | None) -> float:
+def measured_jump(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, q: np.ndarray | None, p: EngineParams) -> float:
     """Height jump (m) across p0-p1: measured from the points (``points_jump``); when a side has too few points to
     measure, the gap between the two planes at the middle of the line."""
-    j = points_jump(q, p0, p1) if q is not None else None
+    j = None
+    if q is not None:
+        d = p1 - p0
+        n = np.array([-d[1], d[0]])
+        a_left = float(np.dot(into(fa, p0, p1), n)) >= 0  # fa on the +normal side of p0 -> p1
+        j = points_jump(q, p0, p1, fa.plane if a_left else fb.plane, fb.plane if a_left else fa.plane, p)
     if j is not None:
         return float(j)
     if q is not None and len(q):  # points exist but a side is too thin: the jump cannot be verified, so it is not called a level change
         return 0.0
     mid = (p0 + p1) / 2
     return abs(zat(fa.plane, *mid) - zat(fb.plane, *mid))
+
+
+def into(f: Facet, p0: np.ndarray, p1: np.ndarray) -> np.ndarray:
+    """Unit plan normal of the segment p0-p1 pointing into facet ``f`` (probed just beside the segment, so it is right
+    for a concave facet whose far parts lie on both sides of the segment's line)."""
+    d = p1 - p0
+    n = np.array([-d[1], d[0]]) / max(float(np.hypot(*d)), 1e-12)
+    mid = (p0 + p1) / 2
+    for step in (0.05, 0.15, 0.4):
+        if f.polygon.contains(shapely.Point(*(mid + step * n))):
+            return n
+        if f.polygon.contains(shapely.Point(*(mid - step * n))):
+            return -n
+    c = np.array(f.polygon.representative_point().coords[0])
+    return n if float(np.dot(c - mid, n)) >= 0 else -n
 
 
 def seg_split(line: BaseGeometry) -> list[tuple[np.ndarray, np.ndarray]]:

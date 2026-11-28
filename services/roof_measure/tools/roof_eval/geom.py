@@ -22,6 +22,8 @@ PERIMETER_TYPES = ("eave", "rake", "flat_edge")
 RIDGE_HIP_TYPES = ("ridge", "hip")
 EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "parapet",
               "transition", "flat_edge", "level_change", "flat_seam", "unspecified")
+# a step between two roofs, by name: the engine says sidewall / headwall / level change, the harness's recomputed edge list says level_change
+STEP_TYPES = ("level_change", "step_flashing", "wall_flashing")
 # drawn, never priced, never counted: a seam between two flat facets that is not a real level change (contract 0.4 / 0.5.1).
 # Harness metrics that walk edges (lengths, the false level-change share, cleanliness edge counts) must ignore it.
 UNCOUNTED_EDGE_TYPES = ("flat_seam",)

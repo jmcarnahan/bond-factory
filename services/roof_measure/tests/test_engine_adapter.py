@@ -19,10 +19,10 @@ from roof_measure.model import CORE_EDGE_TYPES, EDGE_TYPES, ModelError, validate
 from roof_measure.quality import assess_engine
 
 FT = 1 / 0.3048
+STEPS = ("level_change", "step_flashing", "wall_flashing")
 SHAPES = [n for n in _cases() if n.endswith("_d8")]
 KNOWN_GEOMETRY_LIMIT = {
-    "complex_hip_d8": "a 20-facet roof: the partition (not the adapter) misses valley and hip length",
-    "two_level_d8": "regressed by the lattice anchor in slice C; cause in straighten (_simplify_chain, crease branch, straighten.py:102: chain_crease_tol_m 0.1 m is under one 0.12 m raster cell, so a one-cell jog at the four-way junction survives and 2.4 ft of ridge is typed hip); owner slice B"}
+    "complex_hip_d8": "a 20-facet roof: the partition (not the adapter) misses valley and hip length"}
 
 
 def base() -> BlockSet:
@@ -114,9 +114,11 @@ def test_edge_lengths_are_within_5_percent_of_exact_and_jumps_within_015_m(name)
         want[e.type] = want.get(e.type, 0.0) + e.length_ft
     for t in ("eave", "rake", "ridge", "hip", "valley", "flat_edge", "level_change", "transition"):
         a, b = got.get(t, 0.0), want.get(t, 0.0)
+        if t == "level_change":  # the exact roofs call every step level_change; the engine names it (sidewall, headwall)
+            a = sum(got.get(k, 0.0) for k in STEPS)
         assert abs(a - b) <= max(0.05 * b, 1.0), (t, a, b)
     exact = [e for e in c.roof.edges if e.type == "level_change"]
-    mine = [e for e in model["edges"] if e["type"] == "level_change"]
+    mine = [e for e in model["edges"] if e["type"] in STEPS]
     for e in mine:
         mid = ((e["points"][0][0] + e["points"][1][0]) / 2, (e["points"][0][1] + e["points"][1][1]) / 2)
         near = min(exact, key=lambda x: math.dist(mid, ((x.p0[0] + x.p1[0]) / 2 * FT, (x.p0[1] + x.p1[1]) / 2 * FT)))
@@ -129,11 +131,11 @@ def test_a_shed_high_side_is_a_rake_flagged_high_edge_in_the_model():
     assert sum(1 for e in model["edges"] if e.get("high_edge")) == 1
 
 
-def test_a_level_change_edge_carries_its_jump_and_only_that_type_does():
+def test_a_step_edge_carries_its_jump_and_only_that_type_does():
     model, _ = model_of("two_level_d8")
-    lc = [e for e in model["edges"] if e["type"] == "level_change"]
+    lc = [e for e in model["edges"] if e["type"] in STEPS]
     assert lc and all(e["jump_ft"] > 0.3 * FT for e in lc)
-    assert not any("jump_ft" in e for e in model["edges"] if e["type"] != "level_change")
+    assert not any("jump_ft" in e for e in model["edges"] if e["type"] not in STEPS)
 
 
 def test_the_model_planes_and_the_height_datum_are_feet_above_ground():
@@ -199,7 +201,7 @@ def test_the_envelope_carries_everything_and_serialises():
         assert k in t, k
     assert t["planes_surface_area_sqft"] == t["area_sqft"] == t["area_sqft_roof_edge"]  # one roof, one area
     assert env["warning_codes"] == ["low_slope_confirm"] and env["model"]["quality"]["engine"] == "planes/1"
-    assert env["model"]["planes"] and env["model"]["totals"]["lengths_ft"]["level_change"] > 0
+    assert env["model"]["planes"] and env["model"]["totals"]["lengths_ft"]["step_flashing"] > 0  # the pitched roof drains into the flat deck's wall
     for code in ("low_slope_confirm", "outline_mismatch", "poor_fit", "low_density"):
         assert code in WARNING_CODES
 

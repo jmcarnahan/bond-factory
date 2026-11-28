@@ -127,13 +127,12 @@ def test_false_level_change_flagged_on_continuous_roof_not_on_real_step():
     m = M(res)
     assert m["false_level_change_count"] == 1 and m["false_level_change_share"] > 0.05
     # a real 1 m step at x = 6 is not false
-    pts = H.two_level_points(1.0)
-    real = H.gable_result()
-    real["edges"].append(H.edge("level_change", (6, 0.5, 3.5), (6, 7.5, 3.5), ["f1"]))
+    real, pts = H.pitched_step(1.0)
     m = M(real, ref=pts)
     assert m["false_level_change_count"] == 0 and m["level_change_edges"] == 1
     # the same edge on a 0.2 m step is false
-    m = M(real, ref=H.two_level_points(0.2))
+    real, pts = H.pitched_step(0.2)
+    m = M(real, ref=pts)
     assert m["false_level_change_count"] == 1
 
 
@@ -260,11 +259,9 @@ def test_truth_flat_edge_counts_in_perimeter_from_extra_block():
 
 
 def test_level_change_threshold_is_the_contract_03_m():
-    real = H.gable_result()
-    real["edges"].append(H.edge("level_change", (6, 0.5, 3.5), (6, 7.5, 3.5), ["f1"]))
-    assert M(real, ref=H.two_level_points(0.4))["false_level_change_count"] == 0  # 0.4 m step: a real level change
-    assert M(real, ref=H.two_level_points(0.2))["false_level_change_count"] == 1
-    assert M(real, ref=H.two_level_points(0.35))["false_level_change_count"] == 0
+    for jump, false in ((0.4, 0), (0.2, 1), (0.35, 0)):  # 0.4 m step: a real level change; 0.2 m: false
+        real, pts = H.pitched_step(jump)
+        assert M(real, ref=pts)["false_level_change_count"] == false, jump
 
 
 def test_price_delta_for_flat_only_and_mixed_roofs():

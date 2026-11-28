@@ -26,7 +26,7 @@ def test_the_example_carries_the_contract_04_keys_with_current_values():
     assert m["source"]["engine"] == "planes/1" and m["source"]["engine_params"] == DEFAULT.stable_hash()
     assert env["verification"]["skipped"] == "engine" and env["verification"]["verdict"] == "unverified"
     assert "verifier_unverified" not in env["warning_codes"]
-    jumps = [e["jump_ft"] for e in m["edges"] if e["type"] == "level_change"]
+    jumps = [e["jump_ft"] for e in m["edges"] if e["type"] in ("level_change", "step_flashing", "wall_flashing")]
     assert jumps and all(j > 0.3 / 0.3048 for j in jumps)
     assert m["quality"]["engine"] == "planes/1" and set(m["totals"]["lengths_ft"]) >= {"flat_edge", "level_change"}
     assert env["totals"]["roofing_flat_sqft"] > 0 and env["totals"]["roofing_pitched_sqft"] > 0
