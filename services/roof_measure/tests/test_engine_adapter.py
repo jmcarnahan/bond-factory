@@ -11,7 +11,7 @@ import pytest
 from engine_cases import _cases, case, run
 from shapely.geometry import Polygon
 
-from roof_measure.classify import BlockSet
+from roof_measure.blockset import BlockSet
 from roof_measure.engine import adapter, synth_points
 from roof_measure.engine.load import roof_points_from_arrays
 from roof_measure.envelope import WARNING_CODES, build_envelope
@@ -226,11 +226,9 @@ def test_a_borderline_low_slope_roof_is_flagged_for_confirmation():
 
 
 # ----------------------------------------------------------------------------- model.py: the two new edge types
-def test_the_block_path_keeps_its_ten_length_keys_and_the_new_types_only_appear_when_used():
+def test_totals_carry_all_twelve_length_keys():
     facets = [{"area_sqft": 100.0, "kind": "flat", "pitch_rise": 0.0}]
-    ten = _totals(facets, [{"type": "eave", "length_ft": 10.0}])
-    assert set(ten["lengths_ft"]) == set(CORE_EDGE_TYPES)
-    assert set(_totals(facets, [{"type": "eave", "length_ft": 10.0}], engine=True)["lengths_ft"]) == set(EDGE_TYPES)
+    assert set(_totals(facets, [{"type": "eave", "length_ft": 10.0}])["lengths_ft"]) == set(EDGE_TYPES)
     with_new = _totals(facets, [{"type": "flat_edge", "length_ft": 10.0}])
     assert with_new["lengths_ft"]["flat_edge"] == 10.0 and "level_change" in with_new["lengths_ft"]
     assert EDGE_TYPES[:10] == CORE_EDGE_TYPES and EDGE_TYPES[10:] == ("flat_edge", "level_change")

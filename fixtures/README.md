@@ -10,12 +10,10 @@ Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`; the serv
 | File | What it is | Owner |
 |---|---|---|
 | `roof_measurement_0.2_{pass,adjusted,unverified,fail}.json` | Example 0.2 envelopes, one per verification verdict. Each file IS the envelope (the `result` of the job GET response, `contract` is `bond.roof_model/0.2`) and its `model` is the 0.1 roof model; see `docs/contract-0.2.md`. The Appendix C list there covers only these roof envelopes; the bare models (`site1_*`, `synthetic_*`) remain separate. Asserted by the service and by `bond_roof` (Dart). | service |
-| `synthetic_flat_curbs.json` | Closed-form flat block with a parapet, 17 chimney curbs (`wall_flashing` outlines) and one `step_flashing` edge. Keeps the chimney-hole tests. | service (`synth.py`) |
-| `synthetic_hip_zigzag.json` | Closed-form hip whose south eave is split into 7 segments (five short ones under 2 ft between two 13 ft ends), nearly collinear. The verifier's `adjusted` input. | service (`synth.py`) |
-| `synthetic_solar_response.json` | SYNTHETIC Google Solar `buildingInsights` response built by `synth.py`. Not a Google response. | service (`synth.py`) |
+| `synthetic_flat_curbs.json` | Closed-form flat block with a parapet, 17 chimney curbs (`wall_flashing` outlines) and one `step_flashing` edge. Keeps the chimney-hole tests. | kept file; its generator was removed with the block path |
+| `synthetic_hip_zigzag.json` | Closed-form hip whose south eave is split into 7 segments (five short ones under 2 ft between two 13 ft ends), nearly collinear. The verifier's `adjusted` input. | kept file; its generator was removed with the block path |
 | `site1_lidar.json` | What the LiDAR service produced for the same address. | service |
-| `site1_blocks.json` | Intermediate `bond.roof_blocks/0.1` output of the data layer (LiDAR blocks) for the same address. NOT a roof model. Any code that loads every fixture must filter by the `schema` string, as the Dart tests and the demo already do. | service |
-| `synthetic_hip.json`, `synthetic_gable.json`, `synthetic_flat_parapet.json` | Closed-form cases with known totals, produced by the service (`python -m roof_measure.synth`). | service |
+| `synthetic_hip.json`, `synthetic_gable.json`, `synthetic_flat_parapet.json` | Closed-form cases with known totals, kept as files for the Dart tests; their generator was removed with the block path. | service |
 | `sync/upload_request_ok.json` | Valid upload body: a put, a patch, a put and a delete on `notes`. | hand-written |
 | `sync/upload_request_mixed.json` | Upload body that yields every verdict kind (ok, invalid, skipped, conflict, not_found, unsupported). Needs a `note-taken` row owned by another user. | hand-written |
 | `sync/upload_response_mixed.json` | The exact answer to the mixed request. | hand-written |

@@ -1,124 +1,63 @@
 # roof_measure
 
-Python library and private service: address -> footprint + USGS 3DEP LiDAR (+ Google Solar, + an LLM verifier) -> a
-roof measurement envelope `bond.roof_model/0.2` (`bond.roof_model/0.1` model inside). Apps either call
-`roof_measure.measure()` in-process or call the service over its async job API. The straight skeleton uses CGAL
-through compas_cgal (GPL), so the library is GPL-3.0-or-later as well. API and envelope: [docs/contract-0.2.md](../../docs/contract-0.2.md).
-
-## Run locally
-
-```
-make setup
-make serve                      # auth off, loopback only, debug routes on, port 8011
-PORT=8031 make serve            # another port
-# with auth on, as in production (token of 32+ characters, no debug routes):
-ROOF_MEASURE_TOKEN=$(openssl rand -hex 16) ROOF_MEASURE_HOST=127.0.0.1 PORT=8031 \
-  .venv/bin/uvicorn roof_measure.api:app --host 127.0.0.1 --port 8031
-curl -s localhost:8011/healthz
-curl -s -X POST localhost:8011/v1/measurements -H 'content-type: application/json' \
-  -d '{"address": "100 Example Ave, Sampletown, CA 90000", "method": "fixture"}'      # debug fixture job, no network
-curl -s localhost:8011/v1/measurements/<id>
-```
-
-Auth is on unless `ROOF_MEASURE_AUTH=off` AND the bind host is loopback. Without `ROOF_MEASURE_TOKEN` (32+
-ASCII characters) the process prints one line and exits with status 1. The start-up log shows `ROOF_MEASURE_HOST`,
-which is what the image passes to uvicorn; uvicorn's own line shows the address it bound. Debug fixture routes and request fields exist only with
-`ROOF_MEASURE_DEBUG=1`. Environment variables: [contract Appendix A](../../docs/contract-0.2.md).
+Python library: address -> footprint + USGS 3DEP LiDAR -> the plane engine -> a roof measurement envelope
+`bond.roof_model/0.2` (`bond.roof_model/0.1` model inside). Apps call `roof_measure.measure()` in-process. Envelope and
+call: [docs/contract-0.2.md](../../docs/contract-0.2.md), [contract-0.3](../../docs/contract-0.3.md),
+[contract-0.4](../../docs/contract-0.4.md). Licence: see the repository `NOTICE`.
 
 ## Use as a library
 
-For development here, `make setup` installs `.[dev,service,render]`. A consumer installs only the core (no
-fastapi, uvicorn or matplotlib); pin a full SHA, see [contract §3.1](../../docs/contract-0.2.md).
+`make setup` installs `.[dev,render]` for development. A consumer installs only the core (numpy, scipy, shapely, pyproj,
+laspy, requests); pin a full SHA, see [contract §3.1](../../docs/contract-0.2.md).
 
 ```python
 from roof_measure import measure, MeasureError
 
 try:
-    envelope = measure("100 Example Ave, Sampletown, CA 90000", cache_dir="/var/cache/roof",
-                       anthropic_api_key=None, on_stage=print)
+    envelope = measure("100 Example Ave, Sampletown, CA 90000", cache_dir="/var/cache/roof", on_stage=print)
 except MeasureError as e:          # e.code, e.message, e.retryable
     print(e.to_dict())
 ```
 
-As written this geocodes and downloads LiDAR, so it needs the network and a writable `cache_dir` (on a laptop use
-`tempfile.mkdtemp()`). For an offline try-out add `verify=False, blocks_path="<copy of fixtures/site1_blocks.json>"`
-(contract §3.10).
-
-`measure()` blocks for up to `deadline_s + 30` s: run it off the request thread, in a pool of one or two. Signature,
-errors, isolation and caching: [docs/contract-0.2.md section 3](../../docs/contract-0.2.md).
-
-## Docker and Railway
-
-Build context is the repository root (uv workspace lock, shared fixtures). The image installs the `service` and
-`render` extras on top of the core dependencies:
-
-```
-docker buildx build --platform linux/amd64 -f services/roof_measure/Dockerfile -t roof-measure .
-docker run --rm -p 8011:8011 -e ROOF_MEASURE_HOST=0.0.0.0 -e ROOF_MEASURE_TOKEN=<32+ chars> -v roof-data:/data roof-measure
-```
-
-The image binds `::` by default, which uvicorn opens IPv6-only. Railway's proxy and private network are IPv6, so
-that stays the default there. A local `docker run -p` maps over IPv4 and never reaches it, so local Docker testing
-needs `-e ROOF_MEASURE_HOST=0.0.0.0`. The start-up log line prints the bind host. The slim image has no curl or
-ps: Railway runs the `/healthz` check over HTTP from outside, so nothing in the container needs them.
-
-The image runs as a non-root user and keeps jobs, results and the fetch cache under `/data`. On Railway use one
-replica, a volume mounted at `/data`, `ROOF_MEASURE_TOKEN`, and optionally `ANTHROPIC_API_KEY` (verifier, agent
-methods) and `GOOGLE_SOLAR_API_KEY` (Solar footprint link). `railway.toml` sets the `/healthz` health check. `RAILWAY_RUN_UID=0` is
-required on the service: the volume mounts root-owned, so the container must run as root to create `/data/jobs`
-(without it the service logs the fix and stops at boot). Size the volume for about 5 GB: results are a few KB
-each, and after 14 days finished job directories (PNG, blocks, transcripts) and cached results are deleted. The
-fetch cache (LiDAR tiles, several MB per building) is purged after 30 days. All of these purges run at boot and at
-most hourly after a job; job directories are also purged after each job.
+This geocodes and downloads LiDAR, so it needs the network and a writable `cache_dir`. For an offline try-out pass
+`points_path="<house folder>"` (`points_wide.npy`, `footprint.json`, `meta.json`: the regression set's layout).
+`measure()` blocks for up to `deadline_s + 30` s: run it off the request thread. `engine` (only `"planes"`) is still
+accepted for callers that pass it and goes with the next version; `verify`, `anthropic_api_key` and `google_solar_api_key`
+are gone (a caller that passes one gets a `TypeError`).
 
 ## Pipeline
 
-`api.py` (routes) -> `service.py` (cache or queue) -> `jobs.py` (disk job store, bounded worker pool) ->
-`runner.py` (geocode, result cache) -> `pipeline.py` -> `envelope.py`.
+`library.py` (child process, `_isolate.py`/`_child.py`) -> `pipeline.py` -> `pipeline_engine.py` -> `engine/` -> `envelope.py`.
 
 1. Geocode (`geocode.py`, Census) unless `lat` and `lng` are given.
 2. Footprint (`footprint.py` chain, each link records `footprint_source`): LA County parcel + LARIAC
-   (`footprint_county.py`, `lariac`), OpenStreetMap with three hedged Overpass mirrors (`footprint_osm.py`, `osm`),
-   Google Solar segment boxes when a key is set (`footprint_solar.py`, `solar`), a hull of the LiDAR roof
-   surface (`footprint_hull.py`, `lidar_hull`). Solar and hull footprints cap confidence at 0.5 and never `pass`.
-3. LiDAR (`lidar.py`, EPT over HTTPS) -> height-continuous blocks (`blocks.py`) -> classification
-   (`classify.py`, `skeleton.py`) or an agent (`agent.py`) -> model (`model.py`).
-4. Verifier (`verify*.py`): deterministic merge of tiny collinear segments, then an LLM review when
-   `ANTHROPIC_API_KEY` is set. It never fails a job; trouble means verdict `unverified`.
-5. Envelope: 14 totals including the drip edge and ridge cap variants, confidence, warning codes.
+   (`footprint_county.py`, `lariac`), OpenStreetMap (`footprint_osm.py`, `osm`), a hull of the LiDAR roof surface
+   (`footprint_hull.py`, `lidar_hull`; caps confidence at 0.5, never `pass`).
+3. LiDAR (`lidar.py`, EPT over HTTPS): the roof returns of the building.
+4. The plane engine (`engine/`): facets from the measured planes, flat and pitched told apart at 2/12, typed edges,
+   totals and quality signals; `engine/adapter.py` makes the model, `quality.py` the quality object.
+5. Envelope (`envelope.py`): totals, confidence, warning codes. No verifier runs: the verification block says `unverified`,
+   `skipped: engine`.
 
-`method: "auto"`: LiDAR skeleton; when LiDAR is missing or too sparse and both the Solar and Anthropic keys are
-set, `solar_agent`; otherwise the job fails with the LiDAR error code. `deadline.py` is the shared time budget
-(`ROOF_MEASURE_JOB_TIMEOUT_S`, footprint stage capped at 60 s).
-
-Each job writes under `DATA_DIR/jobs/<id>/`: `job.json`, `result.json`, `<tag>_blocks.json`, `<tag>_model.json`,
-`<tag>_model.png`, agent and verifier transcripts. Results for repeat requests are in `DATA_DIR/results/`.
-
-## Data layer notes
+`include_other_buildings=True` measures the other county outlines of the parcel with the same engine (`lot.py`).
+`deadline.py` is the shared time budget (footprint stage capped at 60 s).
 
 | Module | Job |
 |---|---|
 | `geocode.py` | US Census geocoder. The point is in the street: never point-in-polygon on a parcel. |
 | `lidar.py` | `select_project` ranks 3DEP EPT projects covering the point; `fetch_best_points` falls through to older surveys; under 4 roof points/m2 is `LidarTooSparse`, under 8 adds a `low_point_density` warning. |
 | `frame.py` | Metric CRS (UTM zone from longitude) to feet, origin at the south-west corner of the footprint box. |
-| `blocks.py` | 0.25 m height raster in the footprint, local plane fits, connected components with steps under 0.12 m, polygons snapped to the footprint. |
-| `cache.py` | Disk cache of every HTTP body, keyed by request, 30 day TTL, `ROOF_MEASURE_CACHE` overrides the directory. |
+| `cache.py` | Disk cache of every HTTP body, keyed by request, 30 day TTL. |
 
-Blocks may extend a little past the outline (roof overhang), so areas can exceed the footprint area. Wall and parapet
-heights are not measured; parapets are rule based. Tests are offline; recorded property data lives in the untracked
-`local/test-data/` and the real site list in `local/sites.json` (see `tests/sites.example.json`). Tests that need them
-skip when absent. Live checks: `ROOF_MEASURE_NETWORK=1 .venv/bin/python -m pytest -m network`.
+Tests are offline and use synthetic roofs; recorded property data lives in the untracked `local/test-data/` and the real
+site list in `local/sites.json` (see `tests/sites.example.json`). Tests that need them skip when absent. Live checks:
+`ROOF_MEASURE_NETWORK=1 .venv/bin/python -m pytest -m network`.
 
 ## Commands
 
 ```
 make test                      # offline suite
 make lint
-make fixtures                  # regenerate ../../fixtures synthetic models and the four 0.2 envelopes
-.venv/bin/roof-measure measure "100 Example Ave, Sampletown, CA 90000" --out out/ --blocks ../../fixtures/site1_blocks.json
-.venv/bin/python -m roof_measure.synth      # regenerate the closed-form 0.1 fixtures (overwrites ../../fixtures/synthetic_*.json)
+make fixtures                  # regenerate ../../fixtures/roof_engine (the engine's example envelope)
+make roof-eval / roof-synth    # the regression harness, tools/roof_eval/README.md
 ```
-
-Methods: `lidar_skeleton` (rules), `lidar_agent` (Claude picks forms from the block table), `solar_agent` (Claude
-picks forms from Solar segments). `--no-agent` runs the rules on the same evidence. The agent is capped at 12
-tool rounds.

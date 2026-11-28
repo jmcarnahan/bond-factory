@@ -1,5 +1,12 @@
 # Roof measurement service contract 0.2
 
+> **Removed in 0.6 (library cleanup, no change to the plane engine's output).** The block-path engine, the methods
+> `lidar_agent` and `solar_agent`, the LLM verifier (the `verification` block of an engine result says `unverified`,
+> `skipped: engine`), Google Solar evidence and the Solar footprint link, the test hooks `blocks_path` and `solar_fixture`
+> and the whole standalone job service (the HTTP API, auth, job store, runner, Dockerfile) are gone; only
+> `roof_measure.measure(...)` remains, with the plane engine. Sections below that describe them are history; git keeps the code.
+> The four `roof_measurement_0.2_*` fixtures stay as files for the Dart readers but nothing regenerates them.
+
 `bond.roof_model/0.2` is the result envelope of the `roof_measure` service. The pipeline is reachable two ways, with the same
 envelope: the job API of §1 (the private service, deployed as a Docker image) or in-process through the Python
 library of §3. Both link the GPL straight skeleton through compas_cgal. This document is what an app copies: the API, the envelope, the error codes, the environment variables and one example. The model

@@ -128,7 +128,7 @@ def test_flat_share_is_the_flat_part_of_the_priced_area():
 
 
 def test_a_model_with_a_flat_seam_validates_and_keeps_it_out_of_the_totals():
-    from roof_measure.classify import BlockSet
+    from roof_measure.blockset import BlockSet
     from roof_measure.engine.adapter import engine_model
 
     roof = synth_points.flat_two_level()

@@ -1,4 +1,4 @@
-"""Data stages of the pipeline: geocode, footprint chain, LiDAR, blocks. Imported lazily by ``pipeline``."""
+"""Data stages of the pipeline: geocode, footprint chain, LiDAR. Each stage reports itself through ``on_stage`` and checks the deadline before it starts."""
 
 from __future__ import annotations
 
@@ -6,9 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from . import config
-from .classify import BlockSet
-from .config import SOLAR_KEY_ENV  # noqa: F401  (re-exported: tests and pipeline import it from here)
+from .blockset import BlockSet
 from .deadline import Deadline
 
 
@@ -55,69 +53,10 @@ def _address_dict(parts: Any, formatted: str) -> dict[str, str]:
     return {"line1": parts.line1, "city": parts.city, "state": parts.state, "zip": parts.zip, "formatted": formatted}
 
 
-def _stage_footprint(address: str, lat_lng: tuple[float, float] | None, deadline: Deadline,
-                     on_stage: Callable[[str], None], outline_id: str | None = None,
-                     pinned: bool = True) -> BlockSet:
-    """Geocode + footprint -> an empty block set (footprint only)."""
-    import numpy as np
-    from shapely.geometry import Polygon
-
-    from . import footprint as fp_mod
-    from . import frame as frame_mod
-
-    on_stage("geocode")
-    lat, lng, parts, formatted = _locate(address, lat_lng)
-    deadline.check("footprint")
-    on_stage("footprint")
-    fp = fp_mod.fetch_footprint(lat, lng, parts, deadline=deadline, building_outline_id=outline_id,
-                                point_given=pinned and lat_lng is not None)
-    frame, fp_m = frame_mod.Frame.for_footprint(fp.polygon_wgs84)
-    ring = [tuple(p) for p in frame.to_ft(np.array(fp_m.exterior.coords))][:-1]
-    if not Polygon(ring).exterior.is_ccw:
-        ring = ring[::-1]
-    bs = BlockSet(address=_address_dict(parts, formatted), origin={"lat": frame.origin_lat, "lng": frame.origin_lng},
-                  frame={"epsg": frame.epsg, "x0_m": frame.x0_m, "y0_m": frame.y0_m}, footprint_ft=ring,
-                  footprint_meta={"provider": fp.provider, "id": fp.id, "area_sqft": fp.area_sqft,
-                                  "height_ft": fp.height_ft})
-    bs.extra["_geo"] = {"lat": lat, "lng": lng}
-    bs.extra["_fp"] = _footprint_info(fp)
-    return bs
-
-
-def _stage_blocks(address: str, out_dir: Path, tag: str, lat_lng: tuple[float, float] | None, deadline: Deadline,
-                  on_stage: Callable[[str], None], outline_id: str | None = None, pinned: bool = True) -> BlockSet:
-    """Full data stage for the LiDAR methods; the blocks JSON is written then read back."""
-    from . import blocks as blocks_mod
-    from . import footprint as fp_mod
-    from . import frame as frame_mod
-    from . import lidar
-
-    on_stage("geocode")
-    lat, lng, parts, formatted = _locate(address, lat_lng)
-    deadline.check("footprint")
-    on_stage("footprint")
-    fp = fp_mod.fetch_footprint(lat, lng, parts, deadline=deadline, building_outline_id=outline_id,
-                                point_given=pinned and lat_lng is not None)
-    frame, fp_m = frame_mod.Frame.for_footprint(fp.polygon_wgs84)
-    deadline.check("lidar")
-    on_stage("lidar")
-    points = lidar.fetch_for_footprint(fp_m, frame.epsg)
-    deadline.check("blocks")
-    on_stage("blocks")
-    meta = {"provider": fp.provider, "id": fp.id, "area_sqft": fp.area_sqft, "height_ft": fp.height_ft}
-    blockset = blocks_mod.segment_blocks(points, fp_m, frame, address=_address_dict(parts, formatted),
-                                         footprint_meta=meta)
-    path = out_dir / f"{tag}_blocks.json"
-    blockset.to_json(path)
-    base = BlockSet.load(path)
-    base.extra["_fp"] = _footprint_info(fp)
-    return base
-
-
 def _stage_points(address: str, lat_lng: tuple[float, float] | None, deadline: Deadline,
                   on_stage: Callable[[str], None], outline_id: str | None = None, pinned: bool = True) -> tuple[Any, ...]:
     """Data stage of the plane engine: ``(base, fp_m, frame, points)``. ``base`` is a footprint-only ``BlockSet``
-    (address, origin, frame, footprint ring) with the footprint info in ``extra['_fp']``; nothing is segmented."""
+    (address, origin, frame, footprint ring) with the footprint info in ``extra['_fp']``."""
     import numpy as np
     from shapely.geometry import Polygon
 
@@ -184,12 +123,3 @@ def _stage_points_dir(house_dir: str | Path, address: str) -> tuple[Any, ...]:
     base.extra["_fp"] = {"source": "lariac" if county else "osm", "warnings": [], "codes": [], "other_buildings": 0,
                          "match": meta.get("parcel_match"), "building": None}
     return base, fp_m, frame, points
-
-
-def _solar_key() -> str:
-    key = config.solar_key()
-    if key:
-        return key
-    raise PipelineError("The live Solar API needs a Google Solar key (the google_solar_api_key argument or "
-                        "GOOGLE_SOLAR_API_KEY) and the API enabled on the project. Use --solar-fixture for the "
-                        "synthetic fixture.")

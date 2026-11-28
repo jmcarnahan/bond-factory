@@ -30,8 +30,8 @@ elif cmd == "stderr-exit-3":
     sys.exit(3)
 elif cmd == "echo-env":
     emit({"t": "ok", "envelope": {"_env": sorted(os.environ)}})
-elif cmd == "echo-key":
-    emit({"t": "ok", "envelope": {"_key": req["runtime"]["anthropic_api_key"]}})
+elif cmd == "echo-req":
+    emit({"t": "ok", "envelope": {"_req": sorted(req), "_runtime": sorted(req["runtime"])}})
 elif cmd == "stray-stdout":
     sys.stdout.write("42\n[1,2]\njunk-without-newline\n")
     sys.stdout.flush()

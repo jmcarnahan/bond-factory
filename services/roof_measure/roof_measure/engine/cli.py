@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _write_model(path: str, res, house, params) -> int:
     """The adapted model (validated) and assessment; exit 3 when the result cannot be a valid model."""
-    from ..classify import BlockSet
+    from ..blockset import BlockSet
     from ..model import ModelError
     from ..quality import assess_engine
     from .adapter import engine_model

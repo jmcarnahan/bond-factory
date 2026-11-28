@@ -1,5 +1,9 @@
 # roof_measure envelope 0.3 (additive to 0.2)
 
+> **Removed in 0.6.** The block path (and with it the `planes_only` result and the block-path quality object, `model.planes`
+> snapping and the four plane totals it made), the agent methods, the verifier, Solar and the job service. See the note at the
+> top of contract-0.2.md. The plane engine's quality, planes and totals (contract-0.4.md) remain.
+
 `PIPELINE_VERSION` is `0.4.0` (0.3.0 added the keys below; 0.3.1 adds the planes-only result and a sliver repair, see the end of this file; 0.4.0 adds the optional `other_buildings` key, see "Other buildings on the lot"); the contract name stays `bond.roof_model/0.2` and every 0.2 key keeps its meaning and its
 value. 0.3 only ADDS optional keys and three warning codes (`parcel_street_match`, `agent_failed_fell_back`, `model_failed`; and the street-match note moves from `other` to the first). A parser that ignores unknown keys (the Dart `RoofMeasurement`
 does) needs no change. `method_used` never gains a new value: a retry or a fallback is a reason code, not a method.

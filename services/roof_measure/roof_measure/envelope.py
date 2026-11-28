@@ -8,6 +8,7 @@ from typing import Any
 
 from .version import CONTRACT, PIPELINE_VERSION
 
+# closed contract vocabulary; entries the library no longer emits stay until the 0.6.0 contract
 WARNING_CODES = ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
                  "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "method_fallback", "verifier_unverified",
                  "verifier_adjusted", "verifier_failed", "verifier_timeout", "solar_segments_only",
@@ -17,9 +18,9 @@ TOTALS_KEYS = ("area_sqft", "squares", "eave_ft", "rake_ft", "ridge_ft", "hip_ft
                "predominant_pitch", "facets", "drip_edge_eave_ft", "drip_edge_eave_rake_ft", "ridge_cap_ridge_ft",
                "ridge_cap_ridge_hip_ft")
 VERDICTS = ("pass", "adjusted", "fail", "unverified")
-DEGRADED_SOURCES = ("solar", "lidar_hull")
+DEGRADED_SOURCES = ("lidar_hull",)
 _BASE = {"high": 0.9, "medium": 0.7, "low": 0.5}
-_CAP = {"osm": 0.85, "solar": 0.5, "lidar_hull": 0.5}
+_CAP = {"osm": 0.85, "lidar_hull": 0.5}
 LOW_DENSITY_PTS_M2 = 12.0
 
 
@@ -55,7 +56,7 @@ def confidence_score(model: dict[str, Any], footprint_source: str, verdict: str,
 
 
 def cap_verification(verification: dict[str, Any], footprint_source: str) -> dict[str, Any]:
-    """A copy with ``pass`` lowered to ``adjusted`` for a degraded footprint (solar, lidar_hull)."""
+    """A copy with ``pass`` lowered to ``adjusted`` for a degraded footprint (lidar_hull)."""
     out = copy.deepcopy(verification)
     if out.get("verdict") == "pass" and footprint_source in DEGRADED_SOURCES:
         out["verdict"] = "adjusted"
@@ -67,9 +68,9 @@ def cap_verification(verification: dict[str, Any], footprint_source: str) -> dic
 def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source: str, verification: dict[str, Any],
                    warnings: list[str], warning_codes: list[str], density_pts_m2: float | None = None,
                    generated_at: str | None = None, assessment: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Assemble the 0.2 result. Degraded footprints (solar, lidar_hull) can be at most ``adjusted``.
+    """Assemble the 0.2 result. A degraded footprint (lidar_hull) can be at most ``adjusted``.
 
-    ``assessment`` (``quality.assess``) adds the optional 0.3 keys: ``model.quality``, ``model.planes`` and four
+    ``assessment`` (``quality.assess_engine``) adds the optional 0.3 keys: ``model.quality``, ``model.planes`` and four
     extra totals. Without it the envelope is exactly the 0.2 one.
     """
     if len(warnings) != len(warning_codes):
@@ -80,10 +81,6 @@ def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source:
         raise ValueError(f"verdict must be one of {VERDICTS}")
     codes = [c if c in WARNING_CODES else "other" for c in warning_codes]
     totals = totals_from_model(model)
-    if (model.get("source") or {}).get("planes_only") and assessment:
-        from .planes_only import planes_only_totals
-
-        totals = planes_only_totals(assessment.get("totals", {}))
     if assessment:
         model["quality"] = assessment["quality"]
         if "planes" in assessment:  # absent when the assessment failed

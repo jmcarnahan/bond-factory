@@ -3,25 +3,23 @@
 from __future__ import annotations
 
 import json
-import shutil
-from pathlib import Path
+from functools import lru_cache
 from types import SimpleNamespace
 
 import pytest
-from conftest import FIXTURES
+from house_helpers import house
 from shapely.geometry import Polygon
 
-from roof_measure import _isolate, cache, library, lot
-from roof_measure.blocks import BlocksError
-from roof_measure.classify import BlockSet
+from roof_measure import _isolate, cache, library, lot, pipeline_engine
 from roof_measure.deadline import Deadline
 from roof_measure.footprint_types import Footprint
 from roof_measure.library import measure
+from roof_measure.model import ModelError
 from roof_measure.pipeline import run_pipeline
 from roof_measure.pipeline_notes import collect_warnings
+from roof_measure.synth_engine_envelope import engine_envelope
 
 ADDR = "100 Example Ave, Sampletown, CA 90000"
-BLOCKS = FIXTURES / "site1_blocks.json"
 FT_PER_M = 1 / 0.3048
 
 
@@ -36,21 +34,25 @@ def cand(i="B2", area=424.0):
     return lot.Candidate(Polygon([(0, 0), (1, 0), (1, 1)]), "lacounty_lariac_2020", i, area)
 
 
-def builder_at(dx_m: float, dy_m: float, calls: list | None = None):
-    """A stand-in for ``lot.build_blocks``: the fixture's blocks in a frame shifted by (dx_m, dy_m) from the main one."""
-    def build(c, main_frame, address, out_path):
+@lru_cache(maxsize=1)
+def _engine_env_json() -> str:
+    return json.dumps(engine_envelope())
+
+
+def planes_at(dx_m: float, dy_m: float, calls: list | None = None):
+    """A stand-in for ``pipeline_engine.run_planes_outline``: a real engine envelope (a synthetic roof), its frame shifted
+    by (dx_m, dy_m) from the main one; one file per building in its own work folder."""
+    def run(c, main_frame, address, work, deadline, params=None):
         if calls is not None:
             calls.append(c.id)
-        d = json.loads(BLOCKS.read_text())
-        d["frame"] = {**d["frame"], "x0_m": d["frame"]["x0_m"] + dx_m, "y0_m": d["frame"]["y0_m"] + dy_m}
-        Path(out_path).write_text(json.dumps(d))
-        return BlockSet.load(out_path)
-    return build
+        (work / f"{c.id}.json").write_text("{}")
+        frame = {**main_frame, "x0_m": main_frame["x0_m"] + dx_m, "y0_m": main_frame["y0_m"] + dy_m}
+        return SimpleNamespace(envelope=json.loads(_engine_env_json()), blockset=SimpleNamespace(frame=frame))
+    return run
 
 
 def call(tmp_path, **kw):
-    args = {"method": "lidar_skeleton", "verify": False, "cache_dir": tmp_path / "cache", "blocks_path": BLOCKS,
-            "isolate": False}
+    args = {"method": "lidar_skeleton", "cache_dir": tmp_path / "cache", "points_path": house(tmp_path), "isolate": False}
     return measure(ADDR, **(args | kw))
 
 
@@ -75,17 +77,18 @@ def test_default_call_is_unchanged(tmp_path, monkeypatch):
     assert stable(call(tmp_path, include_other_buildings=False)) == stable(plain)
 
 
-def test_asking_with_no_other_building_changes_nothing(tmp_path):
-    assert stable(call(tmp_path, include_other_buildings=True)) == stable(call(tmp_path))  # blocks_path: no lookup
+def test_asking_with_no_other_building_changes_nothing(tmp_path, monkeypatch):
+    monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: [])
+    assert stable(call(tmp_path, include_other_buildings=True)) == stable(call(tmp_path))
 
 
 def test_two_building_lot_has_the_key_offset_and_totals(tmp_path, monkeypatch):
     monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: [cand("B2", 424.0)])
-    monkeypatch.setattr(lot, "build_blocks", builder_at(10.0, 20.0))
+    monkeypatch.setattr(pipeline_engine, "run_planes_outline", planes_at(10.0, 20.0))
     env = call(tmp_path, include_other_buildings=True)
     plain = call(tmp_path)
     (other,) = env["other_buildings"]
-    assert other["index"] == 1 and other["status"] in ("ok", "planes_only") and other["error_code"] is None
+    assert other["index"] == 1 and other["status"] == "ok" and other["error_code"] is None
     assert other["footprint"] == {"provider": "lacounty_lariac_2020", "id": "B2", "area_sqft": 424.0}
     assert other["offset_ft"] == pytest.approx([10.0 * FT_PER_M, 20.0 * FT_PER_M], abs=0.01)
     assert set(other["model"]) >= {"facets", "totals", "quality", "planes"} and set(plain["totals"]) <= set(other["totals"])
@@ -111,15 +114,14 @@ def test_offset_is_east_north_of_the_main_origin():
 def test_a_shed_under_120_sqft_is_ignored(tmp_path, monkeypatch):
     calls: list[str] = []
     monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: [cand("SHED", 119.0)])
-    monkeypatch.setattr(lot, "build_blocks", builder_at(5.0, 5.0, calls))
+    monkeypatch.setattr(pipeline_engine, "run_planes_outline", planes_at(5.0, 5.0, calls))
     env = call(tmp_path, include_other_buildings=True)
     assert calls == [] and "other_buildings" not in env and "lot_buildings" not in env["totals"]
 
 
 def test_the_old_warning_for_other_buildings_stays():
     fpinfo = {"source": "lariac", "warnings": [], "codes": [], "other_buildings": 1}
-    _, codes = collect_warnings({"warnings": [], "source": {}}, fpinfo, {"verdict": "unverified"}, None, None,
-                                "lidar_skeleton", [])
+    _, codes = collect_warnings({"warnings": [], "source": {}}, fpinfo, None, [])
     assert "other_buildings_on_parcel" in codes
 
 
@@ -141,9 +143,9 @@ def test_candidates_come_from_the_footprint_chain_largest_first(monkeypatch):
 
 def test_a_failing_second_building_is_recorded_and_the_main_result_is_intact(tmp_path, monkeypatch):
     def boom(*a, **k):
-        raise BlocksError("no roof here")
+        raise ModelError("no roof here")
     monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: [cand("B2", 424.0)])
-    monkeypatch.setattr(lot, "build_blocks", boom)
+    monkeypatch.setattr(pipeline_engine, "run_planes_outline", boom)
     env = call(tmp_path, include_other_buildings=True)
     plain = call(tmp_path)
     (other,) = env["other_buildings"]
@@ -155,17 +157,17 @@ def test_a_failing_second_building_is_recorded_and_the_main_result_is_intact(tmp
 
 
 def test_one_failure_does_not_stop_the_next_building(tmp_path, monkeypatch):
-    ok = builder_at(8.0, 8.0)
+    ok = planes_at(8.0, 8.0)
 
-    def build(c, main_frame, address, out_path):
+    def build(c, main_frame, address, work, deadline, params=None):
         if c.id == "BAD":
-            raise BlocksError("x")
-        return ok(c, main_frame, address, out_path)
+            raise ModelError("x")
+        return ok(c, main_frame, address, work, deadline)
     monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: [cand("BAD", 500.0), cand("GOOD", 300.0)])
-    monkeypatch.setattr(lot, "build_blocks", build)
+    monkeypatch.setattr(pipeline_engine, "run_planes_outline", build)
     env = call(tmp_path, include_other_buildings=True)
     assert (env["other_buildings"][0]["index"], env["other_buildings"][0]["status"]) == (1, "failed")
-    assert env["other_buildings"][1]["status"] in ("ok", "planes_only") and env["totals"]["lot_buildings"] == 2
+    assert env["other_buildings"][1]["status"] == "ok" and env["totals"]["lot_buildings"] == 2
 
 
 class _Clock:
@@ -189,16 +191,16 @@ class _Clock:
 
 def test_deadline_exhaustion_skips_the_rest_and_says_so(tmp_path, monkeypatch):
     calls: list[str] = []
-    monkeypatch.setattr(lot, "build_blocks", builder_at(6.0, 6.0, calls))
+    monkeypatch.setattr(pipeline_engine, "run_planes_outline", planes_at(6.0, 6.0, calls))
     work = tmp_path / "w"
-    res = run_pipeline(ADDR, work, blocks_path=BLOCKS, verify=False, render=False)
+    res = run_pipeline(ADDR, work, points_path=house(tmp_path))
     cands = [cand("A", 500.0), cand("B", 400.0), cand("C", 300.0)]
     # first share 60 / 3 = 20 s (measured); then 4 s left for two buildings: below MIN_SHARE_S, both skipped
     lot.add_other_buildings(res, address=ADDR, lat_lng=None, deadline=_Clock(60.0, 4.0), out_dir=work,
                             finder=lambda *a, **k: cands)
     entries = res.envelope["other_buildings"]
     assert calls == ["A"]
-    assert entries[0]["status"] in ("ok", "planes_only")
+    assert entries[0]["status"] == "ok"
     assert [(e["status"], e["error_code"]) for e in entries[1:]] == [("failed", "timeout")] * 2
     assert res.envelope["totals"]["lot_buildings"] == 2
     assert "timeout" in res.envelope["warnings"][-1]
@@ -213,40 +215,32 @@ def test_a_crashed_child_is_retried_without_the_extra_buildings(tmp_path, monkey
             raise _isolate.ChildCrashed("measurement_failed", "the measurement process exited with code -11")
         return {"warnings": ["w"], "warning_codes": ["other"], "totals": {}}
     monkeypatch.setattr(_isolate, "run_isolated", fake)
-    env = measure(ADDR, method="lidar_skeleton", verify=False, cache_dir=tmp_path / "c", blocks_path=BLOCKS,
+    env = measure(ADDR, method="lidar_skeleton", cache_dir=tmp_path / "c", points_path=house(tmp_path),
                   include_other_buildings=True)
     assert seen == [True, False]
     assert env["warning_codes"][-1] == "other" and "other buildings" in env["warnings"][-1]
     seen.clear()
-    with pytest.raises(library.MeasureError):  # without the flag a crash is still a crash (non-agent method)
+    with pytest.raises(library.MeasureError):  # without the flag a crash is still a crash
         monkeypatch.setattr(_isolate, "run_isolated", lambda *a, **k: (_ for _ in ()).throw(
             _isolate.ChildCrashed("measurement_failed", "x")))
-        measure(ADDR, method="lidar_skeleton", verify=False, cache_dir=tmp_path / "c", blocks_path=BLOCKS)
+        measure(ADDR, method="lidar_skeleton", cache_dir=tmp_path / "c", points_path=house(tmp_path))
 
 
-def test_an_agent_crash_with_extra_buildings_still_falls_back_to_the_rules(tmp_path, monkeypatch):
-    """The agent crashes with and without the extra buildings: the third try is the rule method, not an error."""
-    seen: list[tuple[str, bool]] = []
-
+def test_a_crash_that_repeats_without_the_extra_buildings_raises_the_first_crash(tmp_path, monkeypatch):
     def fake(req, on_stage, grace=0):
-        seen.append((req["method"], bool(req["include_other_buildings"])))
-        if req["method"] == "lidar_agent":
-            raise _isolate.ChildCrashed("measurement_failed", "the measurement process exited with code -11")
-        return {"warnings": [], "warning_codes": [], "totals": {}, "model": {"quality": {"reasons": []}}}
+        raise _isolate.ChildCrashed("measurement_failed", f"crash with lot={req['include_other_buildings']}")
     monkeypatch.setattr(_isolate, "run_isolated", fake)
-    env = measure(ADDR, method="lidar_agent", verify=False, cache_dir=tmp_path / "c", blocks_path=BLOCKS,
-                  include_other_buildings=True)
-    assert seen == [("lidar_agent", True), ("lidar_agent", False), ("lidar_skeleton", False)]
-    assert env["warning_codes"] == ["agent_failed_fell_back", "other"]
+    with pytest.raises(library.MeasureError, match="lot=True"):
+        measure(ADDR, method="lidar_skeleton", cache_dir=tmp_path / "c", points_path=house(tmp_path),
+                include_other_buildings=True)
 
 
 def test_work_files_do_not_collide(tmp_path, monkeypatch):
     monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: [cand("A", 500.0), cand("B", 300.0)])
-    monkeypatch.setattr(lot, "build_blocks", builder_at(6.0, 6.0))
+    monkeypatch.setattr(pipeline_engine, "run_planes_outline", planes_at(6.0, 6.0))
     work = tmp_path / "keep"
     call(tmp_path, include_other_buildings=True, work_dir=work)
-    assert (work / "lot_1" / "blocks.json").is_file() and (work / "lot_2" / "blocks.json").is_file()
-    shutil.rmtree(work)
+    assert (work / "lot_1" / "A.json").is_file() and (work / "lot_2" / "B.json").is_file()
 
 
 def _ok_entry(index, totals, model=None):
@@ -271,14 +265,12 @@ def test_a_building_with_nan_totals_is_failed_and_the_lot_totals_stay_finite(tmp
 
 
 def test_a_nan_inside_a_building_s_model_fails_that_building_only(tmp_path, monkeypatch):
-    from roof_measure import pipeline
-
-    main = BlockSet.load(BLOCKS)
+    frame = {"epsg": 32611, "x0_m": 0.0, "y0_m": 0.0}
     env = {"model": {"source": {}, "facets": [{"area_sqft": float("nan")}]},
            "totals": {"area_sqft": 300.0, "squares": 3.0, "outline_perimeter_ft": 70.0}}
-    monkeypatch.setattr(pipeline, "run_pipeline", lambda *a, **k: SimpleNamespace(envelope=env))
-    got = lot.measure_one(1, cand("B2", 424.0), main.frame, {"formatted": "x"}, tmp_path, Deadline.after(30_000),
-                          builder=lambda c, f, a, p: SimpleNamespace(frame=main.frame))
+    monkeypatch.setattr(pipeline_engine, "run_planes_outline",
+                        lambda *a, **k: SimpleNamespace(envelope=env, blockset=SimpleNamespace(frame=frame)))
+    got = lot.measure_one(1, cand("B2", 424.0), frame, {"formatted": "x"}, tmp_path, Deadline.after(30_000))
     assert got["status"] == "failed" and got["error_code"] == "measurement_failed" and got["model"] is None
 
 

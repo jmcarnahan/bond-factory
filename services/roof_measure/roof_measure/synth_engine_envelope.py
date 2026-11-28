@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .classify import BlockSet
+from .blockset import BlockSet
 
 EPSG = 32631  # the zone whose grid holds the null island of the placeholder fixtures (origin 0, 0)
 STAMP = "2026-11-22T00:00:00Z"

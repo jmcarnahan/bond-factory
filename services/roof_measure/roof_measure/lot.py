@@ -1,8 +1,8 @@
-"""Every building on the lot: measure the county's other outlines with the rule method and attach them to the envelope.
+"""Every building on the lot: measure the county's other outlines with the plane engine and attach them to the envelope.
 
 ``measure(..., include_other_buildings=True)`` runs the usual pipeline for the main building (the largest outline on
 the parcel), then ``add_other_buildings`` measures each other outline of at least ``MIN_AREA_SQFT`` with
-``lidar_skeleton`` (no agent, no verifier) inside the same deadline. Nothing here runs unless asked, and a failing
+the plane engine inside the same deadline. Nothing here runs unless asked, and a failing
 second building never fails the first.
 
 Frames: every building gets its own model frame (feet, origin at the south-west corner of its own bounding box) in the
@@ -23,7 +23,7 @@ from typing import Any
 
 from shapely.geometry import Polygon
 
-from . import cache, errors
+from . import errors
 from .deadline import Deadline
 from .frame import FT_PER_M
 
@@ -33,7 +33,7 @@ MIN_AREA_SQFT = 120.0  # a smaller outline (a shed, a meter closet) is not worth
 MIN_SHARE_S = 8.0  # less time than this for a building: skip it (and the ones after it) and say so
 MAX_BUILDINGS = 6  # the largest few; a parcel of dozens of outlines must not eat the deadline
 TIMEOUT = "timeout"
-OK, PLANES_ONLY, FAILED = "ok", "planes_only", "failed"
+OK, FAILED = "ok", "failed"
 
 
 @dataclass
@@ -48,13 +48,13 @@ class Candidate:
 
 # ----------------------------------------------------------------------------- finding the buildings
 def find_candidates(res: Any, address: str, lat_lng: tuple[float, float] | None, deadline: Deadline,
-                    blocks_path: str | Path | None = None, pinned: bool = True) -> list[Candidate]:
+                    pinned: bool = True) -> list[Candidate]:
     """The other outlines of the main building's footprint, largest first (``[]`` when there are none).
 
     Runs the footprint chain again for the same point: every request is in the fetch cache from the main run, so
     it is free. If the answer is not the building that was measured (a different id), nothing is returned.
     """
-    if blocks_path or res.footprint_source not in ("lariac", "osm"):
+    if res.footprint_source not in ("lariac", "osm"):
         return []
     from . import footprint as fp_mod
     from .pipeline_stages import _locate
@@ -85,23 +85,6 @@ def _area(poly: Polygon) -> float:
 
 
 # ----------------------------------------------------------------------------- measuring one building
-def build_blocks(cand: Candidate, main_frame: dict[str, Any], address: dict[str, Any], out_path: Path) -> Any:
-    """LiDAR blocks of one outline in a frame of the main frame's CRS; written to ``out_path`` and read back."""
-    from . import blocks as blocks_mod
-    from . import lidar
-    from .classify import BlockSet
-    from .frame import Frame, project_geometry
-
-    epsg = int(main_frame["epsg"])
-    fp_m = project_geometry(cand.polygon_wgs84, 4326, epsg)
-    frame = Frame.from_footprint_m(fp_m, epsg)  # type: ignore[arg-type]
-    points = lidar.fetch_for_footprint(fp_m, epsg)  # type: ignore[arg-type]
-    meta = {"provider": cand.provider, "id": cand.id, "area_sqft": cand.area_sqft, "height_ft": None}
-    bs = blocks_mod.segment_blocks(points, fp_m, frame, address=address, footprint_meta=meta)  # type: ignore[arg-type]
-    bs.to_json(out_path)
-    return BlockSet.load(out_path)
-
-
 def offset_ft(main_frame: dict[str, Any], other_frame: dict[str, Any]) -> list[float]:
     """Where the other model's origin lies in the main model's frame, plan feet ``[dx (east), dy (north)]``."""
     if int(main_frame["epsg"]) != int(other_frame["epsg"]):
@@ -120,30 +103,19 @@ def _fp_dict(cand: Candidate) -> dict[str, Any]:
 
 
 def measure_one(index: int, cand: Candidate, main_frame: dict[str, Any], address: dict[str, Any], out_dir: Path,
-                deadline: Deadline, builder: Callable[..., Any] | None = None, engine: str = "blocks") -> dict[str, Any]:
-    """The ``other_buildings`` entry of one outline; every failure becomes ``status`` ``failed`` plus a job code.
-    ``engine="planes"`` measures it with the plane engine (the same engine as the main building)."""
-    from .pipeline import run_pipeline
+                deadline: Deadline) -> dict[str, Any]:
+    """The ``other_buildings`` entry of one outline, measured with the plane engine (the main building's engine);
+    every failure becomes ``status`` ``failed`` plus a job code."""
+    from .pipeline_engine import run_planes_outline
 
     work = out_dir / f"lot_{index}"
     try:
         work.mkdir(parents=True, exist_ok=True)
-        if engine == "planes":
-            from .pipeline_engine import run_planes_outline
-
-            res = run_planes_outline(cand, main_frame, address, work, deadline)
-            base = res.blockset
-        else:
-            with cache.deadline_scope(deadline):
-                base = (builder or build_blocks)(cand, main_frame, address, work / "blocks.json")
-            deadline.check("blocks")
-            res = run_pipeline(address.get("formatted") or address.get("line1") or "lot building", work,
-                               "lidar_skeleton", blocks_path=work / "blocks.json", deadline=deadline, verify=False,
-                               render=False)
+        res = run_planes_outline(cand, main_frame, address, work, deadline)
+        base = res.blockset
         env = res.envelope
-        planes_only = bool((env["model"].get("source") or {}).get("planes_only"))
         entry = {"index": index, "footprint": _fp_dict(cand), "offset_ft": offset_ft(main_frame, base.frame),
-                 "status": PLANES_ONLY if planes_only else OK, "error_code": None, "model": env["model"],
+                 "status": OK, "error_code": None, "model": env["model"],
                  "totals": env["totals"]}
         json.dumps(entry, allow_nan=False)  # a NaN anywhere in this building fails this building, not the main result
         _lot_part(entry["totals"])  # ... as does a total the lot sums cannot use
@@ -156,13 +128,12 @@ def measure_one(index: int, cand: Candidate, main_frame: dict[str, Any], address
 
 # ----------------------------------------------------------------------------- the envelope
 def add_other_buildings(res: Any, *, address: str, lat_lng: tuple[float, float] | None, deadline: Deadline | None,
-                        out_dir: str | Path, blocks_path: str | Path | None = None, pinned: bool = True,
-                        finder: Callable[..., list[Candidate]] | None = None,
-                        builder: Callable[..., Any] | None = None, engine: str = "blocks") -> None:
+                        out_dir: str | Path, pinned: bool = True,
+                        finder: Callable[..., list[Candidate]] | None = None) -> None:
     """Measure the other buildings of ``res`` (a ``PipelineResult``) and add the envelope keys; no-op when none."""
     deadline = deadline or Deadline.after(10_000)
     try:
-        cands = (finder or find_candidates)(res, address, lat_lng, deadline, blocks_path,
+        cands = (finder or find_candidates)(res, address, lat_lng, deadline,
                                            **({} if finder else {"pinned": pinned}))
     except Exception as exc:  # noqa: BLE001 - a lookup bug must not fail the main result
         log.info("other buildings: lookup failed (%s)", type(exc).__name__)
@@ -177,8 +148,7 @@ def add_other_buildings(res: Any, *, address: str, lat_lng: tuple[float, float] 
         if share < MIN_SHARE_S:
             entries.extend(_failed(i, c, TIMEOUT) for i, c in enumerate(cands[n - 1:], n))
             break
-        entries.append(measure_one(n, cand, main_frame, res.blockset.address, Path(out_dir), Deadline.after(share),
-                                   builder, engine))
+        entries.append(measure_one(n, cand, main_frame, res.blockset.address, Path(out_dir), Deadline.after(share)))
     try:
         _attach(res.envelope, entries)
     except Exception as exc:  # noqa: BLE001 - the lot is an addition: it never fails or pollutes the main result

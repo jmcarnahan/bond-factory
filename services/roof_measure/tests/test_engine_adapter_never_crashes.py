@@ -11,7 +11,7 @@ import numpy as np
 from shapely.geometry import MultiPolygon, Polygon, box
 
 from roof_measure import errors, lidar, pipeline_engine
-from roof_measure.classify import BlockSet
+from roof_measure.blockset import BlockSet
 from roof_measure.deadline import Deadline, DeadlineExceeded
 from roof_measure.engine import adapter
 from roof_measure.footprint_types import FootprintError

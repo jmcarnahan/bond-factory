@@ -60,8 +60,8 @@ def test_variant_arithmetic():
 @pytest.mark.parametrize("overall,source,verdict,density,want", [
     ("high", "lariac", "pass", None, 0.9), ("medium", "lariac", "pass", 20.0, 0.7), ("low", "lariac", "pass", 20.0, 0.5),
     ("high", "osm", "pass", None, 0.85), ("medium", "osm", "pass", None, 0.7),
-    ("high", "solar", "pass", None, 0.5), ("high", "lidar_hull", "pass", None, 0.5),
-    ("high", "lariac", "adjusted", None, 0.85), ("high", "solar", "adjusted", None, 0.45),
+    ("high", "lidar_hull", "pass", None, 0.5),
+    ("high", "lariac", "adjusted", None, 0.85), ("high", "lidar_hull", "adjusted", None, 0.45),
     ("high", "lariac", "unverified", None, 0.7), ("low", "lariac", "unverified", None, 0.5),
     ("high", "lariac", "fail", None, 0.3), ("low", "lariac", "fail", None, 0.3),
     ("medium", "osm", "pass", 11.9, 0.6), ("medium", "osm", "pass", 12.0, 0.7),
@@ -72,7 +72,7 @@ def test_confidence_table(overall, source, verdict, density, want):
 
 
 def test_confidence_is_clamped():
-    assert 0.0 <= confidence_score({"confidence": {"overall": "low"}}, "solar", "fail", 0.0) <= 1.0
+    assert 0.0 <= confidence_score({"confidence": {"overall": "low"}}, "lidar_hull", "fail", 0.0) <= 1.0
     assert confidence_score({"confidence": {}}, "osm", "pass") == 0.5  # unknown overall behaves like low
 
 
@@ -96,7 +96,7 @@ def test_warnings_and_codes_must_line_up_and_unknown_codes_become_other():
 
 
 def test_degraded_footprints_can_never_pass():
-    for source in ("solar", "lidar_hull"):
+    for source in ("lidar_hull",):
         e = env(footprint_source=source)
         assert e["verification"]["verdict"] == "adjusted" and "lowered from pass" in e["verification"]["notes"][-1]
         assert e["confidence"] == 0.45

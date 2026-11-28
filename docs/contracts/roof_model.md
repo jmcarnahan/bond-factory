@@ -147,9 +147,7 @@ parapet `#FB8C00`, transition `#D81B60`, unspecified `#26A69A`. Facet fill: flat
 
 `fixtures/site1_lidar.json`: what the service produced. `fixtures/synthetic_hip.json`,
 `fixtures/synthetic_gable.json`, `fixtures/synthetic_flat_parapet.json`, `fixtures/synthetic_flat_curbs.json`, `fixtures/synthetic_hip_zigzag.json`: closed-form cases
-with known totals. `fixtures/site1_blocks.json` (schema `bond.roof_blocks/0.1`) and
-`fixtures/synthetic_solar_response.json` (a synthetic Solar response) are inputs to the service,
-not roof models; consumers filter on the `schema` string. Dart `bond_roof` tests load every
+with known totals. Consumers filter on the `schema` string. Dart `bond_roof` tests load every
 roof-model fixture and check: schema parses,
 totals recompute from facets and edges within 0.5 sq ft / 0.05 ft, every edge type in the
 palette, diagrams render without throwing and hide no more than 30% of labels.

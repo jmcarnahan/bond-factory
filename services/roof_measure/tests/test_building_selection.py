@@ -1,20 +1,17 @@
 """Which building is measured (plan 3.3): the parcel that holds the roof point, the outline on it, an outline by id,
 and the answer carried into the envelope (``model.source.building``, ``model.quality.parcel_match``). Synthetic parcels."""
 
-import json
 from types import SimpleNamespace
 
 import pytest
-from conftest import FIXTURES
 
-from roof_measure import footprint, footprint_county, pipeline, pipeline_stages
+from roof_measure import footprint, footprint_county, pipeline_stages
 from roof_measure.footprint_types import FootprintError, FootprintUnavailable
 from roof_measure.geocode import Address
 from roof_measure.library import measure
 
 LAT, LNG, D = 34.0, -118.0, 0.0001  # D is about 11 m
 ADDR = Address("100 Example Ave", "Sampletown", "CA", "90000")
-BLOCKS = FIXTURES / "site1_blocks.json"
 
 
 def ring(lat0, lng0, dlat, dlng):
@@ -155,34 +152,19 @@ def test_measure_accepts_the_outline_id_and_unknown_id_is_no_footprint(tmp_path,
     net.routes["LACounty_Parcel"] = {"features": [A]}
     net.routes["Countywide_Building_Outlines"] = {"features": []}
     with pytest.raises(MeasureError) as e:
-        measure("", lat=LAT, lng=LNG, method="lidar_skeleton", verify=False, cache_dir=tmp_path / "c", isolate=False,
+        measure("", lat=LAT, lng=LNG, method="lidar_skeleton", cache_dir=tmp_path / "c", isolate=False,
                 building_outline_id="NOPE")
     assert e.value.code == "no_footprint"
 
 
 # ---- (c) the answer in the envelope
-def blocks_with(tmp_path, fpinfo):
-    doc = json.loads(BLOCKS.read_text())
-    doc["extra"] = {**doc.get("extra", {}), "_fp": fpinfo}
-    path = tmp_path / "blocks.json"
-    path.write_text(json.dumps(doc))
-    return path
+def test_the_offline_folder_carries_its_parcel_match_and_names_no_building(tmp_path):
+    """The envelope's building and parcel match for a live run are asserted in test_pipeline_engine; the offline folder has
+    a parcel match in its meta.json and no building to name."""
+    from house_helpers import house
 
-
-def test_the_envelope_carries_the_building_and_the_parcel_match(tmp_path):
-    building = {"parcel_id": "P-A", "outline_id": "MINE", "outline_centroid": [LAT + D, LNG - D], "chosen_by": "auto"}
-    path = blocks_with(tmp_path, {"source": "lariac", "warnings": [], "codes": [], "other_buildings": 0,
-                                  "match": "street", "building": building})
-    env = pipeline.run_pipeline("x", tmp_path / "out", "lidar_skeleton", blocks_path=path, verify=False,
-                                render=False).envelope
-    assert env["model"]["source"]["building"] == building
-    assert env["model"]["quality"]["parcel_match"] == "street"
-
-
-def test_old_blocks_files_have_neither_key(tmp_path):
-    env = pipeline.run_pipeline("x", tmp_path / "out", "lidar_skeleton", blocks_path=BLOCKS, verify=False,
-                                render=False).envelope
-    assert "building" not in env["model"]["source"] and "parcel_match" not in env["model"].get("quality", {})
+    env = measure("x", cache_dir=tmp_path / "c", points_path=house(tmp_path), isolate=False)
+    assert "building" not in env["model"]["source"] and env["model"]["quality"]["parcel_match"] == "exact"
 
 
 def test_a_non_county_footprint_has_a_building_but_no_parcel_match():

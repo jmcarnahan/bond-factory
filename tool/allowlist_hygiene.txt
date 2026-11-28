@@ -10,4 +10,3 @@ packages/bond_ui/test/source_guards_test.dart
 # Placeholder addresses on Example Ave (fixtures, docs, examples).
 text: Example Ave
 # Synthetic Google Solar response placed near lat/lng 0/0 (segment boxes need more than four decimals).
-fixtures/synthetic_solar_response.json

@@ -1,14 +1,12 @@
-# roof_measure service. `make setup` once, then `make test`, `make serve`, `make measure ADDR="..."`.
+# roof_measure library. `make setup` once, then `make test`, `make lint`.
 # Module venv from `make setup`, else the root workspace venv (`uv sync --all-packages`, what CI uses).
 VENV := $(if $(wildcard .venv/bin/python),.venv,../../.venv)
 PY := $(VENV)/bin/python
-# real sites: local/sites.json
-ADDR ?= 100 Example Ave, Sampletown, CA 90000
 
-.PHONY: setup test lint measure serve fixtures eval
+.PHONY: setup test lint fixtures
 setup:  # always the module venv, never the root fallback
 	uv venv .venv --python 3.12 --seed >/dev/null || python3 -m venv .venv
-	uv pip install --python .venv/bin/python -e ".[dev,service,render]" || .venv/bin/pip install -e ".[dev,service,render]"
+	uv pip install --python .venv/bin/python -e ".[dev,render]" || .venv/bin/pip install -e ".[dev,render]"
 
 test:
 	$(PY) -m pytest -q
@@ -16,22 +14,9 @@ test:
 lint:
 	$(VENV)/bin/ruff check roof_measure tests tools
 
-measure:
-	$(VENV)/bin/roof-measure measure "$(ADDR)" --out out/
-
-# Local dev server: no auth, loopback only, debug fixture routes on. Production sets ROOF_MEASURE_TOKEN instead.
-serve:
-	ROOF_MEASURE_AUTH=off ROOF_MEASURE_HOST=127.0.0.1 ROOF_MEASURE_DEBUG=1 \
-	$(VENV)/bin/uvicorn roof_measure.api:app --host 127.0.0.1 --port $${PORT:-8011}
-
-# Regenerate the synthetic fixtures and the four 0.2 envelopes in ../../fixtures (deterministic).
+# Regenerate the plane engine's example envelope in ../../fixtures/roof_engine (deterministic).
 fixtures:
 	$(PY) -m roof_measure.synth_envelopes
-
-# Offline rule-method evaluation of saved LiDAR block files: `make eval BLOCKS=<file-or-dir> [ARGS="--json f.json --svg dir"]`
-eval:
-	@test -n "$(BLOCKS)" || { echo "usage: make eval BLOCKS=<file-or-dir> [ARGS=...]"; exit 2; }
-	$(PY) -m tools.eval_blocks $(BLOCKS) $(ARGS)
 
 # ---- roof regression harness (tools/roof_eval; the data root is $ROOF_EVAL_DATA, never in this repo) ----
 # roof-eval [SPLIT=tuning|demo|heldout|all] [ENGINE=library|results-dir:<dir>|"<cmd> {house_dir} {out_json}"] [BASELINE=name]

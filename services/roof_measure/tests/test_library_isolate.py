@@ -1,4 +1,4 @@
-"""measure(isolate=True): a real child on the blocks fixture, and a fake child for the failure modes; zero network."""
+"""measure(isolate=True): a real child on a synthetic house, and a fake child for the failure modes; zero network."""
 
 import json
 import os
@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import FIXTURES
+from house_helpers import house
 
 import roof_measure._child as child_mod
 import roof_measure._isolate
@@ -21,7 +21,6 @@ import roof_measure.library
 from roof_measure.library import MeasureError, measure
 
 ADDR = "100 Example Ave, Sampletown, CA 90000"
-BLOCKS = FIXTURES / "site1_blocks.json"
 FAKE_CHILD = Path(__file__).with_name("fake_child_script.py")
 
 
@@ -45,7 +44,7 @@ def fake_child(monkeypatch):
 
 
 def call(tmp_path, addr=ADDR, **kw):
-    args = {"method": "lidar_skeleton", "verify": False, "cache_dir": tmp_path / "cache", "blocks_path": BLOCKS}
+    args = {"method": "lidar_skeleton", "cache_dir": tmp_path / "cache", "points_path": house(tmp_path)}
     return measure(addr, **(args | kw))
 
 
@@ -71,14 +70,14 @@ def test_happy_path_and_stage_thread(tmp_path):
         threads.add(threading.get_ident())
     env = call(tmp_path, on_stage=cb)
     assert env["contract"] == "bond.roof_model/0.2" and env["totals"]["area_sqft"] > 0
-    assert seen == ["model", "render"] and threads == {threading.get_ident()}
+    assert seen == ["model"] and threads == {threading.get_ident()}
 
 
 def test_relative_paths_are_resolved_for_the_child(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    shutil.copy(BLOCKS, tmp_path / "b.json")
-    env = measure(ADDR, method="lidar_skeleton", verify=False, cache_dir="relcache", work_dir="relwork",
-                  blocks_path="b.json", isolate=True)
+    shutil.copytree(house(tmp_path / "src"), tmp_path / "h")
+    env = measure(ADDR, method="lidar_skeleton", cache_dir="relcache", work_dir="relwork",
+                  points_path="h", isolate=True)
     assert env["contract"] == "bond.roof_model/0.2"
     assert any(p.name.endswith("_model.json") for p in (tmp_path / "relwork").iterdir())
     assert not (tmp_path / "relwork" / "relwork").exists() and (tmp_path / "relcache").is_dir()
@@ -128,12 +127,6 @@ def test_the_stderr_tail_reaches_the_crash_message(tmp_path, fake_child):
     assert "exited with code 3" in e.value.message and "boom-marker" in e.value.message
 
 
-def test_the_anthropic_key_reaches_the_child_and_none_stays_none(tmp_path, fake_child, monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "env-key")
-    assert call(tmp_path, "echo-key", work_dir=tmp_path / "w1", anthropic_api_key="arg-key")["_key"] == "arg-key"
-    assert call(tmp_path, "echo-key", work_dir=tmp_path / "w2")["_key"] is None
-
-
 def test_stray_stdout_lines_are_dropped(tmp_path, fake_child):
     seen = []
     env = call(tmp_path, "stray-stdout", work_dir=tmp_path / "w", on_stage=seen.append)
@@ -169,10 +162,9 @@ def test_the_real_child_keeps_library_prints_off_the_protocol_stream(tmp_path):
         from roof_measure import _child
         sys.exit(_child.main())
     """)
-    req = {"address": "x", "lat_lng": None, "method": "lidar_skeleton", "verify": False, "force": False,
-           "deadline_s": 30.0, "work_dir": str(tmp_path), "blocks_path": None, "solar_fixture": None,
-           "runtime": {"cache_dir": str(tmp_path), "anthropic_api_key": None, "google_solar_api_key": None,
-                       "overpass_urls": None, "footprint_stage_s": None}}
+    req = {"address": "x", "lat_lng": None, "method": "lidar_skeleton", "force": False,
+           "deadline_s": 30.0, "work_dir": str(tmp_path),
+           "runtime": {"cache_dir": str(tmp_path), "overpass_urls": None, "footprint_stage_s": None}}
     res = subprocess.run([sys.executable, "-P", "-c", code], input=json.dumps(req) + "\n", capture_output=True,
                          text=True, timeout=60, check=False)
     assert res.returncode == 0, res.stderr[-500:]
@@ -212,20 +204,20 @@ STUB_PIPELINE = textwrap.dedent("""
     from types import SimpleNamespace
     import roof_measure.pipeline as p
     from roof_measure import cache, config
-    from roof_measure.blocks import BlocksError
     from roof_measure.footprint_types import FootprintError
+    from roof_measure.model import ModelError
 
     def fake(address, out_dir, method, **k):
         if address == "no-outline":
             raise FootprintError("no outline")
-        if address == "no-blocks":
-            raise BlocksError("no blocks")
+        if address == "bad-model":
+            raise ModelError("bad model")
         rt = config.current()
         return SimpleNamespace(envelope={
-            "address": address, "method": method, "anthropic": rt.anthropic_api_key,
-            "solar": rt.google_solar_api_key, "overpass": list(rt.overpass_urls or []), "cache_dir": str(rt.cache_dir),
-            "force": cache._FORCE.get(), "lat_lng": list(k["lat_lng"]) if k["lat_lng"] else None,
-            "blocks_path": k["blocks_path"], "solar_fixture": k["solar_fixture"], "verify": k["verify"]})
+            "address": address, "method": method, "overpass": list(rt.overpass_urls or []),
+            "cache_dir": str(rt.cache_dir), "force": cache._FORCE.get(),
+            "lat_lng": list(k["lat_lng"]) if k["lat_lng"] else None, "points_path": k["points_path"],
+            "lot": k["include_other_buildings"], "outline": k["building_outline_id"], "hints": k["hints"]})
     p.run_pipeline = fake
     from roof_measure import _child
     sys.exit(_child.main())
@@ -238,28 +230,31 @@ def stub_child(monkeypatch):
 
 
 def test_the_real_child_receives_every_request_field(tmp_path, stub_child):
-    fixture = tmp_path / "solar.json"
-    fixture.write_text("{}")
-    env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True, anthropic_api_key="k-a",
-                  google_solar_api_key="k-s", overpass_urls=["https://m1.example/api"], force=True, lat=1.0, lng=2.0,
-                  method="lidar_skeleton", solar_fixture=fixture, blocks_path=BLOCKS, verify=False)
+    folder = house(tmp_path / "src")
+    env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True,
+                  overpass_urls=["https://m1.example/api"], force=True, lat=1.0, lng=2.0, method="lidar_skeleton",
+                  points_path=folder, include_other_buildings=True, building_outline_id=" B7 ", hints={"steps": False})
     assert env == {
-        "address": "x", "method": "lidar_skeleton", "anthropic": "k-a", "solar": "k-s",
-        "overpass": ["https://m1.example/api"], "cache_dir": str((tmp_path / "cache").resolve()), "force": True,
-        "lat_lng": [1.0, 2.0], "blocks_path": str(BLOCKS.resolve()), "solar_fixture": str(fixture.resolve()),
-        "verify": False}
+        "address": "x", "method": "lidar_skeleton", "overpass": ["https://m1.example/api"],
+        "cache_dir": str((tmp_path / "cache").resolve()), "force": True, "lat_lng": [1.0, 2.0],
+        "points_path": str(folder.resolve()), "lot": True, "outline": "B7", "hints": {"steps": False}}
 
 
 def test_the_real_child_defaults_are_off_and_none(tmp_path, stub_child):
-    env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True, method="solar_agent")
-    assert (env["method"], env["anthropic"], env["solar"], env["overpass"], env["force"], env["lat_lng"],
-            env["blocks_path"], env["solar_fixture"], env["verify"]) == (
-        "solar_agent", None, None, [], False, None, None, None, True)
+    env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True)
+    assert (env["method"], env["overpass"], env["force"], env["lat_lng"], env["points_path"], env["lot"],
+            env["outline"], env["hints"]) == ("auto", [], False, None, None, False, None, None)
+
+
+def test_the_request_carries_no_keys(tmp_path, fake_child):
+    env = call(tmp_path, "echo-req", work_dir=tmp_path / "w")
+    assert "runtime" in env["_req"] and "verify" not in env["_req"] and "engine" not in env["_req"]
+    assert env["_runtime"] == ["cache_dir", "footprint_stage_s", "overpass_urls"]
 
 
 @pytest.mark.parametrize(("addr", "code", "retryable", "message"), [
     ("no-outline", "no_footprint", False, "no outline"),
-    ("no-blocks", "measurement_failed", False, None),
+    ("bad-model", "measurement_failed", False, "bad model"),
 ])
 def test_the_real_child_relays_the_error_code(tmp_path, stub_child, addr, code, retryable, message):
     with pytest.raises(MeasureError) as e:

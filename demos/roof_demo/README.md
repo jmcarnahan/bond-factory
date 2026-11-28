@@ -1,5 +1,7 @@
 # roof_demo
 
+> Service mode removed; the demo's service client is removed in the roof-accuracy round.
+
 A single-screen Flutter app (web and iOS) that exercises `bond_roof` and `bond_roof_ui`
 end to end. Not shipped.
 

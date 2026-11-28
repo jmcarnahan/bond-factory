@@ -6,7 +6,7 @@ import time
 import pytest
 import requests
 
-from roof_measure import cache, footprint, footprint_county, footprint_osm, footprint_solar
+from roof_measure import cache, footprint, footprint_county, footprint_osm
 from roof_measure.deadline import Deadline, DeadlineExceeded
 from roof_measure.footprint_types import AmbiguousBuilding, Footprint, FootprintError
 from roof_measure.geocode import Address
@@ -151,37 +151,6 @@ def empty_osm(net):
         net.routes[u] = {"elements": []}
 
 
-def test_solar_link_needs_a_key_and_uses_segment_hull(net, monkeypatch):
-    empty_osm(net)
-    insights = {"name": "buildings/x", "solarPotential": {"roofSegmentStats": [
-        {"boundingBox": {"sw": {"latitude": LAT, "longitude": LNG}, "ne": {"latitude": LAT + D, "longitude": LNG + D}}},
-        {"boundingBox": {"sw": {"latitude": LAT + D, "longitude": LNG}, "ne": {"latitude": LAT + 2 * D, "longitude": LNG + 2 * D}}}]}}
-    seen = []
-    monkeypatch.setattr(footprint_solar.solar, "fetch_building_insights",
-                        lambda lat, lng, key, timeout=30.0: seen.append(key) or insights)
-    with pytest.raises(FootprintError, match="No building footprint"):  # no key: link skipped
-        footprint.fetch_footprint(LAT, LNG, ADDR)
-    assert seen == []
-    monkeypatch.setenv("GOOGLE_SOLAR_API_KEY", "test-key")
-    fp = footprint.fetch_footprint(LAT, LNG, ADDR)
-    assert seen == ["test-key"] and fp.source == "solar" and fp.provider == "solar"
-    assert fp.warning_codes == ["footprint_solar"] and fp.polygon_wgs84.is_valid
-    assert fp.polygon_wgs84.bounds == pytest.approx((LNG, LAT, LNG + 2 * D, LAT + 2 * D))
-    assert "test-key" not in " ".join(fp.warnings)
-
-
-def test_solar_unavailable_moves_on(net, monkeypatch):
-    empty_osm(net)
-    monkeypatch.setenv("GOOGLE_SOLAR_API_KEY", "k")
-
-    def boom(*a, **k):
-        raise footprint_solar.solar.SolarUnavailable("disabled")
-
-    monkeypatch.setattr(footprint_solar.solar, "fetch_building_insights", boom)
-    with pytest.raises(FootprintError, match="No building footprint"):
-        footprint.fetch_footprint(LAT, LNG, ADDR)
-
-
 def test_hull_link_is_last_and_records_lidar_hull(net, monkeypatch):
     empty_osm(net)
     from shapely.geometry import box
@@ -257,7 +226,7 @@ def test_osm_prefers_house_number_and_skips_slivers():
 
 def test_old_import_names_still_work():
     assert footprint.PARCEL_URL == footprint_county.PARCEL_URL and callable(footprint.pick_parcel)
-    assert footprint._area_sqft(osm_way(1) and footprint_osm.parse_osm({"elements": [osm_way(1)]}, LAT, LNG).polygon_wgs84) > 1000
+    assert footprint.area_sqft(osm_way(1) and footprint_osm.parse_osm({"elements": [osm_way(1)]}, LAT, LNG).polygon_wgs84) > 1000
     assert json.dumps(footprint.OVERPASS_URLS)
 
 
@@ -280,10 +249,8 @@ def test_a_used_up_stage_cap_does_not_stop_the_chain(net, monkeypatch):
     net.routes["LACounty_Parcel"] = {"features": []}
     for u in footprint_osm.OVERPASS_URLS:
         net.routes[u] = lambda url, kw: time.sleep(0.3) or {"elements": []}  # slower than the zero stage cap: no race
-    monkeypatch.setenv("GOOGLE_SOLAR_API_KEY", "k")
     monkeypatch.setattr(footprint, "FOOTPRINT_STAGE_S", 0.0)
     called = []
-    monkeypatch.setattr(footprint, "fetch_solar", lambda *a, **k: called.append("solar"))
 
     def hull(lat, lng, deadline=None):
         called.append("hull")
@@ -293,7 +260,7 @@ def test_a_used_up_stage_cap_does_not_stop_the_chain(net, monkeypatch):
     with pytest.raises(FootprintError, match="could not be reached") as e:  # OSM timed out: an outage, not a miss
         footprint.fetch_footprint(LAT, LNG, ADDR, deadline=Deadline.after(100))
     assert isinstance(e.value, footprint.FootprintUnavailable)
-    assert called == ["hull"]  # solar skipped (stage spent), hull still attempted
+    assert called == ["hull"]  # the stage is spent, the hull is still attempted
 
 
 def test_every_link_failed_with_one_unreachable_is_upstream_unavailable_with_the_hull_reason(net, monkeypatch):

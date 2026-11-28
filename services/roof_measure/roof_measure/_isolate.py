@@ -21,7 +21,7 @@ CHILD_ENV_KEYS = ("PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC
                   "PYTHONHOME", "LD_LIBRARY_PATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
                   "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy", "SYSTEMROOT")
 CHILD_ENV_CAPS = {"OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
-                  "RAYON_NUM_THREADS": "2", "MPLBACKEND": "Agg", "PYTHONUNBUFFERED": "1"}
+                  "RAYON_NUM_THREADS": "2", "PYTHONUNBUFFERED": "1"}
 
 
 def _child_env() -> dict[str, str]:
@@ -34,12 +34,8 @@ def _child_argv() -> list[str]:
     return [sys.executable, "-P", "-m", "roof_measure._child"]  # -P: the working directory stays off sys.path
 
 
-AGENT_HANG_EXIT = 4  # the child stops itself with this code when the agent stage outlives its time budget
-
-
 class ChildCrashed(MeasureError):
-    """The child process died on a signal (a native crash such as a segfault in CGAL) or stopped itself because the
-    agent stage hung past its time budget (exit code ``AGENT_HANG_EXIT``), not with an error reply.
+    """The child process died on a signal (a native crash such as a segfault), not with an error reply.
 
     ``signal_number`` is the signal; the message names it and carries the end of the child's stderr, where
     ``faulthandler`` (enabled in ``_child``) left the Python traceback of the crash.
@@ -145,9 +141,6 @@ def run_isolated(req: dict[str, Any], on_stage: Callable[[str], None] | None, gr
                     proc.kill()
                     proc.wait()
                 text = f"the measurement process {_exit_text(proc.returncode)}" + _stderr_tail(stderr_path)
-                if proc.returncode == AGENT_HANG_EXIT:
-                    raise ChildCrashed("measurement_failed", "the measurement process was stopped: the agent stage "
-                                       "did not finish within its time budget (a native hang)" + _stderr_tail(stderr_path))
                 if proc.returncode is not None and proc.returncode < 0:
                     raise ChildCrashed("measurement_failed", text, signal_number=-proc.returncode)
                 raise MeasureError("measurement_failed", text)

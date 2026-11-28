@@ -1,7 +1,20 @@
 # roof_measure changelog
 
-## Unreleased (patch; additive; default output and cache keys unchanged)
+## Unreleased (will be 0.6.0; so far a clean-up: output and cache keys unchanged)
 
+- **Legacy paths removed, no output change.** The plane engine is the only engine. Removed: the block-path engine
+  (`blocks`, `classify`, `skeleton*`, `ringgeom`, `model_cleanup`, `model_slivers`), the older planes family (`planes*`),
+  the agent paths (`agent*`), the verifier (`verify*`), Google Solar evidence and the Solar footprint link, the standalone
+  job service (`api`, `auth`, `jobs`, `keys`, `normalize`, `results`, `runner`, `service`, `settings`, `cli`, Dockerfile,
+  `railway.toml`, the `service` extra), the debug renderer and the block-shaped fixture generators; `compas_cgal` and
+  `anthropic` left the dependencies (`anthropic` is now the `label` extra of `tools/roof_eval/label`). `measure(engine="blocks")`
+  and the agent methods raise `ValueError`; `blocks_path`, `solar_fixture` are gone; `STAGES` is `geocode, footprint, lidar, model`.
+  `verify`, `anthropic_api_key` and `google_solar_api_key` are removed (a caller that passes one gets a `TypeError`); `engine`
+  stays for now (only `"planes"`) and goes in the next step. Dead helpers went too (`text.ft_in`, `errors.error_body` and the
+  service-only error codes `invalid_request`, `unauthorized`, `unknown_job`, `queue_full`, `interrupted`). Proven identical on every house and synthetic roof (digest of the full envelope). The offline entry is
+  `points_path`. Git history keeps the old code.
+- `pyproject.toml` version moved 0.2.0 -> 0.5.1 to match `PIPELINE_VERSION` (it was stale).
+- `measure(verify=..., anthropic_api_key=..., google_solar_api_key=...)` now raise `TypeError` (see above).
 - **`measure(..., hints={"steps": False})`** (plane engine): a step line between two PITCHED sections whose fitted planes agree
   at the seam is typed from the planes (valley, ridge or hip) instead of `level_change`. `engine/hints.py`
   (`params_from_hints`, `clean_hints`), `EngineParams.pitched_steps` (skipped by `stable_hash` while True, so the default hash

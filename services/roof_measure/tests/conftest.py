@@ -33,28 +33,6 @@ def local_data():
     return _get
 
 
-@pytest.fixture(scope="session")
-def site1_blocks_path() -> Path:
-    path = FIXTURES / "site1_blocks.json"
-    assert path.is_file(), "run `python -m roof_measure.synth --site1-blocks` first"
-    return path
-
-
-@pytest.fixture(scope="session")
-def solar_fixture_path() -> Path:
-    path = FIXTURES / "synthetic_solar_response.json"
-    assert path.is_file(), "run `make fixtures` first"
-    return path
-
-
-@pytest.fixture(scope="session")
-def handmade_blocks_path() -> Path:
-    """Hand-crafted blocks (hip + 3 awnings + 4 flats); regenerate with `python -m roof_measure.synth --site1-blocks`."""
-    path = DATA / "site1_blocks_handmade.json"
-    assert path.is_file()
-    return path
-
-
 class Net:
     """Routes cache.fetch_json by URL fragment; a value can be a dict, an exception, or a callable."""
 
@@ -80,17 +58,5 @@ class Net:
 def net(monkeypatch):
     n = Net()
     monkeypatch.setattr(cache, "fetch_json", n)
-    monkeypatch.delenv("GOOGLE_SOLAR_API_KEY", raising=False)
     monkeypatch.setattr(footprint, "fetch_hull", lambda *a, **k: (_ for _ in ()).throw(FootprintError("no lidar")))
     return n
-
-
-
-
-@pytest.fixture
-def no_planes_model(monkeypatch):
-    """Keep the block model: for tests that pin what the block (skeleton) model does on a poor roof, or the
-    planes-only net. The planes model (planes_model.replace_if_bad) would otherwise redraw those roofs."""
-    from roof_measure import planes_model
-
-    monkeypatch.setattr(planes_model, "replace_if_bad", lambda *a, **k: None)

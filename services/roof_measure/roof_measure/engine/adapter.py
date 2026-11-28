@@ -190,7 +190,7 @@ def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[s
                              if lidar else None),
                    "solar": None, "from_planes": True, "engine": "planes/1", "engine_params": res.params_hash},
         "blocks": blocks, "facets": facets, "edges": edges, "holes": [],
-        "totals": {**_totals(facets, edges, engine=True),
+        "totals": {**_totals(facets, edges),
                    "note": "These totals describe the DRAWN roof (the facets of this model, at the measured roof edge). "
                            "The envelope's totals are the priced ones."},
         "confidence": {"overall": "low" if res.quality.verdict != "ok" else "medium", "notes": [

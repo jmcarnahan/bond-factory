@@ -11,7 +11,7 @@ import pytest
 from test_engine_edges import CTX, facet, points_on
 from test_pipeline_engine import no_network, run, world  # noqa: F401  (fixtures: the pipeline test's fakes)
 
-from roof_measure import keys, library
+from roof_measure import library
 from roof_measure.engine import hints as H
 from roof_measure.engine.edges import build_edges
 from roof_measure.engine.errors import Ctx
@@ -48,20 +48,6 @@ def test_bad_hints_raise_naming_the_key(hints, key):
 def test_clean_hints_keeps_only_what_changes_something():
     assert H.clean_hints(None) is None and H.clean_hints({}) is None and H.clean_hints({"steps": True}) is None
     assert H.clean_hints({"steps": False}) == {"steps": False}
-
-
-def _req(**extra):
-    return {"method": "lidar_skeleton", "verify": False, "engine": "planes", "lat": 1.0, "lng": 2.0, **extra}
-
-
-def test_cache_key_moves_only_for_a_hint_that_changes_something():
-    base = keys.request_key(_req())
-    assert base is not None
-    for h in (None, {}, {"steps": True}):
-        assert keys.request_key(_req(hints=h)) == base
-    assert keys.request_key(_req(hints={"steps": False})) != base
-    blocks = {"method": "lidar_skeleton", "verify": False, "engine": "blocks", "lat": 1.0, "lng": 2.0}
-    assert keys.request_key({**blocks, "hints": {"steps": False}}) == keys.request_key(blocks)
 
 
 def test_library_measure_takes_hints_and_rejects_bad_ones(tmp_path):
