@@ -36,6 +36,7 @@ def _warning_text(code: str, res: Any, low_slope_sqft: float = 0.0) -> str:
             "outline_mismatch": "The roof points do not match the building outline closely; the outline may be a different "
                                 "building or a different roof.",
             "poor_fit": "The measured planes fit the roof points poorly; the diagram may be rough.",
+            "objects_failed": "The chimneys and lanterns on this roof could not be looked for: their count is unknown, not zero.",
             "low_slope_confirm": f"About {low_slope_sqft:.0f} sq ft of the roof is close to flat (about 2/12): "
                                  "confirm the roof type at the site."}[code]
 
@@ -43,6 +44,8 @@ def _warning_text(code: str, res: Any, low_slope_sqft: float = 0.0) -> str:
 def engine_warnings(res: Any) -> list[tuple[str, str]]:
     """(code, text) for the verdict reasons the engine raised and for borderline low-slope facets."""
     out = [(c, _warning_text(c, res)) for c in res.quality.reasons if c in ("low_density", "outline_mismatch", "poor_fit")]
+    if res.diagnostics.get("objects_error"):
+        out.append(("objects_failed", _warning_text("objects_failed", res)))
     low = float(res.totals.get("low_slope_confirm_sqft") or 0.0)
     if low > 0:
         out.append(("low_slope_confirm", _warning_text("low_slope_confirm", res, low)))

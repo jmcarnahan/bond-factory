@@ -66,12 +66,21 @@ def _fit_shares(facets: list[Facet], pts: np.ndarray, p: EngineParams) -> tuple[
 
 def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygon, parcel_match: str | None,
             provider: str, supported_pct: float | None, support_area_m2: float,
-            extra: float | None, tree_pct: float | None, p: EngineParams) -> Quality:
-    """Plan 3.9 signals and verdict. ``pts`` are all roof points in the frame of the facets."""
-    fit_all, fit_cov, cover_pts, fit_clear, tree_cover = _fit_shares(facets, pts, p)
+            extra: float | None, tree_pct: float | None, p: EngineParams, diag: dict | None = None) -> Quality:
+    """Plan 3.9 signals and verdict. ``pts`` are all roof points in the frame of the facets (the crop round the given
+    wall line). The fit shares are taken over the returns inside the drawn roof outline grown by
+    ``fit_outline_margin_m``: they say how well the planes describe THIS roof, not how many returns of a neighbour's roof,
+    a wall or a tree the wall-line crop caught. ``coverage`` stays over all of ``pts``."""
+    near = shapely.contains_xy(outline.buffer(p.fit_outline_margin_m), pts[:, 0], pts[:, 1]) if len(pts) else np.zeros(0, bool)
+    fit_all, fit_cov, _, fit_clear, tree_cover = _fit_shares(facets, pts[near], p)
+    cover_pts = _fit_shares(facets, pts, p)[2]
     n = len(pts)
     dens = float(shapely.contains_xy(outline, pts[:, 0], pts[:, 1]).sum() / max(outline.area, 1.0))
     cover = support_area_m2 / max(wall.area, 1.0)
+    d = diag or {}
+    # against the GIVEN wall, on purpose: the points are the crop round it, so their centre sits between the given and
+    # the registered wall and the registered centre read higher (160 houses: two ok houses 0.05 -> 0.12); the normal
+    # 0.8-0.9 m registration keeps every tuning house under mismatch_shift (max 0.165)
     shift = float(np.hypot(*(pts[:, :2].mean(0) - np.array(wall.centroid.coords[0]))) / math.sqrt(max(wall.area, 1.0))) if n else 0.0
     reasons = []
     if dens < p.density_refuse:
@@ -86,11 +95,21 @@ def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygo
         reasons.append("poor_fit")
     if parcel_match in ("street", "nearest"):
         reasons.append("not_exact_parcel")
+    if d.get("edge_no_evidence_share", 0.0) >= p.no_evidence_share:
+        reasons.append("outline_no_evidence")  # part of the outline has no roof returns at all: drawn from the wall line
+    if d.get("edge_end_share", 0.0) >= p.roof_continues_share:
+        reasons.append("roof_continues")  # the roof plane carries on past the outline: an attached roof left out
     return Quality(verdict=reasons[0] if reasons else "ok", reasons=reasons, fit_all=fit_all, fit_covered=fit_cov,
                    coverage=cover_pts, supported_pct=supported_pct, density=round(dens, 1), outline_shift=round(shift, 3),
                    parcel_match=parcel_match, outline_source=provider,
                    roof_cover_of_outline=round(cover, 2), extra_roof_ring_ratio=None if extra is None else round(extra, 2),
                    tree_contact_pct=tree_pct, fit_clear=fit_clear, tree_cover_pct=tree_cover)
+
+
+def part_missed_reason(roof_part_missed_sqft: float, p: EngineParams) -> str | None:
+    """``roof_part_missed`` when the objects step found planar roof the facets left out (only blobs over 3 m2 are
+    counted there) of at least ``part_missed_min_sqft``; None otherwise. For the step that knows the figure."""
+    return "roof_part_missed" if roof_part_missed_sqft >= p.part_missed_min_sqft else None
 
 
 def tree_contact_pct(outline: Polygon, unassigned: np.ndarray) -> float:

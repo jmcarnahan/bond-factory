@@ -15,6 +15,10 @@ Map<String, dynamic> sampleJson() => jsonDecode(File(samplePath).readAsStringSyn
 
 RoofMeasurement loadSample() => RoofMeasurement.parseAny(sampleJson());
 
+/// The generated 0.6 example (the real engine's output on a synthetic roof).
+const enginePath = '../../fixtures/roof_engine/roof_measurement_0.6_engine.json';
+Map<String, dynamic> engineJson() => jsonDecode(File(enginePath).readAsStringSync()) as Map<String, dynamic>;
+
 /// The model of the sample.
 RoofModel sampleModel() => loadSample().model;
 
@@ -53,6 +57,7 @@ List<String> unknownEnvelopeKeys(Map<String, dynamic> json) {
     final lengths = t['lengths_ft'];
     if (lengths is Map) {
       for (final k in lengths.keys) {
+        if (k == 'parapet' && lengths[k] == 0) continue; // written as 0 by the engine
         if (!edgeTypes.contains(k)) out.add('$path.lengths_ft.$k');
       }
     }

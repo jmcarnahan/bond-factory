@@ -47,8 +47,12 @@ class EngineParams:
     mismatch_lo: float = 0.70  # ratio: roof support / outline below this: outline_mismatch
     mismatch_hi: float = 1.30  # ratio: ... above this: outline_mismatch
     mismatch_shift: float = 0.17  # ratio: outline_shift at or above this: outline_mismatch
+    no_evidence_share: float = 0.20  # ratio: edge_no_evidence_share at or above this: outline_no_evidence (160 houses: 3 at 0.29-0.47, next 0.11)
+    roof_continues_share: float = 0.10  # ratio: edge_end_share at or above this: roof_continues (160 houses: max 0.03; an attached roof along a tenth of the outline)
+    part_missed_min_sqft: float = 32.3  # sq ft: roof_part_missed_sqft at or above this (the objects step's own 3 m2 gate): roof_part_missed
     planes_min_assigned_pct: float = 50.0  # percent: fewer returns on detected planes than this (or none found): poor_fit, reason planes_not_found (synthetic 14/12 cross gable at 8 pts/m2 before the steep fix drew one flat facet)
     fit_floor: float = 0.55  # ratio: fit_all below this: poor_fit
+    fit_outline_margin_m: float = 0.3  # m: fit_all / fit_covered count the returns inside the drawn outline grown by this (the edge regularisation tolerance 0.15 m plus the finder's per-side noise, about 0.15 m)
     supported_floor: float = 70.0  # percent: supported area below this: poor_fit
     # ---- input preparation
     crop_buffer_m: float = 1.3  # m: points kept within this of the footprint
@@ -174,7 +178,7 @@ class EngineParams:
     edge_clamp_hi_m: float = 1.5  # m: a filled or tree-only side of a county (wall-line) outline moves outward at most this far
     edge_clamp_hi_roofedge_m: float = 0.5  # m: the same for an outline that already traces the roof edge (OpenStreetMap, LiDAR hull)
     support_buffer_m: float = 1.0  # m: the roof-point support (quality: roof_cover_of_outline) counts within the wall line grown by this
-    support_cell_k: float = 1.5  # spacings: its cell edge is this many point spacings ...
+    support_cell_k: float = 1.0  # spacings: its cell edge is this many point spacings (1.0 in the registered frame matches the old support-polygon ratio: 160-house median 1.071 against 1.070) ...
     support_cell_max_m: float = 1.0  # m: ... at most this (and at least support_cell_m)
     # ---- labelling raster and graph cut
     grid_min_m: float = 0.12  # m: label raster step (never finer)
@@ -231,6 +235,7 @@ class EngineParams:
     sliver_thin_area_m2: float = 4.0  # m2: ... or smaller than this and thinner than ...
     sliver_width_m: float = 0.45  # m
     small_facet_m2: float = 12.0  # m2: facets below this may merge into a neighbour
+    off_plane_facet_mad_m: float = 0.35  # m: a small facet whose returns (all of them, assigned or not) have a median residual over its plane above this is not a roof plane: the neighbour with the longest shared boundary takes it (tree crown, clutter). EVIDENCE: 3 of 237 small facets of the tuning houses lie between 0.25 and 0.5; a real small hip end 0.16, a tree facet 0.75
     small_merge_rms_m: float = 0.045  # m: ... when the neighbour's rms rises by less than this
     coplanar_facet_gtol: float = 0.05  # gradient: adjacent facets merge when planes differ by less ...
     coplanar_facet_gap_m: float = 0.2  # m: ... and their mean gap is below this
@@ -318,7 +323,7 @@ class EngineParams:
     obj_layered_share: float = 0.35  # ratio: more roof returns than this inside the blob's footprint ...
     obj_layered_spread_m: float = 0.5  # m: ... with a height spread (std) above this is canopy with the roof seen through it
     obj_lantern_max_h_m: float = 0.9  # m: lower than this and at least obj_lantern_min_area_m2 wide is a lantern ...
-    obj_lantern_min_area_m2: float = 1.5  # m2: (the footprint is the rectangle of the returns: a 5 x 5 ft lantern is 2.3 m2 by the walls, 1.8 by its returns)
+    obj_lantern_min_area_m2: float = 2.0  # m2: the footprint is the rectangle of the returns (a roof lantern is about 2.4 m2; rooftop units on flat commercial roofs read 1.5-2.7)
     obj_chimney_max_area_m2: float = 3.0  # m2: ... at least obj_lantern_max_h_m high and at most this wide is a chimney
     obj_mislabel_area_m2: float = 3.0  # m2: a planar blob wider than this is a roof part the facets left out (mislabelled)
     obj_planar_rms_m: float = 0.08  # m: ... planar means a plane fit with an rms under this

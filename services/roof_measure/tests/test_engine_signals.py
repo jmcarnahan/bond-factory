@@ -117,3 +117,44 @@ def test_canopy_starts_half_a_metre_above_the_surface(lift, canopy):
 def test_a_lot_of_canopy_alone_is_not_a_poor_fit():
     got = q(n=1000, off=400, lift=+1.0)  # fit_all 0.6 (above the floor), 40% canopy
     assert got.fit_all == 0.6 and got.tree_cover_pct == 40.0 and "poor_fit" not in got.reasons
+
+
+# ----------------------------------------------------------------------------- the fit is over THIS roof
+def test_returns_beyond_the_drawn_outline_do_not_count_against_the_fit():
+    """1000 returns on the roof plane, plus 500 on a neighbour 2 m beyond the outline and 1 m lower: over all returns
+    fit_all would be 1000 / 1500 = 0.67; over the drawn roof (+ fit_outline_margin_m) it is 1.0."""
+    roof = cloud(1000)
+    nb = cloud(500)
+    nb[:, 0] += 12.0  # x 12..22: beyond the 10 m roof by 2 m and more
+    nb[:, 2] -= 1.0
+    res = quality([facet()], np.vstack([roof, nb]), WALL, WALL, "exact", "lacounty", 100.0, 100.0, None, None, P)
+    assert res.fit_all == 1.0 and res.coverage == pytest.approx(1000 / 1500, abs=0.001)
+
+
+def test_a_miss_inside_the_margin_still_counts():
+    """A return 0.2 m outside the outline (inside the 0.3 m margin) and 1 m below the plane is a miss of this roof."""
+    pts = np.vstack([cloud(999), [[10.2, 5.0, 2.0]]])
+    res = quality([facet()], pts, WALL, WALL, "exact", "lacounty", 100.0, 100.0, None, None, P)
+    assert res.fit_all == pytest.approx(0.999, abs=0.0005)
+
+
+# ----------------------------------------------------------------------------- reasons from the edge finder
+@pytest.mark.parametrize("share, flagged", [(0.19, False), (0.20, True), (0.32, True)])
+def test_outline_no_evidence_at_its_share(share, flagged):
+    res = quality([facet()], cloud(1000), WALL, WALL, "exact", "lacounty", 100.0, 100.0, None, None, P,
+                  diag={"edge_no_evidence_share": share})
+    assert ("outline_no_evidence" in res.reasons) is flagged and (res.verdict == "ok") is not flagged
+
+
+@pytest.mark.parametrize("share, flagged", [(0.03, False), (0.10, True)])
+def test_roof_continues_at_its_share(share, flagged):
+    res = quality([facet()], cloud(1000), WALL, WALL, "exact", "lacounty", 100.0, 100.0, None, None, P,
+                  diag={"edge_end_share": share})
+    assert ("roof_continues" in res.reasons) is flagged
+
+
+def test_roof_part_missed_from_the_objects_figure():
+    from roof_measure.engine.signals import part_missed_reason
+
+    assert part_missed_reason(0.0, P) is None and part_missed_reason(32.2, P) is None
+    assert part_missed_reason(32.3, P) == "roof_part_missed"

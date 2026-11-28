@@ -282,3 +282,23 @@ def test_model_origin_carries_the_epsg_and_projects_back_to_the_frame_origin(wor
     x, y = Transformer.from_crs(4326, o["epsg"], always_xy=True).transform(o["lng"], o["lat"])
     minx, miny, _, _ = w.main_wall.bounds
     assert abs(x - minx) < 0.01 and abs(y - miny) < 0.01
+
+
+def test_a_failing_object_finder_leaves_the_measurement_standing_and_says_the_count_is_unknown(world, tmp_path, monkeypatch):
+    from roof_measure.engine import finish
+
+    def boom(*a, **k):
+        raise RuntimeError("synthetic failure")
+
+    w = world(main="flat_pitched_step_d8")
+    good = run(w, tmp_path / "ok")
+    monkeypatch.setattr(finish, "find_objects", boom)
+    env = run(w, tmp_path / "bad")
+    assert env["model"]["objects"] == [] and env["totals"]["chimney_count"] == env["totals"]["lantern_count"] == 0
+    assert "objects_failed" in env["warning_codes"] and "objects_failed" not in good["warning_codes"]
+    assert env["totals"]["area_sqft"] == good["totals"]["area_sqft"] and len(env["model"]["facets"]) == len(good["model"]["facets"])
+
+
+def test_the_envelope_totals_are_exactly_the_contract_keys_of_model_totals(world, tmp_path):
+    env = run(world(main="complex_hip_d8"), tmp_path)
+    assert env["totals"] == {k: env["model"]["totals"][k] for k in TOTALS_KEYS}

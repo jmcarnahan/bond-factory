@@ -293,3 +293,18 @@ def test_without_a_wide_cloud_the_roof_points_stand_in():
     pts = simulate(roof, density=8, seed=1)
     res, _ = _run(pts, roof.wall_polygon(), context=None)
     assert abs(res.outline.drawn.area / Polygon(roof.roof_outline).area - 1) <= 0.03
+
+
+def test_the_residual_after_registration_is_small_on_a_true_outline_and_large_on_a_wrong_one():
+    """Every side of the simulated gable overhangs 0.3 m: after registration the measured sides agree within the
+    sampling noise (under 0.1 m). A wall line with a 2 x 2 m notch the roof does not have: its two notch sides measure
+    about +2.3 m against 0.3 elsewhere, 4 m of a 40 m ring 2 m off: residual about 0.2 (at least 0.15). A side with no
+    roof at all is filled, not measured, and does not enter the residual (edge_no_evidence_share reports it)."""
+    roof = gable()
+    pts = simulate(roof, density=8, seed=1)
+    res, _ = _run(pts, roof.wall_polygon())
+    assert res.diagnostics["edge_residual_m"] < 0.1
+    x0, y0, x1, y1 = roof.wall_polygon().bounds
+    notched = Polygon([(x0, y0), (x1 - 2.0, y0), (x1 - 2.0, y0 + 2.0), (x1, y0 + 2.0), (x1, y1), (x0, y1)])
+    res, _ = _run(pts, notched)
+    assert res.diagnostics["edge_residual_m"] >= 0.15

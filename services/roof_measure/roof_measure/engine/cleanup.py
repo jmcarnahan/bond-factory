@@ -201,6 +201,38 @@ def merge_small_facets(items: list, planes: list, q: np.ndarray, ctx: Ctx) -> tu
     return items, merged
 
 
+def merge_off_plane_facets(items: list, planes: list, returns: np.ndarray, ctx: Ctx) -> tuple[list, int]:
+    """A facet under ``small_facet_m2`` whose returns (all of them inside it, assigned to a plane or not) have a median residual
+    over its own plane above ``off_plane_facet_mad_m`` is not a roof plane of its own (a tree crown or clutter that took a
+    neighbour's plane): the neighbour sharing the most boundary takes it, so no area is lost. Returns (items, number merged)."""
+    p = ctx.p
+    items = [list(x) for x in items]
+    merged = 0
+    while len(items) > 1:
+        ctx.check()
+        for i, (label, pg) in enumerate(items):
+            if pg.area >= p.small_facet_m2:
+                continue
+            pts = returns[shapely.contains_xy(pg, returns[:, 0], returns[:, 1])]
+            if len(pts) < p.plane_min_pts or float(np.median(np.abs(pres(planes[label], pts)))) <= p.off_plane_facet_mad_m:
+                continue
+            nb = _longest_neighbour(i, items)
+            if nb is None:
+                continue
+            u = unary_union([items[nb[1]][1], pg])  # facets share exact vertices: a plain union first, a closed one if not
+            if u.geom_type != "Polygon":
+                u = unary_union([items[nb[1]][1].buffer(0.02), pg.buffer(0.02)]).buffer(-0.02)
+            if u.geom_type != "Polygon":
+                continue
+            items[nb[1]][1] = _exact(u)
+            del items[i]
+            merged += 1
+            break
+        else:
+            break
+    return items, merged
+
+
 def merge_coplanar_facets(items: list, planes: list, ctx: Ctx) -> tuple[list, int]:
     """Adjacent facets of (nearly) the same plane, or of the same flat membrane, are one facet."""
     p = ctx.p

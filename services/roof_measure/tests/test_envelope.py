@@ -100,7 +100,7 @@ def test_bad_verdict_is_rejected():
 def test_warning_code_list_matches_the_contract():
     assert WARNING_CODES == ("footprint_osm", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
                              "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "low_slope_confirm",
-                             "outline_mismatch", "poor_fit", "low_density", "other")  # 0.6.0 removed the codes with no producer
+                             "outline_mismatch", "poor_fit", "low_density", "objects_failed", "other")  # 0.6.0 removed the codes with no producer
 
 
 def test_source_unreachable_code_survives_build_envelope():

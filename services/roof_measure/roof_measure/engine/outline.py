@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+from shapely import affinity
 from shapely.geometry import LineString, Polygon
 
 from .edge_finder import clamp_offsets, find_roof_edge, support_area
@@ -57,7 +58,7 @@ def build_outline(q: np.ndarray, qlab: np.ndarray, planes: list, footprint: Poly
     diag.update({"overhang_measured_m": [None if v is None else round(v, 2) for v in res.measured],
                  "overhang_applied_m": [round(v, 2) for v in clamp_offsets(res.offsets, county, res.sources, p)],
                  "edge_strips": dict(sorted(res.rejected.items())),
-                 "support_area_m2": round(support_area(q, footprint, p), 1),
+                 "support_area_m2": round(support_area(q, affinity.translate(footprint, *res.shift), p), 1),  # registered
                  "footprint_area_m2": round(float(footprint.area), 1), "outline_area_m2": round(float(outline.area), 1)})
     return outline, diag
 

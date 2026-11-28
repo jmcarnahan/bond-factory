@@ -1735,7 +1735,7 @@ wheels = [
 
 [[package]]
 name = "roof-measure"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "services/roof_measure" }
 dependencies = [
     { name = "laspy", extra = ["lazrs"] },

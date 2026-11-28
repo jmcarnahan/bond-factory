@@ -233,8 +233,8 @@ void main() {
 
     test('a model with objects and no geometry draws no mark and no huge coordinate', () {
       const model = RoofModel(
-        totals: const RoofTotals(totalAreaSqft: 0, pitchedAreaSqft: 0, flatAreaSqft: 0, squares: 0, lengthsFt: {}),
-        objects: const [RoofObject(id: 'o', kind: ObjectKind.chimney, center: (x: 3.0, y: 3.0), sizeFt: (3.0, 3.0))],
+        totals: RoofTotals(totalAreaSqft: 0, pitchedAreaSqft: 0, flatAreaSqft: 0, squares: 0, lengthsFt: {}),
+        objects: [RoofObject(id: 'o', kind: ObjectKind.chimney, center: (x: 3.0, y: 3.0), sizeFt: (3.0, 3.0))],
       );
       expectSane(model, marks: 0);
     });

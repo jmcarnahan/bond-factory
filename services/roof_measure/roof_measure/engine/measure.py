@@ -191,7 +191,7 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
         return refused("lidar_too_sparse", p, round(dens0, 1), outline_source), stages
     _outline_sensitivity(run, o)
     t = run.tick("outline", t)
-    best, h = build_partition(o, q, qlab, planes, theta, ctx)
+    best, h = build_partition(o, q, qlab, planes, theta, ctx, crop)
     stages.run = best
     diag["grid_m"] = round(h, 3)
     diag.update(best.diag)

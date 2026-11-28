@@ -4,7 +4,7 @@ Written before the first run: a synthetic roof and its wall polygon translated b
 0.19/0.03 m in x/y) give the same number of planes, the same number of facets and every typed edge length within 0.5 ft.
 The label raster hangs on ``anchor.anchor_of`` (the median of the inlier points), so it cannot see the offset. PARKED: ring.py's
 cell lattice, measure._crop's voxel key and detect.support_area still bin on an absolute lattice; on the synthetic roofs below that
-changes nothing, but on real houses it does (Wayne 8 or 9 planes, Paul 6-8 facets under a pure translation). Anchoring them
+changes nothing, but on real houses it does (one house 8 or 9 planes, another 6-8 facets under a pure translation). Anchoring them
 changed 23 of 151 houses of the tuning set against lib-0.5.1 (thresholds were tuned on the old phase), so it is parked until a
 threshold re-tune; add a real-house case here when that lands."""
 

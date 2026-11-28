@@ -12,10 +12,9 @@ import 'support.dart';
 void main() {
   _layoutGroup();
   final old = loadOldFixtures();
-  test('the old fixtures are found, the 0.4 engine example among them', () {
-    expect(old.length, greaterThanOrEqualTo(10));
-    expect(old.map((f) => f.name), contains('roof_measurement_0.4_engine'));
-    expect(old.map((f) => f.name), isNot(contains('roof_measurement_0.6_sample')));
+  test('the old fixtures are found; neither 0.6 example is among them', () {
+    expect(old.length, greaterThanOrEqualTo(9));
+    expect(old.map((f) => f.name).where((n) => n.contains('0.6')), isEmpty);
   });
 
   for (final f in old) {

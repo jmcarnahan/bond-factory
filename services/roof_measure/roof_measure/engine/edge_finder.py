@@ -353,6 +353,18 @@ def support_area(q: np.ndarray, wall: Polygon, p: EngineParams) -> float:
     return float(ndi.binary_closing(grid).sum() + 0.0) * h * h
 
 
+def _residual(sides: list[dict]) -> float:
+    """How much the measured sides disagree after registration: the length-weighted mean distance (m) of their
+    offsets from their length-weighted median. Overhangs differing per side give about 0.1-0.2 m; a wall line of
+    another shape or building gives much more. 0 without two measured sides."""
+    use = sorted((d["off"], d["L"]) for d in sides if d["src"] == "ok" and d["off"] is not None)
+    if len(use) < 2:
+        return 0.0
+    off, w = np.array(use).T
+    med = float(off[np.searchsorted(np.cumsum(w), w.sum() / 2)])
+    return float((w * np.abs(off - med)).sum() / w.sum())
+
+
 def find_roof_edge(context: np.ndarray | None, roof_xyz: np.ndarray, q: np.ndarray, qlab: np.ndarray, planes: list,
                    ring: Polygon, county: bool, p: EngineParams) -> EdgeResult:
     """The roof edge round the CCW ``ring`` (building frame). ``context`` is the wide cloud (x, y, z, class) in the
@@ -375,7 +387,7 @@ def find_roof_edge(context: np.ndarray | None, roof_xyz: np.ndarray, q: np.ndarr
     per = sum(d["L"] for d in sides) or 1.0
     blind = sum(d["L"] for d in sides if d["why"] and set(d["why"]) <= {"few", "noroof", "noplane"}) / per
     carry = sum(d["L"] for d in sides if d["src"] != "ok" and d["why"] and 2 * d["why"].count("end") >= len(d["why"])) / per
-    diag = {"edge_no_evidence_share": round(blind, 3), "edge_end_share": round(carry, 3), "edge_shift_m": [round(dx, 3), round(dy, 3)], "edge_common_m": round(o, 3),
+    diag = {"edge_residual_m": round(_residual(sides), 3), "edge_no_evidence_share": round(blind, 3), "edge_end_share": round(carry, 3), "edge_shift_m": [round(dx, 3), round(dy, 3)], "edge_common_m": round(o, 3),
             "edge_shift_refused": not shifted, "edge_split_sides": len(sides) - len(first),
             "edge_candidates": len(C.cand), "edge_side_source": sources}
     return EdgeResult(poly, ring_out, measured, offsets, sources, (dx, dy), reasons, diag)

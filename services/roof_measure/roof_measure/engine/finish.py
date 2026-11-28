@@ -20,7 +20,7 @@ from .params import EngineParams
 from .partition import PartitionRun, explode
 from .plane_math import aspect_deg, pitch_rise, pres
 from .ring import ring_filter
-from .signals import quality, ring_roof_extra_ratio, tree_contact_pct
+from .signals import part_missed_reason, quality, ring_roof_extra_ratio, tree_contact_pct
 from .state import Run
 from .totals import roof_totals
 from .types import Edge, EngineResult, Facet, Outline, Partition, Plane, Quality
@@ -92,7 +92,7 @@ def _quality(run: Run, facets: list[Facet], o: Polygon, crop: np.ndarray, plab: 
     pall = run.pts_all[shapely.contains_xy(run.wall.buffer(p.crop_buffer_m), run.pts_all[:, 0], run.pts_all[:, 1])]
     pall = ring_filter(pall, run.wall, p, {})  # the same points the planes were fitted on
     return quality(facets, pall, o, run.wall, run.parcel_match, run.source, run.diag.get("supported_pct"),
-                   run.diag.get("support_area_m2", 0), extra, tree_pct, p)
+                   run.diag.get("support_area_m2", 0), extra, tree_pct, p, diag=run.diag)
 
 
 def facets_stage(run: Run, best: PartitionRun, q: np.ndarray, o: Polygon) -> tuple[list[Facet], list[Edge]]:
@@ -126,11 +126,17 @@ def assemble(run: Run, facets: list[Facet], edges: list[Edge], o: Polygon,
     if run.context is not None:  # without the wide cloud there is nothing to look at
         try:
             objects, mislabelled = find_objects(run.context, facets, outline, run.ground_z, p)
-        except Exception as ex:  # noqa: BLE001 - objects are decoration: the measurement stands, the diagnostics say why none
-            diag["objects_error"] = str(ex)[:80]
+        except Exception as ex:  # noqa: BLE001 - the measurement stands without objects; ``objects_failed`` tells the reader the count is unknown
+            diag["objects_error"] = f"{type(ex).__name__}: {str(ex)[:60]}"
+    missed = round(sum(m["area_sqft"] for m in mislabelled), 1)
+    reason = part_missed_reason(missed, p)
+    if reason and reason not in quality_.reasons:  # planar roof the facets left out: the area needs a look
+        quality_.reasons.append(reason)
+        quality_.verdict = reason if quality_.verdict == "ok" else quality_.verdict
+        diag["quality"] = quality_.to_dict()
     tot = roof_totals(facets, edges, set(diag["borderline_facets"]), objects)
     return EngineResult(facets=facets, edges=edges, outline=outline, totals=tot, quality=quality_,
-                        objects=objects, roof_part_missed_sqft=round(sum(m["area_sqft"] for m in mislabelled), 1),
+                        objects=objects, roof_part_missed_sqft=missed,
                         planes=[Plane(float(pl[0]), float(pl[1]), float(pl[2])) for pl in world_planes],
                         partition=partition, diagnostics=diag, timings=run.timings, params_hash=p.stable_hash())
 

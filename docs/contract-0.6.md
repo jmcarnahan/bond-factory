@@ -22,8 +22,9 @@ house-folder hook) stay. Errors, stages, isolation and caching are as in `contra
 
 ## Totals (`envelope.totals`, and the same values in `model.totals`)
 
-One function (`engine/totals.py`, `roof_totals`) adds up the facets, edges and objects of the drawn roof; the engine and the model
-adapter both call it, so the two cannot disagree. Areas in square feet (sloped), lengths in feet (3D). A test parses this table
+One function (`engine/totals.py`, `roof_totals`) adds up the facets, edges and objects of the drawn roof. THE RULE: `model.totals` is that
+function over the model's own rows and `envelope.totals` is exactly its 24 contract keys (never the engine's separate dict, which can differ by
+the 0.05 sq ft of a spike the adapter removes). Areas in square feet (sloped), lengths in feet (3D). A test parses this table
 and asserts the engine writes exactly these keys, in this order, and no other.
 
 | Key | Meaning |
@@ -90,14 +91,19 @@ across is not found at 13 returns/m2, and under 1.0 m is not reliably found at 8
 `outline_shift`, `flat_share`, `plane_mismatch_pct`, `outline_covered_pct`, `model_uncovered_pct`, `level_spread_ft`,
 `planes_lidar`, `facets_model` and `roof_part_missed_sqft` (square feet of planar blobs over 3 m2 that no facet covers; 0 when
 none). Reasons: `lidar_too_sparse`, `low_density`, `outline_mismatch`, `poor_fit`, `planes_not_found`, `not_exact_parcel`,
-`low_slope_confirm`, `parcel_street_match`, `other_buildings_on_parcel`. `model.quality.overhang_scale` is gone (the drawn roof is
+`low_slope_confirm`, `parcel_street_match`, `other_buildings_on_parcel`, `outline_no_evidence` (a fifth or more of the building
+outline has no roof returns, so that part of the roof edge is estimated), `roof_continues` (the roof plane carries on past a
+tenth or more of the outline: an attached roof may be missing), `roof_part_missed` (`roof_part_missed_sqft` is a third of a square
+or more: check the roof area). `outline_shift` is the distance from the roof returns' centre to the given outline's centre over
+the square root of the outline's area; the outline's registration offset and the disagreement left after it are the diagnostics
+`edge_shift_m` and `edge_residual_m` (metres). `model.quality.overhang_scale` is gone (the drawn roof is
 the one roof).
 
 ## Warning codes
 
 The closed list, each with a producer: `footprint_osm`, `footprint_lidar_hull`, `source_unreachable`, `parcel_without_building`,
 `other_buildings_on_parcel`, `parcel_street_match`, `low_point_density`, `low_slope_confirm`, `outline_mismatch`, `poor_fit`,
-`low_density`, `other`. An unknown code becomes `other`. Removed in 0.6.0 (no producer): `footprint_solar`, `method_fallback`,
+`low_density`, `objects_failed` (the object finder failed: `model.objects` is empty and the chimney and lantern counts are unknown, not zero), `other`. An unknown code becomes `other`. Removed in 0.6.0 (no producer): `footprint_solar`, `method_fallback`,
 `verifier_unverified`, `verifier_adjusted`, `verifier_failed`, `verifier_timeout`, `solar_segments_only`,
 `agent_failed_fell_back`, `flat_roof_assumed`, `model_failed`, `model_from_planes`.
 

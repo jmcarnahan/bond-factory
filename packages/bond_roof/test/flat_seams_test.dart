@@ -99,12 +99,4 @@ void main() {
     expect(m.model.quality!.flatShare, (raw as num).toDouble());
     expect(m.model.parseNotes, isEmpty);
   });
-
-  test('the 0.4 engine example (kept for the Python side) still parses; only its old parapet length key is noted', () {
-    final j = jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.4_engine.json').readAsStringSync()) as Map<String, dynamic>;
-    final m = RoofMeasurement.parseAny(j);
-    expect(m.model.parseNotes, ['totals.lengths_ft.parapet: unknown edge type, kept in extraLengths']);
-    expect(m.model.quality!.flatShare, isNotNull);
-    expect(m.toJson()['nearby_buildings'], j['nearby_buildings']);
-  });
 }

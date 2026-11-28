@@ -32,6 +32,8 @@ class RoofTotals {
     final extra = <String, double>{};
     for (final e in raw.entries) {
       if (EdgeType.values.any((t) => t.json == e.key)) continue;
+      // `parapet` stays valid in the schema for stored results; the engine writes it as 0 and emits no such edge.
+      if (e.key == 'parapet' && e.value == 0) continue;
       extra[e.key] = asNum(e.value, '$path.lengths_ft.${e.key}');
       notes?.add('$path.lengths_ft.${e.key}: unknown edge type, kept in extraLengths');
     }
@@ -81,7 +83,11 @@ class RoofTotals {
   }
 
   /// The keys this class reads itself (the rest of `model.totals` is [RoofEngineTotals.knownKeys]).
-  static const List<String> ownKeys = ['total_area_sqft', 'pitched_area_sqft', 'flat_area_sqft', 'squares', 'lengths_ft'];
+  static const List<String> ownKeys = [
+    'total_area_sqft', 'pitched_area_sqft', 'flat_area_sqft', 'squares', 'lengths_ft',
+    // Model-only keys the engine still writes and this package does not read.
+    'predominant_pitch_rise', 'predominant_pitch_area_sqft', 'note',
+  ];
 
   final double totalAreaSqft, pitchedAreaSqft, flatAreaSqft, squares;
 

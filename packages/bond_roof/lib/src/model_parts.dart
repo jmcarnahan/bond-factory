@@ -228,6 +228,7 @@ class RoofEdge {
     required this.lengthFt,
     this.facets = const [],
     this.jumpFt,
+    this.upper,
   });
 
   factory RoofEdge.fromJson(Map<String, dynamic> j, String path, [List<String>? notes]) {
@@ -249,6 +250,7 @@ class RoofEdge {
       lengthFt: numOr(j, 'length_ft', path, math.sqrt(math.pow(b.x - a.x, 2) + math.pow(b.y - a.y, 2))),
       facets: strList(j['facets'], '$path.facets'),
       jumpFt: numOrNull(j, 'jump_ft', path),
+      upper: j['upper'] is String ? j['upper'] as String : null,
     );
   }
 
@@ -261,6 +263,9 @@ class RoofEdge {
   /// The height step in feet of a step edge ([EdgeType.hasJump]); null otherwise.
   final double? jumpFt;
 
+  /// The facet on the high side of a step edge ([EdgeType.hasJump]); null otherwise or when not sent.
+  final String? upper;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'type': type.json,
@@ -268,6 +273,7 @@ class RoofEdge {
         'length_ft': lengthFt,
         'facets': facets,
         if (jumpFt != null) 'jump_ft': jumpFt,
+        if (upper != null) 'upper': upper,
       };
 
   @override
@@ -279,10 +285,11 @@ class RoofEdge {
       other.b == b &&
       other.lengthFt == lengthFt &&
       listEq(other.facets, facets) &&
-      other.jumpFt == jumpFt;
+      other.jumpFt == jumpFt &&
+      other.upper == upper;
 
   @override
-  int get hashCode => Object.hash(id, type, a, b, lengthFt, Object.hashAll(facets), jumpFt);
+  int get hashCode => Object.hash(id, type, a, b, lengthFt, Object.hashAll(facets), jumpFt, upper);
 }
 
 class RoofHole {

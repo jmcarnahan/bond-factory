@@ -13,7 +13,7 @@ from .version import CONTRACT, PIPELINE_VERSION
 # verifier_*, solar_segments_only, agent_failed_fell_back, flat_roof_assumed, model_failed and model_from_planes)
 WARNING_CODES = ("footprint_osm", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
                  "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "low_slope_confirm",
-                 "outline_mismatch", "poor_fit", "low_density", "other")
+                 "outline_mismatch", "poor_fit", "low_density", "objects_failed", "other")
 VERDICTS = ("pass", "adjusted", "fail", "unverified")
 DEGRADED_SOURCES = ("lidar_hull",)
 _BASE = {"high": 0.9, "medium": 0.7, "low": 0.5}
