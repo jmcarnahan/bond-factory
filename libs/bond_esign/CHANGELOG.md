@@ -24,3 +24,7 @@ First release: sign a PDF on the app's own page, with an append-only evidence lo
   `seal` and `certs` load on first use, so `import bond_esign` works without the extra.
 - `evidence` exports every request column except `meta`, every signer column except `signature_png`, `token_sha256` and
   `code_sha256` (plus `signature_png_base64`), the events in seq order, `chain {ok, count, head}` and `check {ok, problems}`.
+- Fixes before release: `/Rotate` given as an indirect object is read through pypdf's `page.rotation`; the panel script posts a drawing only
+  when the pad has ink (an empty Draw pad gives `signature_required`) and sizes the canvas from its content box; the closed-panel sentence
+  for a request that is not open reads "This document can no longer be signed."; the certificate footer reads "Certificate page n of m".
+- `asset_tags(base_url)` URLs carry `?v=<content hash>` so a cached asset is never stale after an upgrade.

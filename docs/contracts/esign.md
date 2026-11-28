@@ -142,7 +142,7 @@ can recompute every hash. Compare `chain.head` with the head printed on the sign
 
 ## Verify a chain offline
 
-Needs only the export. Ten lines of standard library Python:
+Needs only the export. About a dozen lines of standard library Python:
 
 ```python
 import hashlib, json

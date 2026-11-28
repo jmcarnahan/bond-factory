@@ -38,9 +38,9 @@
     }
 
     function sizeCanvas() {
-      var rect = canvas.getBoundingClientRect();
-      var w = Math.round(rect.width);
-      var h = Math.round(rect.height);
+      // the content box (the bounding rect would include the border and over-size the backing store)
+      var w = Math.round(canvas.clientWidth);
+      var h = Math.round(canvas.clientHeight);
       if (!w || !h) {
         return;
       }
@@ -172,7 +172,7 @@
         ev.preventDefault();
         return;
       }
-      if (mode === "drawn" && pad) {
+      if (mode === "drawn" && pad && !pad.isEmpty()) {
         pngInput.value = pad.toDataURL("image/png");
       } else {
         pngInput.value = "";

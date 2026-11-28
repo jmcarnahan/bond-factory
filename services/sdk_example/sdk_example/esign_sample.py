@@ -1,6 +1,7 @@
 """A generated two-page sample PDF for the e-signing demo (synthetic text only; reportlab in invariant mode, so the
-same inputs give the same bytes). Page 2 carries the line "Accepted by (customer)" with a ruled line beside it: that
-printed text is what `AnchorRule` finds to place the signature."""
+same inputs give the same bytes). Page 2 carries the line "Accepted by (customer)" with a ruled line beside it, 2.5 pt
+below the label's baseline as a WeasyPrint table-cell border is. That printed text is what `AnchorRule` finds to place
+the signature; the signature stands on the ruled line and its caption prints just under it."""
 
 from __future__ import annotations
 
@@ -10,6 +11,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 ANCHOR_TEXT = "Accepted by (customer)"
+LINE_Y = 190  # the label's text baseline on page 2
+LINE_BELOW = 2.5  # the ruled line sits this far below the baseline: the signature stands on it, the caption prints under it
 
 
 def sample_pdf(title: str = "Sample Service Agreement") -> bytes:
@@ -34,9 +37,9 @@ def sample_pdf(title: str = "Sample Service Agreement") -> bytes:
     pdf.drawString(72, height - 96, "Acceptance")
     pdf.setFont("Helvetica", 11)
     pdf.drawString(72, height - 124, "By signing below the customer accepts the sample agreement on the previous page.")
-    y = 190
+    y = LINE_Y
     pdf.drawString(72, y, ANCHOR_TEXT)
-    pdf.line(72 + pdf.stringWidth(ANCHOR_TEXT, "Helvetica", 11) + 8, y - 2, width - 72, y - 2)
+    pdf.line(72 + pdf.stringWidth(ANCHOR_TEXT, "Helvetica", 11) + 4, y - LINE_BELOW, width - 72, y - LINE_BELOW)
     pdf.showPage()
     pdf.save()
     return buffer.getvalue()

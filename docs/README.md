@@ -46,6 +46,7 @@
 - ../packages/bond_notify_powersync/README.md — PowerSync adapter for notice tables
 - migration/todo-checklist.md — the order an app adopts the TODO modules in, with a link to each note
 - migration/bond_tasks_py_host.md — the code an app writes around bond_tasks_py: models, routes and the service call behind each, signatures
+- migration/bond_esign.md — adopting bond_esign behind an existing provider seam: the adapter, the status mapping, who completes the request, the limits
 - migration/README.md — one note per module: what it replaces, the adapter, call sites, data, acceptance
 - sdk/README.md — how an app consumes bond-factory (Dart git + SHA, Python Poetry or wheel), versioning, module index
 - sdk/adopter-check.md — `.bond-adopter.toml` format and `make adopter-check`: an app's own battery against this tree

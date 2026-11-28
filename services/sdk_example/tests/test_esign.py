@@ -111,7 +111,7 @@ def test_a_voided_request_page_has_no_form(client):
     created = demo(client)
     assert client.post(f"/esign/demo/{created['request_id']}/void").json()["status"] == "voided"
     page = client.get(created["sign_url"])
-    assert not has_form(page.text) and "This document is not ready to sign yet." in page.text
+    assert not has_form(page.text) and "This document can no longer be signed." in page.text
     assert post(client, created, typed_form()).headers["location"].endswith("?error=not_open")
 
 

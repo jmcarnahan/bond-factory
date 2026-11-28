@@ -11,7 +11,7 @@ def test_english_defaults_and_date():
     assert en.title == "Signature certificate"
     assert en.format_date(date(2026, 11, 27)) == "Nov 27, 2026"
     assert en.stamp_caption.format(name="A", date="d", ref="r") == "Signed electronically by A, d, ref r"
-    assert en.page_of.format(n=1, m=2) == "Page 1 of 2"
+    assert en.page_of.format(n=1, m=2) == "Certificate page 1 of 2"
 
 
 def test_format_datetime():

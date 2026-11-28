@@ -89,7 +89,7 @@ class CertificateLabels:
         "The SHA-256 of the final file is recorded by the issuing system. The event record is a hash chain; "
         "the head hash at the time this document was built is {head}."
     )
-    page_of: str = "Page {n} of {m}"
+    page_of: str = "Certificate page {n} of {m}"
     zone_label: str = "UTC"
     continued: str = "(continued)"
     event_kinds: tuple[tuple[str, str], ...] = _EN_EVENTS
@@ -149,7 +149,7 @@ class CertificateLabels:
                 "El SHA-256 del archivo final lo registra el sistema emisor. El registro de eventos es una "
                 "cadena de hashes; el hash de cabecera al generar este documento es {head}."
             ),
-            page_of="Pagina {n} de {m}",
+            page_of="Página del certificado {n} de {m}",
             continued="(continuacion)",
             event_kinds=_ES_EVENTS,
             methods=_ES_METHODS,

@@ -91,7 +91,7 @@ def test_two_panels_share_a_page():
     [
         ({"can_sign": False, "signer_status": "signed"}, "Thank you. This document is signed."),
         ({"can_sign": False, "reason": errors.EXPIRED}, "expired"),
-        ({"can_sign": False, "reason": errors.NOT_OPEN}, "not ready"),
+        ({"can_sign": False, "reason": errors.NOT_OPEN}, "can no longer be signed"),
         ({"can_sign": False, "reason": errors.ALREADY_COMPLETED}, "cannot be signed"),
         ({"needs_code": True, "code_verified": False}, "code we sent"),
     ],
@@ -150,7 +150,17 @@ def test_error_line_text():
 def test_asset_tags_order_and_escape():
     tags = asset_tags('/static/"x/')
     assert tags.index("signature_pad") < tags.index("bond-esign.js")
-    assert tags.count("<script defer") == 2 and 'href="/static/&quot;x/bond-esign.css"' in tags
+    assert tags.count("<script defer") == 2 and 'href="/static/&quot;x/bond-esign.css?v=' in tags
+
+
+def test_asset_tags_carry_the_content_hash_of_each_file():
+    import hashlib
+    import re
+
+    tags = asset_tags("/s")
+    for name in ("bond-esign.css", "signature_pad.umd.min.js", "bond-esign.js"):
+        want = hashlib.sha256(asset_path(name).read_bytes()).hexdigest()[:12]
+        assert re.search(rf'"/s/{re.escape(name)}\?v={want}"', tags), name
 
 
 def test_asset_path_rules():

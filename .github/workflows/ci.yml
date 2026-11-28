@@ -57,15 +57,15 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: '3.12'
-      # sdk_example depends on all twelve libs, so this installs them without roof_measure's heavy geo stack.
+      # sdk_example depends on all thirteen libs, so this installs them without roof_measure's heavy geo stack.
       - run: uv sync --locked --all-extras --package sdk_example --package legacy_host
       - run: make test-libs
       - run: make lint-libs
-      - name: Postgres-marked tests (bond_jobs, bond_tasks_py, bond_notify_py, bond_push_py)
+      - name: Postgres-marked tests (bond_jobs, bond_tasks_py, bond_notify_py, bond_push_py, bond_esign)
         env:
           BOND_TEST_POSTGRES_URL: postgresql+psycopg://postgres@localhost:5432/bond_test
         run: |
-          for lib in libs/bond_jobs libs/bond_tasks_py libs/bond_notify_py libs/bond_push_py; do
+          for lib in libs/bond_jobs libs/bond_tasks_py libs/bond_notify_py libs/bond_push_py libs/bond_esign; do
             (cd "$lib" && ../../.venv/bin/python -m pytest -q -m postgres) || { rc=$?; [ "$rc" -eq 5 ] || exit "$rc"; }
           done
       - name: Dependency licence check (Python side; this job has no Dart package config)
@@ -101,10 +101,10 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: '3.12'
-      - name: Build the twelve library wheels
+      - name: Build the thirteen library wheels
         run: |
           mkdir -p dist
-          for pkg in bond_service_kit bond_storage bond_auth_py bond_jobs bond_sync_py bond_oauth bond_calendar bond_tasks_py bond_signin bond_notify_py bond_push_py bond_capture_py; do
+          for pkg in bond_service_kit bond_storage bond_auth_py bond_jobs bond_sync_py bond_oauth bond_calendar bond_tasks_py bond_signin bond_notify_py bond_push_py bond_capture_py bond_esign; do
             uv build --package "$pkg" --wheel --out-dir dist
           done
           ls -l dist

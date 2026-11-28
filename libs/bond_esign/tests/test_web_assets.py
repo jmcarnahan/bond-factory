@@ -29,6 +29,13 @@ def test_js_clamps_the_canvas_backing_store_to_the_server_limits():
     assert "canvas.width = Math.max(1, Math.floor(w * dpr))" in js
 
 
+def test_js_posts_the_drawing_only_when_the_pad_has_ink():
+    js = text("bond-esign.js")
+    assert 'pad && !pad.isEmpty()) {\n        pngInput.value = pad.toDataURL' in js
+    assert "getBoundingClientRect" not in js
+    assert "canvas.clientWidth" in js and "canvas.clientHeight" in js
+
+
 def test_js_is_strictly_clean():
     js = text("bond-esign.js")
     for bad in ("eval(", "new Function", "alert(", "confirm(", "prompt(", "showModal", "innerHTML",

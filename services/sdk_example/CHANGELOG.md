@@ -6,7 +6,10 @@
   `models/esign.py`); `esign_wiring.py` (tables, consent, PDF storage keys, client IP, the `esign_complete` job);
   `routes/esign.py` (fake-mode `POST /esign/demo` and `/esign/demo/{id}/void`, staff `GET /esign/requests/{id}/evidence`,
   `GET /esign/static/{name}`) and `routes/esign_pages.py` (the signing page under a strict CSP, the form post, the
-  original and signed PDFs); `esign_sample.py` makes the sample PDF.
+  original and signed PDFs); `esign_sample.py` makes the sample PDF (its ruled line sits 2.5 pt under the label's
+  baseline, so the caption prints under the line). `POST /jobs/tick` also runs `esign_wiring.expire_overdue`
+  (`expire_due`: overdue open requests become `expired`, one event each); a worker loop passes it as the `then` of
+  `sweep_wiring.before_hook`. The signing page declares an empty icon, so the browser does not request a favicon.
 - Tasks and inbox routes are the libs' router factories (`routes/task_routers.py`); `routes/tasks.py`, `task_today.py` and `notices.py` are gone, the wire is unchanged. `POST /tasks/parse` takes `rich` (default false).
 - Connections: native-app flow (`start?mode=native`, cookie-less `/go` and callback for native states, `POST
   /connections/{provider}/redeem`); `SDK_EXAMPLE_NATIVE_REDIRECTS` (default `sdkdemo://connections`).

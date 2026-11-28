@@ -18,6 +18,7 @@ from bond_esign import (
     build_signed_pdf,
     complete,
     default_consent,
+    expire_due,
 )
 from fastapi import FastAPI, Request
 
@@ -65,6 +66,14 @@ def enqueue_completion(session: Any, request_id: str, now: datetime) -> None:
     """Queue the build once per request (the key makes a second call a no-op)."""
     bond_jobs.enqueue(session, BackgroundJob, JOB_TYPE, {"request_id": request_id}, key=f"{JOB_TYPE}:{request_id}",
                       now=now)
+
+
+def expire_overdue(session: Any, now: datetime) -> int:
+    """Close every open request past its `expires_at` (status `expired`, one `expired` event each).
+
+    Runs from the job tick's `before` hook (routes/jobs.py in fake mode; an app's worker loop passes it as the `then`
+    of `sweep_wiring.before_hook`, or calls `expire_due` from its own scheduler). The tick commits the session."""
+    return expire_due(session, TABLES, now=now)
 
 
 def install(app: FastAPI) -> None:

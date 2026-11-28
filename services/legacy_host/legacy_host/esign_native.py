@@ -70,7 +70,11 @@ class NativeProvider:
         elif request.status != "completed":  # only `open` can still complete; the rest never will
             raise EsignError(f"envelope {envelope_id} is {request.status}", retryable=request.status == "open",
                              code=be.errors.NOT_READY if request.status == "open" else request.status)
-        return self.store.get(key)
+        stored = self.store.get(key)
+        if be.sha256_hex(stored) != request.signed_sha256:  # never serve bytes the record does not vouch for
+            raise EsignError(f"stored signed copy of {envelope_id} does not match its record", retryable=False,
+                             code="SIGNED_COPY_MISMATCH")
+        return stored
 
     def _request(self, envelope_id: str):
         request = self.session.get(self.t.request, envelope_id)

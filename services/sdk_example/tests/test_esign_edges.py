@@ -96,3 +96,20 @@ def test_the_tables_match_the_library_contract(app):
     names = set(inspect(app.state.engine).get_table_names())
     assert {"esign_requests", "esign_signers", "esign_events"} <= names
     assert TABLES.request.__tablename__ == "esign_requests"
+
+
+def test_the_signing_page_has_an_empty_icon_so_no_favicon_request_fails(client):
+    created = demo(client)
+    assert '<link rel="icon" href="data:,">' in client.get(created["sign_url"]).text
+    assert '<link rel="icon" href="data:,">' in client.get("/esign/sign/not-a-token").text
+
+
+def test_the_tick_expires_an_overdue_open_request_once(client):
+    created = demo(client, expires_in_seconds=-60)
+    assert kinds(client, created) == ["created", "token_issued"]
+    ran = tick(client, "2030-01-01T00:00:00Z")
+    assert "ran" in ran
+    assert kinds(client, created).count("expired") == 1
+    assert evidence(client, created)["request"]["status"] == "expired"
+    tick(client, "2030-01-01T01:00:00Z")  # a second pass writes nothing more
+    assert kinds(client, created).count("expired") == 1

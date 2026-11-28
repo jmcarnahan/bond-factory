@@ -73,3 +73,26 @@ def test_send_open_sign_fetch(tmp_path):
     with app.state.session_factory() as session:
         assert session.execute(text("SELECT status, completed_at FROM esign_envelopes WHERE id = :i"),
                                {"i": row.id}).one()[0] == "completed"
+
+
+def test_a_tampered_stored_copy_is_not_served(tmp_path):
+    import pytest
+
+    from legacy_host.esign_seam import EsignError
+
+    app = esign_app(tmp_path)
+    client = TestClient(app)
+    now = app.state.clock.utcnow_naive()
+    with app.state.session_factory() as session:
+        both = providers(app, session)
+        row = send_for_signature(session, both, "native", estimate(session, "est-7"), pdf=PDF, file_name="Estimate 7",
+                                 signer_name="Pat Customer", signer_email="pat@example.com", client_user_id="cu-7",
+                                 now=now, envelope_class=EsignEnvelope)
+        link = signing_link(session, both, row, "http://testserver/estimates/est-7/sign")
+        form = f"consent_version={both['native'].consent.version}&consent_accepted=1&mode=typed&typed_name=Pat+Customer"
+        client.post(link, content=form, headers={"content-type": "application/x-www-form-urlencoded"})
+        assert signed_pdf(session, both, row, now=now).startswith(b"%PDF")
+        app.state.esign_store.put(f"esign/{row.envelope_id}/signed.pdf", b"%PDF-1.7 not the signed copy")
+        with pytest.raises(EsignError) as err:
+            both["native"].fetch_signed_pdf(row.envelope_id)
+        assert err.value.code == "SIGNED_COPY_MISMATCH" and err.value.retryable is False

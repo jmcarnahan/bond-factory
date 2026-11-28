@@ -55,6 +55,7 @@ MESSAGES = {
 def _page(title: str, body: str, status: int = 200) -> HTMLResponse:
     text = (f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+            f'<link rel="icon" href="data:,">'
             f"<title>{html.escape(title)}</title>\n{asset_tags('/esign/static')}</head>"
             f"<body><main><h1>{html.escape(title)}</h1>\n{body}</main></body></html>")
     return HTMLResponse(text, status_code=status, headers={"Content-Security-Policy": CSP, "Cache-Control": "no-store"})

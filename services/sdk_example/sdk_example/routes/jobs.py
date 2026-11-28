@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .. import sweep_wiring, wiring
 from ..auth_dep import current_user_id
+from ..esign_wiring import expire_overdue
 from ..signin_prune import schedule as schedule_prune
 
 
@@ -43,6 +44,12 @@ def parse_now(value: str) -> datetime:
     return at.replace(tzinfo=UTC) if at.tzinfo is None else at.astimezone(UTC)
 
 
+def before_tick(session, now: datetime) -> None:
+    """The scheduling work of one pass: the daily prune job, then close overdue e-sign requests."""
+    schedule_prune(session, now)
+    expire_overdue(session, now)
+
+
 def register(app: FastAPI) -> None:
     @app.post("/jobs/tick")
     def tick(request: Request, body: TickBody | None = None, user_id: str = Depends(current_user_id)) -> dict:
@@ -54,7 +61,7 @@ def register(app: FastAPI) -> None:
         try:
             swept = sweep_wiring.sweep_app(request.app, state.clock.utcnow_naive())
             ran = bond_jobs.tick(state.engine, state.session_factory, state.job_registry, state.clock,
-                                 before=schedule_prune)  # an app's worker loop passes sweep_wiring.before_hook
+                                 before=before_tick)  # an app's worker loop passes sweep_wiring.before_hook
         finally:
             wiring.set_now(request.app, getattr(state, "clock_pin", None))  # the pin, else real time
         return {"ran": ran, **swept}

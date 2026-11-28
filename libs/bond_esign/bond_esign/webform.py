@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import functools
+import hashlib
 import html
 import importlib.resources
 import math
@@ -46,7 +48,7 @@ class PanelLabels:
     typed_preview_label: str = "Your signature will look like this"
     signed_message: str = "Thank you. This document is signed."
     not_available_expired: str = "This signing link has expired. Please ask for a new one."
-    not_available_not_open: str = "This document is not ready to sign yet."
+    not_available_not_open: str = "This document can no longer be signed."
     not_available_generic: str = "This document cannot be signed right now."
     code_needed: str = "Please enter the code we sent you before signing."
     noscript_hint: str = "Without JavaScript you can sign by typing your full name."
@@ -68,7 +70,7 @@ class PanelLabels:
             typed_preview_label="Su firma se verá así",
             signed_message="Gracias. Este documento está firmado.",
             not_available_expired="Este enlace de firma ha vencido. Pida uno nuevo.",
-            not_available_not_open="Este documento aún no está listo para firmar.",
+            not_available_not_open="Este documento ya no se puede firmar.",
             not_available_generic="Este documento no se puede firmar en este momento.",
             code_needed="Ingrese el código que le enviamos antes de firmar.",
             noscript_hint="Sin JavaScript puede firmar escribiendo su nombre completo.",
@@ -97,12 +99,23 @@ def asset_path(name: str) -> pathlib.Path:
     return pathlib.Path(str(importlib.resources.files("bond_esign") / "web" / name))
 
 
+@functools.cache
+def _asset_tag(name: str) -> str:
+    """First 12 hex of the file's sha256: a new library version gets a new URL, so a cached copy is never stale."""
+    return hashlib.sha256(asset_path(name).read_bytes()).hexdigest()[:12]
+
+
 def asset_tags(base_url: str) -> str:
+    """The stylesheet and script tags for the page head. Each URL carries ``?v=<content hash>``."""
     base = _e(base_url.rstrip("/"))
+
+    def url(name: str) -> str:
+        return f"{base}/{name}?v={_asset_tag(name)}"
+
     return (
-        f'<link rel="stylesheet" href="{base}/bond-esign.css">\n'
-        f'<script defer src="{base}/signature_pad.umd.min.js"></script>\n'
-        f'<script defer src="{base}/bond-esign.js"></script>'
+        f'<link rel="stylesheet" href="{url("bond-esign.css")}">\n'
+        f'<script defer src="{url("signature_pad.umd.min.js")}"></script>\n'
+        f'<script defer src="{url("bond-esign.js")}"></script>'
     )
 
 

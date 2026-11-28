@@ -116,7 +116,7 @@ def _render(data: CertificateData, labels: CertificateLabels, brand: Brand | Non
 
 
 def certificate_pages(data: CertificateData, *, labels: CertificateLabels, brand: Brand | None = None) -> bytes:
-    """Render the certificate; two passes so every page can say "Page n of m"."""
+    """Render the certificate; two passes so every page can say "Certificate page n of m"."""
     _, pages = _render(data, labels, brand, None)
     pdf, _ = _render(data, labels, brand, pages)
     return pdf

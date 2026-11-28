@@ -20,7 +20,8 @@ def visible_box(page) -> tuple[float, float, float, float]:
 
 
 def is_rotated(page) -> bool:
-    return (page.get("/Rotate") or 0) % 360 != 0
+    """True when the page is displayed rotated; pypdf resolves indirect and inherited /Rotate values."""
+    return int(page.rotation) % 360 != 0
 
 
 def page_count(pdf: bytes) -> int:

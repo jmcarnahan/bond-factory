@@ -27,7 +27,7 @@ def test_one_signer_one_page_with_every_field():
     text, flat = _text(pdf), _flat(pdf)
     for want in ("Signature certificate", "Sample estimate 100", "req-0001", "Pat Example", "pat@example.com",
                  "customer", "Private signing link", "203.0.113.7", "2026-11-27 18:30:05 UTC",
-                 "bond-esign-consent/1", "Page 1 of 1", "How to verify", "Signed", "Request created",
+                 "bond-esign-consent/1", "Certificate page 1 of 1", "How to verify", "Signed", "Request created",
                  "I agree to sign this document electronically."):  # fmt: skip
         assert want in text, want
     for want in ("ef" * 32, "12" * 32, HEAD, "cd" * 32):
@@ -51,7 +51,7 @@ def test_many_events_and_long_consent_overflow():
     pdf = certificate_pages(data(events=events, consent_text="word " * 1200), labels=EN, brand=None)
     n = len(PdfReader(io.BytesIO(pdf)).pages)
     assert n >= 2
-    assert f"Page {n} of {n}" in _text(pdf) and "Page 1 of " + str(n) in _text(pdf)
+    assert f"Certificate page {n} of {n}" in _text(pdf) and "Certificate page 1 of " + str(n) in _text(pdf)
     assert "40" in _text(pdf)
 
 
@@ -80,7 +80,7 @@ def test_brand_logo_and_accent():
 
 def test_spanish_labels():
     text = _text(certificate_pages(data(), labels=CertificateLabels.spanish(), brand=None))
-    assert "Certificado de firma" in text and "Pagina 1 de 1" in text and "Firmado" in text
+    assert "Certificado de firma" in text and "Página del certificado 1 de 1" in text and "Firmado" in text
     assert "Enlace de firma privado" in text
 
 

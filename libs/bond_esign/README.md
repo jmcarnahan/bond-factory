@@ -60,6 +60,14 @@ helper `certs.py` and pyHanko's seal time use the wall clock. Every function flu
 | Other endings | `decline(session, t, signer, reason=, ctx=, now=)`, `void(session, t, request, reason=, ctx=, now=)`, `expire_due(session, t, now=)` |
 | With the emailed code | `issue_code(session, t, signer, now=)` returns the 6 digits (you email them); `verify_code(session, t, signer, code, ctx=, now=)` |
 
+Full keyword lists (all after `session, t`; `*` marks the end of positional arguments):
+
+- `create_request(session, t, *, pdf, title, signers, consent, now, policy=Policy(), subject_type=None, subject_id=None,
+  expires_at=None, company_id=None, meta=None, ctx=None)`
+- `sign(session, t, signer, *, pdf, consent_version, consent_accepted, typed_name, drawn_png, ctx, now, method="link")`
+- `record_download(session, t, request, *, signer=None, ctx=None, now)`
+- `record_delivery(session, t, request, *, channel, reference=None, signer=None, ctx=None, now)`
+
 `create_request` takes the PDF (at most `Policy.max_pdf_bytes`, 25,000,000 by default; encrypted PDFs are
 `invalid_pdf`), 1 to `Policy.max_signers` signers (10 by default), and `expires_at`, `subject_type`/`subject_id` (your
 link to an estimate, order or similar), `company_id` (only on a table built from `TenantEsignRequestMixin`) and `meta`
@@ -79,11 +87,20 @@ allowed. It then writes `consent_given` and `signed` events. When every signer h
 The mixins own the table names, foreign keys and constraints. Datetimes are naive UTC. `tests/test_schema.py` pins
 every column.
 
-| Table | Columns |
+Types are SQLAlchemy generic types: they become `DATETIME`/`BLOB` on SQLite and `TIMESTAMP WITHOUT TIME ZONE`/`BYTEA`
+on PostgreSQL (checked with `CreateTable` for both). `str` columns are `VARCHAR`; `sha256` columns are `VARCHAR(64)`;
+long text is `TEXT`; "JSON" is the generic `JSON`. Columns are NOT NULL unless marked `null`.
+
+| Table | Columns (type; `null` = nullable) |
 |---|---|
-| `esign_requests` | `id` (uuid text), `status`, `title`, `subject_type`, `subject_id`, `document_sha256`, `document_bytes`, `page_count`, `consent_version`, `consent_language`, `consent_sha256`, `consent_text`, `policy` (JSON), `expires_at`, `signed_sha256`, `sealed`, `timestamped`, `completed_at`, `voided_at`, `declined_at`, `void_reason`, `meta` (JSON), `created_at`, `updated_at`; `company_id` with the tenant mixin |
-| `esign_signers` | `id`, `request_id`, `position`, `name`, `email`, `role`, `key`, `status`, `placement`, `date_placement` (JSON), `token_sha256`, `token_expires_at`, `code_sha256`, `code_expires_at`, `code_sent_at`, `code_verified_at`, `code_attempts`, `method`, `witness`, `signature_kind`, `typed_name`, `signature_png`, `signature_sha256`, `signed_at`, `ip`, `user_agent`, `decline_reason`, `created_at`, `updated_at` |
-| `esign_events` | `id`, `request_id`, `seq`, `signer_id`, `kind`, `at`, `ip`, `user_agent`, `actor`, `data` (JSON), `prev_hash`, `row_hash` |
+| `esign_requests` | `id` str; `status` str; `title` str; `subject_type`, `subject_id` str null; `document_sha256` sha; `document_bytes`, `page_count` int; `consent_version`, `consent_language` str; `consent_sha256` sha; `consent_text` text; `policy` JSON; `expires_at` datetime null; `signed_sha256` sha null; `sealed`, `timestamped` bool; `completed_at`, `voided_at`, `declined_at` datetime null; `void_reason` text null; `meta` JSON; `created_at`, `updated_at` datetime null; `company_id` str with the tenant mixin |
+| `esign_signers` | `id` str; `request_id` str; `position` int; `name` str; `email` str null; `role` str; `key` str null; `status` str; `placement`, `date_placement` JSON null; `token_sha256` sha null; `token_expires_at` datetime null; `code_sha256` sha null; `code_expires_at`, `code_sent_at`, `code_verified_at` datetime null; `code_attempts` int; `method`, `witness`, `signature_kind`, `typed_name` str null; `signature_png` LargeBinary null; `signature_sha256` sha null; `signed_at` datetime null; `ip` str null; `user_agent`, `decline_reason` text null; `created_at`, `updated_at` datetime null |
+| `esign_events` | `id` str; `request_id` str; `seq` int; `signer_id` str null; `kind` str; `at` datetime; `ip` str null; `user_agent` text null; `actor` str null; `data` JSON; `prev_hash`, `row_hash` sha |
+
+Defaults are SQLAlchemy column defaults, not database `DEFAULT` clauses, so a migration needs none: `id` is a uuid4
+string; `sealed` and `timestamped` are false; `meta` is `{}`; `code_attempts` is 0; `data` is `{}`. `created_at` and
+`updated_at` default to `func.now()` (`updated_at` also on update); the service sets both explicitly from your `now`,
+so the stored values are your clock's. `status` has no column default: the service sets `open` and `pending`.
 
 ```python
 import bond_esign as es
@@ -101,7 +118,9 @@ T = es.Tables(request=EsignRequest, signer=EsignSigner, event=EsignEvent)
 `ix_esign_requests_company_id` with the tenant mixin); `esign_signers` primary key `id`, foreign key `request_id` to
 `esign_requests.id` ON DELETE CASCADE with an index on it, unique `uq_esign_signers_request_position` on
 `(request_id, position)`, unique `token_sha256`; `esign_events` primary key `id`, foreign key `request_id` to
-`esign_requests.id` ON DELETE CASCADE, unique `uq_esign_events_request_seq` on `(request_id, seq)`. The signature
+`esign_requests.id` ON DELETE CASCADE, unique `uq_esign_events_request_seq` on `(request_id, seq)`. `esign_events`
+has no separate `request_id` index: that unique's leading column serves. The unique on `token_sha256` is unnamed
+(the table's own `UNIQUE (token_sha256)`). The signature
 image is a `LargeBinary` column, at most `Policy.max_signature_bytes` (200,000) after cropping.
 
 ## Statuses, events, errors
@@ -169,7 +188,9 @@ text under `anchor_missing`. `AnchorRule` fields: `occurrence` (0-based over all
 `/Rotate` other than 0 are skipped, and the right edge of the text is estimated with Helvetica widths at the run's
 font size, not the font the PDF embeds. A stamp on a rotated page raises `ValueError`. Fractions are of the page's
 CropBox, else its MediaBox. `fixtures/esign/weasy_acceptance.pdf` is a document laid out the way a WeasyPrint estimate
-is; the defaults put the box on the ruled line beside the label.
+is; the defaults put the box on the ruled line beside the label. The caption band sits in the bottom 8 pt of the box, so
+with the `AnchorRule` defaults the printed ruled line should be about 2-3 pt below the label's text baseline (as a
+WeasyPrint table-cell border is) for the caption to land under the line.
 
 The stamp: a drawn image is scaled to fit and anchored bottom-left; a typed name is set in Times-Italic and shrunk to
 fit. A caption ("Signed electronically by <name>, <date>, ref <first 8 of the signer id>") takes an 8 pt band at the
@@ -216,7 +237,8 @@ head.
 - **Keep a named person** who can explain the process (links, consent, the evidence) if a signature is questioned.
 - **Serve the web assets** (below) and **add CSRF** through `hidden={"csrf": ...}` in `render_panel`. The library
   does not read hidden fields you add.
-- **Own the transaction.** Commit after a successful call. An `EsignError` leaves nothing to keep, so roll back;
+- **Own the transaction.** Commit after `create_request` (and `issue_token`) before the signer can act: a rollback
+  after a refused `sign` would otherwise discard the uncommitted request. Commit after a successful call. An `EsignError` leaves nothing to keep, so roll back;
   the one exception is `expired`, where the flip to `expired` survives only if you commit (`expire_due` also sweeps it).
 - **Run the build in a job worker**, not in the request. Sealing uses pyHanko's synchronous API: call it from sync code.
 
@@ -229,7 +251,8 @@ submit button. When signing is not possible it returns one sentence instead (sig
 code). Form fields: `docs/contracts/esign.md`.
 
 Serve the files from `asset_names()` (`bond-esign.css`, `bond-esign.js`, `signature_pad.umd.min.js`,
-`LICENSE-signature_pad`) from the paths `asset_path(name)` gives, and put `asset_tags("/your/static")` in the page head.
+`LICENSE-signature_pad`) from the paths `asset_path(name)` gives, and put `asset_tags("/your/static")` in the page head. Each URL from `asset_tags` ends in
+`?v=<content hash>`, so the files can be cached for a long time and a library upgrade is never served stale.
 
 - No dialog, popover or overlay anywhere. No inline script, style or event handler, so a strict Content-Security-Policy
   works (allow your own origin for script and style).
@@ -259,14 +282,16 @@ A PAdES signature over the whole file, with one invisible signature field. Times
 all fail the file is sealed without a timestamp, unless `require_timestamp=True`, which raises `seal_failed` (so does
 `require_timestamp` with no server). `intact` means unchanged since sealing, not who sealed it: store
 `sealer.fingerprint` and pass it back as `expected_fingerprint`; `trusted` is then True or False (None when none was
-given). A self-signed seal shows "validity unknown" in Acrobat, but a change after sealing is still detected. A seal
+given). `SealCheck.signed_at` is the seal's own time (the timestamp server's when it was timestamped, else the
+signing clock pyHanko read), not the `now` you passed. A self-signed seal shows "validity unknown" in Acrobat, but a change after sealing is still detected. A seal
 from a certificate authority your readers trust is the way to a green tick.
 
 Make a throwaway certificate: `python -m bond_esign.certs --cn "Example Co Seal" --org "Example Co" --out seal.p12`
 (prompts for the passphrase; writes the file with mode 600; prints the base64 for a secret store). Never commit it.
 
-Unsealed builds are byte-deterministic: the same request, events and original always give the same bytes, so a
-retried job gets the same hash, and a rebuild after `complete` matches. Sealed output is not (the signature carries a
+Unsealed builds are byte-deterministic: the build uses the events before `document_built`, so a retried job gets
+the same bytes and hash. An app must still never rebuild or overwrite a completed request's stored copy: an event
+appended between the first build and `complete` (a new token, say) changes a later rebuild. Sealed output is not (the signature carries a
 time), so seal once and store that file; `complete` then refuses a different one (`hash_conflict`).
 
 ## A minimal wiring

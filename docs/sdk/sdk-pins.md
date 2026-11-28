@@ -40,6 +40,7 @@ Fill in a row only for modules the app imports; delete the rest. Update this fil
 | bond_tasks_notifications | | | |
 | bond_tasks_powersync | | | |
 | bond_notify_powersync | | | |
+| bond_esign | | | |
 
 The TODO modules (`bond_tasks*`, `bond_notify*`, `bond_push`, `bond_push_py`, `bond_capture_py`) are first pinned at `fe57595d2530dfd0933dba81971dd021ec472ead`.
 

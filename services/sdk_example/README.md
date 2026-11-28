@@ -54,7 +54,7 @@ Apple sender got; `PUT /fake/capture {down}` makes the pretend model unavailable
 the app clock until set to null; the sync upload and token report it as `server_now` (a tick with `now` then returns to the pin; with no pin it RELEASES the clock to real time afterwards). The model replays `fixtures/capture/model_output.json`.
 
 Running the sweep for real (both call `sweep_wiring.run_sweep`; the ledger makes two runners safe together):
-1. In a worker loop: `bond_jobs.tick(..., before=sweep_wiring.before_hook(app, schedule_prune), before_every=30)`.
+1. In a worker loop: `bond_jobs.tick(..., before=sweep_wiring.before_hook(app, schedule_prune), before_every=30)`. To also close overdue e-sign requests pass `routes.jobs.before_tick` (the prune schedule plus `esign_wiring.expire_overdue`, which runs `bond_esign.expire_due`) as `then`; fake-mode `POST /jobs/tick` already does.
 2. With no jobs table: `python scripts/sweep_interval.py --every 60` (`bond_jobs.run_schedule`: the sweep every N seconds and the prune hourly; `--once --now <iso>` for one pass that also prunes).
 
 Push goes out only with `SDK_EXAMPLE_APNS_KEY_FILE`, `_KEY_ID` and `_TEAM_ID` set (real mode); without them the

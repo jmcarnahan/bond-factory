@@ -45,6 +45,7 @@ Per-app notes live beside the module notes (`sbel.md`).
 | `bond_push_py`, `bond_push`, `bond_push_apple` | `bond_push_py.md`, `bond_push.md`, `bond_push_apple.md` | after `bond_tasks`: S, then A (`bond_push_apple` only for an app with push on) |
 | `bond_auth_secure_storage` | `bond_auth_secure_storage.md` | any app that keeps a refresh token in the keychain |
 | `bond_capture_py` | `bond_capture_py.md` | after `bond_tasks_py`: S |
+| `bond_esign` | `bond_esign.md` | any app with an envelopes table and a provider seam (the host in `services/legacy_host` is the template) |
 | `bond_tasks_notifications` | `bond_tasks_notifications.md` | after `bond_tasks`, `bond_notify`, `bond_push`: S |
 | `bond_tasks_powersync`, `bond_notify_powersync` | `bond_tasks_powersync.md`, `bond_notify_powersync.md` | after `bond_sync_powersync` and `bond_tasks`: S |
 | the whole TODO checklist | `todo-checklist.md` | the order to adopt the modules above |
