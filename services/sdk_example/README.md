@@ -26,7 +26,9 @@ fake mode and logs one warning. Real mode needs `SDK_EXAMPLE_AUTH_SECRET`, and a
 | Inbox, push devices, capture, sweep | `routes/task_routers.py` (`make_notices_router`), `routes/push.py`, `routes/task_capture.py`, `todo_wiring.py`, `sweep_wiring.py` | bond_notify_py, bond_push_py, bond_capture_py |
 | Sync host (notes, tasks, notices, push_devices) | `routes/sync.py`, `sync_todo.py` | bond_sync_py |
 | Calendar events | `routes/calendar.py`, `calendar_wiring.py` | bond_calendar |
-| Migrations | `alembic/versions/0001` to `0005_todo_tables.py` | |
+| E-signing: tables, consent, PDF storage, completion job | `models/esign.py`, `alembic/versions/0007_esign.py`, `esign_wiring.py` (copy as is; replace the consent company and contact, the `esign/<id>/...` storage keys, the zone, the IP rule) | bond_esign |
+| E-signing routes | `routes/esign_pages.py` (copy as is: the panel, the post, the PDFs); `routes/esign.py` (replace the fake-mode `POST /esign/demo` and `esign_sample.py` with a route that creates a request for the app's own PDF and mails the link, and `EVIDENCE_CAPABILITY` with the staff rule) | bond_esign |
+| Migrations | `alembic/versions/0001` to `0007_esign.py` | |
 
 `routes/a0_wiring.py` sorts before every other route module (middleware and error handlers must be in place first).
 `routes/task_capture.py` sorts before `routes/task_routers.py` so `/tasks/parse` and `/tasks/links/search` register
@@ -52,7 +54,7 @@ Apple sender got; `PUT /fake/capture {down}` makes the pretend model unavailable
 the app clock until set to null; the sync upload and token report it as `server_now` (a tick with `now` then returns to the pin; with no pin it RELEASES the clock to real time afterwards). The model replays `fixtures/capture/model_output.json`.
 
 Running the sweep for real (both call `sweep_wiring.run_sweep`; the ledger makes two runners safe together):
-1. In a worker loop: `bond_jobs.tick(..., before=sweep_wiring.before_hook(app, schedule_prune), before_every=30)`.
+1. In a worker loop: `bond_jobs.tick(..., before=sweep_wiring.before_hook(app, schedule_prune), before_every=30)`. To also close overdue e-sign requests pass `routes.jobs.before_tick` (the prune schedule plus `esign_wiring.expire_overdue`, which runs `bond_esign.expire_due`) as `then`; fake-mode `POST /jobs/tick` already does.
 2. With no jobs table: `python scripts/sweep_interval.py --every 60` (`bond_jobs.run_schedule`: the sweep every N seconds and the prune hourly; `--once --now <iso>` for one pass that also prunes).
 
 Push goes out only with `SDK_EXAMPLE_APNS_KEY_FILE`, `_KEY_ID` and `_TEAM_ID` set (real mode); without them the

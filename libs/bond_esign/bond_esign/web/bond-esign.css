@@ -1,0 +1,309 @@
+/* bond-esign panel styles. Everything is scoped under .bond-esign; theme it with the custom properties. */
+.bond-esign,
+.bond-esign__decline {
+  --bond-esign-accent: #1f4fd8;
+  --bond-esign-border: #8a8f98;
+  --bond-esign-text: #1b1d21;
+  --bond-esign-surface: #ffffff;
+  --bond-esign-radius: 8px;
+}
+
+.bond-esign {
+  box-sizing: border-box;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 16px;
+  color: var(--bond-esign-text);
+  background: var(--bond-esign-surface);
+  border: 1px solid var(--bond-esign-border);
+  border-radius: var(--bond-esign-radius);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.bond-esign *,
+.bond-esign *::before,
+.bond-esign *::after {
+  box-sizing: border-box;
+}
+
+.bond-esign [hidden] {
+  display: none !important;
+}
+
+.bond-esign--closed p {
+  margin: 0;
+}
+
+.bond-esign__heading {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.bond-esign__doc,
+.bond-esign__who {
+  margin: 0 0 8px;
+}
+
+.bond-esign__consent-text {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--bond-esign-border);
+  border-radius: var(--bond-esign-radius);
+  overflow-wrap: anywhere;
+}
+
+.bond-esign__consent-text p {
+  margin: 0 0 8px;
+}
+
+.bond-esign__consent-text p:last-child {
+  margin-bottom: 0;
+}
+
+.bond-esign__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.bond-esign__consent label {
+  display: block;
+  flex: 1;
+  min-height: 44px;
+  padding: 10px 0;
+}
+
+.bond-esign input[type="checkbox"] {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--bond-esign-accent);
+}
+
+.bond-esign__field {
+  margin: 12px 0;
+}
+
+.bond-esign__field label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.bond-esign input[type="text"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: inherit;
+  background: var(--bond-esign-surface);
+  border: 1px solid var(--bond-esign-border);
+  border-radius: var(--bond-esign-radius);
+  font: inherit;
+}
+
+.bond-esign__tabs {
+  display: flex;
+  gap: 0;
+  margin: 12px 0 8px;
+}
+
+.bond-esign__tab {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 16px;
+  color: var(--bond-esign-text);
+  background: var(--bond-esign-surface);
+  border: 1px solid var(--bond-esign-border);
+  font: inherit;
+  cursor: pointer;
+}
+
+.bond-esign__tab:first-child {
+  border-radius: var(--bond-esign-radius) 0 0 var(--bond-esign-radius);
+}
+
+.bond-esign__tab:last-child {
+  border-radius: 0 var(--bond-esign-radius) var(--bond-esign-radius) 0;
+  border-left-width: 0;
+}
+
+.bond-esign__tab[aria-selected="true"] {
+  color: #ffffff;
+  background: var(--bond-esign-accent);
+  border-color: var(--bond-esign-accent);
+}
+
+.bond-esign__draw {
+  position: relative;
+  margin: 8px 0;
+}
+
+.bond-esign__canvas {
+  display: block;
+  width: 100%;
+  height: 180px;
+  background: var(--bond-esign-surface);
+  border: 1px solid var(--bond-esign-border);
+  border-radius: var(--bond-esign-radius);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* the baseline rule the signer writes on */
+.bond-esign__draw::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(44px + 8px + 40px);
+  border-bottom: 1px solid var(--bond-esign-border);
+  pointer-events: none;
+}
+
+.bond-esign__clear {
+  min-width: 44px;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 8px 16px;
+  color: var(--bond-esign-text);
+  background: var(--bond-esign-surface);
+  border: 1px solid var(--bond-esign-border);
+  border-radius: var(--bond-esign-radius);
+  font: inherit;
+  cursor: pointer;
+}
+
+.bond-esign__preview-label {
+  margin: 8px 0 4px;
+  font-size: 0.875rem;
+}
+
+.bond-esign__preview {
+  min-height: 3rem;
+  margin: 0 0 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--bond-esign-border);
+  font-family: "Snell Roundhand", "Brush Script MT", Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 1.75rem;
+  overflow-wrap: anywhere;
+}
+
+.bond-esign__error {
+  min-height: 1.45em;
+  margin: 8px 0;
+  color: #b00020;
+}
+
+.bond-esign__submit {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 16px;
+  color: #ffffff;
+  background: var(--bond-esign-accent);
+  border: 1px solid var(--bond-esign-accent);
+  border-radius: var(--bond-esign-radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bond-esign__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bond-esign__hint {
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+}
+
+.bond-esign :focus-visible {
+  outline: 3px solid var(--bond-esign-accent);
+  outline-offset: 2px;
+}
+
+/* decline: a quiet disclosure under the sign button; the open <details> is the confirmation step */
+.bond-esign__decline,
+.bond-esign__decline *,
+.bond-esign__decline *::before,
+.bond-esign__decline *::after {
+  box-sizing: border-box;
+}
+
+.bond-esign__decline {
+  max-width: 40rem;
+  margin: 4px auto 0;
+  padding: 0 16px;
+  color: var(--bond-esign-text);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.bond-esign__decline summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  color: var(--bond-esign-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bond-esign__decline-form {
+  padding: 4px 0 16px;
+}
+
+.bond-esign__decline-form label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.bond-esign__decline-form textarea {
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  padding: 8px 12px;
+  color: inherit;
+  background: var(--bond-esign-surface);
+  border: 1px solid var(--bond-esign-border);
+  border-radius: var(--bond-esign-radius);
+  font: inherit;
+  resize: vertical;
+}
+
+.bond-esign__decline-submit {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  color: var(--bond-esign-accent);
+  background: transparent;
+  border: 1px solid var(--bond-esign-accent);
+  border-radius: var(--bond-esign-radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bond-esign__decline :focus-visible {
+  outline: 3px solid var(--bond-esign-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bond-esign,
+  .bond-esign *,
+  .bond-esign__decline,
+  .bond-esign__decline * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

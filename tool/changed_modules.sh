@@ -9,7 +9,7 @@ if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
   echo "changed_modules: base ref '$BASE' cannot be resolved (shallow clone? run: git fetch origin $BASE:$BASE, or set BASE=<ref>)" >&2
   exit 2
 fi
-ALL="packages/bond_roof packages/bond_roof_ui demos/roof_demo services/roof_measure packages/bond_json packages/bond_api packages/bond_test_support packages/bond_ui packages/bond_auth packages/bond_auth_firebase packages/bond_sync packages/bond_sync_powersync packages/bond_tasks packages/bond_tasks_ui packages/bond_connections packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin services/sdk_example packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_push_apple packages/bond_auth_secure_storage packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync libs/bond_notify_py libs/bond_push_py libs/bond_capture_py services/legacy_host demos/legacy_phone"
+ALL="packages/bond_roof packages/bond_roof_ui demos/roof_demo services/roof_measure packages/bond_json packages/bond_api packages/bond_test_support packages/bond_ui packages/bond_auth packages/bond_auth_firebase packages/bond_sync packages/bond_sync_powersync packages/bond_tasks packages/bond_tasks_ui packages/bond_connections packages/bond_connections_ui packages/bond_signin packages/bond_signin_ui demos/sdk_demo libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin services/sdk_example packages/bond_notify packages/bond_notify_ui packages/bond_push packages/bond_push_apple packages/bond_auth_secure_storage packages/bond_tasks_notifications packages/bond_tasks_powersync packages/bond_notify_powersync libs/bond_notify_py libs/bond_push_py libs/bond_capture_py libs/bond_esign services/legacy_host demos/legacy_phone"
 
 # prefix -> affected modules (reverse dependencies)
 affected() {
@@ -53,6 +53,7 @@ affected() {
     libs/bond_notify_py/*) echo libs/bond_notify_py services/sdk_example services/legacy_host ;;
     libs/bond_push_py/*) echo libs/bond_push_py services/sdk_example services/legacy_host ;;
     libs/bond_capture_py/*) echo libs/bond_capture_py services/sdk_example ;;
+    libs/bond_esign/*) echo libs/bond_esign services/sdk_example services/legacy_host ;;
     services/sdk_example/*)  echo services/sdk_example ;;
     services/legacy_host/*)  echo services/legacy_host ;;
     demos/legacy_phone/*)  echo demos/legacy_phone ;;
@@ -62,11 +63,13 @@ affected() {
     fixtures/push/*)         echo libs/bond_push_py packages/bond_push services/sdk_example ;;
     fixtures/capture/*)      echo libs/bond_capture_py packages/bond_tasks services/sdk_example ;;
     fixtures/signin/*)       echo libs/bond_signin packages/bond_signin packages/bond_signin_ui services/sdk_example demos/sdk_demo ;;
+    fixtures/esign/*)        echo libs/bond_esign services/sdk_example services/legacy_host ;;
     fixtures/legacy_host/*)  echo packages/bond_tasks packages/bond_api services/legacy_host demos/legacy_phone packages/bond_notify_powersync ;;
     fixtures/*)              echo packages/bond_roof services/roof_measure demos/roof_demo ;;
+    docs/contracts/esign.md|docs/decisions/2026-11-27-native-esign.md) echo libs/bond_esign services/sdk_example services/legacy_host ;;
     docs/contracts/*|docs/contract-0.2.md) echo packages/bond_roof services/roof_measure demos/roof_demo ;;
     docs/decisions/2026-11-10-roof-module-v1.md|docs/decisions/2026-11-11-roof-dart-packages-mit.md|docs/research/2026-11-10-roof-module-v1/*) echo packages/bond_roof packages/bond_roof_ui services/roof_measure ;;
-    pyproject.toml|uv.lock)  echo services/roof_measure libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin libs/bond_notify_py libs/bond_push_py libs/bond_capture_py services/sdk_example services/legacy_host ;;
+    pyproject.toml|uv.lock)  echo services/roof_measure libs/bond_service_kit libs/bond_storage libs/bond_auth_py libs/bond_jobs libs/bond_sync_py libs/bond_oauth libs/bond_calendar libs/bond_tasks_py libs/bond_signin libs/bond_notify_py libs/bond_push_py libs/bond_capture_py libs/bond_esign services/sdk_example services/legacy_host ;;
     pubspec.yaml|pubspec.lock|analysis_options.yaml|Makefile|make/*|tool/*) echo "$ALL" ;;
   esac
 }

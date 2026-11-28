@@ -28,5 +28,8 @@ Third-party notices:
 - The Roboto font in packages/bond_roof_ui/assets/fonts/ carries its own
   Apache-2.0 licence, which ships next to the font files and is not changed by
   this notice.
+- libs/bond_esign/bond_esign/web/signature_pad.umd.min.js is signature_pad 5.1.8 by
+  Szymon Nowak, vendored unchanged under the MIT licence; the licence text ships beside it
+  as LICENSE-signature_pad.
 
 This notice is not legal advice.

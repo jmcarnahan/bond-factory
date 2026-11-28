@@ -1,0 +1,35 @@
+[project]
+name = "bond_esign"
+version = "0.1.0"
+description = "Electronic signing of a PDF on the app's own page: evidence chain, signed PDF, optional seal"
+license = "MIT"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "sqlalchemy>=2.0.36",
+    "pypdf>=7.2,<8",
+    "reportlab>=5.0,<6",
+    "pillow>=12.3",
+]
+
+[project.optional-dependencies]
+seal = ["pyhanko>=0.38.2,<0.39", "cryptography>=48.0"]
+dev = ["pytest>=8.3", "ruff>=0.6", "psycopg[binary]>=3.2"]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bond_esign*"]
+
+[tool.setuptools.package-data]
+"*" = ["web/*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["postgres: needs a real PostgreSQL (env BOND_TEST_POSTGRES_URL); skipped otherwise"]

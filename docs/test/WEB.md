@@ -334,3 +334,78 @@ the repo root. Written from the 2026-11-11 roof-module-v1 walk.
 
 `kill $(cat tmp/logs/roof_demo.pid) $(cat tmp/logs/roof_measure.pid)`; confirm :8077 and :8011 are free;
 `rm -rf tmp/walk-data tmp/handtest`.
+
+# Web walk recipe: services/sdk_example signing page
+
+The signing page of `bond_esign`, served by `services/sdk_example` in fake mode. This is a plain HTML page, NOT
+Flutter: no semantics placeholder, no `flt-*` elements, ordinary CSS selectors. Run everything from the repo root.
+The page sends a strict Content-Security-Policy (`default-src 'self'; img-src 'self' data:; style-src 'self';
+script-src 'self'`), so a console CSP violation is a failure.
+
+## Start
+
+1. Example API, backgrounded, pid saved (`tmp/logs/sdk_example.pid`): `make -C services/sdk_example serve` (uvicorn
+   on :8012). Fake mode is the default (`SDK_EXAMPLE_MODE=real` turns it off; the demo routes then answer 404).
+   `curl -s localhost:8012/health` must return `"mode": "fake"`. If an older `out/sdk_example.db` exists, run `make -C services/sdk_example migrate` first (startup refuses a database behind head: "run make migrate"), or remove that file for a fresh demo database.
+2. Create a demo request: `curl -s -X POST localhost:8012/esign/demo -H 'content-type: application/json' -d '{}'`
+   returns `{"request_id": ..., "sign_url": "/esign/sign/<token>"}`. Body keys, all optional: `expires_in_seconds`
+   (negative gives an already expired request), `allow_typed`, `allow_drawn`, `signer_name`. Open
+   `http://localhost:8012` plus `sign_url`.
+3. Sign in as the demo user (needed for the job tick and the evidence): `curl -s -c tmp/jar -X POST
+   localhost:8012/auth/demo -H 'Origin: http://localhost:8078' -H 'content-type: application/json'
+   -d '{"user_id":"demo-user-1"}'` (the cookie lands in `tmp/jar`; the Origin header is required).
+   Run one job tick: `curl -s -b tmp/jar -X POST localhost:8012/jobs/tick -H 'Origin: http://localhost:8078'
+   -H 'content-type: application/json' -d '{}'`; the `ran` list in the answer holds an `esign_complete` job.
+4. Void a request for step 8: `POST /esign/demo/{request_id}/void`.
+
+## Page setup
+
+- Viewports: 390x844 (primary) and 1280x800. Nothing may overflow horizontally at 390.
+- Selectors (from `bond_esign/webform.py`): the form `form[data-bond-esign]`; consent checkbox
+  `input[name=consent_accepted]`; name field `input[name=typed_name]`; tabs `[role=tab][data-mode=drawn]` and
+  `[role=tab][data-mode=typed]` (hidden until the script runs); canvas `canvas`; clear button `.bond-esign__clear`;
+  submit `button[type=submit]` (class `bond-esign__submit`); error line `.bond-esign__error`; the closed notice
+  `.bond-esign--closed`. Hidden fields: `mode`, `consent_version`, `drawn_png`.
+- Drawing: pointer events on the canvas (`page.mouse.move/down/move/up` over its bounding box). The canvas needs a few
+  strokes with at least 12 by 6 pixels of ink, or `sign()` refuses it.
+- The submit button is disabled with JavaScript until consent is ticked and there is a typed name (Type) or ink (Draw).
+- Without JavaScript: a browser context with `javaScriptEnabled: false`; the tabs and canvas stay hidden.
+- The page is served without cache (`Cache-Control: no-store`); reload shows the current state.
+
+## Walk steps
+
+1. **Open the link.** Heading is the document title; a link "View the document (PDF)"; the consent text sits in the
+   page as paragraphs (not behind a link); the panel is a form with the checkbox, "Your full name", Draw and Type tabs,
+   and "Sign and accept". Submit is disabled.
+2. **Gates.** Tick consent with no name and no ink: submit still disabled. Switch to Type, enter a name: enabled.
+3. **Draw.** Switch to Draw, draw with the pointer: enabled with consent ticked. Click Clear: the canvas empties and
+   submit is disabled. Draw again.
+4. **Rotate and resize.** Change the viewport 390x844 to 844x390 and back, and to 1280x800: the strokes are still
+   there and not blurry; submit state unchanged.
+5. **Submit.** Tick consent, submit: a 303 back to the page; it now says "Your signed copy is being prepared." and
+   shows no form. No dialog, popover or overlay appeared at any point (`[role=dialog]`, `dialog`, `[aria-modal]`
+   absent). Outside the canvas the page scrolls normally.
+6. **Job and download.** Run the tick (Start step 3), reload: a "Download signed copy" link. Open `signed.pdf`:
+   the original pages plus a certificate page (name, time, IP, hashes, event timeline); the signature sits on the line
+   beside "Accepted by (customer)". Render the pages to images and LOOK at them: placement, scale, nothing clipped.
+7. **Replay.** Post the same form again (`fetch` the form body to the same URL): the answer is a 303 back; no second
+   signature, same state; the evidence shows one `signed` event.
+8. **Closed pages.** Create a request with `expires_in_seconds: -60` and another, then void it: opening either shows
+   one plain sentence in `.bond-esign--closed`, no form.
+9. **No JavaScript.** With JavaScript disabled, type a name in the name field, tick consent, submit: it signs
+   (a `<noscript>` hint says typing works without JavaScript).
+10. **Evidence.** Sign in as the demo user (Start step 3), then `curl -s -b tmp/jar localhost:8012/esign/requests/<request_id>/evidence`:
+    `chain.ok` true, `check.ok` true, event kinds in order `created`, `token_issued`, `viewed`, `consent_given`,
+    `signed`, `document_built`, `completed`, then `downloaded` after the download (a declined request: `created`, `token_issued`, `viewed`, `declined`).
+11. **Decline.** Open a fresh request (Start step 2), at 390x844 and again at 1280x800. Under the sign button there is
+    a quiet link "Decline to sign" (at least 44px tall, not a second primary button). Expand it: a "Reason
+    (optional)" field and an outlined "Decline" button appear; nothing is posted yet. Type a reason, press Decline: a
+    303 back to the page, which now shows `.bond-esign--closed` with "You declined to sign this document. Nothing was
+    signed." and no form. Reload: the same message. The evidence shows one `declined` event with the reason. No
+    dialog, popover or overlay at any point; nothing overflows at 390. With JavaScript disabled it works the same.
+12. **Error check** after every step: no console error, no CSP violation, no `pageerror`, no dialog.
+
+## Cleanup
+
+`kill $(cat tmp/logs/sdk_example.pid)`; confirm :8012 is free; `rm -f tmp/jar`. The demo database is
+`out/sdk_example.db` (gitignored).
