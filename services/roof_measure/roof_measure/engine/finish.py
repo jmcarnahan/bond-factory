@@ -138,7 +138,7 @@ def assemble(run: Run, facets: list[Facet], edges: list[Edge], tot: dict, o: Pol
     h = best.origin[2]
     partition = Partition(best.labels, best.origin[0], best.origin[1], h, _plane_objs(best.planes, qlab, q), best.beta)
     outline = Outline(o_world, o_p_world, run.source, run.county,
-                      p.overhang_scale_draw if run.county else min(p.overhang_scale_draw, p.overhang_scale_roofedge),
+                      p.overhang_scale_draw,
                       tuple(diag.get("overhang_measured_m", [])), tuple(diag.get("overhang_applied_m", [])),
                       float(diag.get("support_area_m2", 0.0)))
     return EngineResult(facets=facets, edges=edges, outline=outline, totals=tot, quality=quality_,

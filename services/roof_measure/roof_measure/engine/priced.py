@@ -12,7 +12,7 @@ from shapely.geometry import Polygon
 from .edges import build_edges
 from .errors import Ctx, EngineTimeout
 from .facets import SQM2SQFT
-from .outline import build_outline
+from .outline import scaled_outline
 from .types import Edge, Facet
 
 
@@ -22,12 +22,10 @@ def priced_clip(facets: list[Facet], edges: list[Edge], outline: Polygon, q: np.
     clip fails (``diag['priced_clip_error']`` says so)."""
     p = ctx.p
     ps = p.overhang_scale
-    eff = ps if county else min(ps, p.overhang_scale_roofedge)
-    drawn = p.overhang_scale_draw if county else min(p.overhang_scale_draw, p.overhang_scale_roofedge)
-    if abs(eff - drawn) <= 1e-9:  # the EFFECTIVE scales decide (a non-county outline caps both at the roof-edge scale)
+    if not county or abs(ps - p.overhang_scale_draw) <= 1e-9:  # a non-county outline is priced as drawn
         return facets, edges, outline
     try:
-        os_ = build_outline(q, wall, theta, eff, p)[0]
+        os_ = scaled_outline(diag, ps, county, theta, p)
         os_ = Polygon(os_.exterior) if os_.geom_type == "Polygon" else os_.convex_hull
         clip = os_.intersection(outline)
         if clip.geom_type != "Polygon":

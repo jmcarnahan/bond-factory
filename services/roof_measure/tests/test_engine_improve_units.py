@@ -1,4 +1,4 @@
-"""Unit tests of the phase 2b pieces: plane-island dropping, flat-roof junk absorption, spacing-corrected edge position."""
+"""Unit tests of the phase 2b pieces: plane-island dropping, flat-roof junk absorption."""
 
 import numpy as np
 from shapely.geometry import Polygon, box
@@ -6,7 +6,6 @@ from shapely.geometry import Polygon, box
 from roof_measure.engine.errors import Ctx
 from roof_measure.engine.grow import drop_islands
 from roof_measure.engine.junk import absorb_flat_junk
-from roof_measure.engine.outline import local_spacing
 from roof_measure.engine.params import DEFAULT
 
 PLANES = [np.array([0.0, 0.0, 3.0])]
@@ -68,16 +67,6 @@ def test_a_flat_facet_over_the_size_limit_stays():
     items = [[0, box(0, 0, 10, 8).difference(box(6, 0, 10, 4))], [1, box(6, 0, 10, 4)]]  # 16 m2 platform: a real level
     out, n = absorb_flat_junk(items, planes, Ctx(DEFAULT, None))
     assert n == 0 and len(out) == 2
-
-
-def test_local_spacing_follows_the_point_density():
-    rng = np.random.default_rng(1)
-    sup = box(0, 0, 10, 8)
-    a, b = np.array([0.0, 0.0]), np.array([10.0, 0.0])
-    dense = np.c_[rng.uniform(0, 10, 1280), rng.uniform(0, 8, 1280), np.zeros(1280)]  # 16 pts/m2
-    thin = np.c_[rng.uniform(0, 10, 320), rng.uniform(0, 8, 320), np.zeros(320)]  # 4 pts/m2
-    assert abs(local_spacing(dense, sup, a, b, DEFAULT) - 0.25) < 0.03
-    assert abs(local_spacing(thin, sup, a, b, DEFAULT) - 0.5) < 0.06
 
 
 def test_a_sub_millimetre_pinch_does_not_become_a_self_intersecting_ring_in_the_result():

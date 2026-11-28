@@ -38,7 +38,7 @@ def test_a_failed_priced_clip_is_reported_not_good(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("clip failed")
 
-    monkeypatch.setattr(priced, "build_outline", boom)
+    monkeypatch.setattr(priced, "scaled_outline", boom)
     roof = gable()
     pts = __import__("roof_measure.engine.synth_points", fromlist=["simulate"]).simulate(roof, density=8, seed=1)
     wall = roof.wall_polygon()

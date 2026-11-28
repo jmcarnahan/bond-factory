@@ -21,8 +21,7 @@ from roof_measure.quality import assess_engine
 FT = 1 / 0.3048
 SHAPES = [n for n in _cases() if n.endswith("_d8")]
 KNOWN_GEOMETRY_LIMIT = {
-    "complex_hip_d8": "a 20-facet roof: the partition (not the adapter) misses valley and hip length",
-    "dutch_gable_d8": "the partition leaves a 4 ft sliver of rake beside the small gable (engine geometry, not typing)"}
+    "complex_hip_d8": "a 20-facet roof: the partition (not the adapter) misses valley and hip length"}
 
 
 def base() -> BlockSet:
