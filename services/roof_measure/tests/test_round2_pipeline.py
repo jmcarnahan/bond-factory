@@ -99,7 +99,7 @@ def test_transient_upstream_errors_are_retryable(exc):
 
 def test_pipeline_binds_the_deadline_to_every_fetch(tmp_path, net):
     with pytest.raises(DeadlineExceeded):
-        pipeline.run_pipeline("100 Example Ave, Sampletown, CA 90000", tmp_path, "lidar_skeleton",
+        pipeline.run_pipeline("100 Example Ave, Sampletown, CA 90000", tmp_path,
                               deadline=Deadline.after(0))
     assert net == []
 

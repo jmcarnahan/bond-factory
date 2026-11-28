@@ -1,5 +1,7 @@
 # Roof measurement service contract 0.2
 
+> **Superseded for the roof model by [contract-0.6.md](contract-0.6.md)** (totals, edges, objects, the `measure` call). Kept as the record of this shape.
+
 > **Removed in 0.6 (library cleanup, no change to the plane engine's output).** The block-path engine, the methods
 > `lidar_agent` and `solar_agent`, the LLM verifier (the `verification` block of an engine result says `unverified`,
 > `skipped: engine`), Google Solar evidence and the Solar footprint link, the test hooks `blocks_path` and `solar_fixture`

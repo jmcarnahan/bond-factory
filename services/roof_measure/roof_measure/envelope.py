@@ -6,17 +6,14 @@ import copy
 import datetime as dt
 from typing import Any
 
+from .model import TOTALS_KEYS
 from .version import CONTRACT, PIPELINE_VERSION
 
-# closed contract vocabulary; entries the library no longer emits stay until the 0.6.0 contract
-WARNING_CODES = ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
-                 "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "method_fallback", "verifier_unverified",
-                 "verifier_adjusted", "verifier_failed", "verifier_timeout", "solar_segments_only",
-                 "agent_failed_fell_back", "flat_roof_assumed", "model_failed", "model_from_planes", "low_slope_confirm",
+# closed contract vocabulary: every code that still has a producer (0.6.0 removed footprint_solar, method_fallback,
+# verifier_*, solar_segments_only, agent_failed_fell_back, flat_roof_assumed, model_failed and model_from_planes)
+WARNING_CODES = ("footprint_osm", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
+                 "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "low_slope_confirm",
                  "outline_mismatch", "poor_fit", "low_density", "other")
-TOTALS_KEYS = ("area_sqft", "squares", "eave_ft", "rake_ft", "ridge_ft", "hip_ft", "valley_ft", "step_flashing_ft",
-               "predominant_pitch", "facets", "drip_edge_eave_ft", "drip_edge_eave_rake_ft", "ridge_cap_ridge_ft",
-               "ridge_cap_ridge_hip_ft")
 VERDICTS = ("pass", "adjusted", "fail", "unverified")
 DEGRADED_SOURCES = ("lidar_hull",)
 _BASE = {"high": 0.9, "medium": 0.7, "low": 0.5}
@@ -25,18 +22,9 @@ LOW_DENSITY_PTS_M2 = 12.0
 
 
 def totals_from_model(model: dict[str, Any]) -> dict[str, Any]:
-    """The 14 envelope totals, all derived from ``model['totals']`` and ``model['facets']``."""
+    """The envelope totals: the keys of ``model.totals`` that contract 0.6 lists (the rest are model-only shape keys)."""
     t = model["totals"]
-    L = t["lengths_ft"]
-    eave, rake, ridge, hip = L["eave"], L["rake"], L["ridge"], L["hip"]
-    out = {
-        "area_sqft": t["total_area_sqft"], "squares": t["squares"], "eave_ft": eave, "rake_ft": rake,
-        "ridge_ft": ridge, "hip_ft": hip, "valley_ft": L["valley"], "step_flashing_ft": L["step_flashing"],
-        "predominant_pitch": t["predominant_pitch_rise"], "facets": len(model["facets"]),
-        "drip_edge_eave_ft": eave, "drip_edge_eave_rake_ft": eave + rake,
-        "ridge_cap_ridge_ft": ridge, "ridge_cap_ridge_hip_ft": ridge + hip,
-    }
-    return {k: (v if k == "facets" else round(float(v), 3)) for k, v in out.items()}
+    return {k: t[k] for k in TOTALS_KEYS}
 
 
 def confidence_score(model: dict[str, Any], footprint_source: str, verdict: str,
@@ -70,8 +58,7 @@ def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source:
                    generated_at: str | None = None, assessment: dict[str, Any] | None = None) -> dict[str, Any]:
     """Assemble the 0.2 result. A degraded footprint (lidar_hull) can be at most ``adjusted``.
 
-    ``assessment`` (``quality.assess_engine``) adds the optional 0.3 keys: ``model.quality``, ``model.planes`` and four
-    extra totals. Without it the envelope is exactly the 0.2 one.
+    ``assessment`` (``quality.assess_engine``) adds ``model.quality`` and ``model.planes``.
     """
     if len(warnings) != len(warning_codes):
         raise ValueError("warnings and warning_codes must have the same length")
@@ -85,7 +72,6 @@ def build_envelope(model: dict[str, Any], *, method_used: str, footprint_source:
         model["quality"] = assessment["quality"]
         if "planes" in assessment:  # absent when the assessment failed
             model["planes"] = assessment["planes"]
-        totals.update(assessment.get("totals", {}))
     return {
         "contract": CONTRACT,
         "pipeline_version": PIPELINE_VERSION,

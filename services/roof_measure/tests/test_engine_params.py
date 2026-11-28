@@ -40,4 +40,12 @@ def test_the_plan_numbers_are_the_defaults():
     assert (p.s3_axis, p.s3_snap_az) == (True, 10.0)
     assert (p.s4_gentle, p.s4_keep_area, p.s4_rms, p.s4_pts) == (True, 1.5, 0.05, 12)
     assert (p.density_refuse, p.density_ok, p.fit_floor, p.supported_floor) == (4.0, 6.0, 0.55, 70.0)
-    assert (p.mismatch_lo, p.mismatch_hi, p.mismatch_shift, p.cut_up_facets, p.cut_up_hv_per_sq) == (0.70, 1.30, 0.17, 14, 7.0)
+    assert (p.mismatch_lo, p.mismatch_hi, p.mismatch_shift) == (0.70, 1.30, 0.17)
+
+
+# The default parameter hash is the key of every cached result: a deliberate change re-pins it (and bumps PIPELINE_VERSION).
+DEFAULT_HASH = "787ae54961a1a2dd8a83fe03f4550e27090ed37368d3a608469b95f2d0170f5f"
+
+
+def test_the_default_parameter_hash_is_pinned():
+    assert DEFAULT.stable_hash() == DEFAULT_HASH

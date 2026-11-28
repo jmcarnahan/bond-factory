@@ -45,4 +45,4 @@ def test_docs_embed_the_pass_envelope_verbatim_and_name_every_warning_code():
 def test_pipeline_version_and_the_contract_name():
     from roof_measure.version import CONTRACT, PIPELINE_VERSION
 
-    assert PIPELINE_VERSION == "0.5.1" and CONTRACT == "bond.roof_model/0.2"
+    assert PIPELINE_VERSION == "0.6.0" and CONTRACT == "bond.roof_model/0.2"

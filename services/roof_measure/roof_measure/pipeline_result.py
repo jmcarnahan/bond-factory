@@ -15,7 +15,7 @@ class PipelineResult:
     model: dict[str, Any]
     blockset: BlockSet
     paths: dict[str, Path] = field(default_factory=dict)
-    method_used: str = "lidar_skeleton"
+    method_used: str = "planes"
     footprint_source: str = "unknown"
     verification: dict[str, Any] = field(default_factory=dict)
     envelope: dict[str, Any] = field(default_factory=dict)

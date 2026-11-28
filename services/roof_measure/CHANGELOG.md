@@ -1,25 +1,50 @@
 # roof_measure changelog
 
-## Unreleased (will be 0.6.0; so far a clean-up: output and cache keys unchanged)
+## 0.6.0 (pipeline version; one roof, one set of totals, chimneys and lanterns; contract in ../../docs/contract-0.6.md)
+
+`PIPELINE_VERSION` 0.5.1 to 0.6.0 (keys the result cache). A consumer must change: totals keys, `measure` arguments, the
+example fixture. The pitched/flat split, the facets and the edge lengths per type are the 0.5.1 drawn roof's (proved per house).
 
 - **Legacy paths removed, no output change.** The plane engine is the only engine. Removed: the block-path engine
   (`blocks`, `classify`, `skeleton*`, `ringgeom`, `model_cleanup`, `model_slivers`), the older planes family (`planes*`),
   the agent paths (`agent*`), the verifier (`verify*`), Google Solar evidence and the Solar footprint link, the standalone
   job service (`api`, `auth`, `jobs`, `keys`, `normalize`, `results`, `runner`, `service`, `settings`, `cli`, Dockerfile,
   `railway.toml`, the `service` extra), the debug renderer and the block-shaped fixture generators; `compas_cgal` and
-  `anthropic` left the dependencies (`anthropic` is now the `label` extra of `tools/roof_eval/label`). `measure(engine="blocks")`
-  and the agent methods raise `ValueError`; `blocks_path`, `solar_fixture` are gone; `STAGES` is `geocode, footprint, lidar, model`.
-  `verify`, `anthropic_api_key` and `google_solar_api_key` are removed (a caller that passes one gets a `TypeError`); `engine`
-  stays for now (only `"planes"`) and goes in the next step. Dead helpers went too (`text.ft_in`, `errors.error_body` and the
-  service-only error codes `invalid_request`, `unauthorized`, `unknown_job`, `queue_full`, `interrupted`). Proven identical on every house and synthetic roof (digest of the full envelope). The offline entry is
-  `points_path`. Git history keeps the old code.
-- `pyproject.toml` version moved 0.2.0 -> 0.5.1 to match `PIPELINE_VERSION` (it was stale).
-- `measure(verify=..., anthropic_api_key=..., google_solar_api_key=...)` now raise `TypeError` (see above).
-- **`measure(..., hints={"steps": False})`** (plane engine): a step line between two PITCHED sections whose fitted planes agree
-  at the seam is typed from the planes (valley, ridge or hip) instead of `level_change`. `engine/hints.py`
-  (`params_from_hints`, `clean_hints`), `EngineParams.pitched_steps` (skipped by `stable_hash` while True, so the default hash
-  and every cached result are untouched), the hinted parameters are hashed into the cache key, `model.source.hints` records
-  the hint when given. Unknown key or non-bool value: `ValueError`. Contract: `docs/contract-0.4.md` "Hints". No `PIPELINE_VERSION` bump.
+  `anthropic` left the dependencies (`anthropic` is now the `label` extra of `tools/roof_eval/label`). `blocks_path`,
+  `solar_fixture` are gone; `STAGES` is `geocode, footprint, lidar, model`. Dead helpers went too (`text.ft_in`,
+  `errors.error_body` and the service-only error codes). The offline entry is `points_path`.
+- **`measure(...)` arguments removed:** `engine`, `method`, `hints`, `verify`, `anthropic_api_key`, `google_solar_api_key`
+  (a caller that passes one gets a `TypeError`). The one hint, `steps`, is retired: a step line between two pitched facets whose
+  fitted planes agree at the seam is always typed from the planes (it changed nothing on the 160 tuning houses). `engine/hints.py`,
+  `EngineParams.pitched_steps` and `model.source.hints` are gone.
+- **One roof, one set of totals.** `engine/totals.py` writes exactly the 24 keys of the contract table, from the drawn facets,
+  edges and objects, for the engine, `model.totals` and `envelope.totals` alike. New: `eave_ft`, `rake_ft`, `flat_edge_ft`,
+  `ridge_ft`, `hip_ft`, `valley_ft`, `step_flashing_ft`, `wall_flashing_ft`, `transition_ft`, `level_change_ft` (lengths by
+  type), `exposed_edge_ft`, `eave_rake_ft`, `ridge_hip_ft`, `chimney_count`, `chimney_perimeter_ft`, `lantern_count`.
+  **Removed:** `planes_surface_area_sqft`, `area_sqft_wall_line`, `squares_wall_line`, `outline_perimeter_ft`,
+  `outline_perimeter_wall_ft`, `overhang_ft_median`, `roof_edge_perimeter_geom_ft`, `drip_edge_eave_ft`,
+  `drip_edge_eave_rake_ft`, `ridge_cap_ridge_ft`, `ridge_cap_ridge_hip_ft`, `predominant_pitch`, `roofing_pitched_squares`,
+  `roofing_flat_squares`, `area_sqft_measured_edge`, `squares_measured_edge`, `perimeter_measured_edge_ft`, the
+  `pitched_area_sqft` / `flat_area_sqft` / `facet_count` / `facets` / `lengths_ft` / `complexity` / `high_edge_ft` twins in the
+  totals. The priced roof edge and the wall-line clip are gone with the blend: the reported area is the drawn area (squares rise on
+  most roofs). `area_sqft_roof_edge` stays one release (it equals `area_sqft`). `ridge_hip_ft` is the plain sum ridge + hip (it no
+  longer leaves out a crease between two low-slope facets). `model.totals` keeps the model-only shape keys `lengths_ft`,
+  `total_area_sqft`, `pitched_area_sqft`, `flat_area_sqft`, `predominant_pitch_rise`, `predominant_pitch_area_sqft`.
+- **Things standing on the roof: `model.objects`** (chimney, lantern, unknown; never facets; no trees) from the new
+  `engine/objects.py`, with `chimney_count` / `chimney_perimeter_ft` / `lantern_count` and the lantern's sides in
+  `exposed_edge_ft`. A planar blob over 3 m2 that no facet covers is not listed: `model.quality.roof_part_missed_sqft`.
+  Skylights cannot be seen by LiDAR and are never listed. 22 `obj_*` engine parameters (the parameter hash changed).
+- **Edges:** a step edge (`level_change`, `step_flashing`, `wall_flashing`) carries `upper`, the id of the higher facet, beside `jump_ft`.
+- `model.source.method` and `method_used` are `planes` (`lidar_skeleton` and the agent names stay valid when reading old results).
+- **Warning codes:** removed (no producer) `footprint_solar`, `method_fallback`, `verifier_unverified`, `verifier_adjusted`,
+  `verifier_failed`, `verifier_timeout`, `solar_segments_only`, `agent_failed_fell_back`, `flat_roof_assumed`, `model_failed`,
+  `model_from_planes`.
+- **Fixtures:** the engine example is `fixtures/roof_engine/roof_measurement_0.6_engine.json` (was `..._0.4_engine.json`), now with a
+  chimney and a lantern. `synth_engine_envelope.engine_envelope()` emits the 0.6.0 shape.
+- **Harness (`tools/roof_eval`):** the priced-versus-drawn split is retired (`priced.py`, `priced_ratio`, `*_drawn` figures,
+  `priced_inconsistent_houses`): every tier is compared with the drawn roof. Gate 7a (the contractor-squares interval contains
+  1.00) is REPORTED, not a gate (`"report_only": true` in the gate file). The engine's totals keys are not read.
+- `pyproject.toml` version 0.5.1 -> 0.6.0.
 
 ## 0.5.1 (pipeline version; flat roofs read right, nearby buildings; contract in ../../docs/contract-0.4.md)
 

@@ -1,5 +1,7 @@
 # roof_measure envelope 0.3 (additive to 0.2)
 
+> **Superseded for the roof model by [contract-0.6.md](contract-0.6.md)** (totals, edges, objects, the `measure` call). Kept as the record of this shape.
+
 > **Removed in 0.6.** The block path (and with it the `planes_only` result and the block-path quality object, `model.planes`
 > snapping and the four plane totals it made), the agent methods, the verifier, Solar and the job service. See the note at the
 > top of contract-0.2.md. The plane engine's quality, planes and totals (contract-0.4.md) remain.

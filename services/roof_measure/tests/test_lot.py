@@ -52,7 +52,7 @@ def planes_at(dx_m: float, dy_m: float, calls: list | None = None):
 
 
 def call(tmp_path, **kw):
-    args = {"method": "lidar_skeleton", "cache_dir": tmp_path / "cache", "points_path": house(tmp_path), "isolate": False}
+    args = {"cache_dir": tmp_path / "cache", "points_path": house(tmp_path), "isolate": False}
     return measure(ADDR, **(args | kw))
 
 
@@ -97,7 +97,7 @@ def test_two_building_lot_has_the_key_offset_and_totals(tmp_path, monkeypatch):
     assert t["lot_area_sqft"] == pytest.approx(plain["totals"]["area_sqft"] + other["totals"]["area_sqft"], abs=0.01)
     assert t["lot_squares"] == pytest.approx(plain["totals"]["squares"] + other["totals"]["squares"], abs=0.01)
     assert t["lot_outline_perimeter_ft"] == pytest.approx(
-        plain["totals"]["outline_perimeter_ft"] + other["totals"]["outline_perimeter_ft"], abs=0.01)
+        sum(x["totals"][k] for x in (plain, other) for k in ("eave_ft", "rake_ft", "flat_edge_ft")), abs=0.01)
     for k, v in plain["totals"].items():  # the existing keys still mean "the main building"
         assert t[k] == v
     assert model_of(env) == model_of(plain) and env["warnings"] == plain["warnings"]
@@ -215,7 +215,7 @@ def test_a_crashed_child_is_retried_without_the_extra_buildings(tmp_path, monkey
             raise _isolate.ChildCrashed("measurement_failed", "the measurement process exited with code -11")
         return {"warnings": ["w"], "warning_codes": ["other"], "totals": {}}
     monkeypatch.setattr(_isolate, "run_isolated", fake)
-    env = measure(ADDR, method="lidar_skeleton", cache_dir=tmp_path / "c", points_path=house(tmp_path),
+    env = measure(ADDR, cache_dir=tmp_path / "c", points_path=house(tmp_path),
                   include_other_buildings=True)
     assert seen == [True, False]
     assert env["warning_codes"][-1] == "other" and "other buildings" in env["warnings"][-1]
@@ -223,7 +223,7 @@ def test_a_crashed_child_is_retried_without_the_extra_buildings(tmp_path, monkey
     with pytest.raises(library.MeasureError):  # without the flag a crash is still a crash
         monkeypatch.setattr(_isolate, "run_isolated", lambda *a, **k: (_ for _ in ()).throw(
             _isolate.ChildCrashed("measurement_failed", "x")))
-        measure(ADDR, method="lidar_skeleton", cache_dir=tmp_path / "c", points_path=house(tmp_path))
+        measure(ADDR, cache_dir=tmp_path / "c", points_path=house(tmp_path))
 
 
 def test_a_crash_that_repeats_without_the_extra_buildings_raises_the_first_crash(tmp_path, monkeypatch):
@@ -231,7 +231,7 @@ def test_a_crash_that_repeats_without_the_extra_buildings_raises_the_first_crash
         raise _isolate.ChildCrashed("measurement_failed", f"crash with lot={req['include_other_buildings']}")
     monkeypatch.setattr(_isolate, "run_isolated", fake)
     with pytest.raises(library.MeasureError, match="lot=True"):
-        measure(ADDR, method="lidar_skeleton", cache_dir=tmp_path / "c", points_path=house(tmp_path),
+        measure(ADDR, cache_dir=tmp_path / "c", points_path=house(tmp_path),
                 include_other_buildings=True)
 
 
@@ -249,8 +249,8 @@ def _ok_entry(index, totals, model=None):
 
 
 def test_a_building_with_nan_totals_is_failed_and_the_lot_totals_stay_finite(tmp_path, monkeypatch):
-    bad = {"area_sqft": float("nan"), "squares": 3.0, "outline_perimeter_ft": 70.0}
-    good = {"area_sqft": 300.0, "squares": 3.0, "outline_perimeter_ft": 70.0}
+    bad = {"area_sqft": float("nan"), "squares": 3.0, "eave_ft": 50.0, "rake_ft": 20.0, "flat_edge_ft": 0.0}
+    good = {"area_sqft": 300.0, "squares": 3.0, "eave_ft": 50.0, "rake_ft": 20.0, "flat_edge_ft": 0.0}
     monkeypatch.setattr(lot, "find_candidates", lambda *a, **k: [cand("BAD", 500.0), cand("GOOD", 300.0)])
     monkeypatch.setattr(lot, "measure_one", lambda i, *a, **k: _ok_entry(i, bad if i == 1 else good))
     env = call(tmp_path, include_other_buildings=True)
@@ -267,7 +267,7 @@ def test_a_building_with_nan_totals_is_failed_and_the_lot_totals_stay_finite(tmp
 def test_a_nan_inside_a_building_s_model_fails_that_building_only(tmp_path, monkeypatch):
     frame = {"epsg": 32611, "x0_m": 0.0, "y0_m": 0.0}
     env = {"model": {"source": {}, "facets": [{"area_sqft": float("nan")}]},
-           "totals": {"area_sqft": 300.0, "squares": 3.0, "outline_perimeter_ft": 70.0}}
+           "totals": {"area_sqft": 300.0, "squares": 3.0, "eave_ft": 50.0, "rake_ft": 20.0, "flat_edge_ft": 0.0}}
     monkeypatch.setattr(pipeline_engine, "run_planes_outline",
                         lambda *a, **k: SimpleNamespace(envelope=env, blockset=SimpleNamespace(frame=frame)))
     got = lot.measure_one(1, cand("B2", 424.0), frame, {"formatted": "x"}, tmp_path, Deadline.after(30_000))
@@ -275,7 +275,7 @@ def test_a_nan_inside_a_building_s_model_fails_that_building_only(tmp_path, monk
 
 
 def test_attaching_the_lot_never_raises_and_writes_no_lot_keys_on_failure(monkeypatch):
-    env = {"totals": {"area_sqft": float("nan"), "squares": 1.0, "outline_perimeter_ft": 1.0}, "warnings": [],
+    env = {"totals": {"area_sqft": float("nan"), "squares": 1.0, "eave_ft": 1.0, "rake_ft": 0.0, "flat_edge_ft": 0.0}, "warnings": [],
            "warning_codes": []}
     res = SimpleNamespace(envelope=env, blockset=SimpleNamespace(frame={}, address={}))
     monkeypatch.setattr(lot, "measure_one", lambda i, *a, **k: _ok_entry(i, {"area_sqft": 1.0, "squares": 1.0}))

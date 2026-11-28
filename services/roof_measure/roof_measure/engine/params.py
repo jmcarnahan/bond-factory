@@ -50,8 +50,6 @@ class EngineParams:
     planes_min_assigned_pct: float = 50.0  # percent: fewer returns on detected planes than this (or none found): poor_fit, reason planes_not_found (synthetic 14/12 cross gable at 8 pts/m2 before the steep fix drew one flat facet)
     fit_floor: float = 0.55  # ratio: fit_all below this: poor_fit
     supported_floor: float = 70.0  # percent: supported area below this: poor_fit
-    cut_up_facets: int = 14  # facets at or above this: complexity "cut_up"
-    cut_up_hv_per_sq: float = 7.0  # ft of hip+valley per roofing square at or above this: "cut_up"
     # ---- input preparation
     crop_buffer_m: float = 1.3  # m: points kept within this of the footprint
     thin_above_pts: int = 9000  # pts: voxel-thin a crop denser than this
@@ -301,6 +299,29 @@ class EngineParams:
     step_up_cos: float = 0.3  # a step line across the lower slope with the upper roof up-slope of it (cos over this) is headwall flashing
     # ---- outputs
     fit_tol_m: float = 0.15  # m: a point fits its facet's plane within this (fit_all / fit_covered)
+    # ---- objects standing on the roof (engine.objects.find_objects): chimneys, flues, lanterns; never trees
+    obj_hag_m: float = 1.0  # m: a return is a candidate only above the local ground by more than this ...
+    obj_reach_m: float = 3.0  # m: ... and within this of the roof outline
+    obj_above_plane_m: float = 0.3  # m: ... and above the plane of the facet under it by more than this
+    obj_link_min_m: float = 0.35  # m: candidates link into one blob within max(this, obj_link_spacings x mean spacing)
+    obj_link_spacings: float = 1.6  # ratio of the mean return spacing (1/sqrt(density)) that still links two returns
+    obj_min_points: int = 4  # pts: fewer returns is noise, not an object
+    obj_pad_spacings: float = 0.15  # ratio of the mean spacing: the footprint is the rectangle of the returns grown by this (the outermost returns of a surface lie a fraction of a spacing inside its edge)
+    obj_align_ratio: float = 1.6  # ratio: the footprint follows the walls unless the free minimum rectangle is this much smaller
+    obj_min_side_m: float = 0.5  # m: a blob thinner than this is a seam or edge error of the facets (a line), not an object
+    obj_edge_m: float = 0.4  # m: a blob this close to the roof edge is a parapet, wall or gutter line, not a chimney
+    obj_min_area_m2: float = 0.25  # m2: a smaller footprint is dropped
+    obj_tree_outside_share: float = 0.3  # ratio of a blob's returns outside the outline above which it is a tree
+    obj_tree_reach_m: float = 1.5  # m: a blob this close to a tree blob is part of the same tree (its edge over the roof)
+    obj_tree_h95_m: float = 4.0  # m: a blob whose 95th percentile height is above this is a tree
+    obj_on_plane_m: float = 0.15  # m: a return this close to a facet plane is ON the roof (for the layered test)
+    obj_layered_share: float = 0.35  # ratio: more roof returns than this inside the blob's footprint ...
+    obj_layered_spread_m: float = 0.5  # m: ... with a height spread (std) above this is canopy with the roof seen through it
+    obj_lantern_max_h_m: float = 0.9  # m: lower than this and at least obj_lantern_min_area_m2 wide is a lantern ...
+    obj_lantern_min_area_m2: float = 1.5  # m2: (the footprint is the rectangle of the returns: a 5 x 5 ft lantern is 2.3 m2 by the walls, 1.8 by its returns)
+    obj_chimney_max_area_m2: float = 3.0  # m2: ... at least obj_lantern_max_h_m high and at most this wide is a chimney
+    obj_mislabel_area_m2: float = 3.0  # m2: a planar blob wider than this is a roof part the facets left out (mislabelled)
+    obj_planar_rms_m: float = 0.08  # m: ... planar means a plane fit with an rms under this
 
     def __post_init__(self) -> None:
         """Canonical values (an int where a float is declared is stored as a float, so 1 and 1.0 hash alike) and sanity

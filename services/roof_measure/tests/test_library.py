@@ -26,7 +26,7 @@ ENVELOPE_KEYS = set(json.loads((FIXTURES / "roof_measurement_0.2_unverified.json
 
 
 def call(tmp_path, **kw):
-    args = {"method": "lidar_skeleton", "cache_dir": tmp_path / "cache", "points_path": house(tmp_path), "isolate": False}
+    args = {"cache_dir": tmp_path / "cache", "points_path": house(tmp_path), "isolate": False}
     return measure(ADDR, **(args | kw))
 
 
@@ -47,7 +47,7 @@ def test_happy_path_on_the_synthetic_house(tmp_path):
     env = call(tmp_path)
     assert env["contract"] == "bond.roof_model/0.2"
     assert set(env) == ENVELOPE_KEYS
-    assert env["totals"]["area_sqft"] > 0 and env["totals"]["facets"] > 0
+    assert env["totals"]["area_sqft"] > 0 and env["totals"]["plane_count"] > 0
     assert (tmp_path / "cache").is_dir()
 
 
@@ -112,9 +112,8 @@ def test_measure_error_shape():
 
 
 @pytest.mark.parametrize("kw", [
-    {"method": "nope"}, {"lat": 34.0}, {"lng": -118.0}, {"lat": 91.0, "lng": 0.0}, {"lat": float("nan"), "lng": 0.0},
+    {"lat": 34.0}, {"lng": -118.0}, {"lat": 91.0, "lng": 0.0}, {"lat": float("nan"), "lng": 0.0},
     {"deadline_s": 0}, {"deadline_s": float("inf")}, {"points_path": "/no/such/folder"},
-    {"engine": "blocks"}, {"method": "lidar_agent"}, {"method": "solar_agent"},
 ])
 def test_bad_arguments_are_value_errors(tmp_path, kw):
     with pytest.raises(ValueError) as e:
@@ -125,7 +124,7 @@ def test_bad_arguments_are_value_errors(tmp_path, kw):
 def test_blank_address_needs_coordinates(tmp_path):
     with pytest.raises(ValueError):
         measure("  ", cache_dir=tmp_path, isolate=False)
-    env = measure("", lat=34.0, lng=-118.0, cache_dir=tmp_path / "c", method="lidar_skeleton",
+    env = measure("", lat=34.0, lng=-118.0, cache_dir=tmp_path / "c",
                   points_path=house(tmp_path), isolate=False)
     assert env["contract"] == "bond.roof_model/0.2"
 
@@ -136,14 +135,14 @@ def test_blank_address_needs_coordinates(tmp_path):
 ])
 def test_more_bad_arguments_are_value_errors(tmp_path, kw):
     args = {"cache_dir": tmp_path / "c", "points_path": house(tmp_path), "isolate": False,
-            "method": "lidar_skeleton", "address": ADDR} | kw
+            "address": ADDR} | kw
     with pytest.raises(ValueError) as e:
         measure(args.pop("address"), **args)
     assert not isinstance(e.value, (MeasureError, TypeError))
 
 
 def test_a_none_address_with_coordinates_is_a_blank_address(tmp_path):
-    env = measure(None, lat=34.0, lng=-118.0, cache_dir=tmp_path / "c", method="lidar_skeleton",  # type: ignore[arg-type]
+    env = measure(None, lat=34.0, lng=-118.0, cache_dir=tmp_path / "c",  # type: ignore[arg-type]
                   points_path=house(tmp_path), isolate=False)
     assert env["contract"] == "bond.roof_model/0.2"
 
@@ -225,7 +224,7 @@ def test_a_directory_argument_that_is_a_file_is_a_value_error(tmp_path, which):
     f.write_text("x")
     kw = {"cache_dir": tmp_path / "c", "work_dir": tmp_path / "w"} | {which: f}
     with pytest.raises(ValueError, match="must be a directory"):
-        measure(ADDR, method="lidar_skeleton", points_path=house(tmp_path), isolate=False, **kw)
+        measure(ADDR, points_path=house(tmp_path), isolate=False, **kw)
 
 
 def test_source_unreachable_reaches_the_envelope(tmp_path, monkeypatch, net):

@@ -1,54 +1,14 @@
-"""Engine hints (``library.measure(..., hints=)``): there are none today. ``{"steps": False}`` (a step line between two PITCHED
-facets whose fitted planes agree at the seam is typed from the planes) is retired: the rule is the default now, so the answer
-changed nothing. The typer tests below keep the rule itself; the library still validates what it is given. Synthetic data only."""
+"""The step rule of the edge typer that the retired ``steps`` hint used to switch: a step line between two PITCHED facets whose
+fitted planes agree at the seam is typed from the planes. Synthetic data only."""
 
 from __future__ import annotations
-
-import inspect
 
 import numpy as np
 import pytest
 from test_engine_edges import CTX, facet, points_on
-from test_pipeline_engine import no_network, run, world  # noqa: F401  (fixtures: the pipeline test's fakes)
 
-from roof_measure import library
-from roof_measure.engine import hints as H
 from roof_measure.engine.edges import build_edges
 from roof_measure.engine.params import DEFAULT
-
-DEFAULT_HASH = "2d08a05e7fe5c0e9a75865d684e05cce0a5b1871638a6e92b6157fe893666d44"
-
-
-def test_the_default_parameter_hash_is_pinned_and_there_is_no_hint_field():
-    assert DEFAULT.stable_hash() == DEFAULT_HASH
-    assert not hasattr(DEFAULT, "pitched_steps")
-
-
-@pytest.mark.parametrize("hints", [None, {}])
-def test_no_hint_is_the_default_parameters(hints):
-    assert H.params_from_hints(hints) is DEFAULT and H.clean_hints(hints) is None
-
-
-@pytest.mark.parametrize("hints,key", [({"nope": True}, "nope"), ({"steps": False}, "steps"), ({"steps": True}, "steps"),
-                                       ({"x": 1}, "x")])
-def test_every_key_is_unknown_and_named(hints, key):
-    with pytest.raises(ValueError, match=key):
-        H.params_from_hints(hints)
-    with pytest.raises(ValueError, match=key):
-        H.clean_hints(hints)
-
-
-def test_a_hints_argument_that_is_not_a_dict_is_refused():
-    with pytest.raises(ValueError, match="dict"):
-        H.clean_hints([("steps", False)])
-
-
-def test_library_measure_takes_hints_and_rejects_every_key(tmp_path):
-    assert "hints" in inspect.signature(library.measure).parameters
-    with pytest.raises(ValueError, match="steps"):
-        library.measure("", lat=1.0, lng=2.0, cache_dir=tmp_path, engine="planes", hints={"steps": False})
-    with pytest.raises(ValueError, match="bogus"):
-        library.measure("", lat=1.0, lng=2.0, cache_dir=tmp_path, engine="planes", hints={"bogus": True})
 
 
 # ---- the edge typer. Four 5 m wide facets in a row: a valley at x=5, a ridge at x=10, a valley at x=15, each 10 m long.
@@ -108,17 +68,3 @@ def test_a_pitched_roof_over_a_flat_deck_is_a_headwall_by_the_points_and_the_pla
     q = np.vstack([points_on(flat, 800, 1), points_on(pitched, 800, 2)])
     seam = _seams([flat, pitched], q)[("F", "P")]
     assert seam.type == "wall_flashing" and seam.upper == "P" and seam.jump_ft == pytest.approx(0.5 / 0.3048, abs=0.3)
-
-
-# ---- the envelope (offline, the pipeline test's fakes)
-
-
-def test_the_envelope_names_no_hints_and_the_parameter_hash_is_the_default(world, tmp_path):  # noqa: F811
-    w = world(main="gable_d8")
-    plain = run(w, tmp_path / "a")
-    assert "hints" not in plain["model"]["source"]
-    assert plain["model"]["quality"]["engine_params"] == DEFAULT.stable_hash()
-    for i, h in enumerate((None, {})):
-        env = run(w, tmp_path / f"b{i}", hints=h)
-        assert "hints" not in env["model"]["source"]
-        assert env["model"]["quality"]["engine_params"] == DEFAULT.stable_hash()

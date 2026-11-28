@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from typing import Any
 
 import numpy as np
 import shapely
@@ -16,13 +15,14 @@ from .cleanup import valid_polygon
 from .edges import build_edges
 from .errors import EngineError
 from .facets import facet_stats, supported_pct
+from .objects import find_objects
 from .params import EngineParams
 from .partition import PartitionRun, explode
 from .plane_math import aspect_deg, pitch_rise, pres
 from .ring import ring_filter
 from .signals import quality, ring_roof_extra_ratio, tree_contact_pct
 from .state import Run
-from .totals import footprint_totals, roof_totals
+from .totals import roof_totals
 from .types import Edge, EngineResult, Facet, Outline, Partition, Plane, Quality
 
 
@@ -95,8 +95,8 @@ def _quality(run: Run, facets: list[Facet], o: Polygon, crop: np.ndarray, plab: 
                    run.diag.get("support_area_m2", 0), extra, tree_pct, p)
 
 
-def facets_stage(run: Run, best: PartitionRun, q: np.ndarray, o: Polygon) -> tuple[list[Facet], list[Edge], dict[str, Any]]:
-    """Facets, edges, borderline flags, supported share and the totals of the one (drawn) roof."""
+def facets_stage(run: Run, best: PartitionRun, q: np.ndarray, o: Polygon) -> tuple[list[Facet], list[Edge]]:
+    """Facets and edges of the one (drawn) roof, with the borderline flags and the supported share."""
     p, diag, ctx = run.ctx.p, run.diag, run.ctx
     facets = facet_stats(explode(best.items), best.planes, q, p)
     diag["facets_per_20m2"] = round(len(facets) / (o.area / 20.0), 2)
@@ -106,13 +106,11 @@ def facets_stage(run: Run, best: PartitionRun, q: np.ndarray, o: Polygon) -> tup
     diag["borderline"] = bool(ids)
     diag["borderline_facets"] = ids
     diag["supported_pct"] = _supported(facets, q, p)
-    tot = roof_totals(facets, edges, set(ids), p)
-    tot.update(footprint_totals(facets, o, run.wall, diag.get("overhang_applied_m", [])))
     run.stages.facets, run.stages.edges = [replace(f) for f in facets], [replace(e) for e in edges]
-    return facets, edges, tot
+    return facets, edges
 
 
-def assemble(run: Run, facets: list[Facet], edges: list[Edge], tot: dict, o: Polygon,
+def assemble(run: Run, facets: list[Facet], edges: list[Edge], o: Polygon,
               best: PartitionRun, q: np.ndarray, qlab: np.ndarray, quality_: Quality) -> EngineResult:
     p, diag, ang = run.ctx.p, run.diag, run.ang
     diag["quality"] = quality_.to_dict()
@@ -124,7 +122,15 @@ def assemble(run: Run, facets: list[Facet], edges: list[Edge], tot: dict, o: Pol
     outline = Outline(o_world, run.source, run.county,
                       tuple(diag.get("overhang_measured_m", [])), tuple(diag.get("overhang_applied_m", [])),
                       float(diag.get("support_area_m2", 0.0)))
+    objects, mislabelled = [], []
+    if run.context is not None:  # without the wide cloud there is nothing to look at
+        try:
+            objects, mislabelled = find_objects(run.context, facets, outline, run.ground_z, p)
+        except Exception as ex:  # noqa: BLE001 - objects are decoration: the measurement stands, the diagnostics say why none
+            diag["objects_error"] = str(ex)[:80]
+    tot = roof_totals(facets, edges, set(diag["borderline_facets"]), objects)
     return EngineResult(facets=facets, edges=edges, outline=outline, totals=tot, quality=quality_,
+                        objects=objects, roof_part_missed_sqft=round(sum(m["area_sqft"] for m in mislabelled), 1),
                         planes=[Plane(float(pl[0]), float(pl[1]), float(pl[2])) for pl in world_planes],
                         partition=partition, diagnostics=diag, timings=run.timings, params_hash=p.stable_hash())
 

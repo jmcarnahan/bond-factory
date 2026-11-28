@@ -19,8 +19,6 @@ from . import config, errors
 STAGES = ("geocode", "footprint", "lidar", "model")
 KILL_GRACE_S = 30.0
 LOT_RETRY_MIN_S = 30.0  # a crashed child is retried without the other buildings only with this much time left
-METHODS = ("lidar_skeleton", "auto")
-ENGINES = ("planes",)
 
 
 class MeasureError(Exception):
@@ -48,20 +46,17 @@ class MeasureError(Exception):
         return f"MeasureError(code={self.code!r}, message={self.message!r}, retryable={self.retryable!r})"
 
 
-def measure(address: str, *, lat: float | None = None, lng: float | None = None, method: str = "auto",
-            force: bool = False, deadline_s: float = 180.0, cache_dir: str | Path,
+def measure(address: str, *, lat: float | None = None, lng: float | None = None, force: bool = False, deadline_s: float = 180.0, cache_dir: str | Path,
             work_dir: str | Path | None = None, overpass_urls: Sequence[str] | None = None,
             on_stage: Callable[[str], None] | None = None, isolate: bool = True,
             include_other_buildings: bool = False, building_outline_id: str | None = None,
-            engine: str = "planes", points_path: str | Path | None = None,
-            hints: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Measure one roof with the plane engine and return the ``bond.roof_model/0.2`` envelope as a dict.
+            points_path: str | Path | None = None) -> dict[str, Any]:
+    """Measure one roof with the plane engine and return the ``bond.roof_model/0.2`` envelope as a dict (0.6.0 keys).
 
     Blocks the calling thread for up to ``deadline_s`` plus ``KILL_GRACE_S`` (30) seconds: run it off a request
     thread and off a serial worker loop. Keys and directories are arguments; the process environment is not consulted.
 
-    ``address`` is geocoded unless ``lat`` and ``lng`` are both given (then it may be ""). ``method`` is "auto" or
-    "lidar_skeleton" (the same thing). ``engine`` is "planes" (the only value; the argument is removed in 0.6.0). ``force`` bypasses the on-disk fetch cache for this call. ``cache_dir`` (required, created if
+    ``address`` is geocoded unless ``lat`` and ``lng`` are both given (then it may be ""). ``force`` bypasses the on-disk fetch cache for this call. ``cache_dir`` (required, created if
     missing) holds fetched bodies; see ``purge_cache``. ``work_dir`` keeps the files the pipeline writes
     (``<slug>_model.json``, ``<slug>_engine.json``); None uses a temporary directory removed afterwards.
     ``isolate=True`` runs the pipeline in a child process killed at ``deadline_s + KILL_GRACE_S``; ``isolate=False``
@@ -71,7 +66,7 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
     or repeat; "geocode" is emitted even when coordinates are given. A callback that raises aborts the call.
     A result whose warnings contain ``source_unreachable`` is degraded by a data-source outage: retry later.
 
-    Raises ``ValueError`` for bad arguments (unknown method or engine, only one of lat/lng, out-of-range
+    Raises ``ValueError`` for bad arguments (only one of lat/lng, out-of-range
     coordinates, ``deadline_s`` <= 0 or not finite, blank address without coordinates, a ``work_dir`` or
     ``cache_dir`` that is a file). Raises ``MeasureError`` for the job codes: address_not_found, no_footprint,
     ambiguous_building, no_lidar_coverage, lidar_too_sparse, measurement_failed (also a crashed child),
@@ -91,28 +86,20 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
     local metric frame, z absolute), ``footprint.json`` (``{"polygon": [[x, y], ...]}`` in the same frame) and
     ``meta.json`` (``frame`` {crs_epsg, x0_m, y0_m}, ``outline_source``, ``parcel_match``, ``lidar``). No network is
     used and ``address`` may be blank.
-
-    ``hints``: answers a person gave that steer the measurement, ``{"steps": False}`` = no wall or step between two
-    pitched parts of the roof (a step line whose planes agree is typed ``valley``/``ridge``/``hip``). Unknown key or
-    non-bool value: ValueError. No hints: output and cache key unchanged. The envelope carries the applied hints as
-    ``model.source.hints``.
     """
-    lat_lng = _check(address, lat, lng, method, deadline_s, overpass_urls, work_dir, cache_dir, engine, points_path,
-                     hints)
+    lat_lng = _check(address, lat, lng, deadline_s, overpass_urls, work_dir, cache_dir, points_path)
     cache_path = Path(cache_dir).resolve()  # absolute: the child must not depend on its working directory
     cache_path.mkdir(parents=True, exist_ok=True)
     own_dir = work_dir is None
     work = Path(tempfile.mkdtemp(prefix="roof_measure_")) if own_dir else Path(work_dir).resolve()  # type: ignore[arg-type]
     try:
         work.mkdir(parents=True, exist_ok=True)
-        from .engine.hints import clean_hints
         req: dict[str, Any] = {
-            "address": (address or "").strip(), "lat_lng": lat_lng, "method": method,
+            "address": (address or "").strip(), "lat_lng": lat_lng,
             "force": bool(force), "deadline_s": float(deadline_s), "work_dir": str(work),
             "include_other_buildings": bool(include_other_buildings),
             "building_outline_id": str(building_outline_id).strip() if building_outline_id else None,
             "points_path": str(Path(points_path).resolve()) if points_path else None,
-            "hints": clean_hints(hints),
             "runtime": {"cache_dir": str(cache_path),
                         "overpass_urls": list(overpass_urls) if overpass_urls else None,
                         "footprint_stage_s": None},
@@ -174,17 +161,9 @@ def purge_cache(cache_dir: str | Path, days: float = 30.0) -> int:
         return cache.purge_old(days)
 
 
-def _check(address: str | None, lat: float | None, lng: float | None, method: str, deadline_s: float,
+def _check(address: str | None, lat: float | None, lng: float | None, deadline_s: float,
            overpass_urls: Sequence[str] | None = None, work_dir: str | Path | None = None,
-           cache_dir: str | Path | None = None, engine: str = "planes",
-           points_path: str | Path | None = None, hints: dict[str, Any] | None = None) -> list[float] | None:
-    from .engine.hints import clean_hints
-
-    clean_hints(hints)  # raises ValueError on an unknown key or a non-bool value
-    if method not in METHODS:
-        raise ValueError(f"method must be one of {METHODS}, got {method!r}: the agent methods were removed")
-    if engine not in ENGINES:
-        raise ValueError(f"engine must be 'planes', got {engine!r}: the block path was removed")
+           cache_dir: str | Path | None = None, points_path: str | Path | None = None) -> list[float] | None:
     if points_path and (not (Path(points_path) / "points_wide.npy").is_file()
                         or not (Path(points_path) / "footprint.json").is_file()):
         raise ValueError(f"points_path must be a house folder with points_wide.npy and footprint.json: {points_path}")
@@ -236,11 +215,11 @@ def _run_in_process(req: dict[str, Any], on_stage: Callable[[str], None] | None)
                              overpass_urls=tuple(rt["overpass_urls"]) if rt["overpass_urls"] else None)
     try:
         with config.use(runtime), cache.force_scope(req["force"]):
-            res = run_pipeline(req["address"], req["work_dir"], req["method"], deadline=Deadline.after(req["deadline_s"]),
+            res = run_pipeline(req["address"], req["work_dir"], deadline=Deadline.after(req["deadline_s"]),
                                lat_lng=tuple(req["lat_lng"]) if req["lat_lng"] else None, on_stage=stage,
                                include_other_buildings=bool(req.get("include_other_buildings")),
                                building_outline_id=req.get("building_outline_id"),
-                               points_path=req.get("points_path"), hints=req.get("hints"))
+                               points_path=req.get("points_path"))
         try:
             json.dumps(res.envelope, allow_nan=False)
         except ValueError:

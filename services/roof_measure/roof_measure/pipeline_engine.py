@@ -24,7 +24,7 @@ from .text import slug
 
 log = logging.getLogger("roof_measure.pipeline_engine")
 
-METHOD = "lidar_skeleton"  # the validated method name an engine result carries (see model.METHODS)
+METHOD = "planes"  # the method name an engine result carries (see model.METHODS)
 MIN_HAG_M = 1.5  # a return lower than this above local ground is a car, a bush or the ground
 MAX_OVERHANG_M = 0.6  # roof returns kept this far past the footprint; the engine's data was cut the same way
 CONTEXT_RING_M = 8.0  # the wider cloud handed to the engine's ring signal
@@ -106,8 +106,7 @@ def measure_points(points: Any, fp_m: Any, frame: Any, base: BlockSet, *, deadli
 
 
 def build_result(res: Any, ground_z: float, lidar_meta: dict[str, Any], base: BlockSet, fpinfo: dict[str, Any],
-                 out: Path, tag: str, params: Any = None, extra_notes: list[str] | None = None,
-                 hints: dict[str, Any] | None = None) -> Any:
+                 out: Path, tag: str, params: Any = None, extra_notes: list[str] | None = None) -> Any:
     """Model, assessment and envelope of an engine result; writes ``<tag>_model.json`` and ``<tag>_engine.json``."""
     import json
 
@@ -118,8 +117,6 @@ def build_result(res: Any, ground_z: float, lidar_meta: dict[str, Any], base: Bl
     model = engine_model(res, base, ground_z, {"method": METHOD}, params or _default_params(), extra_notes)
     if fpinfo.get("building"):  # contract 0.4: which building was measured
         model.setdefault("source", {})["building"] = fpinfo["building"]
-    if hints:  # the answers this measurement was made with (present only when given)
-        model.setdefault("source", {})["hints"] = dict(hints)
     # the LLM verifier never runs on the engine path: it only checks edge-sum arithmetic and
     # passed a wrong roof; the engine's own signals and verdict replace it. ``skipped`` tells readers it was not tried.
     verification = {**no_verification(model, "The diagram comes straight from the measured planes; the verifier "
@@ -148,8 +145,7 @@ def _default_params() -> Any:
 
 def run_planes(address: str, out_dir: str | Path, *, deadline: Deadline | None, lat_lng: tuple[float, float] | None,
                on_stage: Callable[[str], None], building_outline_id: str | None = None, pinned: bool = True,
-               params: Any = None, points_path: str | Path | None = None,
-               hints: dict[str, Any] | None = None) -> Any:
+               params: Any = None, points_path: str | Path | None = None) -> Any:
     """The whole pipeline for one address with the plane engine (``run_pipeline``)."""
     from . import cache
     from .pipeline_stages import _stage_points, _stage_points_dir
@@ -168,7 +164,7 @@ def run_planes(address: str, out_dir: str | Path, *, deadline: Deadline | None, 
     on_stage("model")
     res, ground_z, lidar_meta = measure_points(points, fp_m, frame, base, deadline=deadline, params=params,
                                                parcel_match=fpinfo.get("match"))
-    result = build_result(res, ground_z, lidar_meta, base, fpinfo, Path(out_dir), slug(address), params, hints=hints)
+    result = build_result(res, ground_z, lidar_meta, base, fpinfo, Path(out_dir), slug(address), params)
     log.info("planes pipeline done verdict=%s facets=%d ms=%d", res.quality.verdict, len(res.facets),
              int((time.monotonic() - started) * 1000))
     return result

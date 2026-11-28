@@ -35,7 +35,7 @@ def crashing_child(monkeypatch):
 
 
 def run(tmp_path, **kw):
-    args = {"method": "lidar_skeleton", "cache_dir": tmp_path / "cache", "points_path": house(tmp_path),
+    args = {"cache_dir": tmp_path / "cache", "points_path": house(tmp_path),
             "work_dir": tmp_path / "work"}
     return measure("100 Example Ave, Sampletown, CA 90000", **(args | kw))
 
@@ -76,7 +76,7 @@ def test_a_normal_nonzero_exit_is_not_a_crash(tmp_path, monkeypatch):
     fake = Path(__file__).with_name("fake_child_script.py")
     monkeypatch.setattr(isolate, "_child_argv", lambda: [sys.executable, "-P", str(fake)])
     with pytest.raises(MeasureError) as e:
-        measure("stderr-exit-3", lat=1.0, lng=1.0, method="lidar_skeleton",
+        measure("stderr-exit-3", lat=1.0, lng=1.0,
                 cache_dir=tmp_path / "cache", points_path=house(tmp_path))
     assert not isinstance(e.value, isolate.ChildCrashed) and "exited with code 3" in e.value.message
 

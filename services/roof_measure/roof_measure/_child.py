@@ -81,11 +81,11 @@ def main() -> int:
     try:
         with config.use(runtime), cache.force_scope(req["force"]):
             deadline = Deadline.after(req["deadline_s"])
-            res = run_pipeline(req["address"], req["work_dir"], req["method"], deadline=deadline,
+            res = run_pipeline(req["address"], req["work_dir"], deadline=deadline,
                                lat_lng=tuple(req["lat_lng"]) if req["lat_lng"] else None,
                                on_stage=_stage_hook(), include_other_buildings=bool(req.get("include_other_buildings")),
                                building_outline_id=req.get("building_outline_id"),
-                               points_path=req.get("points_path"), hints=req.get("hints"))
+                               points_path=req.get("points_path"))
         _emit({"t": "ok", "envelope": res.envelope})
     except Exception as exc:
         log.warning("measurement failed: %s", type(exc).__name__)  # no traceback at WARNING: urls hold the address

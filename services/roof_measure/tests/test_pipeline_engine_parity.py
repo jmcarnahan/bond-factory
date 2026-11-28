@@ -18,8 +18,8 @@ from roof_measure.engine.load import load_house
 
 
 def summary(totals, quality, facets):
-    return {"facets": len(facets), "area": totals["planes_surface_area_sqft"], "ridge_hip": totals["ridge_cap_ridge_hip_ft"],
-            "perimeter": totals["outline_perimeter_ft"], "pitched": totals["roofing_pitched_sqft"], "flat": totals["roofing_flat_sqft"],
+    return {"facets": len(facets), "area": totals["area_sqft"], "ridge_hip": totals["ridge_hip_ft"],
+            "perimeter": totals["eave_ft"] + totals["rake_ft"] + totals["flat_edge_ft"], "pitched": totals["roofing_pitched_sqft"], "flat": totals["roofing_flat_sqft"],
             "fit_all": quality["fit_all"]}
 
 

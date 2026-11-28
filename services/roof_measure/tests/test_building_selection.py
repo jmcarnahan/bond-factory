@@ -152,7 +152,7 @@ def test_measure_accepts_the_outline_id_and_unknown_id_is_no_footprint(tmp_path,
     net.routes["LACounty_Parcel"] = {"features": [A]}
     net.routes["Countywide_Building_Outlines"] = {"features": []}
     with pytest.raises(MeasureError) as e:
-        measure("", lat=LAT, lng=LNG, method="lidar_skeleton", cache_dir=tmp_path / "c", isolate=False,
+        measure("", lat=LAT, lng=LNG, cache_dir=tmp_path / "c", isolate=False,
                 building_outline_id="NOPE")
     assert e.value.code == "no_footprint"
 

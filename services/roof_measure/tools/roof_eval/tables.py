@@ -34,8 +34,6 @@ def aggregate(recs: list[dict[str, Any]]) -> dict[str, Any]:
         "overlap_houses": sum(1 for r in have if (metric(r, "overlap_sqft") or 0) > 1.0),
         "T2_label_disagree": sum(1 for r in recs if (r.get("t2_labels") or {}).get("disagree")),
         "T2_two_label_houses": sum(1 for r in recs if r.get("t2_labels")),
-        "priced_inconsistent_houses": sum(1 for r in have if metric(r, "priced_inconsistent")),
-        "priced_from_totals_houses": sum(1 for r in have if "totals" in ((metric(r, "priced.src") or {}).values())),
         "runtime_median_s": stats.median([r.get("runtime_s") for r in recs]),
         "runtime_p90_s": stats.percentile([r.get("runtime_s") for r in recs], 90),
         "T1_squares_abs_err_pct_median": stats.median([abs(x) for x in t1 if x is not None]),
@@ -58,7 +56,7 @@ def aggregate_all(recs: list[dict[str, Any]]) -> dict[str, Any]:
         vals = sorted({str(r["row"].get(k)) for r in recs})
         if len(vals) > 1 or (vals and vals != ["None"]):
             by[k] = {v: aggregate([r for r in recs if str(r["row"].get(k)) == v]) for v in vals}
-    return {"overall": aggregate(recs), "by": by, "t3": m_truth.t3_aggregate(recs), "t3_drawn": m_truth.t3_aggregate(recs, "ratio_drawn"),
+    return {"overall": aggregate(recs), "by": by, "t3": m_truth.t3_aggregate(recs),
             "canaries": [{"id": r["id"], "verdict": r.get("verdict"), "status": r.get("status"),
                           **{k: (r.get("m") or {}).get(k) for k in ("fit_all", "fit_covered", "coverage", "facets", "area_sqft")},
                           "T2_iou": metric(r, "truth.T2.facet_iou.mean_iou")} for r in canaries]}
@@ -95,14 +93,10 @@ def render(summary: dict[str, Any], recs: list[dict[str, Any]]) -> str:
               f"price |delta| % median: T1 {_f(o['price_abs_pct_median_T1'], 1)}, T2 {_f(o['price_abs_pct_median_T2'], 1)}"]
     if summary.get("t3"):
         t = summary["t3"]
-        lines.append(f"T3 aggregate, PRICED area (n={t['n']}): median result/contractor squares {t['median_ratio']:.3f}, "
-                     f"90% interval [{t['lo90']:.3f}, {t['hi90']:.3f}]")
-    if summary.get("t3_drawn"):
-        t = summary["t3_drawn"]
-        lines.append(f"T3 aggregate, DRAWN area (n={t['n']}): median {t['median_ratio']:.3f}, 90% interval [{t['lo90']:.3f}, {t['hi90']:.3f}]")
+        lines.append(f"T3 aggregate (reported, gate 7a is not a gate; n={t['n']}): median result/contractor squares "
+                     f"{t['median_ratio']:.3f}, 90% interval [{t['lo90']:.3f}, {t['hi90']:.3f}], contains 1.00: "
+                     f"{'yes' if t['lo90'] <= 1.0 <= t['hi90'] else 'NO'}")
     lines.append(f"T2 houses with two labels: {o['T2_two_label_houses']}, label runs that disagree (IoU < 0.60): {o['T2_label_disagree']}")
-    lines.append(f"priced totals read from the engine in {o['priced_from_totals_houses']} houses; "
-                 f"{o['priced_inconsistent_houses']} houses with inconsistent priced totals")
     if summary.get("canaries"):
         lines += ["", "## canaries (never counted as evidence)", "", "| id | status | verdict | fit_all | fit_covered | coverage | facets | T2 IoU |",
                   "|---|---|---|---|---|---|---|---|"]

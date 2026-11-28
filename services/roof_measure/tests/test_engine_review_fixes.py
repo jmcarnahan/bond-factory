@@ -21,10 +21,10 @@ def test_a_sliver_next_to_a_facet_with_a_small_gap_does_not_crash(gap):
 
 def test_the_params_hash_does_not_depend_on_int_versus_float():
     """S1: 1 and 1.0 are the same parameter."""
-    assert DEFAULT.replace(cut_up_hv_per_sq=7).stable_hash() == DEFAULT.replace(cut_up_hv_per_sq=7.0).stable_hash()
+    assert DEFAULT.replace(density_refuse=7).stable_hash() == DEFAULT.replace(density_refuse=7.0).stable_hash()
 
 
-@pytest.mark.parametrize("field,value", [("cut_up_hv_per_sq", float("nan")), ("density_refuse", -1.0), ("knn_k", 0)])
+@pytest.mark.parametrize("field,value", [("fit_floor", float("nan")), ("density_refuse", -1.0), ("knn_k", 0)])
 def test_nonsense_params_are_rejected(field, value):
     with pytest.raises(ValueError):
         DEFAULT.replace(**{field: value})

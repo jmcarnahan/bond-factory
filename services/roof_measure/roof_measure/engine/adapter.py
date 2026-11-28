@@ -18,9 +18,9 @@ from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 
-from ..model import EDGE_TYPES, SCHEMA, ModelError, origin_of, validate
+from ..model import EDGE_TYPES, SCHEMA, ModelError, origin_of, predominant_pitch, validate
 from .edges import edge_diagnostics
 from .params import DEFAULT, EngineParams
 from .totals import roof_totals
@@ -29,14 +29,7 @@ from .types import EngineResult, Facet
 FT = 1 / 0.3048
 FLAT_KIND_RISE = 0.5  # contract 0.2: ``kind`` is flat under 0.5/12 (``roof_type`` cuts at 2.0/12)
 MIN_ANGLE_DEG = 10.0  # model.validate rejects a facet corner sharper than this
-SOURCE_METHOD = "lidar_skeleton"  # a validated METHODS value; a deliberate rename is a phase 3 job
-# the totals the envelope carries beside the model's own (area, squares, the lengths by type): read from model.totals
-COST_KEYS = ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft",
-             "roofing_pitched_sqft", "roofing_flat_sqft", "roofing_pitched_squares", "roofing_flat_squares",
-             "low_slope_confirm_sqft", "area_sqft_wall_line", "outline_perimeter_wall_ft", "overhang_ft_median",
-             "flat_edge_ft", "level_change_ft", "complexity", "area_sqft_roof_edge")
-FOOTPRINT_KEYS = ("area_sqft_wall_line", "squares_wall_line", "outline_perimeter_wall_ft", "overhang_ft_median",
-                  "roof_edge_perimeter_geom_ft")  # engine totals that need the wall line or the outline polygon
+SOURCE_METHOD = "planes"
 AREA_TOL_SQFT = 0.5  # a facet whose polygon is smaller than this is dropped from the model
 
 
@@ -123,26 +116,41 @@ def _edge_dicts(res: EngineResult, kept: set[str]) -> list[dict]:
                              "length_ft": float(e.length_ft), "facets": list(e.facets)}
         if e.type in ("level_change", "step_flashing", "wall_flashing") and e.jump_ft is not None:
             d["jump_ft"] = float(e.jump_ft)
+        if e.upper is not None:  # a step: the id of the higher facet
+            d["upper"] = e.upper
         if e.high_edge:
             d["high_edge"] = True
         out.append(d)
     return out
 
 
-def _model_totals(res: EngineResult, facets: list[dict], edges: list[dict], params: EngineParams) -> dict[str, Any]:
-    """``model.totals``: ``roof_totals`` over the facets and edges the model carries (so every total is the sum of
-    them, as ``validate`` checks), in the model's shape plus the cost-sheet keys. The wall-line and outline numbers
-    are the engine's. Keys whose value is None are left out."""
+def _objects(res: EngineResult, facets: list[dict]) -> list[dict[str, Any]]:
+    """``model.objects``: the engine's objects, each on a facet the model kept (the nearest one when its own was dropped)."""
+    ids = {f["id"] for f in facets}
+    polys = {f["id"]: Polygon(f["polygon"]) for f in facets}
+    out = []
+    for o in res.objects:
+        d = {**o, "center": list(o["center"]), "size_ft": list(o["size_ft"]), "polygon": [list(p) for p in o["polygon"]]}
+        if d["facet"] not in ids:
+            c = Point(d["center"])
+            d["facet"] = min(polys, key=lambda i: polys[i].distance(c))
+        out.append(d)
+    return out
+
+
+def _model_totals(facets: list[dict], edges: list[dict], objects: list[dict]) -> dict[str, Any]:
+    """``model.totals``: ``roof_totals`` over the facets, edges and objects the model carries (so every total is the sum
+    of them, as ``validate`` checks) plus the model-only shape keys ``validate`` and the diagrams read."""
     rows = [SimpleNamespace(id=f["id"], area_sqft=f["area_sqft"], roof_type=f["roof_type"], pitch_rise=f["pitch_rise"])
             for f in facets]
-    segs = [SimpleNamespace(type=e["type"], length_ft=e["length_ft"], facets=tuple(e["facets"]), high_edge=bool(e.get("high_edge")))
-            for e in edges]
-    t = roof_totals(rows, segs, {f["id"] for f in facets if f["borderline"]}, params)
-    t.update({k: res.totals[k] for k in FOOTPRINT_KEYS if res.totals.get(k) is not None})
-    t["total_area_sqft"] = t["area_sqft"]
-    t["predominant_pitch_rise"] = t.pop("predominant_pitch")
-    t["lengths_ft"] = {k: t["lengths_ft"].get(k, 0.0) for k in EDGE_TYPES}
-    return {k: v for k, v in t.items() if v is not None}
+    segs = [SimpleNamespace(type=e["type"], length_ft=e["length_ft"]) for e in edges]
+    t = roof_totals(rows, segs, {f["id"] for f in facets if f["borderline"]}, objects)
+    bucket, bucket_area = predominant_pitch(facets)
+    shape = {"lengths_ft": {k: t.get(f"{k}_ft", 0.0) for k in EDGE_TYPES},
+             "total_area_sqft": t["area_sqft"], "pitched_area_sqft": t["roofing_pitched_sqft"],
+             "flat_area_sqft": t["roofing_flat_sqft"], "predominant_pitch_rise": bucket,
+             "predominant_pitch_area_sqft": round(bucket_area, 1)}
+    return {**t, **shape}
 
 
 def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[str, Any] | None = None,
@@ -156,6 +164,7 @@ def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[s
     if not facets:
         raise ModelError("the engine produced no usable facet")
     edges = _edge_dicts(res, kept)
+    objects = _objects(res, facets)
     meta = base.footprint_meta or {}
     lidar = base.lidar or {}
     src = dict(source or {})
@@ -169,9 +178,9 @@ def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[s
                    "lidar": ({k: lidar.get(k) for k in ("project", "acquired", "points_on_roof", "density_per_m2")}
                              if lidar else None),
                    "solar": None, "from_planes": True, "engine": "planes/1", "engine_params": res.params_hash},
-        "blocks": blocks, "facets": facets, "edges": edges, "holes": [],
-        "totals": {**_model_totals(res, facets, edges, params),
-                   "note": "Every total is the sum of the facets and edges of this model; the envelope's totals repeat them."},
+        "blocks": blocks, "facets": facets, "edges": edges, "holes": [], "objects": objects,
+        "totals": {**_model_totals(facets, edges, objects),
+                   "note": "Every total is the sum of the facets, edges and objects of this model; the envelope's totals repeat them."},
         "confidence": {"overall": "low" if res.quality.verdict != "ok" else "medium", "notes": [
             "Drawn from the measured roof planes by the plane engine: one facet per plane, edges typed from geometry.",
             *(notes or [])]},

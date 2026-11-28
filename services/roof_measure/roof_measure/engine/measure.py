@@ -170,7 +170,7 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     diag["axes_deg"] = [round(theta, 1)]
     stages.theta, stages.frame_deg = theta, ang
     run = Run(ctx, wall, wall_world, pts_all, stages, diag, is_county_outline(outline_source), outline_source,
-               parcel_match, context, ang, timings)
+               parcel_match, context, ang, timings, ground_z=float(points.ground_z))
     jp = jump_points(context, wall_world)
     if jp is not None and p.s3_axis and len(jp):
         jp = jp.copy()
@@ -197,12 +197,13 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     diag.update(best.diag)
     diag["beta_used"] = best.beta
     t = run.tick("partition", t)
-    facets, edges, tot = facets_stage(run, best, q, o)
+    facets, edges = facets_stage(run, best, q, o)
     t = run.tick("facets", t)
     quality_ = quality_stage(run, facets, o, crop, plab)
-    flat_sq, pitched_sq = tot.get("roofing_flat_sqft"), tot.get("roofing_pitched_sqft")
-    if flat_sq is not None and pitched_sq is not None and flat_sq + pitched_sq > 0:  # the pitched / flat split of the drawn roof
+    flat_sq = round(sum(f.area_sqft for f in facets if f.roof_type == "flat"), 1)
+    pitched_sq = round(sum(f.area_sqft for f in facets if f.roof_type != "flat"), 1)
+    if flat_sq + pitched_sq > 0:  # the pitched / flat split of the drawn roof
         quality_.flat_share = flat_sq / (flat_sq + pitched_sq)  # UNROUNDED: round(0.8996, 3) would cross a 0.90 line
-    res = assemble(run, facets, edges, tot, o, best, q, best.qlab, quality_)
+    res = assemble(run, facets, edges, o, best, q, best.qlab, quality_)
     run.tick("finish", t)
     return res, stages

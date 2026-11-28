@@ -1,9 +1,9 @@
 # roof_measure
 
 Python library: address -> footprint + USGS 3DEP LiDAR -> the plane engine -> a roof measurement envelope
-`bond.roof_model/0.2` (`bond.roof_model/0.1` model inside). Apps call `roof_measure.measure()` in-process. Envelope and
-call: [docs/contract-0.2.md](../../docs/contract-0.2.md), [contract-0.3](../../docs/contract-0.3.md),
-[contract-0.4](../../docs/contract-0.4.md). Licence: see the repository `NOTICE`.
+`bond.roof_model/0.2` (`bond.roof_model/0.1` model inside), pipeline 0.6.0. Apps call `roof_measure.measure()` in-process.
+Roof model, totals and call: [docs/contract-0.6.md](../../docs/contract-0.6.md) (older shapes: [0.2](../../docs/contract-0.2.md),
+[0.3](../../docs/contract-0.3.md), [0.4](../../docs/contract-0.4.md)). Licence: see the repository `NOTICE`.
 
 ## Use as a library
 
@@ -21,9 +21,8 @@ except MeasureError as e:          # e.code, e.message, e.retryable
 
 This geocodes and downloads LiDAR, so it needs the network and a writable `cache_dir`. For an offline try-out pass
 `points_path="<house folder>"` (`points_wide.npy`, `footprint.json`, `meta.json`: the regression set's layout).
-`measure()` blocks for up to `deadline_s + 30` s: run it off the request thread. `engine` (only `"planes"`) is still
-accepted for callers that pass it and goes with the next version; `verify`, `anthropic_api_key` and `google_solar_api_key`
-are gone (a caller that passes one gets a `TypeError`).
+`measure()` blocks for up to `deadline_s + 30` s: run it off the request thread. `engine`, `method`, `hints`, `verify`,
+`anthropic_api_key` and `google_solar_api_key` are gone (a caller that passes one gets a `TypeError`).
 
 ## Pipeline
 
@@ -35,7 +34,7 @@ are gone (a caller that passes one gets a `TypeError`).
    (`footprint_hull.py`, `lidar_hull`; caps confidence at 0.5, never `pass`).
 3. LiDAR (`lidar.py`, EPT over HTTPS): the roof returns of the building.
 4. The plane engine (`engine/`): facets from the measured planes, flat and pitched told apart at 2/12, typed edges,
-   totals and quality signals; `engine/adapter.py` makes the model, `quality.py` the quality object.
+   the things standing on the roof (`engine/objects.py`: chimneys, lanterns), one set of totals (`engine/totals.py`) and quality signals; `engine/adapter.py` makes the model, `quality.py` the quality object.
 5. Envelope (`envelope.py`): totals, confidence, warning codes. No verifier runs: the verification block says `unverified`,
    `skipped: engine`.
 
@@ -58,6 +57,6 @@ site list in `local/sites.json` (see `tests/sites.example.json`). Tests that nee
 ```
 make test                      # offline suite
 make lint
-make fixtures                  # regenerate ../../fixtures/roof_engine (the engine's example envelope)
+make fixtures                  # regenerate ../../fixtures/roof_engine/roof_measurement_0.6_engine.json (the engine's example envelope)
 make roof-eval / roof-synth    # the regression harness, tools/roof_eval/README.md
 ```

@@ -237,3 +237,22 @@ def _add_trees(rng, roof, pts, density, n_trees):
         tree = np.column_stack([c[0] + rho * np.cos(ang), c[1] + rho * np.sin(ang), zc, np.ones(m)])
         pts = np.vstack([pts, tree])
     return pts
+
+
+def add_box(pts: np.ndarray, roof: SynthRoof, center: tuple[float, float], size_m: tuple[float, float],
+            height_m: float, *, rotation_deg: float = 0.0, density: float = 8, noise_sigma_m: float = 0.03,
+            seed: int = 0) -> np.ndarray:
+    """``pts`` plus a flat-topped box standing on the roof: the roof returns under its footprint are replaced by returns
+    on its top, ``height_m`` above the roof surface at ``center`` (a chimney, a flue or a lantern seen from above: its
+    walls give no returns). ``size_m`` is (x, y) before ``rotation_deg`` turns the footprint about ``center``."""
+    rng = np.random.default_rng(seed)
+    cx, cy = center
+    hx, hy = size_m[0] / 2, size_m[1] / 2
+    foot = shapely.affinity.rotate(shapely.geometry.box(cx - hx, cy - hy, cx + hx, cy + hy), rotation_deg, origin=(cx, cy))
+    kept = pts[~((pts[:, 3] == 1.0) & shapely.contains_xy(foot, pts[:, 0], pts[:, 1]))]
+    gx, gy = _jitter_grid(rng, foot.bounds, density)
+    on = shapely.contains_xy(foot, gx, gy)
+    z0 = next(f.z(cx, cy) for f in roof.facets if f.polygon().buffer(1e-6).contains(shapely.Point(cx, cy)))
+    top = np.column_stack([gx[on], gy[on], z0 + height_m + rng.normal(0.0, noise_sigma_m, int(on.sum())),
+                           np.ones(int(on.sum()))])
+    return np.vstack([kept, top])

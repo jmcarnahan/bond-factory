@@ -12,10 +12,11 @@ from engine_cases import case
 from shapely import affinity
 from shapely.geometry import Polygon
 
-from roof_measure import cache, footprint, lidar, pipeline
+from roof_measure import cache, footprint, lidar
 from roof_measure.footprint_types import Footprint, FootprintError
 from roof_measure.frame import project_geometry
 from roof_measure.library import MeasureError, measure
+from roof_measure.model import TOTALS_KEYS
 from roof_measure.version import PIPELINE_VERSION
 
 EPSG = 32611
@@ -104,7 +105,7 @@ def world(monkeypatch):
 
 def run(w: World, tmp_path, **kw):
     lat, lng = w.point()
-    args = {"method": "auto", "cache_dir": tmp_path / "cache", "isolate": False}
+    args = {"cache_dir": tmp_path / "cache", "isolate": False}
     return measure(ADDR, lat=lat, lng=lng, **(args | kw))
 
 
@@ -112,8 +113,8 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     w = world(main="flat_pitched_step_d8")
     stages: list[str] = []
     env = run(w, tmp_path, on_stage=stages.append)
-    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.5.1"
-    assert env["method_used"] == "lidar_skeleton" and env["footprint_source"] == "lariac"
+    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.6.0"
+    assert env["method_used"] == "planes" and env["footprint_source"] == "lariac"
     assert env["verification"]["verdict"] == "unverified"
     m, t = env["model"], env["totals"]
     from roof_measure.engine.params import DEFAULT
@@ -122,13 +123,10 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     assert m["quality"]["engine_params"] == DEFAULT.stable_hash() and "tree_cover_pct" in m["quality"] and "fit_clear" in m["quality"]
     assert m["source"]["building"]["parcel_id"] == "P1" and m["source"]["building"]["outline_id"] == "B1"
     assert m["source"]["lidar"]["density_per_m2"] >= 6 and m["source"]["footprint"]["provider"].startswith("lacounty")
-    for k in ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft",
-              "roofing_flat_sqft", "roofing_pitched_sqft", "area_sqft_wall_line", "area_sqft_roof_edge", "complexity"):
-        assert k in t, k
-    assert t["roofing_flat_sqft"] > 100 and t["roofing_pitched_sqft"] > 100
-    assert t["area_sqft_wall_line"] <= t["planes_surface_area_sqft"] == t["area_sqft_roof_edge"]
-    lengths = m["totals"]["lengths_ft"]  # a pitched roof draining into the higher flat deck's wall: sidewall flashing
-    assert lengths["level_change"] + lengths["step_flashing"] + lengths["wall_flashing"] > 0
+    assert tuple(t) == TOTALS_KEYS and m["objects"] == []
+    assert t["roofing_flat_sqft"] > 100 and t["roofing_pitched_sqft"] > 100 and t["area_sqft"] == t["area_sqft_roof_edge"]
+    # a pitched roof draining into the higher flat deck's wall: sidewall flashing
+    assert t["level_change_ft"] + t["step_flashing_ft"] + t["wall_flashing_ft"] > 0
     assert m["planes"] and "model_from_planes" not in env["warning_codes"]
     assert "lidar" in stages and "model" in stages and "blocks" not in stages
     json.dumps(env, allow_nan=False)
@@ -243,16 +241,6 @@ def test_an_engine_refusal_is_reported_not_swallowed(world, monkeypatch, tmp_pat
     assert ei.value.code == "no_lidar_coverage"
 
 
-def test_arguments_the_engine_cannot_serve_are_refused_up_front(tmp_path):
-    kw = {"cache_dir": tmp_path / "c", "isolate": False, "lat": 1.0, "lng": 2.0}
-    with pytest.raises(ValueError, match="engine must be"):
-        measure(ADDR, engine="skeleton", **kw)
-    with pytest.raises(ValueError, match="method must be"):
-        measure(ADDR, method="lidar_agent", **kw)
-    with pytest.raises(pipeline.PipelineError):
-        pipeline.run_pipeline(ADDR, tmp_path, "lidar_agent")
-
-
 # ----------------------------------------------------------------------------- the other buildings on the lot
 def test_other_buildings_are_measured_with_the_same_engine(world, tmp_path):
     w = world(main="gable_d8", other="flat_d8")
@@ -273,9 +261,9 @@ def test_an_other_building_that_cannot_be_measured_fails_alone(world, tmp_path):
 
 
 # ----------------------------------------------------------------------------- the removed arguments
-def test_engine_planes_is_accepted_and_no_verifier_runs(world, tmp_path):
+def test_no_verifier_runs(world, tmp_path):
     w = world()
-    env = run(w, tmp_path, engine="planes")
+    env = run(w, tmp_path)
     assert env["verification"]["verdict"] == "unverified" and env["verification"]["skipped"] == "engine"
     assert env["verification"]["rounds"] == 0 and env["verification"]["usage"] == {"input_tokens": 0, "output_tokens": 0}
     assert "verifier_unverified" not in env["warning_codes"]  # nothing was meant to verify an engine result
