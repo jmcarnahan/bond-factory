@@ -45,12 +45,16 @@
    "pitch_rise": 5.98,
    "aspect_deg": 270.0,
    "roof_type": "pitched",
-   "area_sqft": 599.9,
+   "area_sqft": 600.0,
    "points": 396,
    "polygon": [
     [
      3.66,
      3.65
+    ],
+    [
+     -0.32,
+     -0.3
     ],
     [
      -0.32,
@@ -73,14 +77,14 @@
   {
    "id": "f3",
    "plane": [
-    -0.0003,
-    -0.4997,
-    6.6558
+    -0.0,
+    -0.5001,
+    6.6547
    ],
    "pitch_rise": 6.0,
    "aspect_deg": 0.0,
    "roof_type": "pitched",
-   "area_sqft": 384.2,
+   "area_sqft": 384.1,
    "points": 254,
    "polygon": [
     [
@@ -127,7 +131,7 @@
    "pitch_rise": 6.01,
    "aspect_deg": 180.0,
    "roof_type": "pitched",
-   "area_sqft": 576.0,
+   "area_sqft": 576.1,
    "points": 382,
    "polygon": [
     [
@@ -221,7 +225,7 @@
   },
   {
    "type": "eave",
-   "length_ft": 21.3,
+   "length_ft": 21.4,
    "facets": [
     "f1"
    ],
@@ -376,11 +380,11 @@
   }
  ],
  "totals": {
-  "planes_surface_area_sqft": 1872.4,
+  "planes_surface_area_sqft": 1872.5,
   "planes_pitch_weighted": 6.0,
   "outline_perimeter_ft": 189.4,
   "ridge_cap_ridge_hip_ft": 85.5,
-  "roofing_pitched_sqft": 1872.4,
+  "roofing_pitched_sqft": 1872.5,
   "roofing_flat_sqft": 0,
   "complexity": {
    "facets": 4,

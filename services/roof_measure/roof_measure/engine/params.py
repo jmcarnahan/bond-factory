@@ -173,6 +173,8 @@ class EngineParams:
     # ---- labelling raster and graph cut
     grid_min_m: float = 0.12  # m: label raster step (never finer)
     grid_cells_target: float = 22000.0  # cells: step = sqrt(outline area / this)
+    grid_quantum_m: float = 0.01  # m: the step is rounded up to a multiple of this, so a centimetre of outline does not change it
+    label_clip_m: float = 0.10  # m: the labelled cells are kept inside the outline grown by this
     cost_tau_m: float = 0.25  # m: residual saturation in the data cost
     cost_nbrs: int = 5  # pts: neighbours per cell in the data cost
     cost_sigma_m: float = 0.30  # m: weight falloff

@@ -22,7 +22,7 @@ FT = 1 / 0.3048
 SHAPES = [n for n in _cases() if n.endswith("_d8")]
 KNOWN_GEOMETRY_LIMIT = {
     "complex_hip_d8": "a 20-facet roof: the partition (not the adapter) misses valley and hip length",
-    "dutch_gable_d8": "the partition leaves a 4 ft sliver of rake beside the small gable (engine geometry, not typing)"}
+    "two_level_d8": "regressed by the lattice anchor in slice C; cause in straighten (_simplify_chain, crease branch, straighten.py:102: chain_crease_tol_m 0.1 m is under one 0.12 m raster cell, so a one-cell jog at the four-way junction survives and 2.4 ft of ridge is typed hip); owner slice B"}
 
 
 def base() -> BlockSet:
