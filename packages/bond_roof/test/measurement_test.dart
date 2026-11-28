@@ -5,87 +5,40 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-/// Deep equality that treats 4 and 4.0 as the same number.
-bool deepEq(Object? a, Object? b) {
-  if (a is Map && b is Map) {
-    return a.length == b.length && a.keys.every((k) => b.containsKey(k) && deepEq(a[k], b[k]));
-  }
-  if (a is List && b is List) {
-    return a.length == b.length && [for (var i = 0; i < a.length; i++) deepEq(a[i], b[i])].every((x) => x);
-  }
-  return a == b;
-}
-
 Map<String, dynamic> _copy(Map<String, dynamic> j) => jsonDecode(jsonEncode(j)) as Map<String, dynamic>;
 
 void main() {
-  final envelopes = loadEnvelopes();
+  final base = sampleJson();
 
-  test('the four envelope fixtures are present, one per verdict', () {
-    expect(envelopes.length, greaterThanOrEqualTo(4));
-    expect({for (final e in envelopes) e.measurement.verification.verdict},
-        containsAll([RoofVerdict.pass, RoofVerdict.adjusted, RoofVerdict.unverified, RoofVerdict.fail]));
-  });
+  group('the 0.6 sample envelope', () {
+    final m = RoofMeasurement.parseAny(base);
 
-  for (final e in envelopes) {
-    group('envelope ${e.name}', () {
-      final m = e.measurement;
-
-      test('top-level fields', () {
-        expect(m.contract, startsWith('bond.roof_model/0.'));
-        expect(m.pipelineVersion, isNotEmpty);
-        expect(m.methodUsed, isNotEmpty);
-        expect(m.footprintSource, isNotEmpty);
-        expect(m.generatedAt!.year, greaterThan(2000));
-        expect(m.confidenceScore, inInclusiveRange(0, 1));
-        expect(m.model.edges, isNotEmpty);
-        expect(m.model.facets, isNotEmpty);
-      });
-
-      test('the fourteen totals are read as written', () {
-        final t = e.json['totals'] as Map<String, dynamic>;
-        expect(t.length, 14);
-        expect(m.totals.toJson(), isA<Map<String, dynamic>>());
-        expect(deepEq(m.totals.toJson(), t), isTrue, reason: '${m.totals.toJson()} vs $t');
-        expect(m.totals.facets, m.model.facets.length);
-      });
-
-      test('verification and warnings', () {
-        final v = e.json['verification'] as Map<String, dynamic>;
-        expect(m.verification.verdict.json, v['verdict']);
-        expect(m.verification.notes, (v['notes'] as List).cast<String>());
-        expect(m.verification.adjustments.length, (v['adjustments'] as List).length);
-        expect(m.warnings, (e.json['warnings'] as List).cast<String>());
-        expect(m.warningCodes, (e.json['warning_codes'] as List).cast<String>());
-        expect(m.warningCodes.length, m.warnings.length, reason: 'warning_codes parallels warnings');
-      });
-
-      test('JSON round trip keeps every envelope field', () {
-        final out = m.toJson();
-        for (final k in e.json.keys.where((k) => k != 'model')) {
-          expect(deepEq(out[k], e.json[k]), isTrue, reason: k);
-        }
-        final again = RoofMeasurement.parseAny(out);
-        expect(deepEq(again.toJson(), out), isTrue);
-        expect(deepEq(again.model.toJson(), m.model.toJson()), isTrue);
-      });
+    test('top-level fields', () {
+      expect(m.contract, startsWith('bond.roof_model/0.'));
+      expect(m.pipelineVersion, '0.6.0');
+      expect(m.methodUsed, 'planes');
+      expect(m.footprintSource, 'lariac');
+      expect(m.generatedAt!.year, 2026);
+      expect(m.confidenceScore, 0.6);
+      expect(m.model.address.display, '100 Example Ave, Sampletown, CA 90000');
     });
-  }
 
-  test('unfinished verification keys survive: original totals, model id, rounds, usage', () {
-    final adjusted = envelopes.firstWhere((e) => e.measurement.verification.verdict == RoofVerdict.adjusted);
-    final v = adjusted.measurement.verification;
-    expect(v.adjustments, isNotEmpty);
-    expect(v.adjustments.first, containsPair('op', isA<String>()));
-    final raw = adjusted.json['verification'] as Map<String, dynamic>;
-    expect(v.originalTotals != null, raw.containsKey('original_totals'));
-    expect(v.modelId, raw['model']);
-    expect(v.rounds, raw['rounds']);
+    test('the envelope totals are the 0.6 keys, as written', () {
+      expect(m.totals.toJson(), base['totals']);
+      expect(m.totals.planeCount, m.model.facets.length);
+    });
+
+    test('JSON round trip keeps every envelope field', () {
+      final out = m.toJson();
+      for (final k in base.keys.where((k) => k != 'model')) {
+        expect(jsonEncode(out[k]), jsonEncode(base[k]), reason: k);
+      }
+      final again = RoofMeasurement.parseAny(jsonDecode(jsonEncode(out)) as Map<String, dynamic>);
+      expect(jsonEncode(again.toJson()), jsonEncode(out));
+    });
   });
 
   group('tolerant envelope parsing', () {
-    final base = envelopes.first.json;
-
     test('unknown top-level keys are kept in extra and written back', () {
       final j = _copy(base)..['future_field'] = {'a': 1};
       final m = RoofMeasurement.parseAny(j);
@@ -93,22 +46,23 @@ void main() {
       expect(m.toJson()['future_field'], {'a': 1});
     });
 
-    test('unknown verification keys and codes are kept', () {
-      final j = _copy(base);
-      (j['verification'] as Map)['verdict'] = 'maybe';
-      (j['verification'] as Map)['future'] = 7;
-      j['warnings'] = ['w1', 'w2'];
-      j['warning_codes'] = ['footprint_osm', 'brand_new_code'];
+    test('an old verification block is kept as an extra key, not modelled', () {
+      final j = _copy(base)..['verification'] = {'verdict': 'pass', 'notes': ['n']};
       final m = RoofMeasurement.parseAny(j);
-      expect(m.verification.verdict, RoofVerdict.unknown);
-      expect(m.verification.extra, {'future': 7});
-      expect(m.warningCodes, ['footprint_osm', 'brand_new_code']);
+      expect(m.extra['verification'], {'verdict': 'pass', 'notes': ['n']});
+      expect(m.toJson()['verification'], {'verdict': 'pass', 'notes': ['n']});
     });
 
-    test('missing optional blocks are tolerated', () {
+    test('warning codes are kept as strings, unknown ones too', () {
+      final j = _copy(base)
+        ..['warnings'] = ['w1', 'w2']
+        ..['warning_codes'] = ['footprint_osm', 'brand_new_code'];
+      expect(RoofMeasurement.parseAny(j).warningCodes, ['footprint_osm', 'brand_new_code']);
+    });
+
+    test('missing optional blocks are tolerated; totals fall back to the model\'s own 0.6 keys', () {
       final j = _copy(base)
         ..remove('totals')
-        ..remove('verification')
         ..remove('warnings')
         ..remove('warning_codes')
         ..remove('confidence')
@@ -117,20 +71,19 @@ void main() {
         ..remove('method_used')
         ..remove('footprint_source');
       final m = RoofMeasurement.parseAny(j);
-      expect(m.verification.verdict, RoofVerdict.unverified);
       expect(m.warnings, isEmpty);
-      expect(m.warningCodes, isEmpty);
       expect(m.methodUsed, m.model.source.method);
-      expect(m.totals.areaSqft, closeTo(m.model.totals.totalAreaSqft, 1e-9));
-      expect(m.totals.dripEdgeEaveRakeFt, closeTo(RoofTotalsVariants.of(m.model.totals).dripEdgeEaveRakeFt, 1e-9));
+      expect(m.totals.areaSqft, m.model.totals.engine!.areaSqft);
+      expect(m.generatedAt, isNull);
       expect(m.confidenceScore, inInclusiveRange(0, 1));
     });
 
-    test('a missing single totals key falls back to the model', () {
-      final j = _copy(base);
-      (j['totals'] as Map).remove('ridge_cap_ridge_hip_ft');
+    test('a model with no 0.6 keys gives empty envelope totals: not available, not zero', () {
+      final j = _copy(base)..remove('totals');
+      (j['model'] as Map<String, dynamic>)['totals'] = {'total_area_sqft': 10.0};
       final m = RoofMeasurement.parseAny(j);
-      expect(m.totals.ridgeCapRidgeHipFt, closeTo(RoofTotalsVariants.of(m.model.totals).ridgeCapRidgeHipFt, 1e-9));
+      expect(m.totals.areaSqft, isNull);
+      expect(m.totals.toJson(), isEmpty);
     });
 
     test('bad input names the path', () {
@@ -142,35 +95,44 @@ void main() {
       expect(() => RoofMeasurement.fromJson(_copy(base)..['confidence'] = 'high'),
           throwsA(isA<FormatException>().having((e) => e.message, 'message', startsWith('confidence'))));
     });
+
+    test('only 0.x contracts are accepted', () {
+      for (final c in ['bond.roof_model/9.9', 'bond.roof_model/0', 'bond.roof_model/', 'bond.roof_model/1.0']) {
+        expect(() => RoofMeasurement.parseAny(_copy(base)..['contract'] = c), throwsFormatException, reason: c);
+      }
+      expect(RoofMeasurement.parseAny(_copy(base)..['contract'] = 'bond.roof_model/0.6').contract, 'bond.roof_model/0.6');
+    });
+
+    test('confidence is clamped to 0..1', () {
+      expect(RoofMeasurement.parseAny(_copy(base)..['confidence'] = 7).confidenceScore, 1.0);
+      expect(RoofMeasurement.parseAny(_copy(base)..['confidence'] = -2).confidenceScore, 0.0);
+    });
+
+    test('an unparseable generated_at is null and not written', () {
+      final m = RoofMeasurement.parseAny(_copy(base)..['generated_at'] = 'last tuesday');
+      expect(m.generatedAt, isNull);
+      expect(m.toJson().containsKey('generated_at'), isFalse);
+    });
   });
 
-  group('parseAny on bare 0.x models', () {
-    final bare = loadBareModels();
-    test('bare fixtures found', () => expect(bare.length, greaterThanOrEqualTo(3)));
+  group('parseAny on a bare model', () {
+    final bare = _copy(base['model'] as Map<String, dynamic>);
 
-    for (final f in bare) {
-      test(f.name, () {
-        final m = RoofMeasurement.parseAny(f.json);
-        final model = RoofModel.fromJson(f.json);
-        expect(m.verification.verdict, RoofVerdict.unverified);
-        expect(m.methodUsed, model.source.method);
-        expect(m.warnings, model.warnings);
-        expect(m.totals.facets, model.facets.length);
-        expect(m.totals.areaSqft, model.totals.totalAreaSqft);
-        expect(m.confidenceScore, switch (model.confidence.overall) { 'high' => 0.9, 'medium' => 0.7, _ => 0.5 });
-        expect(m.contract, startsWith('bond.roof_model/'));
-        final provider = (model.source.raw['footprint'] as Map?)?['provider'];
-        if (provider == 'synthetic' || provider == 'test') expect(m.footprintSource, 'unknown');
-        if ('$provider'.contains('lariac')) expect(m.footprintSource, 'lariac');
-        // The wrapped measurement is itself a valid envelope.
-        expect(deepEq(RoofMeasurement.parseAny(m.toJson()).toJson(), m.toJson()), isTrue);
-      });
-    }
+    test('is wrapped: method, warnings, totals from the model, confidence from the word', () {
+      final m = RoofMeasurement.parseAny(bare);
+      final model = RoofModel.fromJson(bare);
+      expect(m.methodUsed, model.source.method);
+      expect(m.warnings, model.warnings);
+      expect(m.totals, model.totals.engine);
+      expect(m.confidenceScore, 0.7);
+      expect(m.contract, startsWith('bond.roof_model/'));
+      expect(jsonEncode(RoofMeasurement.parseAny(m.toJson()).toJson()), jsonEncode(m.toJson()));
+    });
 
     test('footprint provider mapping', () {
-      Map<String, dynamic> withProvider(String? p) => _copy(bare.first.json)
+      Map<String, dynamic> withProvider(String? p) => _copy(bare)
         ..['source'] = {
-          'method': 'lidar_skeleton',
+          'method': 'planes',
           if (p != null) 'footprint': {'provider': p},
         };
       const cases = {
@@ -179,10 +141,9 @@ void main() {
         'osm': 'osm',
         'osm_overpass': 'osm',
         'overpass': 'osm',
-        'solar': 'solar',
-        'solar_bbox_hull': 'solar',
         'lidar_hull': 'lidar_hull',
         'lidar': 'lidar_hull',
+        'solar': 'unknown',
         'something_else': 'unknown',
       };
       for (final e in cases.entries) {
@@ -193,42 +154,30 @@ void main() {
 
     test('confidence mapping high 0.9, medium 0.7, low 0.5', () {
       for (final (word, score) in [('high', 0.9), ('medium', 0.7), ('low', 0.5), ('weird', 0.5)]) {
-        final j = _copy(bare.first.json)..['confidence'] = {'overall': word, 'notes': <String>[]};
+        final j = _copy(bare)..['confidence'] = {'overall': word, 'notes': <String>[]};
         expect(RoofMeasurement.parseAny(j).confidenceScore, score, reason: word);
       }
     });
   });
 
-  group('strict envelope details', () {
-    final base = envelopes.first.json;
+  group('what the reader knows (the one-line check for an engine envelope)', () {
+    test('the sample uses only keys, edge types and object kinds the reader knows', () {
+      expect(unknownEnvelopeKeys(base), isEmpty);
+    });
 
-    test('an unknown verdict string is kept and written back', () {
+    test('the helper names an unknown totals key, edge type and object kind', () {
       final j = _copy(base);
-      (j['verification'] as Map)['verdict'] = 'bogus';
-      final m = RoofMeasurement.parseAny(j);
-      expect(m.verification.verdict, RoofVerdict.unknown);
-      expect(m.verification.verdictRaw, 'bogus');
-      expect(m.toJson()['verification']['verdict'], 'bogus');
+      (j['totals'] as Map)['brand_new_ft'] = 1.0;
+      ((j['model'] as Map)['edges'] as List)[0]['type'] = 'gutter';
+      (((j['model'] as Map)['objects'] as List)[0] as Map)['kind'] = 'antenna';
+      expect(unknownEnvelopeKeys(j),
+          unorderedEquals(['totals.brand_new_ft', 'model.edges[0].type=gutter', 'model.objects[0].kind=antenna']));
     });
 
-    test('only 0.x contracts are accepted', () {
-      for (final c in ['bond.roof_model/9.9', 'bond.roof_model/0', 'bond.roof_model/', 'bond.roof_model/1.0']) {
-        expect(() => RoofMeasurement.parseAny(_copy(base)..['contract'] = c), throwsFormatException, reason: c);
-      }
-      expect(RoofMeasurement.parseAny(_copy(base)..['contract'] = 'bond.roof_model/0.3').contract, 'bond.roof_model/0.3');
-    });
-
-    test('confidence is clamped to 0..1', () {
-      expect(RoofMeasurement.parseAny(_copy(base)..['confidence'] = 7).confidenceScore, 1.0);
-      expect(RoofMeasurement.parseAny(_copy(base)..['confidence'] = -2).confidenceScore, 0.0);
-    });
-
-    test('a missing or unparseable generated_at is null and not written', () {
-      for (final j in [_copy(base)..remove('generated_at'), _copy(base)..['generated_at'] = 'last tuesday']) {
-        final m = RoofMeasurement.parseAny(j);
-        expect(m.generatedAt, isNull);
-        expect(m.toJson().containsKey('generated_at'), isFalse);
-      }
+    test('a removed 0.5 key counts as unknown', () {
+      final j = _copy(base);
+      (j['totals'] as Map)['drip_edge_eave_ft'] = 1.0;
+      expect(unknownEnvelopeKeys(j), ['totals.drip_edge_eave_ft']);
     });
   });
 }

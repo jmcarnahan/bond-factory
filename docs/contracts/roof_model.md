@@ -139,18 +139,17 @@ Per block, given its polygon, form and pitch:
    vs flat, predominant pitch, confidence and warnings.
 
 Palette (default, overridable): eave `#2E7D32`, ridge `#8BC34A`, hip `#5E35B1`, valley
-`#E53935`, rake `#FBC02D`, step_flashing `#8D6E63` dashed, wall_flashing `#1E88E5` dashed,
-parapet `#FB8C00`, transition `#D81B60`, unspecified `#26A69A`. Facet fill: flat
+`#E53935`, rake `#FBC02D`, step_flashing `#8D6E63` dashed (sidewall flashing), wall_flashing `#1E88E5` dashed (headwall flashing),
+transition `#D81B60`, unspecified `#26A69A`, flat_edge `#00838F`, level_change `#37474F`, flat_seam `#5A5A5A`. (The `parapet` type and its colour were removed with the block path; an old parapet edge reads as `unspecified`.) Facet fill: flat
 `#E3F2FD`, sloped `#FFF8E1`.
 
 ## 5. Fixtures (the contract tests)
 
-`fixtures/site1_lidar.json`: what the service produced. `fixtures/synthetic_hip.json`,
+`fixtures/roof_engine/roof_measurement_0.6_sample.json` is the reference input of the Dart readers (hand-written, synthetic). `fixtures/synthetic_hip.json`,
 `fixtures/synthetic_gable.json`, `fixtures/synthetic_flat_parapet.json`, `fixtures/synthetic_flat_curbs.json`, `fixtures/synthetic_hip_zigzag.json`: closed-form cases
-with known totals. Consumers filter on the `schema` string. Dart `bond_roof` tests load every
-roof-model fixture and check: schema parses,
-totals recompute from facets and edges within 0.5 sq ft / 0.05 ft, every edge type in the
-palette, diagrams render without throwing and hide no more than 30% of labels.
+with known totals, kept for the Python tests and as old shapes. Consumers filter on the `schema` string. The Dart `bond_roof` tests check on the 0.6 sample: it parses with no
+unknown key, totals recompute from facets and edges within 0.5 sq ft / 0.05 ft, the diagrams hide no more than 30% of labels, and every old fixture still opens
+and draws without throwing (`old_shapes_test.dart`).
 
 ## 6. 0.2 envelope
 

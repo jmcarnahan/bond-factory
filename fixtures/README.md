@@ -1,19 +1,18 @@
 # Fixtures
 
-Site 1 is a real roof. Its address and coordinates are not tracked: the fixtures carry the placeholder
-address `100 Example Ave, Sampletown, CA 90000` and origin 0/0. The real values live in `local/sites.json`
-(copy `services/roof_measure/tests/sites.example.json`), and the property data tests need (point clouds,
-parcel and census recordings) lives in `local/test-data/`. Tests that need either skip when it is absent.
+Every roof fixture here is synthetic and carries the placeholder address `100 Example Ave, Sampletown, CA 90000` and origin 0/0. Real
+property data (point clouds, parcel and census recordings) lives in `local/test-data/` and the real addresses in `local/sites.json`
+(copy `services/roof_measure/tests/sites.example.json`); tests that need them skip when they are absent.
 
 Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`; the service wraps it in the `0.2` envelope, see `docs/contract-0.2.md`).
 
 | File | What it is | Owner |
 |---|---|---|
-| `roof_measurement_0.2_{pass,adjusted,unverified,fail}.json` | Example 0.2 envelopes, one per verification verdict. Each file IS the envelope (the `result` of the job GET response, `contract` is `bond.roof_model/0.2`) and its `model` is the 0.1 roof model; see `docs/contract-0.2.md`. The Appendix C list there covers only these roof envelopes; the bare models (`site1_*`, `synthetic_*`) remain separate. Asserted by the service and by `bond_roof` (Dart). | service |
+| `roof_engine/roof_measurement_0.6_sample.json` | The 0.6 envelope, **hand-written** (`bond.roof_model/0.2` contract id, `pipeline_version` 0.6.0), until the engine's generator replaces it. Synthetic, no real data: a two-level gable house (main roof 40 x 24 ft at 6/12, a lower 9 ft wing at 4.31/12 with a 12 ft sidewall step and a 9 ft headwall), a low-slope wing (hatched, `flat_edge` and a 12 ft `transition`), one 3 x 3 ft chimney and one 5 x 5 ft lantern. Arithmetic is consistent: `eave_rake_ft = eave + rake + flat_edge + exposed`, `ridge_hip_ft = ridge + hip`, pitched + flat = area. Read by the Dart tests, the demo and `bond_roof_ui`; checked by `unknownEnvelopeKeys` / `tool/check_envelope.dart`. `model.totals` and the envelope `totals` are the very same dict (the 0.6 engine writes one totals for the one roof). Derivations, each checked by `packages/bond_roof/test/totals_test.dart` from the file's own edges: `eave_ft`, `rake_ft`, `flat_edge_ft`, `step_flashing_ft`, `wall_flashing_ft`, `transition_ft`, `ridge_ft` are sums of the edges of that type; `exposed_edge_ft` = `step_flashing_ft` + `wall_flashing_ft` + the perimeter of every lantern (12 + 9 + 20 = 41); `eave_rake_ft` = eave + rake + flat edge + exposed; `ridge_hip_ft` = ridge + hip; pitched + flat roofing = area. The two roof planes meet at the ridge at one height. Edit the JSON by hand and keep the sums. | hand-written (Dart) |
+| `roof_measurement_0.2_{pass,adjusted,unverified,fail}.json` | OLD SHAPE, kept for the Python tests. Example 0.2 envelopes, one per verification verdict. Each file IS the envelope (the `result` of the job GET response, `contract` is `bond.roof_model/0.2`) and its `model` is the 0.1 roof model; see `docs/contract-0.2.md`. The Appendix C list there covers only these roof envelopes; the bare models (`site1_*`, `synthetic_*`) remain separate. Asserted by the service and by `bond_roof` (Dart). | service |
 | `synthetic_flat_curbs.json` | Closed-form flat block with a parapet, 17 chimney curbs (`wall_flashing` outlines) and one `step_flashing` edge. Keeps the chimney-hole tests. | kept file; its generator was removed with the block path |
 | `synthetic_hip_zigzag.json` | Closed-form hip whose south eave is split into 7 segments (five short ones under 2 ft between two 13 ft ends), nearly collinear. The verifier's `adjusted` input. | kept file; its generator was removed with the block path |
-| `site1_lidar.json` | What the LiDAR service produced for the same address. | service |
-| `synthetic_hip.json`, `synthetic_gable.json`, `synthetic_flat_parapet.json` | Closed-form cases with known totals, kept as files for the Dart tests; their generator was removed with the block path. | service |
+| `synthetic_hip.json`, `synthetic_gable.json`, `synthetic_flat_parapet.json` | Closed-form cases with known totals, kept as files for the Python tests and the Dart old-shapes test; their generator was removed with the block path. | service |
 | `sync/upload_request_ok.json` | Valid upload body: a put, a patch, a put and a delete on `notes`. | hand-written |
 | `sync/upload_request_mixed.json` | Upload body that yields every verdict kind (ok, invalid, skipped, conflict, not_found, unsupported). Needs a `note-taken` row owned by another user. | hand-written |
 | `sync/upload_response_mixed.json` | The exact answer to the mixed request. | hand-written |

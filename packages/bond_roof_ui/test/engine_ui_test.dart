@@ -9,10 +9,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The synthetic envelope 0.4 example of bond_roof (no real address or geometry).
-RoofMeasurement _m04() => RoofMeasurement.parseAny(
-    jsonDecode(File('../bond_roof/test/envelope04/synthetic_mixed_0.4.json').readAsStringSync()) as Map<String, dynamic>);
+/// The hand-written 0.6 sample envelope (no real address or geometry).
+RoofMeasurement _sample() => RoofMeasurement.parseAny(
+    jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.6_sample.json').readAsStringSync()) as Map<String, dynamic>);
 
+/// An envelope of the old block shape (0.2): it opens, and shows less.
 RoofMeasurement _old() => RoofMeasurement.parseAny(
     jsonDecode(File('../../fixtures/roof_measurement_0.2_pass.json').readAsStringSync()) as Map<String, dynamic>);
 
@@ -45,82 +46,61 @@ Future<List<int>> _pixels(WidgetTester tester, GlobalKey key) async {
 
 void main() {
   group('RoofTotalsTable', () {
-    testWidgets('the ridge + hip row is the drawn ridge plus hip, never smaller than ridge only', (tester) async {
-      final j = jsonDecode(File('../bond_roof/test/envelope04/synthetic_mixed_0.4.json').readAsStringSync()) as Map<String, dynamic>;
-      final t = (j['totals'] ?? (j['model'] as Map)['totals']) as Map<String, dynamic>;
-      t['ridge_ft'] = 30.0;
-      t['hip_ft'] = 12.0;
-      t['ridge_cap_ridge_ft'] = 30.0;
-      t['ridge_cap_ridge_hip_ft'] = 30.0; // the priced value, stale for the drawing
-      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(RoofMeasurement.parseAny(j)))));
-      final row = find.ancestor(of: find.text('Ridge cap (ridge + hip)'), matching: find.byType(Row)).first;
-      expect(find.descendant(of: row, matching: find.textContaining('42')), findsOneWidget);
+    testWidgets('lists the totals the sample has, in the owner\'s words, and nothing it does not have', (tester) async {
+      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(_sample()))));
+      for (final t in [
+        'Total area', 'Pitched roofing', 'Flat roofing', 'Pitch', 'Eaves', 'Rakes', 'Flat roof edges', 'Exposed edges inside the roof',
+        'Eave + rake', 'Ridges', 'Ridge + hip', 'Sidewall flashing', 'Headwall flashing', 'Transitions', 'Chimneys', 'Facets',
+        'Confidence', 'Generated',
+      ]) {
+        expect(find.text(t), findsOneWidget, reason: t);
+      }
+      for (final t in ['Hips', 'Valleys', 'Level changes', 'Verification', 'Drip edge (eave only)', 'Ridge cap (ridge + hip)']) {
+        expect(find.text(t), findsNothing, reason: t);
+      }
+      expect(find.textContaining('14.18 squares'), findsOneWidget);
+      expect(find.text('6/12 (5.9)'), findsOneWidget);
     });
 
-    testWidgets('lists pitched and flat roofing on separate rows when the 0.4 keys are present', (tester) async {
-      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(_m04()))));
-      expect(find.text('Pitched roofing'), findsOneWidget);
-      expect(find.text('Flat roofing'), findsOneWidget);
-      expect(find.text('Low slope, confirm'), findsOneWidget);
-      expect(find.textContaining('10.48 squares'), findsOneWidget);
-      expect(find.textContaining('7.21 squares'), findsOneWidget);
-      expect(find.textContaining('1,048 sq ft'), findsOneWidget);
-      expect(find.textContaining('721 sq ft'), findsOneWidget);
-    });
-
-    testWidgets('the headline is the priced area and equals pitched + flat; the drawn area has its own row', (tester) async {
-      final real = RoofMeasurement.parseAny(jsonDecode(
-          File('../../fixtures/roof_engine/roof_measurement_0.4_engine.json').readAsStringSync()) as Map<String, dynamic>);
-      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(real))));
-      final e = real.totals.engine!;
-      expect(find.text('Total roofing area'), findsOneWidget);
-      expect(find.text('Total area'), findsNothing);
-      expect(find.text('As drawn (to the roof edge)'), findsOneWidget);
-      final priced = e.planesSurfaceAreaSqft!, drawn = e.areaSqftRoofEdge!;
-      expect(e.roofingPitchedSqft! + e.roofingFlatSqft!, closeTo(priced, 0.1));
-      expect(find.textContaining('${sqft(priced)} sq ft'), findsWidgets);
-      expect(find.textContaining('${sqft(drawn)} sq ft'), findsWidgets);
-      // Each row carries its own number: the headline the priced one, the "As drawn" row the roof-edge one.
+    testWidgets('each row carries its own number', (tester) async {
+      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(_sample()))));
       String valueOf(String label) {
         final row = find.ancestor(of: find.text(label), matching: find.byType(Row)).first;
         return tester.widgetList<Text>(find.descendant(of: row, matching: find.byType(Text))).map((t) => t.data).join(' ');
       }
 
-      expect(valueOf('Total roofing area'), contains('${sqft(priced)} sq ft'));
-      expect(valueOf('As drawn (to the roof edge)'), contains('${sqft(drawn)} sq ft'));
-      if (sqft(priced) != sqft(drawn)) {
-        expect(valueOf('Total roofing area'), isNot(contains('${sqft(drawn)} sq ft')));
-      }
+      expect(valueOf('Sidewall flashing'), contains('12ft 0in'));
+      expect(valueOf('Headwall flashing'), contains('9ft 0in'));
+      expect(valueOf('Chimneys'), contains('1'));
+      expect(valueOf('Eave + rake'), contains(feetInches(_sample().totals.eaveRakeFt!)));
     });
 
     testWidgets('the row texts come from the labels', (tester) async {
       final l = const RoofLabels().copyWith({
-        'totals_roofing_pitched': 'Techado inclinado',
-        'totals_roofing_flat': 'Techado plano',
-        'totals_low_slope_confirm': 'Poca pendiente, confirmar',
-        'totals_priced_area': 'Total techado',
-        'totals_as_drawn': 'Dibujado',
+        'totals_sidewall': 'Tapajuntas lateral',
+        'totals_headwall': 'Tapajuntas frontal',
+        'totals_chimneys': 'Chimeneas',
+        'totals_eave_rake': 'Alero + hastial',
       });
-      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(_m04(), labels: l))));
-      expect(find.text('Techado inclinado'), findsOneWidget);
-      expect(find.text('Techado plano'), findsOneWidget);
-      expect(find.text('Poca pendiente, confirmar'), findsOneWidget);
-      expect(find.text('Total techado'), findsOneWidget);
-      expect(find.text('Dibujado'), findsOneWidget);
-      expect(find.text('Pitched roofing'), findsNothing);
+      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(_sample(), labels: l))));
+      for (final t in ['Tapajuntas lateral', 'Tapajuntas frontal', 'Chimeneas', 'Alero + hastial']) {
+        expect(find.text(t), findsOneWidget, reason: t);
+      }
+      expect(find.text('Chimneys'), findsNothing);
     });
 
-    testWidgets('an old envelope shows none of them', (tester) async {
+    testWidgets('an old envelope opens and shows only what its facets and edges give: no verdict, no flashing it lacks', (tester) async {
       await tester.pumpWidget(_host(SingleChildScrollView(child: RoofTotalsTable(_old()))));
-      for (final t in ['Pitched roofing', 'Flat roofing', 'Low slope, confirm']) {
+      expect(find.text('Total area'), findsOneWidget);
+      expect(find.text('Verification'), findsNothing);
+      for (final t in ['Pitched roofing', 'Flat roofing', 'Chimneys', 'Sidewall flashing', 'Headwall flashing']) {
         expect(find.text(t), findsNothing, reason: t);
       }
-      expect(find.text('Total area'), findsOneWidget);
     });
   });
 
   group('RoofDiagramView', () {
-    final scene = AreaDiagram.build(_m04().model);
+    final scene = AreaDiagram.build(_sample().model);
     const box = Size(800, 500);
 
     testWidgets('a tap on a facet reports its id; a tap on no facet reports nothing', (tester) async {
@@ -128,10 +108,10 @@ void main() {
       final taps = <String>[];
       await tester.pumpWidget(_host(SizedBox(width: 800, height: 500, child: RoofDiagramView(scene, onFacetTap: taps.add))));
       final origin = tester.getTopLeft(find.byType(RoofDiagramView));
-      for (final id in ['f1', 'f3', 'f5']) {
+      for (final id in ['f1', 'f2', 'f3']) {
         await tester.tapAt(origin + _centreOf(scene, id, box));
       }
-      expect(taps, ['f1', 'f3', 'f5']);
+      expect(taps, ['f1', 'f2', 'f3']);
       await tester.tapAt(origin + const Offset(2, 2));
       expect(taps, hasLength(3));
       // The package draws nothing over the page: no dialog, sheet or barrier.
@@ -159,7 +139,7 @@ void main() {
     testWidgets('flat facets are painted hatched, pitched ones are not', (tester) async {
       await _size(tester, 800, 500);
       // The length diagram has no text inside the facets, so the only marks there are the hatch.
-      final plan = LengthDiagram.build(_m04().model);
+      final plan = LengthDiagram.build(_sample().model);
       final key = GlobalKey();
       await tester.pumpWidget(_host(Center(
         child: RepaintBoundary(key: key, child: SizedBox(width: 800, height: 500, child: RoofDiagramView(plan))),
@@ -184,7 +164,7 @@ void main() {
         return (dark: dark, total: total);
       }
 
-      final flat = probe('f3');
+      final flat = probe('f4');
       final pitched = probe('f1');
       expect(flat.total, greaterThan(1000));
       expect(flat.dark / flat.total, greaterThan(0.05), reason: 'hatch lines across the flat facet');
@@ -209,11 +189,11 @@ void main() {
     testWidgets('passes onFacetTap to the diagrams and shows the flat and pitched rows', (tester) async {
       await _size(tester, 1280, 4000);
       final taps = <String>[];
-      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofReportStrip(measurement: _m04(), onFacetTap: taps.add))));
+      await tester.pumpWidget(_host(SingleChildScrollView(child: RoofReportStrip(measurement: _sample(), onFacetTap: taps.add))));
       await tester.pump();
       expect(tester.takeException(), isNull);
       expect(find.text('Pitched roofing'), findsOneWidget);
-      expect(find.text('Flat roofing'), findsOneWidget);
+      expect(find.text('Sidewall flashing'), findsOneWidget);
       final views = find.byType(RoofDiagramView);
       expect(views, findsNWidgets(3));
       final area = tester.widget<RoofDiagramView>(views.at(1));

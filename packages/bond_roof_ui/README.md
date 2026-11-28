@@ -15,8 +15,9 @@ printable three-page report (length diagram, area diagram, summary). Pure drawin
   Print, Save PDF and Share PDF buttons with inline status, the totals table, then the length
   diagram, area diagram and summary. Under 600 px wide it builds the compact (400 x 500)
   scenes. Scenes are cached per model, labels and layout. No dialogs, snackbars or tooltips.
-- `RoofTotalsTable(measurement, {labels})`: inline text rows for the totals, both drip edge and
-  both ridge cap variants, pitched and flat roofing on separate rows when the envelope has the 0.4 `roofing_*` totals, the verification verdict with its first note, and the generated time.
+- `RoofTotalsTable(measurement, {labels})`: inline text rows for the totals the roof has (`totalRows` of `bond_roof`: area, pitch, eave,
+  rake, flat edges, exposed edges, eave + rake, ridge, hip, ridge + hip, valley, sidewall and headwall flashing, transition, level
+  changes, chimneys; a roof never gets a row for a thing it does not have), the confidence and the generated time. No verification line.
 - `RoofReport.pages(model, {style, labels, layout})`, `pdfBytes`, `printReport`, `saveReport`,
   `shareReport`: the scenes, the PDF (Letter landscape) and the hand-off to the OS print
   dialog or share sheet through package `printing`. Both are OS-owned surfaces, so they are

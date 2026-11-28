@@ -11,7 +11,6 @@ enum FacetKind {
 class RoofFacet {
   const RoofFacet({
     required this.id,
-    required this.block,
     required this.kind,
     required this.polygon,
     required this.pitchRise,
@@ -40,7 +39,6 @@ class RoofFacet {
     final planEq = j['plane_eq'];
     return RoofFacet(
       id: asStr(j['id'], '$path.id'),
-      block: strOr(j, 'block', path, ''),
       kind: kind,
       polygon: asPoly(j['polygon'], '$path.polygon'),
       pitchRise: pitch,
@@ -60,7 +58,7 @@ class RoofFacet {
     );
   }
 
-  final String id, block;
+  final String id;
   final FacetKind kind;
   final List<Pt> polygon;
   final double pitchRise;
@@ -97,7 +95,6 @@ class RoofFacet {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'block': block,
         'kind': kind.json,
         'polygon': polyJson(polygon),
         'pitch_rise': pitchRise,
@@ -118,7 +115,6 @@ class RoofFacet {
   bool operator ==(Object other) =>
       other is RoofFacet &&
       other.id == id &&
-      other.block == block &&
       other.kind == kind &&
       listEq(other.polygon, polygon) &&
       other.pitchRise == pitchRise &&
@@ -135,7 +131,7 @@ class RoofFacet {
       listEq(other.planEq, planEq);
 
   @override
-  int get hashCode => Object.hash(id, block, kind, Object.hashAll(polygon), pitchRise, aspectDeg, planAreaSqft,
+  int get hashCode => Object.hash(id, kind, Object.hashAll(polygon), pitchRise, aspectDeg, planAreaSqft,
       areaSqft, roofType, pitchFit, pitchSigma, borderline, supportedPct, points, rmsFt,
       planEq == null ? null : Object.hashAll(planEq!));
 }

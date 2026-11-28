@@ -1,18 +1,21 @@
 import 'dart:math' as math;
 
 import 'facet_draw.dart';
+import 'figures.dart';
 import 'format.dart';
 import 'labels.dart';
 import 'layout.dart';
 import 'metrics.dart';
 import 'model.dart';
+import 'object_draw.dart';
 import 'polylabel.dart';
 import 'report_layout.dart';
 import 'scene.dart';
 import 'style.dart';
 
 /// Plan view with facet outlines and a two-line label per facet (pitch, then area), dashed
-/// holes, and the eight totals in a block at the top (four columns wide, two compact). All
+/// holes, the chimneys and lanterns as marks, and the totals the roof has in a block at the top (four columns wide, two
+/// compact). All
 /// text comes from [labels]; [layout] picks the page geometry.
 class AreaDiagram {
   const AreaDiagram._();
@@ -30,8 +33,6 @@ class AreaDiagram {
     final k = layoutScale(layout, width, height);
     final sp = LayoutSpec(layout, k);
     final prims = <Prim>[];
-    final t = m.totals;
-
     final title = m.address.display.isEmpty ? labels.areaTitle : m.address.display;
     prims
       ..add(TextPrim(
@@ -50,16 +51,16 @@ class AreaDiagram {
         anchor: TextAnchor.start,
       ));
     String sq(double v) => '${sqft(v)} ${labels.unitSqft}';
-    // A null value is "not available" (drawn grey); the cell is chosen by the null, not by text.
-    final cells = <(String, String?)>[
-      (labels.totalArea, sq(t.totalAreaSqft)),
-      (labels.totalPitchedArea, sq(m.pitchedAreaSqftByRoofType)),
-      (labels.totalFlatArea, sq(m.flatAreaSqftByRoofType)),
-      (labels.predominantPitch, pitchLabel(t.predominantPitchRise, labels: labels)),
-      (labels.predominantPitchArea, sq(t.predominantPitchAreaSqft)),
-      (labels.twoStoryArea, null),
-      (labels.twoLayerArea, null),
-      (labels.unspecifiedPitchArea, null),
+    final f = RoofFigures.of(m);
+    final pitch = f.pitch;
+    // Only what the roof has: no cell for a thing it does not carry.
+    final cells = <(String, String)>[
+      (labels.totalArea, sq(f.areaSqft)),
+      if (f.hasBothKinds) (labels.totalsRoofingPitched, sq(f.pitchedSqft)),
+      if (f.hasBothKinds) (labels.totalsRoofingFlat, sq(f.flatSqft)),
+      if (pitch != null) (labels.pitch, pitchLabel(pitch, labels: labels)),
+      if (f.chimneys > 0) (labels.totalsChimneys, '${f.chimneys}'),
+      if (f.lanterns > 0) (labels.totalsLanterns, '${f.lanterns}'),
     ];
     final cols = layout.figureColumns;
     final colW = (width - 2 * sp.margin) / cols;
@@ -71,9 +72,9 @@ class AreaDiagram {
         ..add(TextPrim(at: (x: x0, y: y0), text: capText, size: sp.areaCaptionSize, color: 0xFF757575, anchor: TextAnchor.start))
         ..add(TextPrim(
           at: (x: x0, y: y0 + sp.areaValueDy),
-          text: c.$2 ?? labels.notAvailable,
+          text: c.$2,
           size: sp.areaValueSize,
-          color: c.$2 == null ? 0xFF9E9E9E : style.textColor,
+          color: style.textColor,
           anchor: TextAnchor.start,
           bold: true,
         ));
@@ -90,7 +91,9 @@ class AreaDiagram {
     final fit = PlanFit(m,
         left: area.l + sp.planInsetX, top: area.t + sp.planInsetTop, right: area.r - sp.planInsetX, bottom: area.b - sp.planInsetBottom);
     final polys = [for (final f in m.facets) fit.mapAll(f.polygon)];
-    final holes = [for (final h in m.holes) fit.mapAll(h.polygon)];
+    final marks = objectMarks(m, fit, objectMinSide(layout, k));
+    // Facet labels keep clear of the openings and of the marks.
+    final holes = [for (final h in m.holes) fit.mapAll(h.polygon), for (final mk in marks) mk.polygon];
     for (final (i, f) in m.facets.indexed) {
       addFacetPrims(prims, f, polys[i], style, stroke: 0xFF455A64, strokeWidth: 1.8 * k, k: k);
     }
@@ -102,6 +105,8 @@ class AreaDiagram {
         dashed: true,
       ));
     }
+
+    addObjectMarks(prims, marks, style, labels, layout, k);
 
     // Facet labels at the pole of inaccessibility; shrink the text until the label box fits
     // inside the facet, hide it if it never does.

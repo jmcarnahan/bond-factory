@@ -797,6 +797,8 @@ Run one replica only: the job store is on the local volume.
 
 ## Appendix B. Label keys
 
+> Superseded by 0.6: the label set was reworked (verification, variant, parapet, predominant-pitch and Solar keys removed; sidewall, headwall, chimney, lantern, eave + rake keys added). The key list of `packages/bond_roof/lib/src/labels_defaults.dart` is the current one.
+
 The Dart packages draw every user-visible string from a `RoofLabels` object with English defaults. An app builds it
 from its own strings with `RoofLabels.fromMap(Map<String, String>)`; unknown keys are ignored. Service text
 (`warnings`, `verification.notes`, `confidence.notes`) stays English: map `warning_codes` instead.

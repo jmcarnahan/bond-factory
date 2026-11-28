@@ -8,7 +8,6 @@ const _defaultEdgeColors = <EdgeType, int>{
   EdgeType.rake: 0xFFFBC02D,
   EdgeType.stepFlashing: 0xFF8D6E63,
   EdgeType.wallFlashing: 0xFF1E88E5,
-  EdgeType.parapet: 0xFFFB8C00,
   EdgeType.transition: 0xFFD81B60,
   EdgeType.unspecified: 0xFF26A69A,
   EdgeType.flatEdge: 0xFF00838F,
@@ -26,6 +25,12 @@ const double flatSeamStrokePx = 1.2;
 /// A level change's label names the step only when the jump is at least this many feet.
 const double levelChangeStepMinFt = 3.0;
 
+/// Outline and letter colour of a chimney and a lantern: dark, so they read as objects and not as one more edge type.
+const _defaultObjectColors = <ObjectKind, int>{
+  ObjectKind.chimney: 0xFF4E342E,
+  ObjectKind.lantern: 0xFF01579B,
+};
+
 const _defaultDashed = <EdgeType>{EdgeType.stepFlashing, EdgeType.wallFlashing};
 
 /// Colours (ARGB) and sizes for the diagrams. Sizes are for a 1600 px wide scene and scale
@@ -35,6 +40,7 @@ class DiagramStyle {
     Map<EdgeType, int>? edgeColors,
     Set<EdgeType>? dashedTypes,
     Map<EdgeType, double>? edgeWidthScale,
+    Map<ObjectKind, int>? objectColors,
     this.flatFill = 0xFFE3F2FD,
     this.slopedFill = 0xFFFFF8E1,
     this.holeStroke = 0xFF1E88E5,
@@ -46,7 +52,9 @@ class DiagramStyle {
     this.flatRoofFill = 0xFFECEFF1,
     this.hatchColor = 0xFF78909C,
     this.borderlineStroke = 0xFFEF6C00,
-  })  : edgeColors = edgeColors ?? _defaultEdgeColors,
+    this.objectFill = 0xFFFFFFFF,
+  })  : objectColors = objectColors ?? _defaultObjectColors,
+        edgeColors = edgeColors ?? _defaultEdgeColors,
         edgeWidthScale = edgeWidthScale ?? _defaultEdgeWidth,
         dashedTypes = dashedTypes ?? _defaultDashed;
 
@@ -56,11 +64,14 @@ class DiagramStyle {
   final Map<EdgeType, int> edgeColors;
   final Set<EdgeType> dashedTypes;
   final Map<EdgeType, double> edgeWidthScale;
+
+  /// Outline and letter colour per kind of object on the roof ([objectFill] inside).
+  final Map<ObjectKind, int> objectColors;
   final int flatFill, slopedFill, holeStroke;
 
   /// Envelope 0.4: a facet typed `flat` gets this neutral fill and a [hatchColor] hatch; a
   /// borderline ("low slope, confirm") facet is outlined in [borderlineStroke].
-  final int flatRoofFill, hatchColor, borderlineStroke;
+  final int flatRoofFill, hatchColor, borderlineStroke, objectFill;
   final double fontSize;
 
   /// Edges shorter than this many pixels (at 1600 px wide) never get a length label. Longer
@@ -70,6 +81,8 @@ class DiagramStyle {
   final int textColor, background;
 
   int colorOf(EdgeType t) => edgeColors[t] ?? 0xFF607D8B;
+
+  int objectColorOf(ObjectKind k) => objectColors[k] ?? 0xFF424242;
 
   double widthScaleOf(EdgeType t) => edgeWidthScale[t] ?? 1.0;
 }

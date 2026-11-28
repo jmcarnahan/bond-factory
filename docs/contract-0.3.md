@@ -131,8 +131,7 @@ as before.
 A consumer that draws the roof diagram must not draw it from a planes-only model (`facets` is empty): draw
 `model.planes` instead. The Dart `RoofModel.fromJson`, `LengthDiagram`, `AreaDiagram`, `SummaryBlock` and
 `RoofReport.pages` accept such a model without throwing (they draw a page with the legends and no roof;
-`packages/bond_roof/test/planes_only_test.dart`). Example: `fixtures/roof_planes_only/roof_measurement_0.3_planes_only.json`
-(kept apart from the 0.2 examples so that code that loads every envelope in `fixtures/` does not meet zero facets).
+`packages/bond_roof/test/planes_only_test.dart`; the test and the example file were removed with the 0.6 round, superseded).
 
 ### Sliver repair (pipeline 0.3.1)
 

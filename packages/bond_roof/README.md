@@ -1,8 +1,9 @@
 # bond_roof
 
 Pure Dart (no Flutter). Parses the roof model JSON (`bond.roof_model/0.1`, see
-`docs/contracts/roof_model.md`) and the service envelope (`bond.roof_model/0.2`), recomputes totals, and lays out three diagrams as
-device-independent scenes that can be written to SVG or PDF or painted by a Flutter widget.
+`docs/contracts/roof_model.md`) and the service envelope as the 0.6 library writes it, recomputes totals, and lays out three diagrams as
+device-independent scenes that can be written to SVG or PDF or painted by a Flutter widget. An envelope of an older shape (the block path of
+0.2 and 0.3, the 0.4 and 0.5 engine) still opens and draws less: see "Older envelopes".
 
 `dart test` and `dart analyze` need only the Dart SDK. No codegen: `fromJson` and `toJson` are
 hand-written. No network access.
@@ -11,18 +12,20 @@ hand-written. No network access.
 
 | Import | Name | What it is |
 |---|---|---|
-| `bond_roof.dart` | `RoofModel.fromJson` / `toJson` | Parse and write the contract JSON. Throws `FormatException` starting with the JSON path (`edges[3].polygon: ...`) for structural errors. An unknown edge type, facet kind, block form or `lengths_ft` key is mapped (`unspecified`, by pitch, `flat`, `extraLengths`) and recorded in `RoofModel.parseNotes`. Unknown top-level keys (`origin`, `generated_at`, `debug`) survive a round trip in `extra`. |
-| | `RoofMeasurement.parseAny(json)` | Reads a 0.2 envelope (model, 14 totals, verification, confidence, warnings and `warning_codes`) or wraps a bare 0.1 model as an unverified measurement. Unknown top-level keys survive in `extra`. |
-| | `RoofTotalsVariants.of(totals)` | Takes the model's `RoofTotals` (`measurement.model.totals`) and returns drip edge (eave / eave + rake) and ridge cap (ridge / ridge + hip) from the ten length totals. `RoofEnvelopeTotals` carries the same four values as fields (`dripEdgeEaveFt`, `dripEdgeEaveRakeFt`, `ridgeCapRidgeFt`, `ridgeCapRidgeHipFt`) and a `.variants` getter. |
+| `bond_roof.dart` | `RoofModel.fromJson` / `toJson` | Parse and write the contract JSON. Throws `FormatException` starting with the JSON path (`edges[3].polygon: ...`) for structural errors. An unknown edge type, facet kind, object kind or `lengths_ft` key is mapped (`unspecified`, by pitch, `unknown`, `extraLengths`) and recorded in `RoofModel.parseNotes`. Unknown top-level keys (`origin`, `generated_at`, `debug`, an old `blocks`) survive a round trip in `extra`. |
+| | `RoofMeasurement.parseAny(json)` | Reads an envelope (model, `totals` as `RoofEngineTotals`, confidence, warnings and `warning_codes`) or wraps a bare model. Unknown top-level keys (an old `verification`) survive in `extra`. |
+| | `RoofEngineTotals` | The 0.6 totals keys, all nullable: area, squares, pitched and flat roofing, weighted pitch, plane count, eave, rake, flat edge, exposed edge, eave + rake, ridge, hip, valley, ridge + hip, sidewall (`stepFlashingFt`), headwall (`wallFlashingFt`), transition, level change, chimney and lantern counts. A missing key is null, never zero. `RoofEngineTotals.knownKeys` lists what it reads. |
+| | `RoofObject`, `RoofModel.objects` | What stands on the roof: `chimney`, `lantern` or `unknown`, with centre, size in feet, height, facet and LiDAR returns. Drawn as a small outlined rectangle with a one-letter mark; never a facet, never in an area. |
+| | `RoofFigures.of(model)`, `totalRows(model, labels)` | The figures of one roof in ONE place (the 0.6 key when the model has it, else summed from its facets and edges) and the totals rows the summary and the totals table print: only the rows the roof has; ridge + hip is never smaller than ridge. |
 | | `RoofLabels` | Every user-visible string with English defaults; `RoofLabels.fromMap(map)` overrides by `RoofLabels.keys`, `{name}` placeholders in templates. |
 | | `ReportLayout` | `wide` (1600 x 1000, 3-column legend) or `compact` (400 x 500, 2 columns, text sized for a phone card) for the three builders. |
-| | Envelope 0.4 (`docs/contract-0.4.md`) | Optional, all nullable, and absent in old envelopes: facet `roofType` / `pitchFit` / `pitchSigma` / `borderline` / `supportedPct` / `points` / `rmsFt` / `planEq`; edge types `flatEdge` and `levelChange` (`RoofEdge.jumpFt`); `RoofEnvelopeTotals.engine` (`RoofEngineTotals`: flat and pitched roofing, wall-line and roof-edge numbers, `complexity`); `RoofModel.quality` and `RoofModel.building`. A missing key means "not available", never zero. |
+| | Facet and model extras | Facet `roofType` / `pitchFit` / `pitchSigma` / `borderline` / `supportedPct` / `points` / `rmsFt` / `planEq`; edge types `flatEdge`, `levelChange`, `stepFlashing` (sidewall), `wallFlashing` (headwall) with `RoofEdge.jumpFt`; `RoofModel.quality` and `RoofModel.building`. |
 | | `Scene.regions`, `Scene.facetAt(point)` | Facet outlines in scene pixels (not drawn) so a host can map a tap to a facet id. |
 | | `RoofModel.recomputeTotals()` | Totals from facets and edges, same rules as the contract. |
 | | `RoofModel.bounds` | Bounding box of all geometry, feet. |
-| | `feetInches`, `wholeFeet`, `sqft`, `pitchLabel` | Number formats: `209ft 8in`, `35`, `2,121`, `Flat` / `4/12` / `4.5/12`. |
-| | `LengthDiagram.build(model, {labels, layout})` | Edges by type, whole-foot labels, legend of totals, compass, footer. |
-| | `AreaDiagram.build(model, {labels, layout})` | Facet outlines, pitch and area per facet, dashed holes, eight totals. |
+| | `feetInches`, `wholeFeet`, `sqft`, `pitchLabel` | Number formats: `209ft 8in`, `35`, `2,121`; the pitch as the whole number (half up) with the fit beside it when they differ at the tenth: `4.31` is `4/12 (4.3)`, `5.0` is `5/12`, a rise of 0.5 or less is `Flat`. |
+| | `LengthDiagram.build(model, {labels, layout})` | Edges by type, whole-foot labels (a step edge adds its jump: `12, 8 ft step`), chimney and lantern marks, a legend of only what the roof has (edge rows, eave + rake, ridge + hip, exposed edges, the objects), compass, footer. |
+| | `AreaDiagram.build(model, {labels, layout})` | Facet outlines, pitch and area per facet, dashed holes, chimney and lantern marks, the totals the roof has (area, pitched and flat roofing, pitch, chimney and lantern counts). |
 | | `SummaryBlock.build(model, {width, labels, layout})` | Text report; height grows with content. |
 | | `DiagramStyle` | Palette and sizes (`DiagramStyle.report` is the contract palette). |
 | | `Scene`, `LinePrim`, `PolyPrim`, `TextPrim` | The drawing primitives. Logical pixels, y down, ARGB colours, text centred vertically on its anchor point. |
@@ -32,17 +35,27 @@ hand-written. No network access.
 `Scene.hiddenLabels` counts length labels (or facet labels) left off; `Scene.placedLabels` counts
 the ones drawn.
 
-### Hosts: reading envelope 0.4
+### Hosts: reading the 0.6 envelope
 
 - Draw nothing yourself for flat roofs: a facet with `roofType == 'flat'` is hatched by the scenes, a `borderline` one is outlined
   in orange (area diagram: a third line from the `low_slope_marker` label, when it fits). All text comes from `RoofLabels`; pass your
-  translations for the new keys (`low_slope_marker`, `level_change_jump`, `legend_flat_edge`, `legend_level_change`, `legend_flat_seam`, `level_change_step`,
-  `totals_roofing_pitched`, `totals_roofing_flat`, `totals_low_slope_confirm`).
-- `lengthsFt` has thirteen entries now. Code that switches over `EdgeType` must handle `flatEdge`, `levelChange` and `flatSeam`; use
-  `EdgeType.legacy` for "the ten old ones".
-- Prices come from the envelope totals (`engine.planesSurfaceAreaSqft` etc.), not from the model facets.
+  translations for every key in `RoofLabels.keys` (the new ones of 0.6: `legend_chimney`, `legend_lantern`, `mark_chimney`,
+  `mark_lantern`, `pitch`, `totals_eave_rake`, `totals_exposed_edge`, `totals_ridge_hip`, `totals_sidewall`, `totals_headwall`,
+  `totals_transition`, `totals_chimneys`, `totals_lanterns`). The default texts of `legend_step_flashing` and `legend_wall_flashing` are now
+  "Sidewall flashing" and "Headwall flashing".
+- `lengthsFt` has one entry per `EdgeType` (eleven types and `unspecified`). Code that switches over `EdgeType` must handle all of them;
+  `parapet` is gone (an old parapet edge reads as `unspecified`).
 - A user's flat / pitched correction is the host's business: tap a facet (see `bond_roof_ui`), show inline controls, send the change
   to the service, and draw the next measurement.
+- To check an envelope against the reader: `dart run tool/check_envelope.dart file.json` lists every totals key, edge type and object kind
+  the reader does not know (exit code 1); in a test, `expect(unknownEnvelopeKeys(json), isEmpty)` from `test/support.dart`.
+
+### Older envelopes
+
+An envelope or model of an older shape does not throw. It draws its facets and edges, with the totals its own facets and edges give (area,
+the pitch weighted over its pitched facets, a length row per edge type it has, eave + rake and ridge + hip). It shows no verification
+line, no drip edge or ridge cap variants, no parapet row (a parapet edge is drawn as an unspecified line), no "predominant pitch", no
+chimney or lantern. An old `step_flashing` edge reads and is named "Sidewall flashing", an old `wall_flashing` edge "Headwall flashing" (the types are unchanged, the names follow the 0.6 words). `blocks`, `verification`, `from_planes` and `planes_only` stay in `extra` and are written back untouched; the removed keys inside an old `totals` (drip edge, ridge cap, predominant pitch, `complexity` and the rest) are not modelled and are NOT written back. "Ridge + hip" is never shown smaller than "ridge": an old or inconsistent `ridge_hip_ft` below the drawn ridge would make a cost sheet short of ridge cap, so the reader clamps it up.
 
 ### Label placement
 
@@ -64,8 +77,8 @@ placer agree. Text outside Latin-1 needs a TrueType font for the PDF:
 
 ```dart
 final m = RoofMeasurement.parseAny(jsonDecode(body) as Map<String, dynamic>);
-final v = RoofTotalsVariants.of(m.model.totals); // same numbers as m.totals.variants
-print('${v.dripEdgeEaveFt} / ${v.dripEdgeEaveRakeFt} ft drip edge');
+final rows = totalRows(m.model, const RoofLabels()); // the rows this roof has, in report order
+print('${rows.first.label}: ${rows.first.value}');
 final scenes = [
   LengthDiagram.build(m.model, layout: ReportLayout.compact),
   AreaDiagram.build(m.model, labels: RoofLabels.fromMap(strings)),
@@ -80,22 +93,22 @@ dart run example/render_fixtures.dart [font.ttf]
 ```
 
 Writes `<fixture>_<wide|compact>_<length|area|summary>.svg` and `<fixture>.pdf` to `tmp/render/`
-(git-ignored) for every model fixture and every model inside a 0.2 envelope, and prints edges,
+(git-ignored) for every model fixture and every model inside an envelope (`fixtures/` and `fixtures/roof_engine/`), and prints edges,
 labels placed and labels hidden per fixture and layout. On macOS, `qlmanage -t -s 900 -o <dir> file.svg` makes a PNG.
 
 ## Add a fixture
 
-Drop a `bond.roof_model/0.x` model or envelope JSON file in `fixtures/` (repo root, shared with the services) or in
-`packages/bond_roof/test/fixtures/`. Every test and the render script pick up all `*.json` files
-whose `schema` or `contract` matches; other files are skipped. A generated fixture must recompute to within
-0.5 sq ft and 0.05 ft; a `source.method: "manual"` model gets the looser tolerances in
-`test/model_test.dart`.
+The reference input is the hand-written `fixtures/roof_engine/roof_measurement_0.6_sample.json` (see `fixtures/README.md`). A fixture of
+the old shapes in `fixtures/` (shared with the Python side) is opened by `test/old_shapes_test.dart`, which builds all three scenes of
+every roof or envelope JSON there in both layouts. A generated fixture must recompute to within 0.5 sq ft and 0.05 ft.
 
 ## Tests
 
-`test/model_test.dart` (round trip, totals, errors), `format_test.dart`, `layout_test.dart`
-(polylabel, collision geometry, placer), `diagram_test.dart` (every fixture: scene fits, at most
-30 percent of labels hidden, no label overlap or edge contact, well-formed SVG), `pdf_test.dart`, `measurement_test.dart`, `totals_variants_test.dart`, `labels_test.dart` (every key, a Spanish map in both layouts), `tolerant_parser_test.dart`.
+`model_test.dart` (round trip, the 0.6 sample, old shapes, tolerant parser, errors), `totals_test.dart` (the 0.6 keys, null not zero, the
+rows a roof has), `objects_test.dart` (chimney and lantern marks, legend rows, never a facet), `diagram_test.dart` (the sample: scene fits,
+at most 30 percent of labels hidden, no label overlap or edge contact, well-formed SVG, legend and pitch labels), `old_shapes_test.dart`,
+`measurement_test.dart` (envelope, `unknownEnvelopeKeys`), `format_test.dart`, `layout_test.dart` (polylabel, collision geometry, placer),
+`pdf_test.dart`, `labels_test.dart` (every key, a Spanish map in both layouts), `flat_seams_test.dart`, `area_by_roof_type_test.dart`.
 
 ## Known limits
 
@@ -105,7 +118,8 @@ whose `schema` or `contract` matches; other files are skipped. A generated fixtu
 - A facet label can have a hole outline cross the box between the sampled points; only hole
   vertices and edge crossings near the box are checked, not a chord spanning the whole box.
 - `pitchLabel` of a non-finite rise prints "Flat".
-- Predominant pitch is a half-pitch bucket (flat is 0); ties go to the lower pitch.
+- The pitch shown beside the whole number is the fitted value to the tenth; a roof with no pitched facet shows no pitch.
+- An object is drawn as its `polygon` (the measured, possibly rotated footprint) when the service sends one, else as the axis-aligned `size_ft` rectangle (`[x, y]` feet). A mark shorter than 18 px is scaled about its centre.
 
 ## License
 

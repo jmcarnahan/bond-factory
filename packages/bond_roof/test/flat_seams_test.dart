@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:bond_roof/bond_roof.dart';
 import 'package:test/test.dart';
 
+import 'support.dart';
+
 /// An all-flat roof with two levels (invented geometry): three flat facets, two flat_seam edges, a 24 ft level change with a
 /// 5 ft jump and a 10 ft one with a 1.5 ft jump.
 Map<String, dynamic> _json() =>
@@ -89,14 +91,20 @@ void main() {
     expect(s.prims.whereType<LinePrim>().where((p) => p.color == st.colorOf(EdgeType.flatSeam)), isEmpty);
   });
 
-  test('the shipped engine example parses with flat_share and nearby_buildings, no notes', () {
-    final j = jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.4_engine.json').readAsStringSync()) as Map<String, dynamic>;
+  test('the 0.6 sample parses with flat_share, no notes', () {
+    final j = sampleJson();
     final m = RoofMeasurement.parseAny(j);
     final raw = ((j['model'] as Map)['quality'] as Map)['flat_share'];
     expect(raw, isNotNull);
     expect(m.model.quality!.flatShare, (raw as num).toDouble());
     expect(m.model.parseNotes, isEmpty);
-    expect(j, contains('nearby_buildings'));
+  });
+
+  test('the 0.4 engine example (kept for the Python side) still parses; only its old parapet length key is noted', () {
+    final j = jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.4_engine.json').readAsStringSync()) as Map<String, dynamic>;
+    final m = RoofMeasurement.parseAny(j);
+    expect(m.model.parseNotes, ['totals.lengths_ft.parapet: unknown edge type, kept in extraLengths']);
+    expect(m.model.quality!.flatShare, isNotNull);
     expect(m.toJson()['nearby_buildings'], j['nearby_buildings']);
   });
 }

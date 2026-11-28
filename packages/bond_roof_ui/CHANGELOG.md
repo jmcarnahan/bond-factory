@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Roof accuracy round (0.6 contract; BREAKING for hosts that read the old totals): `RoofTotalsTable` prints `totalRows` of `bond_roof`: only the
+  rows the roof has, sidewall and headwall flashing, eave + rake, exposed edges, ridge + hip, chimneys. The drip edge and ridge cap
+  variants, the verification line, the "Total roofing area" / "As drawn" headline and the pitched / flat rows tied to the 0.4 keys are gone.
+- Test: `roof_proof_test.dart` paints the length and area diagram of the 0.6 sample through the real painter.
 - `RoofTotalsTable`: the "ridge + hip" row shows the drawn ridge + hip, so it is never smaller than "ridge only" (it showed the priced value).
 - Envelope 0.4: `RoofDiagramView(scene, {fit, onFacetTap})` and `RoofReportStrip(..., onFacetTap)` report the id of a tapped
   facet (the package draws nothing in response; the host attaches inline controls). New `sceneFit` and `facetIdAt`.

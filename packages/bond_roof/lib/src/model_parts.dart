@@ -5,51 +5,172 @@ import 'json_util.dart';
 export 'json_util.dart' show Pt;
 export 'model_facet.dart';
 
+/// The edge types the engine emits (`docs/contract-0.6.md`) and [unspecified] for anything else.
 enum EdgeType {
+  /// Outer roof edge at the gutter line.
   eave('eave'),
+
+  /// Outer roof edge up a gable end.
   rake('rake'),
+
+  /// Outer edge of a low-slope section.
+  flatEdge('flat_edge'),
   ridge('ridge'),
   hip('hip'),
   valley('valley'),
+
+  /// A step that runs down the lower slope (the sidewall of the higher roof). Carries [RoofEdge.jumpFt].
   stepFlashing('step_flashing'),
+
+  /// A step across the lower slope, or onto a low-slope section (the headwall). Carries [RoofEdge.jumpFt].
   wallFlashing('wall_flashing'),
-  parapet('parapet'),
+
+  /// Pitched meets low-slope with no height step.
   transition('transition'),
-  unspecified('unspecified'),
 
-  /// Perimeter of a flat facet (envelope 0.4).
-  flatEdge('flat_edge'),
-
-  /// A height jump of 0.3 m or more between facets (envelope 0.4); the edge carries [RoofEdge.jumpFt].
+  /// A step between two low-slope sections. Carries [RoofEdge.jumpFt].
   levelChange('level_change'),
 
-  /// A seam between two flat sections at the same level (roof_measure 0.5.1): drawn as a thin dark
-  /// line, never labelled, never priced, and its length is in no total or legend.
-  flatSeam('flat_seam');
+  /// A seam between two flat sections at the same level: drawn as a thin dark line, never labelled, never priced, and
+  /// its length is in no total or legend.
+  flatSeam('flat_seam'),
+
+  /// Any type this package does not know (a newer or older service).
+  unspecified('unspecified');
 
   const EdgeType(this.json);
 
   /// The name used in the JSON contract.
   final String json;
 
-  /// The ten types of contract 0.2 and 0.3, in their fixed order. The legend of an old envelope
-  /// lists exactly these; [flatEdge] and [levelChange] join it only when a model has them.
-  static const List<EdgeType> legacy = [
-    eave, rake, ridge, hip, valley, stepFlashing, wallFlashing, parapet, transition, unspecified,
-  ];
-
-  /// True for the types added after contract 0.3 (written to JSON only when non-zero).
-  bool get isNew04 => this == flatEdge || this == levelChange || this == flatSeam;
+  /// True for the three types whose edges carry a height step in feet.
+  bool get hasJump => this == stepFlashing || this == wallFlashing || this == levelChange;
 }
 
-enum BlockForm {
-  flat('flat'),
-  hip('hip'),
-  gable('gable'),
-  shed('shed');
+/// What stands on the roof (`model.objects`). It is never a facet and never in an area.
+enum ObjectKind {
+  chimney('chimney'),
+  lantern('lantern'),
 
-  const BlockForm(this.json);
+  /// Found but not classified: kept in the model, never drawn.
+  unknown('unknown');
+
+  const ObjectKind(this.json);
   final String json;
+}
+
+/// One entry of `model.objects`: a chimney or flue, a roof lantern, or something unclassified.
+class RoofObject {
+  const RoofObject({
+    required this.id,
+    required this.kind,
+    required this.center,
+    required this.sizeFt,
+    this.polygon,
+    this.heightFt,
+    this.facet,
+    this.returns,
+  });
+
+  /// Throws [FormatException] for an entry that cannot be read at all (no kind, no size and no polygon, a polygon of fewer
+  /// than three points); [RoofModel.fromJson] skips such an entry with a parse note, since objects are decoration. An entry
+  /// with a valid polygon and no (or a bad) `size_ft` takes its size, and a missing centre, from the polygon's bounding box.
+  factory RoofObject.fromJson(Map<String, dynamic> j, String path, [List<String>? notes]) {
+    final kindText = asStr(j['kind'], '$path.kind');
+    var kind = enumOrNull(kindText, ObjectKind.values, (v) => v.json);
+    if (kind == null) {
+      kind = ObjectKind.unknown;
+      notes?.add('$path.kind: unknown value "$kindText", read as unknown');
+    }
+    final polygon = j['polygon'] == null ? null : asPoly(j['polygon'], '$path.polygon');
+    final box = polygon == null ? null : _bbox(polygon);
+    (double, double)? size;
+    try {
+      if (j['size_ft'] != null) {
+        final l = asList(j['size_ft'], '$path.size_ft');
+        if (l.length != 2) badJson('$path.size_ft', 'expected [a, b]');
+        size = (asNum(l[0], '$path.size_ft[0]'), asNum(l[1], '$path.size_ft[1]'));
+      }
+    } on FormatException {
+      if (box == null) rethrow;
+      notes?.add('$path.size_ft: unreadable, taken from the polygon');
+    }
+    if (size == null) {
+      if (box == null) badJson('$path.size_ft', 'missing, and no polygon to take it from');
+      size = (box.maxX - box.minX, box.maxY - box.minY);
+    }
+    final Pt center;
+    if (j['center'] != null) {
+      center = asPt(j['center'], '$path.center');
+    } else if (box != null) {
+      center = (x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2);
+    } else {
+      badJson('$path.center', 'missing');
+    }
+    return RoofObject(
+      id: strOr(j, 'id', path, path),
+      kind: kind,
+      center: center,
+      sizeFt: size,
+      polygon: polygon,
+      heightFt: numOrNull(j, 'height_ft', path),
+      facet: j['facet'] is String ? j['facet'] as String : null,
+      returns: numOrNull(j, 'returns', path)?.round(),
+    );
+  }
+
+  static ({double minX, double maxX, double minY, double maxY}) _bbox(List<Pt> ps) => (
+        minX: ps.map((p) => p.x).reduce(math.min),
+        maxX: ps.map((p) => p.x).reduce(math.max),
+        minY: ps.map((p) => p.y).reduce(math.min),
+        maxY: ps.map((p) => p.y).reduce(math.max),
+      );
+
+  /// Perimeter in feet: of the polygon when there is one, else of the size rectangle.
+  double get perimeterFt {
+    final poly = polygon;
+    if (poly == null) return 2 * (sizeFt.$1.abs() + sizeFt.$2.abs());
+    var sum = 0.0;
+    for (var i = 0; i < poly.length; i++) {
+      final a = poly[i], b = poly[(i + 1) % poly.length];
+      if (a == b) continue;
+      sum += math.sqrt(math.pow(b.x - a.x, 2) + math.pow(b.y - a.y, 2));
+    }
+    return sum;
+  }
+
+  final String id;
+  final ObjectKind kind;
+
+  /// Centre in model feet (x east, y north).
+  final Pt center;
+
+  /// Footprint in feet: `a` along x (east), `b` along y (north).
+  final (double, double) sizeFt;
+
+  /// The footprint as measured (a rotated rectangle), model feet; null when the service sends only [sizeFt]. When present it
+  /// is what is drawn.
+  final List<Pt>? polygon;
+
+  /// Height above the roof surface, feet, when measured.
+  final double? heightFt;
+
+  /// The facet it stands on, when known.
+  final String? facet;
+
+  /// LiDAR returns on the object.
+  final int? returns;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'kind': kind.json,
+        'center': ptJson(center),
+        'size_ft': [sizeFt.$1, sizeFt.$2],
+        if (polygon != null) 'polygon': polyJson(polygon!),
+        if (heightFt != null) 'height_ft': heightFt,
+        if (facet != null) 'facet': facet,
+        if (returns != null) 'returns': returns,
+      };
 }
 
 class RoofAddress {
@@ -98,62 +219,6 @@ class RoofSource {
 
 /// Parsers below are tolerant: an unknown enum value is mapped to a safe one and the mapping is
 /// appended to [notes] (when given) instead of throwing.
-class RoofBlock {
-  const RoofBlock({
-    required this.id,
-    required this.form,
-    required this.polygon,
-    this.pitchRise = 0,
-    this.gableEdges = const [],
-    this.extra = const {},
-  });
-
-  factory RoofBlock.fromJson(Map<String, dynamic> j, String path, [List<String>? notes]) {
-    final formText = asStr(j['form'], '$path.form');
-    var form = enumOrNull(formText, BlockForm.values, (v) => v.json);
-    if (form == null) {
-      form = BlockForm.flat;
-      notes?.add('$path.form: unknown value "$formText", read as flat');
-    }
-    return RoofBlock(
-      id: asStr(j['id'], '$path.id'),
-      form: form,
-      polygon: asPoly(j['polygon'], '$path.polygon'),
-      pitchRise: numOr(j, 'pitch_rise', path, 0),
-      gableEdges: j['gable_edges'] == null
-          ? const []
-          : [
-              for (final (i, v) in asList(j['gable_edges'], '$path.gable_edges').indexed)
-                asNum(v, '$path.gable_edges[$i]').toInt()
-            ],
-      extra: {
-        for (final e in j.entries)
-          if (!_blockKnown.contains(e.key)) e.key: e.value
-      },
-    );
-  }
-
-  static const _blockKnown = {'id', 'form', 'polygon', 'pitch_rise', 'gable_edges'};
-
-  final String id;
-  final BlockForm form;
-  final List<Pt> polygon;
-  final double pitchRise;
-  final List<int> gableEdges;
-
-  /// Other contract fields (ridge_azimuth_deg, eave_height_ft, plan_area_sqft), kept verbatim.
-  final Map<String, dynamic> extra;
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'form': form.json,
-        'polygon': polyJson(polygon),
-        'pitch_rise': pitchRise,
-        'gable_edges': gableEdges,
-        ...extra,
-      };
-}
-
 class RoofEdge {
   const RoofEdge({
     required this.id,
@@ -193,7 +258,7 @@ class RoofEdge {
   final double lengthFt;
   final List<String> facets;
 
-  /// The height step in feet of a [EdgeType.levelChange] edge (envelope 0.4); null otherwise.
+  /// The height step in feet of a step edge ([EdgeType.hasJump]); null otherwise.
   final double? jumpFt;
 
   Map<String, dynamic> toJson() => {

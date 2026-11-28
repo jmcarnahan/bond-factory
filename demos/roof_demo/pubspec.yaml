@@ -1,5 +1,5 @@
 name: roof_demo
-description: Demo app that turns an address into roof measurement diagrams.
+description: Demo app that draws the bundled roof measurement fixtures as diagrams.
 publish_to: none
 resolution: workspace
 version: 0.2.0
@@ -13,7 +13,6 @@ dependencies:
     path: ../../packages/bond_roof
   bond_roof_ui:
     path: ../../packages/bond_roof_ui
-  http: ^1.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

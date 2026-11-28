@@ -1,29 +1,26 @@
 import 'json_util.dart';
-import 'measurement_parts.dart';
 import 'model.dart';
 
-export 'measurement_parts.dart';
-
-/// A `bond.roof_model/0.x` envelope: the model plus the service's totals, verification,
-/// confidence and warnings. Use [parseAny] when the input may be a bare 0.1 model.
+/// A `bond.roof_model/0.x` envelope: the model plus the service's totals, confidence and warnings. Use [parseAny] when
+/// the input may be a bare model. An old envelope's `verification` block and any other key this package no longer
+/// models stay in [extra] and are written back.
 class RoofMeasurement {
   const RoofMeasurement({
-    this.contract = 'bond.roof_model/0.2',
+    this.contract = 'bond.roof_model/0.6',
     this.pipelineVersion = 'unknown',
     required this.methodUsed,
     required this.footprintSource,
     this.generatedAt,
     required this.model,
-    required this.totals,
-    this.verification = const RoofVerification(),
+    this.totals = const RoofEngineTotals(),
     required this.confidenceScore,
     this.warnings = const [],
     this.warningCodes = const [],
     this.extra = const {},
   });
 
-  /// Wraps a bare model as an unverified measurement: method from `source.method`, footprint
-  /// source mapped from `source.footprint.provider`, confidence from `confidence.overall`.
+  /// Wraps a bare model: method from `source.method`, footprint source mapped from `source.footprint.provider`,
+  /// confidence from `confidence.overall`, totals from the model's own 0.6 keys (none when it has none).
   factory RoofMeasurement.fromModel(RoofModel m) {
     final gen = m.extra['generated_at'];
     return RoofMeasurement(
@@ -31,14 +28,14 @@ class RoofMeasurement {
       footprintSource: _footprintSource(m.source.raw['footprint']),
       generatedAt: gen is String ? DateTime.tryParse(gen) : null,
       model: m,
-      totals: RoofEnvelopeTotals.fromModel(m),
+      totals: m.totals.engine ?? const RoofEngineTotals(),
       confidenceScore: _scoreOf(m.confidence.overall),
       warnings: m.warnings,
     );
   }
 
-  /// Parses an envelope. Missing optional keys are tolerated (totals fall back to the model's,
-  /// verification to `unverified`); unknown top-level keys are kept in [extra].
+  /// Parses an envelope. Missing optional keys are tolerated (totals fall back to the model's own 0.6 keys, or are
+  /// empty); unknown top-level keys are kept in [extra].
   factory RoofMeasurement.fromJson(Map<String, dynamic> json) {
     final contract = asStr(json['contract'], 'contract');
     if (!contract.startsWith(_supported)) badJson('contract', 'unsupported contract "$contract"');
@@ -53,12 +50,9 @@ class RoofMeasurement {
           : _footprintSource(model.source.raw['footprint']),
       generatedAt: gen is String ? DateTime.tryParse(gen) : null,
       model: model,
-      totals: json['totals'] == null
-          ? RoofEnvelopeTotals.fromModel(model)
-          : RoofEnvelopeTotals.fromJson(asMap(json['totals'], 'totals'), model),
-      verification: json['verification'] == null
-          ? const RoofVerification()
-          : RoofVerification.fromJson(asMap(json['verification'], 'verification')),
+      totals: (json['totals'] == null ? null : RoofEngineTotals.fromJson(asMap(json['totals'], 'totals'))) ??
+          model.totals.engine ??
+          const RoofEngineTotals(),
       confidenceScore: json['confidence'] == null
           ? _scoreOf(model.confidence.overall)
           : asNum(json['confidence'], 'confidence').clamp(0.0, 1.0),
@@ -88,22 +82,22 @@ class RoofMeasurement {
   static const _supported = 'bond.roof_model/0.';
   static const _known = {
     'contract', 'pipeline_version', 'method_used', 'footprint_source', 'generated_at', 'model', 'totals',
-    'verification', 'confidence', 'warnings', 'warning_codes',
+    'confidence', 'warnings', 'warning_codes',
   };
 
   final String contract, pipelineVersion;
 
-  /// `lidar_skeleton`, `lidar_agent`, `solar_agent` or whatever a newer service reports.
+  /// `lidar_skeleton`, `planes` or whatever a newer service reports.
   final String methodUsed;
 
-  /// `lariac`, `osm`, `solar`, `lidar_hull` or `unknown`.
+  /// `lariac`, `osm`, `lidar_hull` or `unknown`.
   final String footprintSource;
 
   /// Null when the envelope has no parseable `generated_at`.
   final DateTime? generatedAt;
   final RoofModel model;
-  final RoofEnvelopeTotals totals;
-  final RoofVerification verification;
+  /// The envelope `totals` (every field nullable: a key the service did not send is not available).
+  final RoofEngineTotals totals;
 
   /// 0..1; the envelope key is `confidence`.
   final double confidenceScore;
@@ -125,7 +119,6 @@ class RoofMeasurement {
           'generated_at': generatedAt!.toUtc().toIso8601String().replaceFirst(RegExp(r'\.0+Z$'), 'Z'),
         'model': model.toJson(),
         'totals': totals.toJson(),
-        'verification': verification.toJson(),
         'confidence': confidenceScore,
         'warnings': warnings,
         'warning_codes': warningCodes,
@@ -143,7 +136,6 @@ String _footprintSource(Object? footprint) {
   final p = footprint is Map && footprint['provider'] is String ? (footprint['provider'] as String).toLowerCase() : '';
   if (p.contains('lariac') || p.startsWith('la_county') || p.startsWith('lacounty')) return 'lariac';
   if (p == 'osm' || p.startsWith('osm') || p.contains('overpass')) return 'osm';
-  if (p.startsWith('solar')) return 'solar';
   if (p.startsWith('lidar')) return 'lidar_hull';
   return 'unknown';
 }
