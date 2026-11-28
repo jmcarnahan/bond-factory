@@ -3,7 +3,7 @@ Role: sign a PDF on the app's own page: evidence chain, signed PDF, optional sea
 
 ## Key files
 - `models.py` mixins (`esign_requests`, `esign_signers`, `esign_events`); `events.py` kinds + hash chain (`append`, `verify_chain`)
-- `service.py` create_request + re-exports; `signing.py` signing_view/sign; `lifecycle.py` decline/void/expire; `tokens.py`, `codes.py`
+- `service.py` create_request + re-exports; `signing.py` signing_view/sign; `lifecycle.py` decline/void/expire; `tokens.py` (incl. find_signer_by_key), `codes.py`
 - `documents.py` build_signed_pdf/complete; `verify.py` verify_evidence (rows vs hashed events); `evidence_export.py` export; `signature_image.py` PNG + typed-name checks; `consent.py`
 - `anchor.py`, `stamping.py`, `certificate*.py`, `build.py`, `seal.py`, `certs.py` PDF side; `webform.py` + `web/` panel; `types.py`, `errors.py`
 

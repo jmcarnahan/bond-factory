@@ -12,10 +12,12 @@ First release: sign a PDF on the app's own page, with an append-only evidence lo
 - Events: kind constants `CREATED`, `TOKEN_ISSUED`, `VIEWED`, `CODE_SENT`, `CODE_VERIFIED`, `CODE_FAILED`, `CONSENT_GIVEN`, `SIGNED`,
   `DECLINED`, `VOIDED`, `EXPIRED`, `DOCUMENT_BUILT`, `COMPLETED`, `COPY_DELIVERED`, `DOWNLOADED`, `KINDS`; `append`, `chain`,
   `verify_chain`, `row_hash`, `canonical`; module `events`. Event `data` rejects floats (TypeError).
-- Service: `create_request`, `issue_token`, `find_signer_by_token`, `signing_view`, `issue_code`, `verify_code`, `sign`, `decline`,
-  `void`, `expire_due`, `build_signed_pdf`, `complete`, `record_delivery`, `record_download`, `evidence`, `policy_of`, `verify_evidence` (returns `EvidenceCheck(ok, chain, problems)`:
+- Service: `create_request`, `issue_token`, `find_signer_by_token`, `find_signer_by_key(session, t, request_id, key)` (the signer whose `key` is the app's reference, lowest position first, or None), `signing_view`, `issue_code`, `verify_code`, `sign`, `decline`,
+  `void` (refused with `already_completed` once every signer has signed, i.e. status `signed` or `completed`), `expire_due`, `build_signed_pdf`, `complete`, `record_delivery`, `record_download`, `evidence`, `policy_of`, `verify_evidence` (returns `EvidenceCheck(ok, chain, problems)`:
   the hash chain plus every signer and request row checked against the hashed events; `build_signed_pdf` refuses a failing
   record with `evidence_mismatch`). `complete` raises `ValueError` when `signed.sha256` or `signed.pages` do not match its bytes.
+- `AnchorRule.h` defaults to 0.0615 (was 0.055): the box bottom is 13 pt below the label baseline on Letter, so the stamp caption clears a ruled line 2 to 6 pt below it (a real estimate with `line-height: 1.4` had it struck through).
+- Dependency floors: `reportlab>=5.0,<6`, `pillow>=12.3`.
 - Signature and consent: `normalise_png`, `typed_renderable`, `default_consent` (en, es; version `bond-esign-consent/1`).
 - PDF facts and documents: `sha256_hex`, `page_count`, `find_anchor`, `stamp`, `certificate_pages`.
 - Web panel: `render_panel`, `parse_submission`, `PanelLabels`, `Submission`, `asset_path`, `asset_names`, `asset_tags`.

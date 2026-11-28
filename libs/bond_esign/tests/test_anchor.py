@@ -88,13 +88,22 @@ def test_rotated_pages_are_skipped():
     assert find_anchor(buf.getvalue(), AnchorRule(PHRASE)) is None
 
 
-def test_weasyprint_fixture():
-    """Measured once from the fixture: the ruled line spans x 0.2745..0.7062 at y 0.3935 (page fractions);
-    the label 'Date' starts at x 0.7062."""
-    found = find_anchor(FIXTURE.read_bytes(), AnchorRule(PHRASE))
+# Each fixture's label baseline, ruled line (upper edge of the 1px border) in PDF points and the right end of the
+# ruled line ("date_x", just before the "Date" label) as a page fraction. Measured once from the PDF: the baselines with pypdf's text visitor, the line from the page content
+# stream (the border strip's `m` operator under the `0.75` scale and y-flip `cm`: y_pt = 792 - 0.75 * y).
+FIXTURES = {
+    "weasy_acceptance.pdf": {"baseline": 427.25, "line": 422.95, "date_x": 0.7069},
+    "weasy_acceptance_tight.pdf": {"baseline": 482.65, "line": 480.35, "date_x": 0.7017},
+}
+
+
+@pytest.mark.parametrize("name", sorted(FIXTURES))
+def test_weasyprint_fixtures(name):
+    frozen = FIXTURES[name]
+    found = find_anchor((FIXTURE.parent / name).read_bytes(), AnchorRule(PHRASE))
     assert found is not None and found.page == 1
-    assert found.x == pytest.approx(0.2747, abs=0.006)  # right of the label, at the start of the line
-    assert found.y == pytest.approx(0.3456, abs=0.006)
-    assert found.x + found.w < 0.7062  # left of the "Date" label
-    bottom = found.y + found.h
-    assert abs(bottom - 0.3935) < 0.015  # the box bottom sits on the ruled line
+    assert found.y == pytest.approx(1 - frozen["baseline"] / 792 - 0.045, abs=0.003)
+    assert found.h == pytest.approx(0.0615)
+    assert found.x + found.w < frozen["date_x"] + 0.002  # left of the "Date" label
+    area_bottom = (1 - found.y - found.h) * 792 + 8  # the signature area stands on the caption band
+    assert abs(area_bottom - frozen["line"]) < 4

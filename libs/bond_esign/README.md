@@ -31,11 +31,14 @@ Poetry form: `docs/sdk/README.md`, "Python". Python 3.12 or 3.13.
 |---|---|---|
 | `sqlalchemy>=2.0.36` | tables and queries | MIT |
 | `pypdf>=7.2,<8` | read, merge, find printed text | BSD-3-Clause |
-| `reportlab>=5.1,<6` | stamp and certificate pages | BSD |
-| `pillow>=13.0` | check and crop the drawn signature | MIT-CMU |
+| `reportlab>=5.0,<6` | stamp and certificate pages | BSD |
+| `pillow>=12.3` | check and crop the drawn signature | MIT-CMU |
 | `pyhanko>=0.38.2,<0.39` (extra `seal`) | PAdES seal, timestamp | MIT |
 | `cryptography>=48.0` (extra `seal`) | self-signed certificate helper | Apache-2.0 OR BSD-3-Clause |
 | `signature_pad` 5.1.8, vendored in `bond_esign/web/` | drawing on a canvas | MIT |
+
+An unsealed build is byte-identical for the same inputs and the same versions of pypdf, reportlab and Pillow: do not
+rebuild a completed request after a dependency upgrade (keep and serve the stored copy).
 
 `import bond_esign` needs no `seal` extra: the seal names (`Sealer`, `verify_seal`, `make_self_signed_pkcs12`) load on
 first use and raise an ImportError that names the extra. Without the extra, `hasattr(bond_esign, "Sealer")` raises
@@ -50,8 +53,8 @@ helper `certs.py` and pyHanko's seal time use the wall clock. Every function flu
 | Step | Call |
 |---|---|
 | 1. Open a request for the PDF | `create_request(session, t, pdf=, title=, signers=[SignerSpec], consent=, now=, ...)` |
-| 2. Make the signer's link | `issue_token(session, t, signer, now=)` returns the raw token once; only its hash is stored |
-| 3. Signer opens the link | `find_signer_by_token`, then `signing_view(session, t, signer, ctx=, now=)` and `render_panel(view, action_url=)` |
+| 2. Make the signer's link | `issue_token(session, t, signer, now=)` returns the raw token once; only its hash is stored (or skip it: see `find_signer_by_key` below) |
+| 3. Signer opens the link | `find_signer_by_token(session, t, token, now=)` or `find_signer_by_key(session, t, request_id, key)`, then `signing_view(session, t, signer, ctx=, now=)` and `render_panel(view, action_url=)` |
 | 4. Signer posts the form | `parse_submission(form, max_signature_bytes=)`, then `sign(session, t, signer, pdf=, ...)` |
 | 5. Job: build | `build_signed_pdf(session, t, request, pdf=original)` is a pure read; safe to retry |
 | 6. Job: keep and record | store both PDFs, then `complete(session, t, request, signed=)` |
@@ -59,6 +62,10 @@ helper `certs.py` and pyHanko's seal time use the wall clock. Every function flu
 | Later | `record_download`, `evidence`, `verify_chain`, `verify_evidence`, `verify_seal` |
 | Other endings | `decline(session, t, signer, reason=, ctx=, now=)`, `void(session, t, request, reason=, ctx=, now=)`, `expire_due(session, t, now=)` |
 | With the emailed code | `issue_code(session, t, signer, now=)` returns the 6 digits (you email them); `verify_code(session, t, signer, code, ctx=, now=)` |
+
+An app that already has its own page credential can skip `issue_token`/`find_signer_by_token` and use
+`find_signer_by_key(session, t, request_id, key)`: it returns the signer of that request whose `key` is the app's own
+reference (the lowest position when several share it), or None. It writes nothing.
 
 Full keyword lists (all after `session, t`; `*` marks the end of positional arguments):
 
@@ -126,7 +133,8 @@ image is a `LargeBinary` column, at most `Policy.max_signature_bytes` (200,000) 
 ## Statuses, events, errors
 
 Request status: `open`; `signed` (every signer signed); `completed` (`complete` stored the final PDF); `declined`
-(any signer declined); `voided`; `expired`. `void` is refused once completed (`already_completed`); on a voided
+(any signer declined); `voided`; `expired`. `void` is refused once every signer has signed, built or not (status `signed` or `completed`: `already_completed`, "This
+document has already been signed."); open (also partly signed), declined and expired requests can be voided; on a voided
 request it changes nothing. `expire_due` turns open requests past `expires_at` into `expired`; `signing_view`, `sign`
 and `issue_token` do the same for the request they touch. Signer status: `pending`, `signed`, `declined`. Signing
 `method`: `link`, `email_code`, `in_person`.
@@ -142,7 +150,7 @@ in the contract. `data` takes only strings, ints, bools, null, lists and dicts; 
 |---|---|
 | `not_open` | the request or signer is not open (signed, declined, voided) |
 | `expired` | past `expires_at` or already expired |
-| `already_completed` | `void` on a completed request |
+| `already_completed` | `void` on a request every signer has signed (`signed` or `completed`) |
 | `consent_required` / `consent_stale` | box not ticked / the consent version posted is not the request's |
 | `code_required` | the policy needs the emailed code and it is not verified |
 | `code_invalid` | `verify_code` with no code waiting |
@@ -176,7 +184,7 @@ certificate and `request.signed_sha256`.
 ## Where the signature goes
 
 ```python
-box = es.Placement(page=-1, x=0.55, y=0.80, w=0.30, h=0.055)   # page 1-based, -1 = last; fractions, origin top-left
+box = es.Placement(page=-1, x=0.55, y=0.80, w=0.30, h=0.0615)  # page 1-based, -1 = last; fractions, origin top-left
 rule = es.AnchorRule("Accepted by (customer)")                  # find printed text instead
 spec = es.SignerSpec("Pat Example", "pat@example.com", anchor=rule, date_placement=None)
 ```
@@ -188,9 +196,11 @@ text under `anchor_missing`. `AnchorRule` fields: `occurrence` (0-based over all
 `/Rotate` other than 0 are skipped, and the right edge of the text is estimated with Helvetica widths at the run's
 font size, not the font the PDF embeds. A stamp on a rotated page raises `ValueError`. Fractions are of the page's
 CropBox, else its MediaBox. `fixtures/esign/weasy_acceptance.pdf` is a document laid out the way a WeasyPrint estimate
-is; the defaults put the box on the ruled line beside the label. The caption band sits in the bottom 8 pt of the box, so
-with the `AnchorRule` defaults the printed ruled line should be about 2-3 pt below the label's text baseline (as a
-WeasyPrint table-cell border is) for the caption to land under the line.
+is; the defaults put the box on the ruled line beside the label. `weasy_acceptance_tight.pdf` is the same page with the default line height (its line is about 2.3 pt below the label
+baseline); `weasy_acceptance.pdf` has `line-height: 1.4` (about 4 to 5 pt). The caption band sits in the bottom 8 pt of
+the box, and with the `AnchorRule` defaults (`dy=-0.045`, `h=0.0615`) the box bottom is 13 pt below the label baseline on
+a Letter page, so the caption starts about 7.8 pt below it: a ruled line 2 to 6 pt below the label baseline stays clear
+of the caption, and the signature area ends 5 pt below the baseline, on the line.
 
 The stamp: a drawn image is scaled to fit and anchored bottom-left; a typed name is set in Times-Italic and shrunk to
 fit. A caption ("Signed electronically by <name>, <date>, ref <first 8 of the signer id>") takes an 8 pt band at the

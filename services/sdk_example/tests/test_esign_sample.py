@@ -4,7 +4,7 @@ import io
 
 from bond_esign import AnchorRule, Placement, Stamp
 from bond_esign.anchor import find_anchor
-from bond_esign.stamping import stamp
+from bond_esign.stamping import _BAND, _CAPTION_SIZE, stamp
 from pypdf import PdfReader
 
 from sdk_example.esign_sample import ANCHOR_TEXT, LINE_BELOW, LINE_Y, sample_pdf
@@ -29,11 +29,13 @@ def test_the_ruled_line_is_below_the_label_and_the_caption_is_below_the_line():
     assert LINE_BELOW == 2.5
     box = find_anchor(pdf, AnchorRule(ANCHOR_TEXT))
     assert box is not None and box.page == 2
-    line_from_top = 1 - line_y / PAGE_H
-    assert abs((box.y + box.h) - line_from_top) <= 0.015  # the box bottom sits on the line
     out = stamp(pdf, [Stamp(Placement(box.page, box.x, box.y, box.w, box.h), typed_name="Pat Example",
-                                                                       caption="Signed electronically by Pat Example")])
-    caption = next(y for text, y in _runs(out, 1) if text.startswith("Signed electronically"))
-    assert caption < line_y  # the caption baseline is under the line, so it never overprints it
-    label = next(y for text, y in _runs(out, 1) if text == ANCHOR_TEXT)
+                            caption="Signed electronically by Pat Example")])
+    runs = _runs(out, 1)
+    caption = next(y for text, y in runs if text.startswith("Signed electronically"))
+    assert caption + 0.72 * _CAPTION_SIZE <= line_y - 1  # the caption's glyph top is clear below the ruled line
+    assert (1 - box.y - box.h) * PAGE_H + _BAND - line_y < 4 and line_y - ((1 - box.y - box.h) * PAGE_H + _BAND) < 4
+    # (the sample has no row under the line, so the next-row condition is vacuous: nothing else is printed below it)
+    assert all(y > line_y for text, y in runs if not text.startswith("Signed electronically"))
+    label = next(y for text, y in runs if text == ANCHOR_TEXT)
     assert abs(label - LINE_Y) < 0.5

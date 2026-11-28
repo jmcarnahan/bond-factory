@@ -58,9 +58,13 @@ def _ctx(request: Request) -> be.RequestContext:
                              user_agent=request.headers.get("user-agent"))
 
 
-def _action(estimate_id: str, request: Request) -> str:
-    """The form's own URL, built from the path and the token only (nothing from the query is copied)."""
-    return f"/estimates/{estimate_id}/sign?{urlencode({'sign': 1, 't': request.query_params.get('t', '')})}"
+DONE = "signing_complete"
+
+
+def _action(estimate_id: str, request: Request, *, event: str | None = None) -> str:
+    """The page's own URL, built from the path and the token only (nothing from the query is copied)."""
+    query = {"sign": 1, "t": request.query_params.get("t", "")}
+    return f"/estimates/{estimate_id}/sign?{urlencode(query | ({'event': event} if event else {}))}"
 
 
 def _show(request: Request, estimate_id: str, session, signer, owner, error: str | None, *, ctx=True):
@@ -74,6 +78,10 @@ def _show(request: Request, estimate_id: str, session, signer, owner, error: str
 def sign_page(estimate_id: str, request: Request, error: str | None = None):
     with request.app.state.session_factory() as session:
         signer, owner = _signer(request, session, estimate_id)
+        if request.query_params.get("event") == DONE:  # back from the sign POST: the completion job may not have run
+            envelope = session.query(EsignEnvelope).filter_by(provider="native", envelope_id=owner.id).first()
+            if envelope is not None and envelope.status != "completed":
+                return _page(owner.title, "<p>Thank you. We are recording your signature; this page will update shortly.</p>")
         return _show(request, estimate_id, session, signer, owner, error)
 
 
@@ -111,7 +119,8 @@ async def sign_post(estimate_id: str, request: Request):
             signer, owner = _signer(request, session, estimate_id)
             return _show(request, estimate_id, session, signer, owner, exc.code, ctx=False)
         session.commit()
-    return RedirectResponse(_action(estimate_id, request), status_code=303)
+        request.app.state.esign_jobs.append(owner.id)  # the completion job, as the webhook used to enqueue it
+    return RedirectResponse(_action(estimate_id, request, event=DONE), status_code=303)
 
 
 @router.get("/estimates/{estimate_id}/envelopes")
@@ -122,8 +131,8 @@ def envelopes(estimate_id: str, request: Request):
         native = NativeProvider(session, TABLES, CONSENT, lambda: now, request.app.state.esign_store)
         rows = session.query(EsignEnvelope).filter_by(estimate_id=estimate_id).order_by(EsignEnvelope.id).all()
         for row in rows:
-            if row.provider == "native":  # the vendor's own rows are shown as stored
-                envelope_status(session, {"native": native}, row, now=now)
+            if row.provider == "native" and not (native.status(row.envelope_id) == "completed" and row.status != "completed"):
+                envelope_status(session, {"native": native}, row, now=now)  # never complete a row ahead of the job
         return [legacy_envelope(row) for row in rows]
 
 

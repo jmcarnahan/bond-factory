@@ -11,8 +11,10 @@ from sqlalchemy import select
 
 from .esign_seam import CANNOT_VOID, EsignError
 
-#: lib request status -> the host's words (`open` is `sent` until the signer has opened the page)
-STATUS_WORDS = {"open": "sent", "signed": "delivered"}
+#: lib request status -> the host's words (`open` is `sent` until the signer has opened the page); `signed` (every
+#: signer signed) is "completed": the signed PDF can be fetched, and fetching builds, stores and completes it
+STATUS_WORDS = {"open": "sent", "signed": "completed"}
+DEFAULT_LABEL = "Accepted by (customer)"
 TOKEN_DAYS = 7
 
 
@@ -24,12 +26,14 @@ class NativeProvider:
 
     def create_envelope(self, *, estimate, pdf: bytes, file_name: str, signer_name: str, signer_email: str,
                         client_user_id: str, email_subject: str) -> str:
-        spec = be.SignerSpec(name=signer_name, email=signer_email, key=client_user_id,
-                             anchor=be.AnchorRule("Accepted by (customer)"))
+        label = getattr(estimate, "customer_line", None) or DEFAULT_LABEL  # the per-estimate setting
+        spec = be.SignerSpec(name=signer_name, email=signer_email, key=client_user_id, anchor=be.AnchorRule(label))
+        valid_until = getattr(estimate, "valid_until", None)
+        expires_at = valid_until if valid_until is not None and valid_until > self.now() else None
         with self._lib_errors():
             request = be.create_request(
                 self.session, self.t, pdf=pdf, title=file_name or estimate.title, signers=[spec],
-                consent=self.consent, now=self.now(), subject_type="estimate", subject_id=str(estimate.id))
+                consent=self.consent, now=self.now(), expires_at=expires_at, subject_type="estimate", subject_id=str(estimate.id))
         request.legacy_estimate_id = str(estimate.id)  # the app's own column, written beside the lib's
         self.store.put(f"esign/{request.id}/original.pdf", pdf)
         return request.id
@@ -37,8 +41,7 @@ class NativeProvider:
     def recipient_view_url(self, *, envelope_id: str, signer_name: str, signer_email: str, client_user_id: str,
                            return_url: str) -> str:
         request = self._request(envelope_id)
-        signer = self.session.execute(select(self.t.signer).where(
-            self.t.signer.request_id == request.id, self.t.signer.key == client_user_id)).scalars().first()
+        signer = be.find_signer_by_key(self.session, self.t, request.id, client_user_id)
         if signer is None:
             raise EsignError(f"no signer {client_user_id!r} on {envelope_id}", code="SIGNER_NOT_FOUND")
         with self._lib_errors():

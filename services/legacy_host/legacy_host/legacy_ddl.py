@@ -25,7 +25,8 @@ LEGACY_DDL = (
         uid VARCHAR PRIMARY KEY, tz VARCHAR(64), day_start VARCHAR(5), day_end VARCHAR(5), remind_lead INTEGER,
         theme VARCHAR, updated_at DATETIME NOT NULL)""",
     # the e-signature tables the app had with a third-party vendor, before bond_esign
-    """CREATE TABLE estimates (id VARCHAR PRIMARY KEY, title VARCHAR NOT NULL, total INTEGER NOT NULL)""",
+    """CREATE TABLE estimates (id VARCHAR PRIMARY KEY, title VARCHAR NOT NULL, total INTEGER NOT NULL,
+        customer_line VARCHAR, valid_until DATETIME)""",
     """CREATE TABLE esign_envelopes (
         id VARCHAR PRIMARY KEY, estimate_id VARCHAR NOT NULL, provider VARCHAR NOT NULL,
         envelope_id VARCHAR NOT NULL, status VARCHAR NOT NULL, signer_name VARCHAR, signer_email VARCHAR,

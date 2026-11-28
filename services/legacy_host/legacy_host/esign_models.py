@@ -15,6 +15,8 @@ class Estimate(Base):
     id = Column(String, primary_key=True)
     title = Column(String, nullable=False)
     total = Column(Integer, nullable=False)
+    customer_line = Column(String, nullable=True)  # the label beside the signature line; NULL means the default
+    valid_until = Column(DateTime, nullable=True)  # naive UTC; the estimate's validity date
 
 
 class EsignEnvelope(Base):

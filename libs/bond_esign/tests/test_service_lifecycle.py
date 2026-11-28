@@ -74,12 +74,10 @@ def test_decline_after_signing_or_expiry_is_refused(session, pdf_bytes):
         decline(session, T, other, reason=None, ctx=CTX, now=at(6))
 
 
-def test_void_open_signed_declined_and_expired_requests(session, pdf_bytes):
-    for prepare in ("open", "signed", "declined", "expired"):
+def test_void_open_declined_and_expired_requests(session, pdf_bytes):
+    for prepare in ("open", "declined", "expired"):
         request, signer = one(session, pdf_bytes, expires_at=NOW + timedelta(minutes=5))
-        if prepare == "signed":
-            sign_it(session, signer, pdf_bytes, now=at(1))
-        elif prepare == "declined":
+        if prepare == "declined":
             decline(session, T, signer, reason=None, ctx=CTX, now=at(1))
         elif prepare == "expired":
             assert expire_due(session, T, now=at(10)) >= 1
@@ -94,6 +92,22 @@ def test_void_twice_changes_nothing_and_writes_no_event(session, pdf_bytes):
     n = len(events_of(session, request))
     assert void(session, T, request, reason="second", ctx=CTX, now=at(9)) is request
     assert (request.void_reason, request.voided_at, len(events_of(session, request))) == ("first", at(1), n)
+
+
+def test_void_after_every_signer_signed_is_refused_and_writes_nothing(session, pdf_bytes):
+    request, _ = signed_request(session, pdf_bytes)
+    n = len(events_of(session, request))
+    with expect("already_completed"):
+        void(session, T, request, reason="too late", ctx=CTX, now=at(4))
+    assert (request.status, request.voided_at, len(events_of(session, request))) == ("signed", None, n)
+
+
+def test_void_with_one_of_two_signers_signed_still_works(session, pdf_bytes):
+    request = new_request(session, pdf_bytes, signers=[SignerSpec("Pat Example", placement=PLACEMENT), SignerSpec("Sam")])
+    sign_it(session, signers_of(session, request)[0], pdf_bytes)
+    assert request.status == "open"
+    void(session, T, request, reason="changed my mind", ctx=CTX, now=at(4))
+    assert request.status == "voided"
 
 
 def test_void_after_completion_is_refused(session, pdf_bytes):

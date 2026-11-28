@@ -82,12 +82,17 @@ def test_the_job_skips_a_voided_request(client, app):
     from sdk_example.db import session_scope
 
     created = demo(client)
-    post(client, created, typed_form())
-    client.post(f"/esign/demo/{created['request_id']}/void")
+    assert client.post(f"/esign/demo/{created['request_id']}/void").json()["status"] == "voided"
     handler = app.state.job_registry.get("esign_complete")
     with session_scope(app.state.session_factory) as session:
         assert handler(session, {"request_id": created["request_id"]}, app.state.clock.utcnow_naive())["skipped"]
         assert handler(session, {"request_id": "gone"}, app.state.clock.utcnow_naive())["skipped"]
+
+
+def test_a_signed_request_cannot_be_voided_before_the_job_runs(client):
+    created = demo(client)
+    post(client, created, typed_form())
+    assert client.post(f"/esign/demo/{created['request_id']}/void").status_code == 409
 
 
 def test_the_tables_match_the_library_contract(app):

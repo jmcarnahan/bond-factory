@@ -18,12 +18,12 @@ from bond_esign.evidence_export import evidence
 from bond_esign.lifecycle import decline, expire_due, record_delivery, record_download, void
 from bond_esign.pdf_read import page_count, sha256_hex
 from bond_esign.signing import sign, signing_view
-from bond_esign.tokens import find_signer_by_token, issue_token
+from bond_esign.tokens import find_signer_by_key, find_signer_by_token, issue_token
 from bond_esign.types import Consent, Placement, Policy, RequestContext, SignerSpec, Tables
 
 __all__ = [
-    "build_signed_pdf", "complete", "create_request", "decline", "evidence", "expire_due", "find_signer_by_token",
-    "issue_code", "issue_token", "policy_of", "record_delivery", "record_download", "sign", "signing_view",
+    "build_signed_pdf", "complete", "create_request", "decline", "evidence", "expire_due", "find_signer_by_key",
+    "find_signer_by_token", "issue_code", "issue_token", "policy_of", "record_delivery", "record_download", "sign", "signing_view",
     "verify_code", "void",
 ]
 

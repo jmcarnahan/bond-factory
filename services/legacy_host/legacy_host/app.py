@@ -36,6 +36,7 @@ def create_app(database_url: str, *, now: Callable[[], datetime] | None = None,
     app.state.session_factory = make_session_factory(engine)
     app.state.clock = Clock(source=now)
     app.state.esign_store = esign_models.MemoryStore()
+    app.state.esign_jobs = []  # envelope ids the sign POST has queued for the completion job
 
     @app.exception_handler(TaskError)
     async def task_error(request: Request, exc: TaskError) -> JSONResponse:

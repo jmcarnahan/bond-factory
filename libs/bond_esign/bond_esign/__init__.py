@@ -45,6 +45,7 @@ from bond_esign.service import (
     decline,
     evidence,
     expire_due,
+    find_signer_by_key,
     find_signer_by_token,
     issue_code,
     issue_token,
@@ -168,6 +169,7 @@ __all__ = [
     "expire_due",
     # loaded on first use
     "find_anchor",
+    "find_signer_by_key",
     "find_signer_by_token",
     "issue_code",
     "issue_token",

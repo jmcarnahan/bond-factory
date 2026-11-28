@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from conftest import NOW, T, at, events_of, expect, kinds_of, new_request, signers_of
 
-from bond_esign import find_signer_by_token, issue_token, sha256_hex, void
+from bond_esign import SignerSpec, find_signer_by_key, find_signer_by_token, issue_token, sha256_hex, void
 
 
 def test_token_is_random_urlsafe_and_only_its_hash_is_stored(session, pdf_bytes):
@@ -64,3 +64,24 @@ def test_no_token_for_an_expired_request_but_a_voided_one_still_resolves(session
     token = issue_token(session, T, other_signer, now=at(0))
     void(session, T, other, reason="x", ctx=None, now=at(1))
     assert find_signer_by_token(session, T, token, now=at(2)) is other_signer  # the page can say "voided"
+
+
+def test_find_signer_by_key_picks_the_request_and_key(session, pdf_bytes):
+    request = new_request(session, pdf_bytes, signers=[SignerSpec("Pat Example", key="c-1"), SignerSpec("Sam Sample", key="c-2")])
+    other = new_request(session, pdf_bytes, signers=[SignerSpec("Pat Example", key="c-1")])
+    first, second = signers_of(session, request)
+    assert find_signer_by_key(session, T, request.id, "c-2") is second
+    assert find_signer_by_key(session, T, request.id, "c-1") is first
+    assert find_signer_by_key(session, T, other.id, "c-1") is signers_of(session, other)[0]
+
+
+def test_find_signer_by_key_is_none_for_missing_request_or_key(session, pdf_bytes):
+    request = new_request(session, pdf_bytes, signers=[SignerSpec("Pat Example", key="c-1")])
+    assert find_signer_by_key(session, T, request.id, "nope") is None
+    assert find_signer_by_key(session, T, "no-such-request", "c-1") is None
+    assert find_signer_by_key(session, T, request.id, "") is None
+
+
+def test_find_signer_by_key_takes_the_lowest_position_on_a_shared_key(session, pdf_bytes):
+    request = new_request(session, pdf_bytes, signers=[SignerSpec("Pat Example", key="same"), SignerSpec("Sam Sample", key="same")])
+    assert find_signer_by_key(session, T, request.id, "same") is signers_of(session, request)[0]

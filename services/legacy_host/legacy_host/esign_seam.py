@@ -91,3 +91,38 @@ def signed_pdf(session, providers, envelope, *, now: datetime) -> bytes:
     pdf = provider_for(envelope, providers).fetch_signed_pdf(envelope.envelope_id)
     envelope_status(session, providers, envelope, now=now)
     return pdf
+
+
+def complete_envelope(session, providers, envelope, now: datetime):
+    """The app's completion job, written the way it always was: ask `status()`, fetch only when it says completed.
+
+    A job runner retries the `RuntimeError`. Native signing enqueues this from the sign POST; the vendor did from its webhook.
+    """
+    if envelope.status == "completed":
+        return None  # already done: skip
+    provider = provider_for(envelope, providers)
+    state = provider.status(envelope.envelope_id)
+    if state != "completed":
+        raise RuntimeError(f"envelope {envelope.envelope_id} is {state}, not completed: trying again later")
+    pdf = provider.fetch_signed_pdf(envelope.envelope_id)
+    envelope.status = "completed"
+    envelope.completed_at = now
+    session.commit()
+    return pdf
+
+
+def take_back(session, providers, estimate_id: str, reason: str) -> None:
+    """Void every open envelope of the estimate; a provider that refuses with `CANNOT_VOID` is asked once more."""
+    from .esign_models import EsignEnvelope  # the host's own table
+
+    rows = session.query(EsignEnvelope).filter(EsignEnvelope.estimate_id == estimate_id,
+                                               EsignEnvelope.status.in_(("sent", "delivered"))).all()
+    for row in rows:
+        try:
+            void_envelope(session, providers, row, reason)
+        except EsignError as err:
+            if err.code != CANNOT_VOID:
+                raise
+            if provider_for(row, providers).status(row.envelope_id) == "completed":
+                raise EsignError("This estimate has already been signed.", code="ALREADY_SIGNED") from err
+            raise

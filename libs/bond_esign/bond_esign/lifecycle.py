@@ -9,6 +9,7 @@ from bond_esign._rows import (
     EXPIRED,
     OPEN,
     PENDING,
+    SIGNED,
     VOIDED,
     clean,
     clean_ctx,
@@ -77,12 +78,12 @@ def decline(session, t: Tables, signer, *, reason: str | None, ctx: RequestConte
 
 
 def void(session, t: Tables, request, *, reason: str, ctx: RequestContext | None, now):
-    """Cancel a request. Refused once completed; a second call on a voided request changes nothing."""
+    """Cancel a request. Refused once every signer has signed (`signed`) or it is completed; a second call on a voided request changes nothing."""
     now = utc(now)
     reason, ctx = clean(reason, 2000), clean_ctx(ctx)  # all input is checked before any state changes
     lock(session, t, request)
-    if request.status == COMPLETED:
-        raise EsignError(ALREADY_COMPLETED, "This document is already signed and completed, so it cannot be voided.")
+    if request.status in (SIGNED, COMPLETED):  # a given acceptance is never taken back, built or not
+        raise EsignError(ALREADY_COMPLETED, "This document has already been signed.")
     if request.status == VOIDED:
         return request
     request.status = VOIDED

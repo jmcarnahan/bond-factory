@@ -64,7 +64,7 @@ def test_the_public_names_of_the_contract_are_exported():
         "SigningView", "SignOutcome", "SignedDocument", "ChainCheck", "SealResult", "SealCheck", "CertificateData",
         "CertificateSigner", "CertificateEvent", "CertificateLabels", "EsignError", "errors", "EsignRequestMixin",
         "TenantEsignRequestMixin", "EsignSignerMixin", "EsignEventMixin", "KINDS", "append", "chain",
-        "verify_chain", "create_request", "issue_token", "find_signer_by_token", "signing_view", "issue_code",
+        "verify_chain", "create_request", "issue_token", "find_signer_by_token", "find_signer_by_key", "signing_view", "issue_code",
         "verify_code", "sign", "decline", "void", "expire_due", "build_signed_pdf", "complete", "record_delivery",
         "record_download", "evidence", "normalise_png", "default_consent", "sha256_hex", "page_count",
         "find_anchor", "stamp", "certificate_pages", "render_panel", "parse_submission", "PanelLabels",

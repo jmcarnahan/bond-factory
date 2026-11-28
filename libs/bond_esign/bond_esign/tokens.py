@@ -49,3 +49,12 @@ def find_signer_by_token(session, t: Tables, token: str, *, now):
     if signer.token_expires_at is not None and utc(now) >= signer.token_expires_at:
         return None
     return signer
+
+
+def find_signer_by_key(session, t: Tables, request_id: str, key: str):
+    """The signer of that request whose ``key`` is the app's reference (lowest position if several), or None."""
+    if not request_id or not key:
+        return None
+    return session.execute(
+        select(t.signer).where(t.signer.request_id == request_id, t.signer.key == key).order_by(t.signer.position)
+    ).scalars().first()

@@ -27,7 +27,7 @@ def test_every_lib_status_comes_out_as_a_host_status_word(tmp_path):
         be.signing_view(session, TABLES, view_signer, ctx=None, now=now)
         assert native.status(env[1]) == "delivered"  # open, and the signer has viewed
         sign_in_lib(app, session, env[2])
-        assert session.get(TABLES.request, env[2]).status == "signed" and native.status(env[2]) == "delivered"
+        assert session.get(TABLES.request, env[2]).status == "signed" and native.status(env[2]) == "completed"
         native.fetch_signed_pdf(env[2])
         assert native.status(env[2]) == "completed"
         be.decline(session, TABLES, signer_of(session, env[3]), reason="no thanks", ctx=None, now=now)
@@ -39,7 +39,7 @@ def test_every_lib_status_comes_out_as_a_host_status_word(tmp_path):
         be.expire_due(session, TABLES, now=now)
         assert native.status(env[5]) == "expired"
         got = {native.status(e) for e in env.values()}
-        assert got <= set(STATUSES) and got == {"delivered", "completed", "declined", "voided", "expired", "sent"}
+        assert got <= set(STATUSES) and got == {"completed", "declined", "voided", "expired", "sent", "delivered"}
 
 
 def test_void_after_completion_is_the_hosts_own_error_with_its_code(tmp_path):

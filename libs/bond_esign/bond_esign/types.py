@@ -20,7 +20,7 @@ class AnchorRule:
     dx: float = 0.01  # box origin relative to the anchor's right edge / baseline, page fractions
     dy: float = -0.045
     w: float = 0.30
-    h: float = 0.055
+    h: float = 0.0615  # box bottom 13pt below the baseline on Letter: clear of a ruled line 2 to 6pt below it
     case_sensitive: bool = False
 
 

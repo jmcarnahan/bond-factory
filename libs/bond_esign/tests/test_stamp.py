@@ -92,21 +92,29 @@ def _runs(pdf: bytes):
     return runs
 
 
-def test_caption_sits_between_the_ruled_line_and_the_next_row_in_the_weasy_fixture():
+# Measured once per fixture (see FIXTURES in test_anchor.py): label baseline and the ruled line's upper edge, PDF points.
+WEASY = {"weasy_acceptance.pdf": 422.95, "weasy_acceptance_tight.pdf": 480.35}
+
+
+@pytest.mark.parametrize("name", sorted(WEASY))
+def test_caption_sits_between_the_ruled_line_and_the_next_row_in_the_weasy_fixtures(name):
     from pathlib import Path
 
     from bond_esign.anchor import find_anchor
+    from bond_esign.stamping import _BAND, _CAPTION_SIZE
     from bond_esign.types import AnchorRule
 
-    fixture = Path(__file__).resolve().parents[3] / "fixtures" / "esign" / "weasy_acceptance.pdf"
-    src = fixture.read_bytes()
+    src = (Path(__file__).resolve().parents[3] / "fixtures" / "esign" / name).read_bytes()
     place = find_anchor(src, AnchorRule("Accepted by (customer)"))
     out = stamp(src, [Stamp(place, png=make_png(), caption="Signed electronically by Pat Example, ref ab12cd34")])
     runs = _runs(out)
-    accepted = next(v for t, v in runs if t.startswith("Accepted by"))
     caption = next(v for t, v in runs if t.startswith("Signed electronically"))
     next_row = next(v for t, v in runs if t.startswith("For Sample Company"))
-    assert next_row < caption < accepted  # PDF y grows upward
+    line = WEASY[name]
+    assert caption + 0.72 * _CAPTION_SIZE <= line - 1  # the caption's glyph top is clear below the ruled line
+    assert caption >= next_row + 0.72 * 10 + 1  # and its baseline is above the next row's text top
+    bottom = (1 - place.y - place.h) * 792
+    assert abs(bottom + _BAND - line) < 4  # the signature area ends on the line
 
 
 def test_caption_takes_a_band_inside_the_box_and_no_caption_uses_the_whole_box():
