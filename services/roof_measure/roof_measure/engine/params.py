@@ -286,6 +286,29 @@ class EngineParams:
     edge_min_seg_m: float = 0.12  # m: shorter raw segments are dropped
     # ---- outputs
     fit_tol_m: float = 0.15  # m: a point fits its facet's plane within this (fit_all / fit_covered)
+    # ---- objects standing on the roof (engine.objects.find_objects): chimneys, flues, lanterns; never trees
+    obj_hag_m: float = 1.0  # m: a return is a candidate only above the local ground by more than this ...
+    obj_reach_m: float = 3.0  # m: ... and within this of the roof outline
+    obj_above_plane_m: float = 0.3  # m: ... and above the plane of the facet under it by more than this
+    obj_link_min_m: float = 0.35  # m: candidates link into one blob within max(this, obj_link_spacings x mean spacing)
+    obj_link_spacings: float = 1.6  # ratio of the mean return spacing (1/sqrt(density)) that still links two returns
+    obj_min_points: int = 4  # pts: fewer returns is noise, not an object
+    obj_pad_spacings: float = 0.15  # ratio of the mean spacing: the footprint is the rectangle of the returns grown by this (the outermost returns of a surface lie a fraction of a spacing inside its edge)
+    obj_align_ratio: float = 1.6  # ratio: the footprint follows the walls unless the free minimum rectangle is this much smaller
+    obj_min_side_m: float = 0.5  # m: a blob thinner than this is a seam or edge error of the facets (a line), not an object
+    obj_edge_m: float = 0.4  # m: a blob this close to the roof edge is a parapet, wall or gutter line, not a chimney
+    obj_min_area_m2: float = 0.25  # m2: a smaller footprint is dropped
+    obj_tree_outside_share: float = 0.3  # ratio of a blob's returns outside the outline above which it is a tree
+    obj_tree_reach_m: float = 1.5  # m: a blob this close to a tree blob is part of the same tree (its edge over the roof)
+    obj_tree_h95_m: float = 4.0  # m: a blob whose 95th percentile height is above this is a tree
+    obj_on_plane_m: float = 0.15  # m: a return this close to a facet plane is ON the roof (for the layered test)
+    obj_layered_share: float = 0.35  # ratio: more roof returns than this inside the blob's footprint ...
+    obj_layered_spread_m: float = 0.5  # m: ... with a height spread (std) above this is canopy with the roof seen through it
+    obj_lantern_max_h_m: float = 0.9  # m: lower than this and at least obj_lantern_min_area_m2 wide is a lantern ...
+    obj_lantern_min_area_m2: float = 2.0  # m2
+    obj_chimney_max_area_m2: float = 3.0  # m2: ... at least obj_lantern_max_h_m high and at most this wide is a chimney
+    obj_mislabel_area_m2: float = 3.0  # m2: a planar blob wider than this is a roof part the facets left out (mislabelled)
+    obj_planar_rms_m: float = 0.08  # m: ... planar means a plane fit with an rms under this
     # ---- hints (caller answers; skipped from stable_hash while at their default)
     pitched_steps: bool = True  # False: a step line between two pitched facets whose planes agree at the seam is typed from the planes
 
