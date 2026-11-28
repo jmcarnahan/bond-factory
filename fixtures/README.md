@@ -52,6 +52,7 @@ Contract: `docs/contracts/roof_model.md` (schema `bond.roof_model/0.1`; the serv
 | `capture/expected_candidates_rich.json`, `expected_degraded_rich.json` | The rich candidates `model_output_rich.json` must produce, and the one plain draft a rich parse gives with the model off. They assume a resolver that returns no candidates. | hand-written |
 | `capture/rich_phrases.json` | Made-up phrases for rich mode, each with its model output file and the expected parse file. | hand-written |
 | `capture/phrases.jsonl` | Labelled phrase set (60 phrases) with the expected parse. Phrase 52 accepts 3 or 4 items: the model reads "...tell Marcus I am out Wednesday" as three tasks plus an all-day "Out of office" event in every run of the 2026-11-11 measurement (`docs/research/2026-11-11-capture-prompt/README.md`); both readings are acceptable. | hand-written |
+| `esign/weasy_acceptance.pdf`, `esign/weasy_acceptance.html` | Synthetic one-page estimate whose signature block (label, ruled line, "Date", short ruled line) is laid out as a WeasyPrint CSS-table row; the PDF was rendered once from the HTML with WeasyPrint 70 in a throwaway venv (WeasyPrint is not a dependency). `bond_esign.anchor.find_anchor` must find "Accepted by (customer)" in it; `libs/bond_esign/tests/test_anchor.py` freezes the measured box. No real names or addresses. | hand-written (rendered once) |
 
 Contract for the sync files: `docs/contracts/sync_upload.md`.
 

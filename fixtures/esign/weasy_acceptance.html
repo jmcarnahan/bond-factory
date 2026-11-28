@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- Synthetic fixture source. The signature block copies the layout an adopter's WeasyPrint estimate uses:
+     a CSS-table row with a label cell, a ruled line cell (55%), "Date" and a short ruled line (20%).
+     No real names, addresses or prices. Render once with WeasyPrint to fixtures/esign/weasy_acceptance.pdf. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sample estimate 100</title>
+<style>
+  @page { size: Letter; margin: 0.7in; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1f2933; }
+  h1 { font-size: 16pt; margin: 0 0 6px; }
+  h2 { font-size: 11pt; margin: 18px 0 6px; color: #3e4c59; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 4px 0; border-bottom: 1px solid #d9e2ec; }
+  td.amount { text-align: right; }
+  .accept { margin-top: 26px; page-break-inside: avoid; }
+  .accept h2 { font-size: 11pt; margin: 0 0 14px; color: #3e4c59; }
+  .sig { display: table; width: 100%; margin-bottom: 16px; font-size: 10pt; }
+  .sig span { display: table-cell; white-space: nowrap; padding-right: 8px; vertical-align: bottom; }
+  .sig .line { width: 55%; border-bottom: 1px solid #1f2933; }
+  .sig .line.short { width: 20%; }
+  .sig .line.filled { border-bottom: 1px solid #1f2933; }
+</style>
+</head>
+<body>
+<h1>Sample Company</h1>
+<p>Estimate 100 for 100 Example Ave, Sampletown, CA 90000</p>
+<h2>Scope</h2>
+<table>
+  <tr><td>Remove existing covering and dispose</td><td class="amount">$1,000.00</td></tr>
+  <tr><td>Install new system, 20 squares</td><td class="amount">$8,000.00</td></tr>
+  <tr><td>Total</td><td class="amount">$9,000.00</td></tr>
+</table>
+<h2>Warranty</h2>
+<p>Sample warranty wording for a fixture. It has no legal meaning.</p>
+<h2>Payment terms</h2>
+<p>Sample payment wording for a fixture. It has no legal meaning.</p>
+<section class="accept">
+  <h2>Acceptance</h2>
+  <div class="sig"><span>Accepted by (customer)</span><span class="line"></span><span>Date</span><span class="line short"></span></div>
+  <div class="sig"><span>For Sample Company</span><span class="line filled">Sam Example</span><span>Date</span><span class="line short filled">Nov 27, 2026</span></div>
+</section>
+</body>
+</html>
