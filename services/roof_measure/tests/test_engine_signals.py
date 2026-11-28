@@ -46,9 +46,9 @@ def test_density_refusal_at_4_and_low_density_under_6(pts, reasons):
     assert q(n=pts).density == pytest.approx(pts / 100, abs=0.06)
 
 
-def test_verdict_is_the_first_reason_and_ok_when_none():
+def test_verdict_is_the_most_serious_reason_and_ok_when_none():
     assert q().verdict == "ok" and q().reasons == []
-    assert q(n=500, support=50.0).reasons == ["low_density", "outline_mismatch"] and q(n=500, support=50.0).verdict == "low_density"
+    assert q(n=500, support=50.0).reasons == ["low_density", "outline_mismatch"] and q(n=500, support=50.0).verdict == "outline_mismatch"
 
 
 # ----------------------------------------------------------------------------- outline mismatch
@@ -158,3 +158,30 @@ def test_roof_part_missed_from_the_objects_figure():
 
     assert part_missed_reason(0.0, P) is None and part_missed_reason(32.2, P) is None
     assert part_missed_reason(32.3, P) == "roof_part_missed"
+
+
+# ----------------------------------------------------------------------------- the verdict is the most serious reason
+def test_a_serious_reason_promotes_a_soft_verdict():
+    """A low density used to hide a wrong outline: [low_density, outline_no_evidence] reads outline_no_evidence."""
+    res = quality([facet()], cloud(500), WALL, WALL, "exact", "lacounty", 100.0, 100.0, None, None, P,
+                  diag={"edge_no_evidence_share": 0.5})
+    assert res.reasons == ["low_density", "outline_no_evidence"] and res.verdict == "outline_no_evidence"
+
+
+def test_roof_part_missed_outranks_not_exact_parcel_and_no_reason_is_added_twice():
+    from roof_measure.engine.signals import add_reason
+
+    res = q(match="nearest")
+    assert res.verdict == "not_exact_parcel"
+    add_reason(res, "roof_part_missed")
+    add_reason(res, "roof_part_missed")
+    assert res.reasons == ["not_exact_parcel", "roof_part_missed"] and res.verdict == "roof_part_missed"
+
+
+def test_the_verdict_order_is_the_closed_list():
+    from roof_measure.engine.signals import REASONS, SOFT, verdict_of
+
+    assert verdict_of([]) == "ok" and verdict_of(["not_exact_parcel", "low_density"]) == "low_density"
+    assert verdict_of(["low_density", "planes_not_found"]) == "poor_fit"  # the word a reader knows for no planes
+    assert verdict_of(["roof_part_missed", "outline_mismatch"]) == "outline_mismatch"
+    assert set(SOFT) - {"ok"} <= set(REASONS) and REASONS.index("low_density") > REASONS.index("roof_part_missed")

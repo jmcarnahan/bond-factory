@@ -20,9 +20,8 @@ from . import axes
 from .detect import detect_planes
 from .edge_measure import jump_points
 from .errors import Ctx, EngineInputError
-from .facets import SQM2SQFT as SQM
 from .finish import assemble, facets_stage, quality_stage
-from .outline import build_outline, overhang_per_side
+from .outline import build_outline
 from .params import EngineParams
 from .partition import build_partition
 from .ring import ring_filter
@@ -132,15 +131,6 @@ def _outline_stage(run: Run, q: np.ndarray, qlab: np.ndarray, theta: float) -> P
     return Polygon(o.exterior)
 
 
-def _outline_sensitivity(run: Run, o: Polygon) -> None:
-    d = run.diag
-    d["overhang_m_per_side"] = overhang_per_side(run.wall, o)
-    d["outline_area_sqft_footprint"] = round(run.wall.area * SQM, 0)
-    d["outline_area_sqft_points"] = round(o.area * SQM, 0)
-    d["outline_sens_sqft_minus015"] = round(o.buffer(-0.15, join_style=2).area * SQM, 0)
-    d["outline_sens_sqft_plus015"] = round(o.buffer(0.15, join_style=2).area * SQM, 0)
-
-
 def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: EngineParams, deadline: float | None,
                    outline_source: str, parcel_match: str | None, context: np.ndarray | None
                    ) -> tuple[EngineResult, Stages]:
@@ -189,7 +179,6 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     dens0 = float(shapely.contains_xy(o, pts_all[:, 0], pts_all[:, 1]).sum() / max(o.area, 1.0))
     if dens0 < p.density_refuse and p.refuse_sparse:
         return refused("lidar_too_sparse", p, round(dens0, 1), outline_source), stages
-    _outline_sensitivity(run, o)
     t = run.tick("outline", t)
     best, h = build_partition(o, q, qlab, planes, theta, ctx, crop)
     stages.run = best

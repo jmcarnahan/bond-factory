@@ -49,7 +49,10 @@ are set from tuning percentiles, and `fit_covered` and `coverage` are always rep
   pitched facet's level HIGH outline edge (a shed's) is `rake` with `high_edge` (contract convention), never ridge or eave.
 - **One roof, one basis:** every tier is compared with the DRAWN roof (the facets and the recomputed edges); the engine's
   totals keys are not read (0.6.0 retired the priced-versus-drawn split). Gate 7a (the contractor-squares interval contains
-  1.00) is a REPORTED figure, not a gate (`report_only` in the gate file).
+  1.00) is a REPORTED figure, not a gate (`report_only` in the gate file): the 0.5 blend that centred the ratio is gone, the drawn area is
+  reported and the interval is printed. Gates 2c and 2d are real gates again and are expected to FAIL until the project owner decides (the
+  reference returns come from the unshifted county outline + 1.2 m). `drip_edge_per_lf` and `ridge_cap_per_lf` in `price.py` and
+  `price_rules.example.json` are the harness's own price-rule names, not totals keys.
 - **Coverage against the county wall (2c, 2d) is REPORTED, not gated:** the reference returns are every high return inside
   the UNSHIFTED county wall + 1.2 m (``derive_reference``, frozen per house). The engine registers the outline to the roof
   (county walls are typically 0.8-0.9 m off), so walls, trees and a neighbour's roof inside the unshifted buffer read as

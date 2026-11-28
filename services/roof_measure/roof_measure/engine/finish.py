@@ -20,7 +20,7 @@ from .params import EngineParams
 from .partition import PartitionRun, explode
 from .plane_math import aspect_deg, pitch_rise, pres
 from .ring import ring_filter
-from .signals import part_missed_reason, quality, ring_roof_extra_ratio, tree_contact_pct
+from .signals import add_reason, part_missed_reason, quality, ring_roof_extra_ratio, tree_contact_pct
 from .state import Run
 from .totals import roof_totals
 from .types import Edge, EngineResult, Facet, Outline, Partition, Plane, Quality
@@ -80,9 +80,7 @@ def quality_stage(run: Run, facets: list[Facet], o: Polygon, crop: np.ndarray, p
     except Exception as ex:  # noqa: BLE001 - the measurement stands; the verdict says the signals failed
         return Quality(verdict="unknown", error=str(ex)[:80])
     if run.diag.get("no_planes_found") or run.diag.get("assigned_pct", 100.0) < p.planes_min_assigned_pct:
-        out.reasons.append("planes_not_found")  # a roof drawn from (almost) no planes is never a confident drawing
-        if out.verdict in ("ok", "not_exact_parcel", "low_density"):
-            out.verdict = "poor_fit"
+        add_reason(out, "planes_not_found")  # a roof drawn from (almost) no planes is never a confident drawing
     return out
 
 
@@ -120,19 +118,23 @@ def assemble(run: Run, facets: list[Facet], edges: list[Edge], o: Polygon,
     h = best.origin[2]
     partition = Partition(best.labels, best.origin[0], best.origin[1], h, _plane_objs(best.planes, qlab, q), best.beta)
     outline = Outline(o_world, run.source, run.county,
-                      tuple(diag.get("overhang_measured_m", [])), tuple(diag.get("overhang_applied_m", [])),
+                      tuple(diag.get("edge_offset_measured_m", [])), tuple(diag.get("edge_offset_applied_m", [])),
                       float(diag.get("support_area_m2", 0.0)))
     objects, mislabelled = [], []
-    if run.context is not None:  # without the wide cloud there is nothing to look at
+    if run.context is None:  # without the wide cloud there is nothing to look at: the counts are unknown, not zero
+        diag["objects_error"] = "no wide cloud"
+    else:
         try:
             objects, mislabelled = find_objects(run.context, facets, outline, run.ground_z, p)
         except Exception as ex:  # noqa: BLE001 - the measurement stands without objects; ``objects_failed`` tells the reader the count is unknown
             diag["objects_error"] = f"{type(ex).__name__}: {str(ex)[:60]}"
-    missed = round(sum(m["area_sqft"] for m in mislabelled), 1)
+    missed = round(float(sum(m["area_sqft"] for m in mislabelled)), 1)
     reason = part_missed_reason(missed, p)
-    if reason and reason not in quality_.reasons:  # planar roof the facets left out: the area needs a look
-        quality_.reasons.append(reason)
-        quality_.verdict = reason if quality_.verdict == "ok" else quality_.verdict
+    if reason:  # planar roof the facets left out: the area needs a look (a failed signal stays "unknown")
+        if quality_.verdict == "unknown":
+            quality_.reasons.append(reason)
+        else:
+            add_reason(quality_, reason)
         diag["quality"] = quality_.to_dict()
     tot = roof_totals(facets, edges, set(diag["borderline_facets"]), objects)
     return EngineResult(facets=facets, edges=edges, outline=outline, totals=tot, quality=quality_,

@@ -12,7 +12,7 @@ There is no raster: the blobs come from point distances, so the result does not 
 (a roof translated by any offset gives the same objects). Skylights are flush with the roof and cannot be seen: not tried.
 
 Returns ``(objects, mislabelled)``. ``objects``: dicts ``id`` ("o1", ... ordered by x then y), ``kind``
-("chimney" | "lantern" | "unknown"), ``center`` [x, y], ``size_ft`` [long, short], ``polygon`` (closed ring of [x, y]: the
+("chimney" | "lantern" | "unknown"; a lantern only on a pitched facet), ``center`` [x, y], ``size_ft`` [long, short], ``polygon`` (closed ring of [x, y]: the
 rectangle of the blob's returns, grown by 0.15 of the mean return spacing: aligned with the walls unless a free
 angle fits much better), ``height_ft`` (95th percentile above the plane),
 ``facet`` (id of the facet under the centre), ``returns`` (count); x, y in feet like the model's facets. ``mislabelled``:
@@ -164,7 +164,7 @@ def find_objects(context: np.ndarray, facets: list[Facet], outline: Outline, gro
         area = foot.area
         ring = np.array(foot.exterior.coords)
         sides = sorted((float(np.hypot(*(ring[i + 1] - ring[i]))) for i in (0, 1)), reverse=True)
-        if tree or area < p.obj_min_area_m2 or sides[1] < p.obj_min_side_m:
+        if tree or area < p.obj_min_area_m2 or sides[1] < p.obj_min_side_m or sides[0] > p.obj_max_aspect * sides[1]:
             continue
         if foot.distance(edge) < p.obj_edge_m:
             continue  # a parapet, a gutter or a wall along the roof edge
@@ -179,13 +179,16 @@ def find_objects(context: np.ndarray, facets: list[Facet], outline: Outline, gro
         d: dict[str, Any] = {
             "center": [round(c.x * FT, 3), round(c.y * FT, 3)],
             "size_ft": [round(sides[0] * FT, 2), round(sides[1] * FT, 2)],
-            "polygon": [[round(x * FT, 3), round(y * FT, 3)] for x, y in ring],
-            "height_ft": round(h95 * FT, 2), "facet": facets[j].id, "returns": len(sel)}
+            "polygon": [[round(float(x) * FT, 3), round(float(y) * FT, 3)] for x, y in ring],
+            "height_ft": round(float(h95) * FT, 2), "facet": facets[j].id, "returns": len(sel)}
         if big:
             d["area_sqft"] = round(area * SQFT, 1)
             mislabelled.append(d)
         else:
-            objects.append({"kind": _kind(h95, area, p), **d})
+            kind = _kind(h95, area, p)
+            if kind == "lantern" and facets[j].roof_type != "pitched":
+                kind = "unknown"  # rooftop units on a low-slope roof look the same, and a lantern's sides enter the totals
+            objects.append({"kind": kind, **d})
     objects.sort(key=lambda o: (o["center"][0], o["center"][1]))
     mislabelled.sort(key=lambda o: (o["center"][0], o["center"][1]))
     return [{"id": f"o{n}", **o} for n, o in enumerate(objects, 1)], mislabelled

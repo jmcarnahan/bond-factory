@@ -120,10 +120,9 @@ def build_result(res: Any, ground_z: float, lidar_meta: dict[str, Any], base: Bl
     model = engine_model(res, base, ground_z, {"method": METHOD}, params or _default_params(), extra_notes)
     if fpinfo.get("building"):  # contract 0.4: which building was measured
         model.setdefault("source", {})["building"] = fpinfo["building"]
-    # the LLM verifier never runs on the engine path: it only checks edge-sum arithmetic and
-    # passed a wrong roof; the engine's own signals and verdict replace it. ``skipped`` tells readers it was not tried.
-    verification = {**no_verification(model, "The diagram comes straight from the measured planes; the verifier "
-                                              "does not run on it."), "skipped": "engine"}
+    # no verifier exists: the engine's own signals and verdict (model.quality) replace it. ``skipped`` tells readers it was not tried.
+    verification = {**no_verification("The diagram comes straight from the measured planes; there is no verifier."),
+                    "skipped": "engine"}
     density = lidar_meta["density_per_m2"]
     warnings, codes = collect_warnings(model, fpinfo, density, engine_warnings(res))
     assessment = assess_engine(res, model, codes)

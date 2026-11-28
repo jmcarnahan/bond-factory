@@ -65,8 +65,8 @@ def test_the_totals_are_the_contract_keys_and_each_is_the_sum_of_the_model(name)
     t = {k: mt[k] for k in TOTALS_KEYS}  # model.totals carries every contract key (plus the model-only shape keys)
     assert all(isinstance(v, (int, float)) and math.isfinite(v) for v in t.values())
     # one function, one answer: the model adds up ITS rows; the engine's own totals differ only where the adapter removed a
-    # spike or collapsed a sliver (a few hundredths of a square foot per facet), so each key is within 0.5 sq ft or ft
-    assert all(t[k] == pytest.approx(res.totals[k], abs=0.5) for k in TOTALS_KEYS), {k: (t[k], res.totals[k]) for k in TOTALS_KEYS}
+    # spike or collapsed a sliver (a few hundredths of a square foot per facet), so each key is within 0.1 (the largest gap over the 45 measured synthetic cases is 0.1: one rounding step of area_sqft)
+    assert all(t[k] == pytest.approx(res.totals[k], abs=0.1) for k in TOTALS_KEYS), {k: (t[k], res.totals[k]) for k in TOTALS_KEYS}
     assert t["area_sqft_roof_edge"] == t["area_sqft"] == mt["total_area_sqft"]  # one roof, one area
     assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["area_sqft"], abs=0.2)
     lengths = mt["lengths_ft"]
@@ -293,7 +293,7 @@ def test_the_model_carries_the_objects_and_their_totals():
     roof = synth_points.flat_pitched(level_change_m=0.6)
     pts = synth_points.simulate(roof, density=8, seed=1)
     pts = synth_points.add_box(pts, roof, (9.0, 5.5), (1.0, 1.2), 1.6, density=8, seed=11)
-    pts = synth_points.add_box(pts, roof, (6.0, -2.5), (1.6, 1.6), 0.5, density=8, seed=12)
+    pts = synth_points.add_box(pts, roof, (3.5, 3.6576), (1.6, 1.6), 0.4, density=8, seed=12)  # a lantern on the pitched ridge
     wall = roof.wall_polygon()
     from roof_measure.engine import measure_roof
 
@@ -309,8 +309,22 @@ def test_the_model_carries_the_objects_and_their_totals():
     assert t["chimney_perimeter_ft"] == pytest.approx(2 * sum(chimney["size_ft"]), abs=0.02)
     assert t["exposed_edge_ft"] == pytest.approx(t["step_flashing_ft"] + t["wall_flashing_ft"] + 2 * sum(lantern["size_ft"]), abs=0.03)
     assert t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"] + t["flat_edge_ft"] + t["exposed_edge_ft"], abs=0.03)
-    assert all(t[k] == pytest.approx(res.totals[k], abs=0.5) for k in TOTALS_KEYS) and res.roof_part_missed_sqft == 0.0
+    assert all(t[k] == pytest.approx(res.totals[k], abs=0.1) for k in TOTALS_KEYS) and res.roof_part_missed_sqft == 0.0
     bad = json.loads(json.dumps(model))
     bad["objects"][0]["kind"] = "tower"
     with pytest.raises(ModelError):
         validate(bad)
+
+
+def test_a_hand_built_model_with_a_parapet_or_unspecified_edge_validates_and_counts_it_in_lengths_only():
+    model, _ = model_of("gable_d8")
+    plain = {k: model["totals"][k] for k in TOTALS_KEYS}
+    eave = next(e for e in model["edges"] if e["type"] == "eave")
+    extra = [{**eave, "id": "e900", "type": "parapet"}, {**eave, "id": "e901", "type": "unspecified"}]
+    built = json.loads(json.dumps(model))
+    built["edges"] += extra
+    built["totals"] = {**adapter._model_totals(built["facets"], built["edges"], built["objects"]), "note": "x"}
+    validate(built)  # the totals add the new edges up under their own type
+    assert built["totals"]["lengths_ft"]["parapet"] == built["totals"]["lengths_ft"]["unspecified"] == pytest.approx(eave["length_ft"], abs=0.01)
+    assert {k: built["totals"][k] for k in TOTALS_KEYS} == plain  # in no contract total
+    assert model["totals"]["lengths_ft"]["parapet"] == model["totals"]["lengths_ft"]["unspecified"] == 0.0  # an engine model: zero

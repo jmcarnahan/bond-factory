@@ -31,13 +31,11 @@
    "lidar": {
     "project": "SYNTHETIC",
     "acquired": "2026-01-01",
-    "points_on_roof": 1311,
+    "points_on_roof": 1307,
     "density_per_m2": 8.0
    },
-   "solar": null,
-   "from_planes": true,
    "engine": "planes/1",
-   "engine_params": "9e5a444152e4eca586643739e1fb4afd52a37213b701e47a1f1d81f258994432",
+   "engine_params": "1125a78f7dbb6ddba89b248e51a9941a8a5f24fc7f3158213a5f86c689a1902a",
    "building": {
     "parcel_id": "SYNTH-P1",
     "outline_id": "SYNTH-B1",
@@ -63,19 +61,19 @@
      ],
      [
       -0.87799,
-      12.00787
+      12.00459
      ],
      [
       41.05971,
       12.02756
      ]
     ],
-    "pitch_rise": 6.01314,
+    "pitch_rise": 6.04438,
     "ridge_azimuth_deg": null,
     "gable_edges": [],
-    "plan_area_sqft": 551.45819,
-    "eave_height_ft": 9.24583,
-    "aspect_deg": 359.98034
+    "plan_area_sqft": 551.52699,
+    "eave_height_ft": 9.23542,
+    "aspect_deg": 0.00786
    },
    {
     "id": "b2",
@@ -87,23 +85,23 @@
      ],
      [
       -0.87799,
-      12.00787
+      12.00459
      ],
      [
       -0.87799,
-      -0.23294
+      -0.11483
      ],
      [
       41.05971,
-      -0.0853
+      -0.20341
      ]
     ],
-    "pitch_rise": 5.97543,
+    "pitch_rise": 6.01152,
     "ridge_azimuth_deg": null,
     "gable_edges": [],
-    "plan_area_sqft": 510.66848,
-    "eave_height_ft": 9.74427,
-    "aspect_deg": 179.96498
+    "plan_area_sqft": 510.59982,
+    "eave_height_ft": 9.72523,
+    "aspect_deg": 179.92846
    },
    {
     "id": "b3",
@@ -119,18 +117,18 @@
      ],
      [
       41.05971,
-      -0.0853
+      -0.20341
      ],
      [
       -0.87799,
-      -0.23294
+      -0.11483
      ]
     ],
     "pitch_rise": 0.0,
     "ridge_azimuth_deg": null,
     "gable_edges": [],
-    "plan_area_sqft": 710.31299,
-    "eave_height_ft": 11.80261
+    "plan_area_sqft": 710.31285,
+    "eave_height_ft": 11.8026
    }
   ],
   "facets": [
@@ -149,28 +147,28 @@
      ],
      [
       -0.87799,
-      12.00787
+      12.00459
      ],
      [
       41.05971,
       12.02756
      ]
     ],
-    "pitch_rise": 6.01314,
-    "aspect_deg": 359.98034,
-    "plan_area_sqft": 551.45819,
-    "area_sqft": 616.81927,
+    "pitch_rise": 6.04438,
+    "aspect_deg": 0.00786,
+    "plan_area_sqft": 551.52699,
+    "area_sqft": 617.54081,
     "roof_type": "pitched",
-    "pitch_fit": 6.02,
+    "pitch_fit": 6.01,
     "pitch_sigma": 0.02,
     "borderline": false,
-    "supported_pct": 99.9,
-    "points": 395,
-    "rms_ft": 0.488,
+    "supported_pct": 99.0,
+    "points": 388,
+    "rms_ft": 0.517,
     "plane_eq": [
-     0.00017,
-     -0.50109,
-     21.857
+     -7e-05,
+     -0.5037,
+     21.915
     ]
    },
    {
@@ -184,32 +182,32 @@
      ],
      [
       -0.87799,
-      12.00787
+      12.00459
      ],
      [
       -0.87799,
-      -0.23294
+      -0.11483
      ],
      [
       41.05971,
-      -0.0853
+      -0.20341
      ]
     ],
-    "pitch_rise": 5.97543,
-    "aspect_deg": 179.96498,
-    "plan_area_sqft": 510.66848,
-    "area_sqft": 570.47793,
+    "pitch_rise": 6.01152,
+    "aspect_deg": 179.92846,
+    "plan_area_sqft": 510.59982,
+    "area_sqft": 571.08727,
     "roof_type": "pitched",
-    "pitch_fit": 6.0,
+    "pitch_fit": 5.99,
     "pitch_sigma": 0.02,
     "borderline": false,
-    "supported_pct": 100.0,
-    "points": 383,
-    "rms_ft": 0.346,
+    "supported_pct": 99.9,
+    "points": 376,
+    "rms_ft": 0.414,
     "plane_eq": [
-     -0.0003,
-     0.49795,
-     9.86
+     -0.00063,
+     0.50096,
+     9.853
     ]
    },
    {
@@ -227,27 +225,27 @@
      ],
      [
       41.05971,
-      -0.0853
+      -0.20341
      ],
      [
       -0.87799,
-      -0.23294
+      -0.11483
      ]
     ],
     "pitch_rise": 0.0,
     "aspect_deg": null,
-    "plan_area_sqft": 710.31299,
-    "area_sqft": 710.31299,
+    "plan_area_sqft": 710.31285,
+    "area_sqft": 710.31285,
     "roof_type": "flat",
     "pitch_fit": 0.01,
-    "pitch_sigma": 0.0,
+    "pitch_sigma": 0.01,
     "borderline": false,
-    "supported_pct": 98.7,
-    "points": 498,
-    "rms_ft": 0.091,
+    "supported_pct": 100.0,
+    "points": 519,
+    "rms_ft": 0.092,
     "plane_eq": [
      0.00046,
-     -7e-05,
+     -6e-05,
      11.803
     ]
    }
@@ -263,10 +261,10 @@
      ],
      [
       -0.87799,
-      12.00787
+      12.00459
      ]
     ],
-    "length_ft": 41.9377,
+    "length_ft": 41.93771,
     "facets": [
      "f1",
      "f2"
@@ -278,14 +276,14 @@
     "points": [
      [
       -0.87799,
-      12.01115
+      12.00787
      ],
      [
       -0.87799,
       25.16718
      ]
     ],
-    "length_ft": 14.71533,
+    "length_ft": 14.73438,
     "facets": [
      "f1"
     ]
@@ -303,7 +301,7 @@
       12.03084
      ]
     ],
-    "length_ft": 14.69331,
+    "length_ft": 14.70866,
     "facets": [
      "f1"
     ]
@@ -332,14 +330,14 @@
     "points": [
      [
       41.05971,
-      -0.0853
+      -0.20341
      ],
      [
       -0.87799,
-      -0.23294
+      -0.11483
      ]
     ],
-    "length_ft": 41.938,
+    "length_ft": 41.93785,
     "facets": [
      "f2",
      "f3"
@@ -353,14 +351,14 @@
     "points": [
      [
       -0.87799,
-      -0.22966
+      -0.11155
      ],
      [
       -0.87799,
-      12.00459
+      12.00131
      ]
     ],
-    "length_ft": 13.66712,
+    "length_ft": 13.54779,
     "facets": [
      "f2"
     ]
@@ -375,10 +373,10 @@
      ],
      [
       41.05971,
-      -0.08202
+      -0.20013
      ]
     ],
-    "length_ft": 13.52419,
+    "length_ft": 13.67255,
     "facets": [
      "f2"
     ]
@@ -389,14 +387,14 @@
     "points": [
      [
       41.05971,
-      -0.08858
+      -0.20669
      ],
      [
       41.05971,
       -17.09646
      ]
     ],
-    "length_ft": 17.00787,
+    "length_ft": 16.88976,
     "facets": [
      "f3"
     ]
@@ -429,10 +427,10 @@
      ],
      [
       -0.87799,
-      -0.23622
+      -0.11811
      ]
     ],
-    "length_ft": 16.86024,
+    "length_ft": 16.97834,
     "facets": [
      "f3"
     ]
@@ -444,38 +442,38 @@
     "id": "o1",
     "kind": "lantern",
     "center": [
-     19.716,
-     -8.127
+     11.631,
+     12.087
     ],
     "size_ft": [
-     5.53,
-     5.19
+     5.18,
+     4.57
     ],
     "polygon": [
      [
-      16.95,
-      -10.723
+      9.043,
+      9.801
      ],
      [
-      22.481,
-      -10.723
+      14.218,
+      9.801
      ],
      [
-      22.481,
-      -5.53
+      14.218,
+      14.374
      ],
      [
-      16.95,
-      -5.53
+      9.043,
+      14.374
      ],
      [
-      16.95,
-      -10.723
+      9.043,
+      9.801
      ]
     ],
-    "height_ft": 1.77,
-    "facet": "f3",
-    "returns": 24
+    "height_ft": 2.36,
+    "facet": "f1",
+    "returns": 19
    },
    {
     "id": "o2",
@@ -490,23 +488,23 @@
     ],
     "polygon": [
      [
-      27.836,
+      27.835,
       16.214
      ],
      [
-      30.761,
+      30.762,
       16.214
      ],
      [
-      30.761,
+      30.762,
       20.127
      ],
      [
-      27.836,
+      27.835,
       20.127
      ],
      [
-      27.836,
+      27.835,
       16.214
      ]
     ],
@@ -516,17 +514,17 @@
    }
   ],
   "totals": {
-   "area_sqft": 1897.6,
-   "squares": 18.976,
-   "roofing_pitched_sqft": 1187.3,
+   "area_sqft": 1898.9,
+   "squares": 18.989,
+   "roofing_pitched_sqft": 1188.6,
    "roofing_flat_sqft": 710.3,
-   "planes_pitch_weighted": 6.0,
+   "planes_pitch_weighted": 6.03,
    "plane_count": 3,
    "eave_ft": 41.94,
-   "rake_ft": 56.6,
+   "rake_ft": 56.66,
    "flat_edge_ft": 75.81,
-   "exposed_edge_ft": 63.38,
-   "eave_rake_ft": 237.72,
+   "exposed_edge_ft": 61.44,
+   "eave_rake_ft": 235.85,
    "ridge_ft": 41.94,
    "hip_ft": 0.0,
    "valley_ft": 0.0,
@@ -538,27 +536,27 @@
    "chimney_count": 1,
    "chimney_perimeter_ft": 13.68,
    "lantern_count": 1,
-   "area_sqft_roof_edge": 1897.6,
+   "area_sqft_roof_edge": 1898.9,
    "low_slope_confirm_sqft": 0,
    "lengths_ft": {
     "eave": 41.94,
-    "rake": 56.6,
+    "rake": 56.66,
     "ridge": 41.94,
     "hip": 0.0,
     "valley": 0.0,
     "step_flashing": 41.94,
     "wall_flashing": 0.0,
-    "parapet": 0.0,
+    "parapet": 0,
     "transition": 0.0,
-    "unspecified": 0.0,
+    "unspecified": 0,
     "flat_edge": 75.81,
     "level_change": 0.0
    },
-   "total_area_sqft": 1897.6,
-   "pitched_area_sqft": 1187.3,
+   "total_area_sqft": 1898.9,
+   "pitched_area_sqft": 1188.6,
    "flat_area_sqft": 710.3,
    "predominant_pitch_rise": 6.0,
-   "predominant_pitch_area_sqft": 1187.3,
+   "predominant_pitch_area_sqft": 1188.6,
    "note": "Every total is the sum of the facets, edges and objects of this model; the envelope's totals repeat them."
   },
   "confidence": {
@@ -580,26 +578,26 @@
   },
   "quality": {
    "engine": "planes/1",
-   "engine_params": "9e5a444152e4eca586643739e1fb4afd52a37213b701e47a1f1d81f258994432",
+   "engine_params": "1125a78f7dbb6ddba89b248e51a9941a8a5f24fc7f3158213a5f86c689a1902a",
    "verdict": "ok",
-   "fit_covered": 0.965,
-   "fit_all": 0.962,
-   "fit_clear": 0.987,
-   "tree_cover_pct": 2.5,
+   "fit_covered": 0.969,
+   "fit_all": 0.966,
+   "fit_clear": 0.992,
+   "tree_cover_pct": 2.7,
    "coverage": 0.997,
-   "supported_pct": 99.5,
+   "supported_pct": 99.6,
    "density_pts_m2": 7.9,
    "parcel_match": "exact",
    "outline_source": "lacounty_lariac_2020",
    "outline_shift": 0.001,
-   "flat_share": 0.37431,
-   "plane_mismatch_pct": 3.5,
+   "flat_share": 0.37406,
+   "plane_mismatch_pct": 3.1,
    "outline_covered_pct": 100.0,
    "model_uncovered_pct": 0.3,
    "level_spread_ft": 1.0,
    "planes_lidar": 3,
    "facets_model": 3,
-   "roof_part_missed_sqft": 0,
+   "roof_part_missed_sqft": 0.0,
    "reasons": []
   },
   "planes": [
@@ -616,24 +614,24 @@
      ],
      [
       -0.87799,
-      12.00787
+      12.00459
      ],
      [
       41.05971,
       12.02756
      ]
     ],
-    "pitch_rise": 6.01,
-    "aspect_deg": 359.98034,
-    "plan_area_sqft": 551.45819,
-    "surface_area_sqft": 616.81927,
-    "height_ft": 12.54,
-    "rms_ft": 0.488,
+    "pitch_rise": 6.04,
+    "aspect_deg": 0.00786,
+    "plan_area_sqft": 551.52699,
+    "surface_area_sqft": 617.54081,
+    "height_ft": 12.55,
+    "rms_ft": 0.517,
     "filled_pct": 0.0,
     "plane_eq": [
-     0.00017,
-     -0.50109,
-     21.857
+     -7e-05,
+     -0.5037,
+     21.915
     ],
     "straighten_method": "engine"
    },
@@ -646,28 +644,28 @@
      ],
      [
       -0.87799,
-      12.00787
+      12.00459
      ],
      [
       -0.87799,
-      -0.23294
+      -0.11483
      ],
      [
       41.05971,
-      -0.0853
+      -0.20341
      ]
     ],
-    "pitch_rise": 5.98,
-    "aspect_deg": 179.96498,
-    "plan_area_sqft": 510.66848,
-    "surface_area_sqft": 570.47793,
+    "pitch_rise": 6.01,
+    "aspect_deg": 179.92846,
+    "plan_area_sqft": 510.59982,
+    "surface_area_sqft": 571.08727,
     "height_ft": 12.81,
-    "rms_ft": 0.346,
+    "rms_ft": 0.414,
     "filled_pct": 0.0,
     "plane_eq": [
-     -0.0003,
-     0.49795,
-     9.86
+     -0.00063,
+     0.50096,
+     9.853
     ],
     "straighten_method": "engine"
    },
@@ -684,23 +682,23 @@
      ],
      [
       41.05971,
-      -0.0853
+      -0.20341
      ],
      [
       -0.87799,
-      -0.23294
+      -0.11483
      ]
     ],
     "pitch_rise": 0.01,
     "aspect_deg": null,
-    "plan_area_sqft": 710.31299,
-    "surface_area_sqft": 710.31299,
+    "plan_area_sqft": 710.31285,
+    "surface_area_sqft": 710.31285,
     "height_ft": 11.81,
-    "rms_ft": 0.091,
+    "rms_ft": 0.092,
     "filled_pct": 0.0,
     "plane_eq": [
      0.00046,
-     -7e-05,
+     -6e-05,
      11.803
     ],
     "straighten_method": "engine"
@@ -708,17 +706,17 @@
   ]
  },
  "totals": {
-  "area_sqft": 1897.6,
-  "squares": 18.976,
-  "roofing_pitched_sqft": 1187.3,
+  "area_sqft": 1898.9,
+  "squares": 18.989,
+  "roofing_pitched_sqft": 1188.6,
   "roofing_flat_sqft": 710.3,
-  "planes_pitch_weighted": 6.0,
+  "planes_pitch_weighted": 6.03,
   "plane_count": 3,
   "eave_ft": 41.94,
-  "rake_ft": 56.6,
+  "rake_ft": 56.66,
   "flat_edge_ft": 75.81,
-  "exposed_edge_ft": 63.38,
-  "eave_rake_ft": 237.72,
+  "exposed_edge_ft": 61.44,
+  "eave_rake_ft": 235.85,
   "ridge_ft": 41.94,
   "hip_ft": 0.0,
   "valley_ft": 0.0,
@@ -730,41 +728,15 @@
   "chimney_count": 1,
   "chimney_perimeter_ft": 13.68,
   "lantern_count": 1,
-  "area_sqft_roof_edge": 1897.6,
+  "area_sqft_roof_edge": 1898.9,
   "low_slope_confirm_sqft": 0
  },
  "verification": {
   "verdict": "unverified",
   "notes": [
-   "The diagram comes straight from the measured planes; the verifier does not run on it."
+   "The diagram comes straight from the measured planes; there is no verifier."
   ],
   "adjustments": [],
-  "original_totals": {
-   "area_sqft": 1897.6,
-   "squares": 18.976,
-   "roofing_pitched_sqft": 1187.3,
-   "roofing_flat_sqft": 710.3,
-   "planes_pitch_weighted": 6.0,
-   "plane_count": 3,
-   "eave_ft": 41.94,
-   "rake_ft": 56.6,
-   "flat_edge_ft": 75.81,
-   "exposed_edge_ft": 63.38,
-   "eave_rake_ft": 237.72,
-   "ridge_ft": 41.94,
-   "hip_ft": 0.0,
-   "valley_ft": 0.0,
-   "ridge_hip_ft": 41.94,
-   "step_flashing_ft": 41.94,
-   "wall_flashing_ft": 0.0,
-   "transition_ft": 0.0,
-   "level_change_ft": 0.0,
-   "chimney_count": 1,
-   "chimney_perimeter_ft": 13.68,
-   "lantern_count": 1,
-   "area_sqft_roof_edge": 1897.6,
-   "low_slope_confirm_sqft": 0
-  },
   "model": null,
   "rounds": 0,
   "usage": {

@@ -27,7 +27,14 @@ import math
 import numpy as np
 from shapely.ops import unary_union
 
-from .edge_measure import crease_slope, into, measured_jump, ridge_check, seam_is_level, seg_split
+from .edge_measure import (
+    crease_slope,
+    into,
+    measured_jump,
+    ridge_check,
+    seam_is_level,
+    seg_split,
+)
 from .ends import adopt_end_pieces, resolve_steps
 from .errors import Ctx
 from .params import EngineParams
@@ -241,10 +248,7 @@ def _jump_m(facets: list[Facet], fs: tuple, p0: np.ndarray, p1: np.ndarray, q: n
     """The measured height jump (m) of a two-facet chain, rounded; None for an outline chain."""
     if len(fs) != 2:
         return None
-    try:
-        return round(float(measured_jump(facets[fs[0]], facets[fs[1]], p0, p1, q, p)), 3)
-    except (ValueError, IndexError):
-        return None
+    return round(float(measured_jump(facets[fs[0]], facets[fs[1]], p0, p1, q, p)), 3)  # a real error surfaces: no silent zero
 
 
 def build_edges(facets: list[Facet], q: np.ndarray | None, ctx: Ctx, absorbed: list | None = None) -> list[Edge]:

@@ -32,8 +32,9 @@ class RoofModel {
   /// newer or older service may send are tolerated: an unknown edge type reads as `unspecified`, an
   /// unknown facet kind is chosen from the pitch, an unknown object kind reads as `unknown`, and an
   /// unknown `lengths_ft` key lands in [RoofTotals.extraLengths]. Each mapping is recorded in
-  /// [parseNotes]. A model of the old block shape (`blocks`, `from_planes`) still parses: the keys this package no
-  /// longer models are kept in [extra] and written back.
+  /// [parseNotes]. A model of the OLD block shape (`blocks`, `from_planes`, `source.solar`;
+  /// the 0.6.0 engine writes none of them, only old stored results carry them) still parses: the keys this package
+  /// no longer models are kept in [extra] and written back.
   factory RoofModel.fromJson(Map<String, dynamic> json) {
     final schema = asStr(json['schema'], 'schema');
     if (!schema.startsWith('bond.roof_model/0.')) badJson('schema', 'unsupported schema "$schema"');

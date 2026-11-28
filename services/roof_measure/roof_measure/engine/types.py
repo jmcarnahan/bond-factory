@@ -54,8 +54,8 @@ class Outline:
     drawn: Polygon
     source: str  # the outline provider as given (e.g. "lariac")
     county: bool  # the given outline is a county wall line (so an overhang was measured and applied)
-    overhang_measured_m: tuple[float | None, ...] = ()
-    overhang_applied_m: tuple[float, ...] = ()
+    edge_offset_measured_m: tuple[float | None, ...] = ()  # per ring side: the finder's measured offset (m, + outward), None when not measured
+    edge_offset_applied_m: tuple[float, ...] = ()  # per ring side: the offset applied (measured, else filled; fill and tree sides clamped)
     support_area_m2: float = 0.0
 
 

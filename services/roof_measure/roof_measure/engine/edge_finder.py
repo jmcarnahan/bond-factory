@@ -62,15 +62,18 @@ class _Cloud:
         return np.sort(ci), np.sort(qi)
 
 
+_NOT_CANDIDATE = (2, 7, 9, 18)  # ASPRS ground, low noise, water, high noise; vegetation stays (the tree test needs it)
+
+
 def candidates(context: np.ndarray | None, roof_xyz: np.ndarray, ring: Polygon, p: EngineParams) -> np.ndarray:
-    """Non-ground returns more than ``edge_hag_m`` above the local ground (median z of the ``edge_ground_k`` nearest
+    """Returns that are not ground, noise or water, more than ``edge_hag_m`` above the local ground (median z of the ``edge_ground_k`` nearest
     ground returns) within reach of the ring. Without a usable wide cloud the roof points themselves (already chosen
     by height) stand in."""
     reach = ring.buffer(p.edge_out_m + p.edge_extend_m + p.edge_shift_max_m + p.edge_half_m)
     if context is None or int((context[:, 3] == 2).sum()) < p.edge_ground_k:
         return roof_xyz[shapely.contains_xy(reach, roof_xyz[:, 0], roof_xyz[:, 1])][:, :3]
     g = context[context[:, 3] == 2]
-    ng = context[context[:, 3] != 2]
+    ng = context[~np.isin(context[:, 3], _NOT_CANDIDATE)]
     ng = ng[shapely.contains_xy(reach, ng[:, 0], ng[:, 1])]
     if not len(ng):
         return np.zeros((0, 3))
@@ -177,8 +180,13 @@ def _side_strips(C: _Cloud, a: np.ndarray, b: np.ndarray, p: EngineParams) -> li
     return out
 
 
-def _consensus(vals: list[float], p: EngineParams) -> list[bool]:
-    """Strips that agree with the side: within max(edge_dev_m, 3 MAD) of the median (all kept under 3 strips)."""
+def _consensus(vals: list[float], p: EngineParams, pair: bool = True) -> list[bool]:
+    """Strips that agree with the side: within max(edge_dev_m, 3 MAD) of the median. Two strips agree only when they lie
+    within 2 x edge_dev_m of each other (else neither counts: their mean is an offset no strip measured); with ``pair``
+    False (the registration pass, where such a side weighs 2 strips) two strips are kept as they are."""
+    if len(vals) == 2 and pair:
+        agree = abs(vals[0] - vals[1]) <= 2 * p.edge_dev_m
+        return [agree, agree]
     if len(vals) < 3:
         return [True] * len(vals)
     v = np.array(vals)
@@ -207,14 +215,15 @@ def _step_split(us: list[float], es: list[float], p: EngineParams) -> int | None
     return best
 
 
-def _side_offset(rows: list[tuple[float, float | None, str]], p: EngineParams) -> tuple[float | None, int, list, str]:
+def _side_offset(rows: list[tuple[float, float | None, str]], p: EngineParams, pair: bool = True
+                 ) -> tuple[float | None, int, list, str]:
     """(median offset, strips kept, rows with consensus outliers marked ``dev``, source). A side without enough clear
     strips takes the run measured under a tree crown (source ``tree``): occlusion can only end that run early, never
     carry it past the returns."""
     rows = list(rows)
     for kind in ("ok", "tree"):
         idx = [i for i, (_, _, w) in enumerate(rows) if w == kind]
-        keep = _consensus([rows[i][1] for i in idx], p)
+        keep = _consensus([rows[i][1] for i in idx], p, pair)
         if kind == "ok":
             for i, kp in zip(idx, keep, strict=True):
                 if not kp:
@@ -247,7 +256,7 @@ def _measure(ring: Polygon, C: _Cloud, p: EngineParams, split: bool) -> tuple[li
                 m = a + t * cut
                 parts = [(a, m, [r for r in rows if r[0] < cut]), (m, b, [r for r in rows if r[0] > cut])]
         for pa, pb, prow in parts:
-            off, kept, prow, src = _side_offset(prow, p)
+            off, kept, prow, src = _side_offset(prow, p, pair=split)
             for _, _, w in prow:
                 reasons[w] = reasons.get(w, 0) + 1
             sides.append({"a": pa, "b": pb, "n": np.array([t[1], -t[0]]), "L": float(np.hypot(*(pb - pa))),
@@ -373,7 +382,7 @@ def find_roof_edge(context: np.ndarray | None, roof_xyz: np.ndarray, q: np.ndarr
     C = _Cloud(candidates(context, roof_xyz, ring, p), q[:, :3], np.asarray(qlab, int),
                np.array([np.asarray(pl, float)[:3] for pl in planes]).reshape(-1, 3))
     first, _ = _measure(ring, C, p, split=False)
-    o, dx, dy = _register(first, p)
+    _, dx, dy = _register(first, p)
     shifted = math.hypot(dx, dy) <= p.edge_shift_max_m
     if not shifted:
         dx = dy = 0.0
@@ -387,7 +396,9 @@ def find_roof_edge(context: np.ndarray | None, roof_xyz: np.ndarray, q: np.ndarr
     per = sum(d["L"] for d in sides) or 1.0
     blind = sum(d["L"] for d in sides if d["why"] and set(d["why"]) <= {"few", "noroof", "noplane"}) / per
     carry = sum(d["L"] for d in sides if d["src"] != "ok" and d["why"] and 2 * d["why"].count("end") >= len(d["why"])) / per
-    diag = {"edge_residual_m": round(_residual(sides), 3), "edge_no_evidence_share": round(blind, 3), "edge_end_share": round(carry, 3), "edge_shift_m": [round(dx, 3), round(dy, 3)], "edge_common_m": round(o, 3),
-            "edge_shift_refused": not shifted, "edge_split_sides": len(sides) - len(first),
-            "edge_candidates": len(C.cand), "edge_side_source": sources}
+    diag = {"edge_shift_m": [round(dx, 3), round(dy, 3)],  # the registration (contract: outline_shift's companion)
+            "edge_residual_m": round(_residual(sides), 3),  # disagreement left after it (contract)
+            "edge_no_evidence_share": round(blind, 3), "edge_end_share": round(carry, 3),  # quality reasons
+            "edge_split_sides": len(sides) - len(first),  # tests; a field report's jog
+            "edge_side_source": sources}  # a field report: which sides were measured, seen under a tree or guessed
     return EdgeResult(poly, ring_out, measured, offsets, sources, (dx, dy), reasons, diag)

@@ -16,6 +16,7 @@ from shapely.geometry import Point, Polygon
 SCHEMA = "bond.roof_model/0.1"
 CORE_EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "parapet",
                    "transition", "unspecified")  # the closed ten of contract 0.2: always in totals.lengths_ft
+SCHEMA_ONLY_EDGE_TYPES = ("parapet", "unspecified")  # valid for stored results and hand-built models; the engine emits neither; in no contract total
 NEW_EDGE_TYPES = ("flat_edge", "level_change")  # contract 0.4 (engine): a result without them reads as zero
 EDGE_TYPES = CORE_EDGE_TYPES + NEW_EDGE_TYPES  # the twelve keys of totals.lengths_ft
 OBJECT_KINDS = ("chimney", "lantern", "unknown")  # contract 0.6: things standing on the roof (never facets)
@@ -28,9 +29,11 @@ TOTALS_KEYS = (
     "chimney_perimeter_ft", "lantern_count", "area_sqft_roof_edge", "low_slope_confirm_sqft")
 UNPRICED_EDGE_TYPES = ("flat_seam",)  # 0.5.1: drawn between two flat pieces of one deck, never priced, in no total
 VALID_EDGE_TYPES = EDGE_TYPES + UNPRICED_EDGE_TYPES  # what an edge may be typed
-# closed contract vocabulary (FORMS, METHODS); entries the library no longer emits stay until the 0.6.0 contract
+# closed vocabularies. FORMS: the engine writes flat and shed; hip and gable stay because the kept synthetic models and old stored
+# results carry them. METHODS: the engine writes "planes"; lidar_skeleton and fixture stay for the same reason (the agent and
+# manual methods were removed: no kept model carries them)
 FORMS = ("flat", "hip", "gable", "shed")
-METHODS = ("planes", "lidar_skeleton", "lidar_agent", "solar_agent", "manual", "fixture")  # the engine writes "planes"; the rest only read old fixtures
+METHODS = ("planes", "lidar_skeleton", "fixture")
 
 
 def origin_of(blockset: Any) -> dict[str, Any]:

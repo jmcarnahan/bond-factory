@@ -1,7 +1,7 @@
 """The plane engine's example envelope (``roof_engine/roof_measurement_0.6_engine.json``), built from a SYNTHETIC roof.
 
 ``flat_pitched_step`` (a flat part, a gable and a 0.6 m step between them) at 8 points/m2, with a 1.0 x 1.2 m chimney on the
-gable and a 1.6 m lantern on the flat part, goes through the real engine, the real adapter and ``build_envelope``: every
+gable and a 1.6 m lantern on the ridge of the pitched part, goes through the real engine, the real adapter and ``build_envelope``: every
 contract-0.6 key a reader can meet is in the file. Nothing here is a real
 place: the address is the placeholder one, the origin is an invented grid point, the parcel and outline ids say SYNTH. Deterministic.
 """
@@ -29,7 +29,7 @@ def engine_envelope() -> dict[str, Any]:
 
     case = next(c for c in synth_points.cases() if c.name == CASE)
     pts = synth_points.add_box(case.points(), case.roof, (9.0, 5.5), (1.0, 1.2), 1.6, density=8, seed=11)  # a chimney
-    pts = synth_points.add_box(pts, case.roof, (6.0, -2.5), (1.6, 1.6), 0.5, density=8, seed=12)  # a lantern on the flat part
+    pts = synth_points.add_box(pts, case.roof, (3.5, 3.6576), (1.6, 1.6), 0.4, density=8, seed=12)  # a lantern on the ridge of the pitched part
     wall = case.roof.wall_polygon()
     rp = roof_points_from_arrays(pts[pts[:, 3] == 1][:, :3], wall, pts)
     res = measure_roof(rp, wall, outline_source="lacounty_lariac_2020", parcel_match="exact", context=pts)

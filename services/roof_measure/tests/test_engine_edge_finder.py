@@ -48,7 +48,7 @@ def _south_y(poly: Polygon, x: float) -> float:
 
 
 # today's (library 0.5.1) drawn-outline symmetric difference against the exact outline, sq ft, per standard case: the
-# bar "no worse than today's" (+ 0.5% of the exact area for sampling noise). Measured once with the deleted outline code.
+# bar "no worse than today's". Measured once with the deleted outline code.
 TODAY_SYMDIFF = {
     "gable_d16": 19, "gable_d8": 19, "hip_d16": 15, "hip_d8": 18, "l_shape_d16": 22, "l_shape_d8": 22, "t_shape_d16": 19,
     "t_shape_d8": 38, "t_shape_d4": 45, "cross_gable_d16": 17, "cross_gable_d8": 44, "cross_gable_d4": 36,
@@ -60,10 +60,25 @@ TODAY_SYMDIFF = {
     "l_shape_d8_banded": 36, "l_shape_d8_offset": 96, "gable_d8_rot17": 13, "gable_d8_rot45": 7, "hip_d8_rot17": 29,
     "hip_d8_rot45": 10, "l_shape_d8_rot17": 30, "l_shape_d8_rot45": 14, "dutch_gable_d8_rot17": 13,
     "dutch_gable_d8_rot45": 7, "t_shape_d8_rot17": 17, "t_shape_d8_rot45": 15}
-# The cases that miss a bar (numbers in the slice report); strict, so an improvement is noticed.
-AREA_MISS = {"gable_d8_banded"}  # -4.2%: the eave falls in a sparse scan band (today -2.2%, also over 2%)
-SYMDIFF_MISS = {"flat_pitched_d8", "flat_pitched_step_d8", "gable_d8_trees", "gable_d8_banded", "hip_d8_rot45",
-                "t_shape_d8_rot17", "gable_d8_rot17"}  # 1-13 sq ft over: today's support correction was fitted on this simulator
+# Slack on that bar: 0.5% of the exact area (about 6 sq ft on a 1,200 sq ft roof), a mean side error of 0.015 m:
+# the run-to-run sampling noise of two correct edge estimates. Without it 14 cases miss by 2-9 sq ft.
+SYMDIFF_SLACK = 0.005
+# Cases that miss a bar, with the measured cause (per side: + = drawn outside the exact edge). Strict, so a fix shows.
+_NOISE = "every side within +-0.06 m of the exact edge (jittered-grid sampling phase); today's correction was fitted on this simulator and reads +-0.02"
+SYMDIFF_MISS = {
+    "flat_pitched_d8": "19 against 10 sq ft: " + _NOISE,
+    "flat_pitched_step_d8": "20 against 10 sq ft: " + _NOISE,
+    "gable_d8_trees": "16 against 9 sq ft: " + _NOISE + " (6 strips rejected under the crowns)",
+    "gable_d8_banded": "55 against 26 sq ft: the west side lies in a sparse scan band with no return in its last 0.5 m: drawn 0.54 m short",
+    "hip_d8_rot45": "23 against 10 sq ft: at 45 degrees the sampling grid runs diagonally to the strips; one 11.3 m eave reads 0.13 m short",
+    "t_shape_d8_rot17": "27 against 17 sq ft: 8 sides each within +-0.08 m (sampling phase at 17 degrees)",
+    "gable_d8_rot17": "19 against 13 sq ft: " + _NOISE}
+AREA_MISS = {"gable_d8_banded": "-4.2% (today -2.2%): the west side drawn 0.54 m short, as above"}
+
+
+def _cases(miss: dict) -> list:
+    return [pytest.param(n, marks=pytest.mark.xfail(strict=True, reason=miss[n])) if n in miss else n
+            for n in sorted(TODAY_SYMDIFF)]
 
 
 @pytest.fixture(scope="module")
@@ -77,26 +92,22 @@ def standard():
     return out
 
 
-@pytest.mark.parametrize("name", sorted(TODAY_SYMDIFF))
+@pytest.mark.parametrize("name", _cases(AREA_MISS))
 def test_outline_area_within_two_percent_of_the_exact_outline(standard, name):
     res, truth = standard[name]
     if res.outline is None:
         pytest.skip("refused (lidar_too_sparse)")
     err = res.outline.drawn.area / truth.area - 1
-    if name in AREA_MISS:
-        pytest.xfail(f"known miss: {100 * err:+.1f}%") if abs(err) > 0.02 else pytest.fail("now passes: drop it from AREA_MISS")
     assert abs(err) <= 0.02, f"{100 * err:+.1f}%"
 
 
-@pytest.mark.parametrize("name", sorted(TODAY_SYMDIFF))
+@pytest.mark.parametrize("name", _cases(SYMDIFF_MISS))
 def test_symmetric_difference_no_worse_than_today(standard, name):
     res, truth = standard[name]
     if res.outline is None:
         pytest.skip("refused (lidar_too_sparse)")
     sd = truth.symmetric_difference(res.outline.drawn).area * M2
-    bar = TODAY_SYMDIFF[name] + 0.005 * truth.area * M2
-    if name in SYMDIFF_MISS:
-        pytest.xfail(f"known miss: {sd:.0f} > {bar:.0f}") if sd > bar else pytest.fail("now passes: drop it from SYMDIFF_MISS")
+    bar = TODAY_SYMDIFF[name] + SYMDIFF_SLACK * truth.area * M2
     assert sd <= bar, f"{sd:.0f} sq ft against {bar:.0f}"
 
 
@@ -308,3 +319,38 @@ def test_the_residual_after_registration_is_small_on_a_true_outline_and_large_on
     notched = Polygon([(x0, y0), (x1 - 2.0, y0), (x1 - 2.0, y0 + 2.0), (x1, y0 + 2.0), (x1, y1), (x0, y1)])
     res, _ = _run(pts, notched)
     assert res.diagnostics["edge_residual_m"] >= 0.15
+
+
+def test_two_strips_that_disagree_do_not_measure_a_side():
+    """Two strips 0.1 and 2.4 m out: their mean (1.25 m) is an offset neither measured. Over 2 x edge_dev_m apart, both
+    are dropped and the side falls to the fill (which is clamped); two that agree still measure it."""
+    from roof_measure.engine.edge_finder import _side_offset
+
+    off, _, rows, src = _side_offset([(0.5, 0.1, "ok"), (1.4, 2.4, "ok")], DEFAULT)
+    assert off is None and src == "" and [w for _, _, w in rows] == ["dev", "dev"]
+    off, _, _, src = _side_offset([(0.5, 0.25, "ok"), (1.4, 0.45, "ok")], DEFAULT)
+    assert src == "ok" and abs(off - 0.35) < 1e-9
+
+
+def test_a_collapsed_edge_polygon_falls_back_to_the_regular_ring(monkeypatch):
+    """Never refuse a roof because the offset ring collapsed: draw the regular ring and say so."""
+    import roof_measure.engine.outline as O
+
+    real = O.find_roof_edge
+
+    def collapsed(*a, **k):
+        r = real(*a, **k)
+        r.polygon = Polygon()
+        return r
+
+    monkeypatch.setattr(O, "find_roof_edge", collapsed)
+    roof = gable()
+    res, st = _run(simulate(roof, density=8, seed=1), roof.wall_polygon())
+    assert res.outline is not None and res.diagnostics["edge_fallback"] == "regular ring"
+    assert abs(st.outline.area - roof.wall_polygon().area) < 0.5
+
+
+def test_without_a_wide_cloud_the_object_counts_are_unknown_not_zero():
+    roof = gable()
+    res, _ = _run(simulate(roof, density=8, seed=1), roof.wall_polygon(), context=None)
+    assert res.diagnostics["objects_error"] == "no wide cloud"

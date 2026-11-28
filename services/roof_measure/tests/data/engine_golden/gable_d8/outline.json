@@ -23,13 +23,13 @@
  ],
  "area_m2": 109.62,
  "source": "points+footprint",
- "overhang_measured_m": [
+ "edge_offset_measured_m": [
   0.31,
   0.31,
   0.32,
   0.3
  ],
- "overhang_applied_m": [
+ "edge_offset_applied_m": [
   0.31,
   0.31,
   0.32,

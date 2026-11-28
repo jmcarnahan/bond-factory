@@ -44,7 +44,7 @@ def test_the_plan_numbers_are_the_defaults():
 
 
 # The default parameter hash is the key of every cached result: a deliberate change re-pins it (and bumps PIPELINE_VERSION).
-DEFAULT_HASH = "9e5a444152e4eca586643739e1fb4afd52a37213b701e47a1f1d81f258994432"
+DEFAULT_HASH = "1125a78f7dbb6ddba89b248e51a9941a8a5f24fc7f3158213a5f86c689a1902a"
 
 
 def test_the_default_parameter_hash_is_pinned():

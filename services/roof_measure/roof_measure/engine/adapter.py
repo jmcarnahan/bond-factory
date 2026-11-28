@@ -1,10 +1,7 @@
 """EngineResult -> the library's roof model (``bond.roof_model/0.1``, contract 0.4 additions) and envelope totals.
 
-WHY the model dict is built here and not by ``planes_model.model_from_planes``: that function re-types every edge from
-plane heights (the engine has already typed them, once, in ``engine.edges``: a second typer would disagree), forces a
-facet under 0.5/12 to pitch 0, rejects nothing it can fix but cannot carry ``roof_type``, ``level_change`` or the
-engine's own ``jump_ft``, and imports the skeleton path. Building the same shape directly (one ``shed`` or ``flat``
-block per facet, like ``model_from_planes``) takes fewer special cases; ``model.validate`` then checks the result.
+The model dict is built here, one ``shed`` or ``flat`` block per facet, from the engine's own typed edges (the engine types every
+edge once, in ``engine.edges``: a second typer would disagree); ``model.validate`` then checks the result.
 
 Units: the engine works in metres in a local metric frame whose origin is the model's origin, so every x, y here is
 ``metres / 0.3048`` and every height is ``(z - ground_z) / 0.3048`` (feet above ground, as ``model.planes`` has them).
@@ -20,7 +17,15 @@ from typing import Any
 import numpy as np
 from shapely.geometry import Point, Polygon
 
-from ..model import EDGE_TYPES, SCHEMA, ModelError, origin_of, predominant_pitch, validate
+from ..model import (
+    EDGE_TYPES,
+    SCHEMA,
+    SCHEMA_ONLY_EDGE_TYPES,
+    ModelError,
+    origin_of,
+    predominant_pitch,
+    validate,
+)
 from .edges import edge_diagnostics
 from .params import DEFAULT, EngineParams
 from .totals import roof_totals
@@ -146,7 +151,8 @@ def _model_totals(facets: list[dict], edges: list[dict], objects: list[dict]) ->
     segs = [SimpleNamespace(type=e["type"], length_ft=e["length_ft"]) for e in edges]
     t = roof_totals(rows, segs, {f["id"] for f in facets if f["borderline"]}, objects)
     bucket, bucket_area = predominant_pitch(facets)
-    shape = {"lengths_ft": {k: t.get(f"{k}_ft", 0.0) for k in EDGE_TYPES},
+    own = {k: round(sum(e["length_ft"] for e in edges if e["type"] == k), 2) for k in SCHEMA_ONLY_EDGE_TYPES}  # 0 for the engine's models
+    shape = {"lengths_ft": {k: own[k] if k in own else t.get(f"{k}_ft", 0.0) for k in EDGE_TYPES},
              "total_area_sqft": t["area_sqft"], "pitched_area_sqft": t["roofing_pitched_sqft"],
              "flat_area_sqft": t["roofing_flat_sqft"], "predominant_pitch_rise": bucket,
              "predominant_pitch_area_sqft": round(bucket_area, 1)}
@@ -177,7 +183,7 @@ def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[s
                                  "area_sqft": meta.get("area_sqft")},
                    "lidar": ({k: lidar.get(k) for k in ("project", "acquired", "points_on_roof", "density_per_m2")}
                              if lidar else None),
-                   "solar": None, "from_planes": True, "engine": "planes/1", "engine_params": res.params_hash},
+                   "engine": "planes/1", "engine_params": res.params_hash},
         "blocks": blocks, "facets": facets, "edges": edges, "holes": [], "objects": objects,
         "totals": {**_model_totals(facets, edges, objects),
                    "note": "Every total is the sum of the facets, edges and objects of this model; the envelope's totals repeat them."},

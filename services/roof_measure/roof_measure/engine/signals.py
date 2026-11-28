@@ -20,20 +20,24 @@ from .types import Facet, Quality
 _NOT_ROOF_CLASSES = [3, 4, 5, 7, 9]  # ASPRS vegetation, noise, water classes: never roof
 
 
-def _fit_shares(facets: list[Facet], pts: np.ndarray, p: EngineParams) -> tuple[float | None, float | None, float | None,
-                                                                             float | None, float | None]:
-    """(fit_all, fit_covered, coverage, fit_clear, tree_cover_pct) over the roof returns ``pts``.
+def _fit_shares(facets: list[Facet], pts: np.ndarray, near: np.ndarray, p: EngineParams
+                ) -> tuple[float | None, float | None, float | None, float | None, float | None]:
+    """(fit_all, fit_covered, coverage, fit_clear, tree_cover_pct): coverage over all roof returns ``pts``, the others
+    over the returns ``near`` the drawn roof (a mask over ``pts``). One containment pass.
 
     fit_all: share within ``fit_tol_m`` of the plane of the facet they fall in (a return outside every facet counts as
     a miss). fit_covered: the same over the returns inside a facet. Canopy: a return more than ``canopy_above_m`` ABOVE
     the surface under it (inside a facet, or outside one but within 2 m of it: the surface there is that facet's
-    plane): trees over the eaves, not roof. fit_clear is fit_all with the canopy left out of the count (reported, not part of the verdict); tree_cover_pct
-    the canopy's share of all returns. Returns far BELOW the surface or off it stay misses."""
-    n = len(pts)
-    assigned = np.full(n, -1)
+    plane): trees over the eaves, not roof. fit_clear is fit_all with the canopy left out of the count (reported, not
+    part of the verdict); tree_cover_pct the canopy's share. Returns far BELOW the surface or off it stay misses."""
+    n_all = len(pts)
+    assigned = np.full(n_all, -1)
     for i, f in enumerate(facets):
         c = shapely.contains_xy(f.polygon, pts[:, 0], pts[:, 1])
         assigned[(assigned < 0) & c] = i
+    coverage = round(float((assigned >= 0).mean()), 3) if n_all else None
+    pts, assigned = pts[near], assigned[near]
+    n = len(pts)
     ins = assigned >= 0
     ok = np.zeros(n, bool)
     canopy = np.zeros(n, bool)
@@ -48,10 +52,10 @@ def _fit_shares(facets: list[Facet], pts: np.ndarray, p: EngineParams) -> tuple[
     if len(out) and facets:  # outside every facet: judged against the nearest facet's plane when one is within 2 m
         pp = shapely.points(pts[out, 0], pts[out, 1])
         d = np.stack([shapely.distance(f.polygon, pp) for f in facets])
-        near = d.argmin(0)
+        near_f = d.argmin(0)
         close = d.min(0) <= 2.0
         for i, f in enumerate(facets):
-            m = close & (near == i)
+            m = close & (near_f == i)
             if m.any():
                 pl = f.plane
                 r = pts[out[m], 2] - (pl[0] * pts[out[m], 0] + pl[1] * pts[out[m], 1] + pl[2])
@@ -61,7 +65,32 @@ def _fit_shares(facets: list[Facet], pts: np.ndarray, p: EngineParams) -> tuple[
     clear_n = n - int(canopy.sum())
     fit_clear = round(float(ok.sum() / clear_n), 3) if clear_n > 0 else None
     tree = round(100.0 * float(canopy.mean()), 1) if n else None
-    return fit_all, fit_cov, round(float(ins.mean()), 3) if n else None, fit_clear, tree
+    return fit_all, fit_cov, coverage, fit_clear, tree
+
+
+# The closed list of quality reasons, most serious first. The verdict is the most serious reason present ("ok" when
+# none). A SOFT verdict (the roof is drawn as measured; the caller only needs to know) is replaced by any serious
+# reason, so a low density or a nearest-parcel match never hides a wrong outline or a poor fit.
+REASONS = ("lidar_too_sparse", "outline_mismatch", "poor_fit", "planes_not_found", "outline_no_evidence",
+           "roof_continues", "roof_part_missed", "low_density", "not_exact_parcel")
+SOFT = ("ok", "not_exact_parcel", "low_density")
+_VERDICT_WORD = {"planes_not_found": "poor_fit"}  # the verdict a reader already knows for a roof drawn from no planes
+
+
+def verdict_of(reasons: list[str]) -> str:
+    """The verdict for ``reasons``: the most serious one in REASONS order, "ok" when there is none."""
+    known = [r for r in reasons if r in REASONS]
+    if not known:
+        return "ok"
+    worst = min(known, key=REASONS.index)
+    return _VERDICT_WORD.get(worst, worst)
+
+
+def add_reason(q: Quality, reason: str) -> None:
+    """Append ``reason`` once and recompute the verdict."""
+    if reason not in q.reasons:
+        q.reasons.append(reason)
+    q.verdict = verdict_of(q.reasons)
 
 
 def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygon, parcel_match: str | None,
@@ -72,8 +101,7 @@ def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygo
     ``fit_outline_margin_m``: they say how well the planes describe THIS roof, not how many returns of a neighbour's roof,
     a wall or a tree the wall-line crop caught. ``coverage`` stays over all of ``pts``."""
     near = shapely.contains_xy(outline.buffer(p.fit_outline_margin_m), pts[:, 0], pts[:, 1]) if len(pts) else np.zeros(0, bool)
-    fit_all, fit_cov, _, fit_clear, tree_cover = _fit_shares(facets, pts[near], p)
-    cover_pts = _fit_shares(facets, pts, p)[2]
+    fit_all, fit_cov, cover_pts, fit_clear, tree_cover = _fit_shares(facets, pts, near, p)
     n = len(pts)
     dens = float(shapely.contains_xy(outline, pts[:, 0], pts[:, 1]).sum() / max(outline.area, 1.0))
     cover = support_area_m2 / max(wall.area, 1.0)
@@ -99,7 +127,7 @@ def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygo
         reasons.append("outline_no_evidence")  # part of the outline has no roof returns at all: drawn from the wall line
     if d.get("edge_end_share", 0.0) >= p.roof_continues_share:
         reasons.append("roof_continues")  # the roof plane carries on past the outline: an attached roof left out
-    return Quality(verdict=reasons[0] if reasons else "ok", reasons=reasons, fit_all=fit_all, fit_covered=fit_cov,
+    return Quality(verdict=verdict_of(reasons), reasons=reasons, fit_all=fit_all, fit_covered=fit_cov,
                    coverage=cover_pts, supported_pct=supported_pct, density=round(dens, 1), outline_shift=round(shift, 3),
                    parcel_match=parcel_match, outline_source=provider,
                    roof_cover_of_outline=round(cover, 2), extra_roof_ring_ratio=None if extra is None else round(extra, 2),

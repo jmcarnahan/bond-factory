@@ -21,7 +21,7 @@ from roof_measure.engine.load import roof_points_from_arrays
 from roof_measure.engine.measure import measure_stages
 from roof_measure.engine.objects import find_objects
 from roof_measure.engine.params import DEFAULT
-from roof_measure.engine.synth_points import add_box, cases, gable, hip, simulate
+from roof_measure.engine.synth_points import add_box, cases, flat, gable, hip, simulate
 from roof_measure.engine.types import Facet, Outline
 
 FT = 1 / 0.3048
@@ -206,3 +206,44 @@ def test_no_side_effects_and_nothing_to_find_returns_empty():
     assert np.array_equal(pts, before) and a == find_objects(pts, res.facets, res.outline, gz)
     assert find_objects(np.zeros((0, 4)), res.facets, res.outline, gz) == ([], [])
     assert find_objects(pts, [], res.outline, gz) == ([], [])
+
+
+def test_a_thin_strip_along_a_ridge_is_a_seam_artefact_and_a_chimney_beside_it_is_not():
+    roof = gable()
+    c = roof.roof_polygon().centroid
+    pts = simulate(roof, density=20, seed=4)
+    pts = add_box(pts, roof, (c.x, c.y + 0.0), (2.5, 0.55), 1.5, density=20, seed=5)  # 2.5 x 0.55 m, 1.5 m high, along the ridge
+    res, gz = _measure(roof, pts)
+    assert find_objects(pts, res.facets, res.outline, gz) == ([], [])
+    assert find_objects(pts, res.facets, res.outline, gz, DEFAULT.replace(obj_max_aspect=100.0))[0], "the strip is found without the rule"
+    pts = add_box(pts, roof, (c.x + 3.0, c.y - 1.5), (1.2, 0.9), 1.5, density=20, seed=6)
+    res, gz = _measure(roof, pts)
+    objs, _ = find_objects(pts, res.facets, res.outline, gz)
+    assert [o["kind"] for o in objs] == ["chimney"]
+
+
+def _flat_with_boxes(centres, size, height, density=16):
+    roof = flat()
+    pts = simulate(roof, density=density, seed=2)
+    for i, c in enumerate(centres):
+        pts = add_box(pts, roof, c, size, height, density=density, seed=30 + i)
+    res, gz = _measure(roof, pts)
+    return res, find_objects(pts, res.facets, res.outline, gz)
+
+
+def test_a_lantern_sized_box_on_a_low_slope_roof_is_unknown_and_adds_no_exposed_edge():
+    c = flat().roof_polygon().centroid
+    res, (objs, _) = _flat_with_boxes([(c.x, c.y)], (1.6, 1.6), 0.5)
+    assert [o["kind"] for o in objs] == ["unknown"]
+    assert res.totals["lantern_count"] == 0 and res.totals["exposed_edge_ft"] == 0
+
+
+def test_rooftop_units_on_a_flat_commercial_roof_are_no_lanterns_and_leave_eave_rake_alone():
+    roof = flat()
+    x0, y0, x1, y1 = roof.roof_polygon().bounds
+    centres = [(x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy) for fx, fy in ((0.3, 0.3), (0.5, 0.5), (0.7, 0.3), (0.3, 0.7), (0.7, 0.7))]
+    res, (objs, _) = _flat_with_boxes(centres, (2.0, 1.1), 0.55)
+    assert len(objs) == 5 and not any(o["kind"] == "lantern" for o in objs)
+    t = res.totals
+    assert t["lantern_count"] == 0 and t["exposed_edge_ft"] == 0
+    assert t["eave_rake_ft"] == round(t["eave_ft"] + t["rake_ft"] + t["flat_edge_ft"], 2)  # the outer edge only

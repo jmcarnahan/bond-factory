@@ -79,8 +79,10 @@ Rules:
   polygons tile the block polygon (holes excluded).
 - `edges[].type` is one of `eave | rake | ridge | hip | valley | step_flashing |
   wall_flashing | parapet | transition | unspecified`, plus `flat_edge | level_change` in a model from the plane
-  engine (contract-0.4.md; an edge with `level_change` carries `jump_ft`), and `flat_seam` since pipeline 0.5.1 (a drawn line
-  between two flat facets, never priced, in no total). Every edge is a straight segment
+  engine (an edge with `level_change`, `step_flashing` or `wall_flashing` carries `jump_ft` and `upper`; see contract-0.6.md), and
+  `flat_seam` since pipeline 0.5.1 (a drawn line between two flat facets, never priced, in no total). `parapet` and `unspecified`
+  stay valid in the schema for stored results and hand-built models; the plane engine emits neither, and `totals.lengths_ft` keeps both
+  keys (0 for an engine model; such an edge is counted there under its own type and in no contract total). Every edge is a straight segment
   (two points). Polylines are split into segments. `facets` lists the 1 or 2 facet ids
   the edge bounds.
 - `totals.lengths_ft` has ALL ten keys of the first list above, zero when absent; a model from the plane engine
@@ -140,7 +142,7 @@ Per block, given its polygon, form and pitch:
 
 Palette (default, overridable): eave `#2E7D32`, ridge `#8BC34A`, hip `#5E35B1`, valley
 `#E53935`, rake `#FBC02D`, step_flashing `#8D6E63` dashed (sidewall flashing), wall_flashing `#1E88E5` dashed (headwall flashing),
-transition `#D81B60`, unspecified `#26A69A`, flat_edge `#00838F`, level_change `#37474F`, flat_seam `#5A5A5A`. (The `parapet` type and its colour were removed with the block path; an old parapet edge reads as `unspecified`.) Facet fill: flat
+transition `#D81B60`, unspecified `#26A69A`, flat_edge `#00838F`, level_change `#37474F`, flat_seam `#5A5A5A`. (`parapet` has no colour of its own: a drawing reads a stored parapet edge as `unspecified`.) Facet fill: flat
 `#E3F2FD`, sloped `#FFF8E1`.
 
 ## 5. Fixtures (the contract tests)

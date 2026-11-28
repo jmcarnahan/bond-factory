@@ -166,3 +166,10 @@ def test_the_reported_area_is_within_the_error_the_drawn_roof_always_had(measure
         worst = max(worst, abs(err))
         assert abs(err) <= 0.045, (name, err)
     assert worst > 0.0
+
+
+def test_a_parapet_or_unspecified_edge_does_not_crash_the_totals_and_is_in_none_of_them():
+    f = facet("f1", box(0, 0, 5, 5), 6.0, "pitched")
+    base = roof_totals([f], [edge("eave", 5.0, ("f1",))], set())
+    t = roof_totals([f], [edge("eave", 5.0, ("f1",)), edge("parapet", 3.0, ("f1",)), edge("unspecified", 2.0, ("f1",))], set())
+    assert t == base

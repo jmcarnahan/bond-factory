@@ -130,9 +130,9 @@ def test_close_gaps_leaves_a_hairline_frame_round_the_facets_alone():
     assert all(abs(g.area - 40.0) <= 0.1 for _, g in out)
 
 
-def test_close_gaps_never_lets_a_merge_cover_another_facet():
-    """A channel that wraps round a small facet: giving it to the big neighbour must not make the big facet cover the
-    small one (the invariant: no merge adds area the pre-merge union did not leave free)."""
+def test_close_gaps_refuses_a_merge_that_would_cover_another_facet():
+    """A channel that wraps round a small facet: giving it to the big neighbour would make the big facet cover the
+    small one (4 m2), far over gap_close_min_m2, so the merge is refused and the facets do not overlap."""
     from shapely.geometry import box
 
     from roof_measure.engine.cleanup import close_gaps

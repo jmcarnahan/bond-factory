@@ -27,11 +27,14 @@ from roof_measure.engine.synth_points import cases
 
 # Roofs that do NOT hold yet. Each entry is a strict xfail: the slice that fixes the named cause must delete the entry.
 KNOWN = {
-    "complex_hip_d8": "small-facet threshold without hysteresis (cleanup.merge_small_facets / _keeps_small): a 3.4-4.8 m2 hip porch is "
-                      "kept or merged away by 0.1 m of outline, 19 or 20 facets and ridge+hip +-5 ft",
-    "l_shape_d8_trees": "edge typing from polluted jump points (edges.py, 'jump before plane logic'): the facets are identical but a 7.7 ft hip "
-                        "is typed level_change 4.8 ft in one run (ridge+hip 84.1 vs 88.6); owner: slice B (typing)"}
-HOLD = ["gable_d8", "hip_d8", "l_shape_d8", "t_shape_d8", "cross_gable_d8", "dutch_gable_d8", "gable_d8_trees", "hip_d8_trees",
+    "l_shape_d8_trees": "the ridge's end, typed from canopy: with the wall buffered -0.1 m the last 7.7 ft of the f3/f4 boundary run diagonally to "
+                        "the roof corner where the planes are 0.64 m apart and the returns beside it are tree (39-55 % of a side's returns on "
+                        "its own plane, 98-100 % on every real step of the three accuracy houses): it is typed a 7.7 ft wall_flashing, so "
+                        "ridge + hip is 83.7 ft against 86.9 (limit 2.0) and the piece adds 7.7 ft to exposed_edge_ft and eave_rake_ft. A rule "
+                        "on that support share (or dropping the crease piece) separates this case but changes 34-47 of the 160 houses "
+                        "(hips and valleys too, not shown false), so it is parked"}
+# complex_hip_d8 holds since two disagreeing strips no longer set a side; the small-facet threshold still has no hysteresis.
+HOLD = ["complex_hip_d8", "gable_d8", "hip_d8", "l_shape_d8", "t_shape_d8", "cross_gable_d8", "dutch_gable_d8", "gable_d8_trees", "hip_d8_trees",
         "hip_d8_rot17", "l_shape_d8_rot45"]
 ROOFS = [pytest.param(n, marks=pytest.mark.xfail(strict=True, reason=KNOWN[n])) for n in KNOWN] + HOLD
 MOVES = {"buffer+0.1": lambda w: w.buffer(0.1, join_style=2), "buffer-0.1": lambda w: w.buffer(-0.1, join_style=2),

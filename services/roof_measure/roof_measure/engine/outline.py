@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 from shapely import affinity
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import Polygon
 
 from .edge_finder import clamp_offsets, find_roof_edge, support_area
 from .params import EngineParams
@@ -44,50 +44,22 @@ def _finish(outline, theta: float, p: EngineParams) -> Any:
     return oc.simplify(p.final_tol_m)
 
 
-def build_outline(q: np.ndarray, qlab: np.ndarray, planes: list, footprint: Polygon, theta: float, county: bool, context: np.ndarray | None, roof_xyz: np.ndarray, p: EngineParams
-                  ) -> tuple[Polygon, dict[str, Any]]:
+def build_outline(q: np.ndarray, qlab: np.ndarray, planes: list, footprint: Polygon, theta: float, county: bool,
+                  context: np.ndarray | None, roof_xyz: np.ndarray, p: EngineParams) -> tuple[Polygon, dict[str, Any]]:
     """Roof-edge polygon for the roof points ``q`` (n, 3) assigned to ``planes`` (labels ``qlab``) and the given
-    ``footprint``. ``context`` is the wide cloud (x, y, z, class) in
-    the building frame (None: ``roof_xyz`` stands in). Returns (polygon, diagnostics)."""
+    ``footprint``. ``context`` is the wide cloud (x, y, z, class) in the building frame (None: ``roof_xyz`` stands
+    in). Returns (polygon, diagnostics)."""
     if len(q) == 0:
         return footprint, {"outline_source": "footprint (no points)"}
     ring = _regular_footprint(footprint, theta, p)
     res = find_roof_edge(context, roof_xyz, q, qlab, planes, ring, county, p)
     outline = _finish(res.polygon, theta, p)
     diag: dict[str, Any] = {"outline_source": "points+footprint", **res.diagnostics}
-    diag.update({"overhang_measured_m": [None if v is None else round(v, 2) for v in res.measured],
-                 "overhang_applied_m": [round(v, 2) for v in clamp_offsets(res.offsets, county, res.sources, p)],
+    if outline.is_empty or outline.geom_type != "Polygon" or outline.area <= 0:  # the offset ring collapsed: never refuse
+        outline = ring  # for that, draw the regular (unregistered) ring and say so
+        diag["edge_fallback"] = "regular ring"
+    diag.update({"edge_offset_measured_m": [None if v is None else round(v, 2) for v in res.measured],
+                 "edge_offset_applied_m": [round(v, 2) for v in clamp_offsets(res.offsets, county, res.sources, p)],
                  "edge_strips": dict(sorted(res.rejected.items())),
-                 "support_area_m2": round(support_area(q, affinity.translate(footprint, *res.shift), p), 1),  # registered
-                 "footprint_area_m2": round(float(footprint.area), 1), "outline_area_m2": round(float(outline.area), 1)})
+                 "support_area_m2": round(support_area(q, affinity.translate(footprint, *res.shift), p), 1)})  # registered
     return outline, diag
-
-
-def overhang_per_side(footprint: Polygon, outline: Polygon) -> list[float]:
-    """Measured distance (m) from each long (>= 3 m) footprint edge to the outline edge outward."""
-    res = []
-    c = np.array(footprint.exterior.coords)
-    ccw = footprint.exterior.is_ccw
-    for i in range(len(c) - 1):
-        a, b = c[i], c[i + 1]
-        d = b - a
-        length = np.hypot(*d)
-        if length < 3.0:
-            continue
-        u = d / length
-        n = np.array([u[1], -u[0]]) if ccw else np.array([-u[1], u[0]])
-        vals = []
-        for s in (0.3, 0.5, 0.7):
-            m = a + d * s
-            ray = LineString([m - n * 1.5, m + n * 2.5])
-            inter = ray.intersection(outline.exterior if outline.geom_type == "Polygon" else outline.boundary)
-            pts = []
-            if not inter.is_empty:
-                for g in (list(inter.geoms) if hasattr(inter, "geoms") else [inter]):
-                    if g.geom_type == "Point":
-                        pts.append(float(np.dot(np.array(g.coords[0]) - m, n)))
-            if pts:
-                vals.append(max(pts))
-        if vals:
-            res.append(round(float(np.median(vals)), 2))
-    return res

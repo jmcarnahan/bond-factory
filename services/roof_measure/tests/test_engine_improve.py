@@ -25,7 +25,7 @@ def test_area_within_the_gate_at_16_and_8_points(name):
 @pytest.mark.parametrize("name", ["gable_d16", "gable_d8", "hip_d16", "hip_d8", "l_shape_d16"])
 def test_measured_overhang_does_not_depend_on_density(name):
     """The true overhang is 0.3 m. The support boundary moves inward as returns thin out; the spacing correction undoes it."""
-    got = [v for v in run(name, DEFAULT).outline.overhang_measured_m if v is not None]
+    got = [v for v in run(name, DEFAULT).outline.edge_offset_measured_m if v is not None]
     assert got and all(abs(v - 0.3) <= 0.12 for v in got), got
 
 

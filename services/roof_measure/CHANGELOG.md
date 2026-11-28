@@ -2,8 +2,9 @@
 
 ## 0.6.0 (pipeline version; one roof, one set of totals, chimneys and lanterns; contract in ../../docs/contract-0.6.md)
 
-`PIPELINE_VERSION` 0.5.1 to 0.6.0 (keys the result cache). A consumer must change: totals keys, `measure` arguments, the
-example fixture. The pitched/flat split, the facets and the edge lengths per type are the 0.5.1 drawn roof's (proved per house).
+`PIPELINE_VERSION` 0.5.1 to 0.6.0 (keys the result cache: every stored roof is recomputed). A consumer must change: totals keys,
+`measure` arguments, the example fixture. Roofs measure differently from 0.5.1 (areas, outline, edge types: see the bullets); read
+them before comparing numbers.
 
 - **Legacy paths removed, no output change.** The plane engine is the only engine. Removed: the block-path engine
   (`blocks`, `classify`, `skeleton*`, `ringgeom`, `model_cleanup`, `model_slivers`), the older planes family (`planes*`),
@@ -30,9 +31,34 @@ example fixture. The pitched/flat split, the facets and the edge lengths per typ
   most roofs). `area_sqft_roof_edge` stays one release (it equals `area_sqft`). `ridge_hip_ft` is the plain sum ridge + hip (it no
   longer leaves out a crease between two low-slope facets). `model.totals` keeps the model-only shape keys `lengths_ft`,
   `total_area_sqft`, `pitched_area_sqft`, `flat_area_sqft`, `predominant_pitch_rise`, `predominant_pitch_area_sqft`.
+- **Label raster follows the points** (stable partition): the facet grid is anchored to the roof points, not to the outline's corner, so
+  moving or re-registering the county outline by a few centimetres no longer changes the facets.
+- **One roof and one totals function.** The 0.5 blend (a priced roof edge at half the measured overhang, clipped to the wall line) is
+  removed: the reported area is the drawn area. Areas rise by a median 6.6% over the blend (before the outline item below).
+- **The roof edge is found from the returns.** Where each roof plane's returns stop, the outline is registered to the points instead of
+  scaled from the county wall line. The median outline area is 0.96 of the old drawn outline; the contractor-squares ratio moves from 1.06
+  to 1.01 on the 31 houses that have one. One outline, no overhang scale: `model.quality.overhang_scale` is gone.
+- **Edge typing from the planes.** A step between two roofs is named sidewall (`step_flashing`) or headwall (`wall_flashing`) from the
+  planes and carries `upper` (the higher facet) beside `jump_ft`; `level_change` stays for a step between two low-slope sections. The
+  measured jump ignores outliers (trees), short end pieces of an edge are kept, and a step between two pitched facets whose planes agree is
+  typed from the planes (the retired hint).
+- **`close_gaps` can no longer lay one facet over another** (an overlap guard).
+- **Off-plane facets merge:** a facet whose returns do not follow its own plane is merged into its neighbour instead of drawn.
+- **The fit is measured inside the drawn roof:** `fit_all`, `fit_covered` and the canopy shares count the returns within
+  `fit_outline_margin_m` of the outline, not every return the wall-line crop caught (neighbours' roofs, walls, trees); `support_area`
+  and `outline_shift` are taken in the registered frame. `outline_shift` is the distance between the centre of the roof returns and the
+  centre of the GIVEN wall line, over the square root of the wall's area.
+- **Three new quality reasons** (`model.quality.reasons`; the first reason is the verdict): `outline_no_evidence` (part of the outline has
+  no roof returns and was drawn from the wall line), `roof_continues` (a roof plane carries on past the outline: an attached roof is left
+  out), `roof_part_missed` (a planar blob over 3 m2 that no facet covers); and the warning code `objects_failed` (the object finder
+  failed: the chimney and lantern counts are unknown, not zero).
+- **Parameters.** Removed: the `overhang_*` family, `cut_up_*`, `pitched_steps`, the `extra_*`, `notch_*`, `support_*`, `spacing_*`,
+  `edge_ray_*` and `bridge_m` settings of the old outline. Added: the `edge_*` family (roof-edge finder), `obj_*` (objects),
+  `jump_*`, `step_*`, `end_*`, `no_evidence_share`, `roof_continues_share`, `part_missed_min_sqft`, `off_plane_facet_mad_m`,
+  `fit_outline_margin_m`, `grid_quantum_m`, `label_clip_m`. The parameter hash changed.
 - **Things standing on the roof: `model.objects`** (chimney, lantern, unknown; never facets; no trees) from the new
   `engine/objects.py`, with `chimney_count` / `chimney_perimeter_ft` / `lantern_count` and the lantern's sides in
-  `exposed_edge_ft`. A planar blob over 3 m2 that no facet covers is not listed: `model.quality.roof_part_missed_sqft`.
+  `exposed_edge_ft`. A box on a low-slope roof is not called a lantern: rooftop units look the same, so `lantern` is only given on a pitched facet and the same blob on a low-slope facet is `unknown` (a real lantern on a low-slope deck must be entered by hand). A planar blob over 3 m2 that no facet covers is not listed: `model.quality.roof_part_missed_sqft`.
   Skylights cannot be seen by LiDAR and are never listed. 22 `obj_*` engine parameters (the parameter hash changed).
 - **Edges:** a step edge (`level_change`, `step_flashing`, `wall_flashing`) carries `upper`, the id of the higher facet, beside `jump_ft`.
 - `model.source.method` and `method_used` are `planes` (`lidar_skeleton` and the agent names stay valid when reading old results).

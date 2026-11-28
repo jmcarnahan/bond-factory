@@ -5,9 +5,9 @@
     low-slope (flat): a wall that water runs up to;
   * ``level_change``: only a step between two low-slope facets.
 
-Ported from the 0.5 block-path typer (``planes_model._step_type``, the variant with both tests: the along-the-fall-line test
-first, then "is the upper roof up-slope of the line"), on the engine's facets instead of its planes. A step across the lower
-slope with the upper roof DOWN-slope of it (a lower roof draining into a higher wall) is sidewall flashing as it was there.
+The line test comes first (a step along the fall line is sidewall whatever stands beside it), then "is the upper roof up-slope
+of the line" (the lower facet's fall direction points away from the upper roof). A step across the lower slope with the upper
+roof DOWN-slope of it (a lower roof draining into a higher wall) is sidewall flashing too.
 """
 
 from __future__ import annotations

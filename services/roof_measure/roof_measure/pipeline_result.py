@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from .blockset import BlockSet
-from .envelope import totals_from_model
 
 
 @dataclass
@@ -23,6 +22,5 @@ class PipelineResult:
     transient: bool = False  # produced by an outage fall-through: the caller must not cache it
 
 
-def no_verification(model: dict[str, Any], note: str) -> dict[str, Any]:
-    return {"verdict": "unverified", "notes": [note], "adjustments": [], "original_totals": totals_from_model(model),
-            "model": None, "rounds": 0, "usage": {"input_tokens": 0, "output_tokens": 0}}
+def no_verification(note: str) -> dict[str, Any]:
+    return {"verdict": "unverified", "notes": [note], "adjustments": [], "model": None, "rounds": 0, "usage": {"input_tokens": 0, "output_tokens": 0}}

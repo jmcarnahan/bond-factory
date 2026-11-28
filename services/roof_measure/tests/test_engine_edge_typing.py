@@ -296,5 +296,56 @@ def test_exact_lengths_hold_under_small_translations_of_points_and_wall_together
             t = "level_change" if e.type in ("step_flashing", "wall_flashing") else e.type
             got[t] = got.get(t, 0.0) + e.length_ft
         for t in ("ridge", "hip", "valley", "level_change"):
-            tol = 1.0 if name == "two_level_d8" else 2.5  # dutch_gable keeps its known partition sliver (strict xfail in the adapter test)
+            tol = 1.0 if name == "two_level_d8" else 2.5  # dutch_gable rot45, same at every shift: hip +2.2 ft, ridge -1.2, steps -1.3: the partition at the gable corner
             assert abs(got.get(t, 0.0) - exact.get(t, 0.0)) <= tol, (name, dx, dy, t, got.get(t, 0.0), exact.get(t, 0.0))
+
+
+# ---- ends.adopt_end_pieces on its own --------------------------------------------------------------------------------
+
+def _seg(x0, y0, x1, y1):
+    return np.array([x0, y0], float), np.array([x1, y1], float)
+
+
+def _dropped(why, a, b, fs=(0, 1)):
+    return (("a", "b"), float(np.hypot(*(b - a))), why, a, b, fs)
+
+
+def test_adopt_end_pieces_repeats_until_nothing_more_joins_and_takes_the_longest_line():
+    from roof_measure.engine.ends import adopt_end_pieces
+
+    v0, v1 = _seg(0, 0, 10, 0)  # a valley 10 m long, a hip 3 m long meeting it at (10, 0)
+    h0, h1 = _seg(10, 0, 10, 3)
+    raw = [("valley", v0, v1, (0, 1)), ("hip", h0, h1, (0, 1)), ("eave", *_seg(0, 5, 4, 5), (0,))]
+    # three kink pieces end to end after (10, 0)/(10, 3): the second touches only the first, which only touches the lines
+    k1 = _dropped("kink", *_seg(10, 0, 11, 0.2))  # touches the valley end and the hip start: the valley (longer) decides
+    k2 = _dropped("kink", *_seg(11, 0.2, 12, 0.5))  # touches only k1: joins on the second round
+    k3 = _dropped("kink", *_seg(20, 20, 21, 20))  # touches nothing
+    added, left = adopt_end_pieces(raw, [k2, k1, k3], DEFAULT)
+    assert sorted(t for t, *_ in added) == ["valley", "valley"] and left == [k3]
+
+
+def test_adopt_end_pieces_takes_kinks_and_seams_only_of_the_same_pair_and_not_short_ones():
+    from roof_measure.engine.ends import adopt_end_pieces
+
+    a, b = _seg(0, 0, 10, 0)
+    raw = [("ridge", a, b, (0, 1))]
+    seam = _dropped("seam", *_seg(10, 0, 11, 0))
+    small_flat = _dropped("small_flat", *_seg(0, 0, -1, 0))  # a flat facet too small: never an end piece
+    other_pair = _dropped("kink", *_seg(10, 0, 11, 1), fs=(0, 2))  # touches the ridge but belongs to two other facets
+    tiny = _dropped("kink", *_seg(10, 0, 10 + DEFAULT.edge_min_seg_m / 2, 0))  # under the minimum segment
+    added, left = adopt_end_pieces(raw, [seam, small_flat, other_pair, tiny], DEFAULT)
+    assert [t for t, *_ in added] == ["ridge"] and left == [small_flat, other_pair, tiny]
+
+
+def test_a_failing_jump_measurement_surfaces_and_is_never_a_silent_zero(monkeypatch):
+    """The jump of a chain is measured by the same call everywhere; a real error in it is raised (the engine's stage handling
+    reports it), not turned into "no jump" (which would drop a short real step as clutter and emit a long one without jump_ft)."""
+    import roof_measure.engine.edges as edges_mod
+
+    def boom(*a, **k):
+        raise ValueError("cannot measure")
+
+    a, b = _valley_facets()
+    monkeypatch.setattr(edges_mod, "measured_jump", boom)
+    with pytest.raises(ValueError, match="cannot measure"):
+        build_edges([a, b], points_on(a), CTX)
