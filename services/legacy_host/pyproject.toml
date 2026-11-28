@@ -11,6 +11,7 @@ dependencies = [
     "httpx>=0.27",
     "bond_service_kit",
     "bond_storage",
+    "bond_esign",
     "bond_sync_py",
     "bond_calendar",
     "bond_tasks_py",
@@ -32,6 +33,7 @@ include = ["legacy_host*"]
 [tool.uv.sources]
 bond_service_kit = { workspace = true }
 bond_storage = { workspace = true }
+bond_esign = { workspace = true }
 bond_sync_py = { workspace = true }
 bond_calendar = { workspace = true }
 bond_tasks_py = { workspace = true }

@@ -18,8 +18,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from . import models  # noqa: F401  (registers the tables on Base)
+from . import esign_models, models  # noqa: F401  (registers the tables on Base)
 from .db import Base, make_engine, make_session_factory
+from .esign_routes import router as esign_router
 from .routes import router as task_router
 from .routes_extra import router as extra_router
 from .sync_wiring import register as register_sync
@@ -34,6 +35,7 @@ def create_app(database_url: str, *, now: Callable[[], datetime] | None = None,
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
     app.state.clock = Clock(source=now)
+    app.state.esign_store = esign_models.MemoryStore()
 
     @app.exception_handler(TaskError)
     async def task_error(request: Request, exc: TaskError) -> JSONResponse:
@@ -59,5 +61,6 @@ def create_app(database_url: str, *, now: Callable[[], datetime] | None = None,
 
     app.include_router(task_router)
     app.include_router(extra_router)
+    app.include_router(esign_router)
     register_sync(app, id_pattern=sync_id_pattern)
     return app

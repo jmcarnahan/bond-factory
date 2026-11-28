@@ -26,7 +26,9 @@ fake mode and logs one warning. Real mode needs `SDK_EXAMPLE_AUTH_SECRET`, and a
 | Inbox, push devices, capture, sweep | `routes/task_routers.py` (`make_notices_router`), `routes/push.py`, `routes/task_capture.py`, `todo_wiring.py`, `sweep_wiring.py` | bond_notify_py, bond_push_py, bond_capture_py |
 | Sync host (notes, tasks, notices, push_devices) | `routes/sync.py`, `sync_todo.py` | bond_sync_py |
 | Calendar events | `routes/calendar.py`, `calendar_wiring.py` | bond_calendar |
-| Migrations | `alembic/versions/0001` to `0005_todo_tables.py` | |
+| E-signing: tables, consent, PDF storage, completion job | `models/esign.py`, `alembic/versions/0007_esign.py`, `esign_wiring.py` (copy as is; replace the consent company and contact, the `esign/<id>/...` storage keys, the zone, the IP rule) | bond_esign |
+| E-signing routes | `routes/esign_pages.py` (copy as is: the panel, the post, the PDFs); `routes/esign.py` (replace the fake-mode `POST /esign/demo` and `esign_sample.py` with a route that creates a request for the app's own PDF and mails the link, and `EVIDENCE_CAPABILITY` with the staff rule) | bond_esign |
+| Migrations | `alembic/versions/0001` to `0007_esign.py` | |
 
 `routes/a0_wiring.py` sorts before every other route module (middleware and error handlers must be in place first).
 `routes/task_capture.py` sorts before `routes/task_routers.py` so `/tasks/parse` and `/tasks/links/search` register

@@ -32,6 +32,9 @@
 - decisions/2026-11-12-router-factories.md — task and inbox routes as router factories in two Python libs
 - decisions/2026-11-12-themable-shape.md — corner radii become a theme token (BondShape) with the old values as default
 - decisions/2026-11-12-adopter-proof.md — adopter proof: requests arrive as failing tests, the legacy host's seven traits, `make adopter-check`
+- decisions/2026-11-27-native-esign.md — native e-signing in the app's own page: evidence over vendor, library only, optional seal, scope limits, licences
+- contracts/esign.md — evidence export `bond.esign_evidence/0.1`, the hash rule, the signing panel's form fields
+- ../libs/bond_esign/README.md — e-sign lib: the flow, tables, statuses, errors, what the app must do, sealing, a 40-line wiring (no sibling bond_* imports)
 - ../libs/bond_notify_py/README.md — stored inbox (notices table, list, read, dismiss, sync handlers); the ledger, stages and sweep live in bond_tasks_py (no sibling bond_* imports)
 - ../libs/bond_push_py/README.md — Apple push sender and device tokens (no sibling bond_* imports)
 - ../libs/bond_capture_py/README.md — natural-language capture: a phrase becomes task and event candidates through a model-client Protocol (no sibling bond_* imports)

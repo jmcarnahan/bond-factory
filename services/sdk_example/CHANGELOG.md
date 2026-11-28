@@ -2,6 +2,11 @@
 
 ## 0.1.0 - unreleased
 - Scaffold.
+- E-signing (`bond_esign`): tables `esign_requests`, `esign_signers`, `esign_events` (migration `0007_esign`,
+  `models/esign.py`); `esign_wiring.py` (tables, consent, PDF storage keys, client IP, the `esign_complete` job);
+  `routes/esign.py` (fake-mode `POST /esign/demo` and `/esign/demo/{id}/void`, staff `GET /esign/requests/{id}/evidence`,
+  `GET /esign/static/{name}`) and `routes/esign_pages.py` (the signing page under a strict CSP, the form post, the
+  original and signed PDFs); `esign_sample.py` makes the sample PDF.
 - Tasks and inbox routes are the libs' router factories (`routes/task_routers.py`); `routes/tasks.py`, `task_today.py` and `notices.py` are gone, the wire is unchanged. `POST /tasks/parse` takes `rich` (default false).
 - Connections: native-app flow (`start?mode=native`, cookie-less `/go` and callback for native states, `POST
   /connections/{provider}/redeem`); `SDK_EXAMPLE_NATIVE_REDIRECTS` (default `sdkdemo://connections`).

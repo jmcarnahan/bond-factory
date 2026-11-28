@@ -1455,6 +1455,7 @@ version = "0.1.0"
 source = { editable = "services/legacy_host" }
 dependencies = [
     { name = "bond-calendar" },
+    { name = "bond-esign" },
     { name = "bond-notify-py" },
     { name = "bond-push-py" },
     { name = "bond-service-kit" },
@@ -1477,6 +1478,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "bond-calendar", editable = "libs/bond_calendar" },
+    { name = "bond-esign", editable = "libs/bond_esign" },
     { name = "bond-notify-py", editable = "libs/bond_notify_py" },
     { name = "bond-push-py", editable = "libs/bond_push_py" },
     { name = "bond-service-kit", editable = "libs/bond_service_kit" },
@@ -2391,6 +2393,7 @@ dependencies = [
     { name = "bond-auth-py", extra = ["firebase"] },
     { name = "bond-calendar" },
     { name = "bond-capture-py" },
+    { name = "bond-esign" },
     { name = "bond-jobs" },
     { name = "bond-notify-py" },
     { name = "bond-oauth" },
@@ -2422,6 +2425,7 @@ requires-dist = [
     { name = "bond-auth-py", extras = ["firebase"], editable = "libs/bond_auth_py" },
     { name = "bond-calendar", editable = "libs/bond_calendar" },
     { name = "bond-capture-py", editable = "libs/bond_capture_py" },
+    { name = "bond-esign", editable = "libs/bond_esign" },
     { name = "bond-jobs", editable = "libs/bond_jobs" },
     { name = "bond-notify-py", editable = "libs/bond_notify_py" },
     { name = "bond-oauth", editable = "libs/bond_oauth" },

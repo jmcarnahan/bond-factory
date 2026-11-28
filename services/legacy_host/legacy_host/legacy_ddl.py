@@ -24,6 +24,13 @@ LEGACY_DDL = (
     """CREATE TABLE user_prefs (
         uid VARCHAR PRIMARY KEY, tz VARCHAR(64), day_start VARCHAR(5), day_end VARCHAR(5), remind_lead INTEGER,
         theme VARCHAR, updated_at DATETIME NOT NULL)""",
+    # the e-signature tables the app had with a third-party vendor, before bond_esign
+    """CREATE TABLE estimates (id VARCHAR PRIMARY KEY, title VARCHAR NOT NULL, total INTEGER NOT NULL)""",
+    """CREATE TABLE esign_envelopes (
+        id VARCHAR PRIMARY KEY, estimate_id VARCHAR NOT NULL, provider VARCHAR NOT NULL,
+        envelope_id VARCHAR NOT NULL, status VARCHAR NOT NULL, signer_name VARCHAR, signer_email VARCHAR,
+        client_user_id VARCHAR, sent_at DATETIME, completed_at DATETIME,
+        CONSTRAINT uq_esign_envelopes_provider_envelope UNIQUE (provider, envelope_id))""",
 )
 
 #: Columns the old tables lack, and the `push_devices` and `notices` tables the app never had. `purpose` is the only one a row needs a value for; the migration backfills it.
@@ -57,6 +64,31 @@ ADOPT = (
         created_at DATETIME NOT NULL, read_at DATETIME, dismissed_at DATETIME)""",
     "CREATE INDEX ix_notices_user_created ON notices (user_id, created_at)",
     "CREATE INDEX ix_notices_source_id ON notices (source_id)",
+    # bond_esign: three tables the app never had; the request table also carries the app's own `legacy_estimate_id`
+    """CREATE TABLE esign_requests (
+        id VARCHAR NOT NULL PRIMARY KEY, status VARCHAR NOT NULL, title VARCHAR NOT NULL, subject_type VARCHAR,
+        subject_id VARCHAR, document_sha256 VARCHAR(64) NOT NULL, document_bytes INTEGER NOT NULL,
+        page_count INTEGER NOT NULL, consent_version VARCHAR NOT NULL, consent_language VARCHAR NOT NULL,
+        consent_sha256 VARCHAR(64) NOT NULL, consent_text TEXT NOT NULL, policy JSON NOT NULL, expires_at DATETIME,
+        signed_sha256 VARCHAR(64), sealed BOOLEAN NOT NULL, timestamped BOOLEAN NOT NULL, completed_at DATETIME,
+        voided_at DATETIME, declined_at DATETIME, void_reason TEXT, meta JSON NOT NULL, created_at DATETIME,
+        updated_at DATETIME, legacy_estimate_id VARCHAR)""",
+    "CREATE INDEX ix_esign_requests_subject ON esign_requests (subject_type, subject_id)",
+    """CREATE TABLE esign_signers (
+        id VARCHAR NOT NULL PRIMARY KEY, request_id VARCHAR NOT NULL REFERENCES esign_requests (id) ON DELETE CASCADE,
+        position INTEGER NOT NULL, name VARCHAR NOT NULL, email VARCHAR, role VARCHAR NOT NULL, "key" VARCHAR,
+        status VARCHAR NOT NULL, placement JSON, date_placement JSON, token_sha256 VARCHAR(64) UNIQUE,
+        token_expires_at DATETIME, code_sha256 VARCHAR(64), code_expires_at DATETIME, code_sent_at DATETIME,
+        code_verified_at DATETIME, code_attempts INTEGER NOT NULL, method VARCHAR, witness VARCHAR,
+        signature_kind VARCHAR, typed_name VARCHAR, signature_png BLOB, signature_sha256 VARCHAR(64),
+        signed_at DATETIME, ip VARCHAR, user_agent TEXT, decline_reason TEXT, created_at DATETIME,
+        updated_at DATETIME, CONSTRAINT uq_esign_signers_request_position UNIQUE (request_id, position))""",
+    "CREATE INDEX ix_esign_signers_request_id ON esign_signers (request_id)",
+    """CREATE TABLE esign_events (
+        id VARCHAR NOT NULL PRIMARY KEY, request_id VARCHAR NOT NULL REFERENCES esign_requests (id) ON DELETE CASCADE,
+        seq INTEGER NOT NULL, signer_id VARCHAR, kind VARCHAR NOT NULL, at DATETIME NOT NULL, ip VARCHAR,
+        user_agent TEXT, actor VARCHAR, data JSON NOT NULL, prev_hash VARCHAR(64) NOT NULL,
+        row_hash VARCHAR(64) NOT NULL, CONSTRAINT uq_esign_events_request_seq UNIQUE (request_id, seq))""",
 )
 
 

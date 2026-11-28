@@ -40,3 +40,11 @@ def legacy_body(code: str, message: str) -> dict[str, Any]:
 
 def legacy_error(exc: TaskError) -> tuple[int, dict[str, Any]]:
     return exc.status, legacy_body(exc.code, exc.message)
+
+
+def legacy_envelope(row: Any) -> dict[str, Any]:
+    """An `esign_envelopes` row as the app's clients read it: the same keys whichever provider made it."""
+    return {"id": row.id, "estimate_id": row.estimate_id, "provider": row.provider, "envelope_id": row.envelope_id,
+            "status": row.status, "signer_name": row.signer_name, "signer_email": row.signer_email,
+            "client_user_id": row.client_user_id, "sent_at": naive_iso(row.sent_at),
+            "completed_at": naive_iso(row.completed_at)}
