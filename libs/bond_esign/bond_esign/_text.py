@@ -41,6 +41,14 @@ def ttf_name(font_path: str) -> str:
     return name
 
 
+def font_for(text: str, default: str, font_path: str | None) -> tuple[str, str]:
+    """(font, text) to draw ``text``: ``default`` when the standard fonts can draw it (or there is no TTF), else
+    the TTF registered for ``font_path`` with line breaks and tabs turned to spaces."""
+    if font_path is None or renderable(text):
+        return default, safe(text)
+    return ttf_name(font_path), text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+
+
 def require_renderable(name: str, font_path: str | None) -> None:
     if font_path is None and not renderable(name):
         raise EsignError(

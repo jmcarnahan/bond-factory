@@ -98,9 +98,9 @@ def test_a_placement_outside_the_page_or_the_page_count_is_a_value_error(session
 
 
 def test_date_placement_is_resolved_too(session, pdf_bytes):
-    spec = SignerSpec("Pat", placement=PLACEMENT, date_placement=Placement(-2, 0.6, 0.8, 0.2, 0.05))
+    spec = SignerSpec("Pat", placement=PLACEMENT, date_placement=Placement(-1, 0.6, 0.8, 0.2, 0.05))
     signer = signers_of(session, new_request(session, pdf_bytes, signers=[spec]))[0]
-    assert signer.date_placement["page"] == 1
+    assert signer.date_placement["page"] == 2  # the same page as the signature (page -1 of two)
 
 
 def test_invalid_pdf_and_oversize_pdf(session, pdf_bytes):

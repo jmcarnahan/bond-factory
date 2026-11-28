@@ -11,7 +11,7 @@ OPEN, SIGNED, COMPLETED, DECLINED, VOIDED, EXPIRED = (
     "open", "signed", "completed", "declined", "voided", "expired",
 )
 PENDING = "pending"  # a signer that has not yet signed or declined
-METHODS = ("link", "email_code", "in_person")
+METHODS = ("link", "app_link", "email_code", "in_person")
 ISO = "%Y-%m-%dT%H:%M:%SZ"
 
 

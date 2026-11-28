@@ -41,8 +41,11 @@ def _consent_of(request) -> Consent:
     return Consent(request.consent_version, request.consent_language, request.consent_text)
 
 
-def signing_view(session, t: Tables, signer, *, ctx: RequestContext | None, now) -> SigningView:
-    """What the page shows. Records ``viewed`` (at most once per ``view_event_gap_seconds`` per signer)."""
+def signing_view(session, t: Tables, signer, *, ctx: RequestContext | None, now,
+                 record_view: bool = True) -> SigningView:
+    """What the page shows. Records ``viewed`` (at most once per ``view_event_gap_seconds`` per signer).
+
+    ``record_view=False`` writes nothing (link previews, HEAD requests)."""
     now = utc(now)
     request = request_of(session, t, signer)
     expire_if_due(session, t, request, now)
@@ -53,7 +56,7 @@ def signing_view(session, t: Tables, signer, *, ctx: RequestContext | None, now)
     elif request.status != OPEN or signer.status != PENDING:
         reason = NOT_OPEN
     can_sign = reason is None
-    if can_sign:
+    if can_sign and record_view:
         last = session.execute(
             select(func.max(t.event.at)).where(
                 t.event.request_id == request.id, t.event.signer_id == signer.id, t.event.kind == events.VIEWED

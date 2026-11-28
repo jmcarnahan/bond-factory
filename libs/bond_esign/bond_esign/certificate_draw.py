@@ -184,6 +184,13 @@ class Flow:
         self.c.setFont(font, size)
         if grey:
             self.c.setFillColorRGB(*GREY)
-        for x, value in cells:
+        for cell in cells:  # (x, value) or (x, value, font_path_for_names)
+            x, value = cell[0], cell[1]
+            if len(cell) > 2 and cell[2]:  # a name: the TTF only when the standard fonts cannot draw it
+                font_here, shown = _text.font_for(value or "", font, cell[2])
+                self.c.setFont(font_here, size)
+                self.c.drawString(MARGIN + x, self.y, shown)
+                self.c.setFont(font, size)
+                continue
             self.c.drawString(MARGIN + x, self.y, self.text(value))
         self.c.setFillColorRGB(0, 0, 0)

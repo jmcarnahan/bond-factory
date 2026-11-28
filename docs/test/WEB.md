@@ -394,8 +394,14 @@ script-src 'self'`), so a console CSP violation is a failure.
    (a `<noscript>` hint says typing works without JavaScript).
 10. **Evidence.** Sign in as the demo user (Start step 3), then `curl -s -b tmp/jar localhost:8012/esign/requests/<request_id>/evidence`:
     `chain.ok` true, `check.ok` true, event kinds in order `created`, `token_issued`, `viewed`, `consent_given`,
-    `signed`, `document_built`, `completed`, then `downloaded` after the download.
-11. **Error check** after every step: no console error, no CSP violation, no `pageerror`, no dialog.
+    `signed`, `document_built`, `completed`, then `downloaded` after the download (a declined request: `created`, `token_issued`, `viewed`, `declined`).
+11. **Decline.** Open a fresh request (Start step 2), at 390x844 and again at 1280x800. Under the sign button there is
+    a quiet link "Decline to sign" (at least 44px tall, not a second primary button). Expand it: a "Reason
+    (optional)" field and an outlined "Decline" button appear; nothing is posted yet. Type a reason, press Decline: a
+    303 back to the page, which now shows `.bond-esign--closed` with "You declined to sign this document. Nothing was
+    signed." and no form. Reload: the same message. The evidence shows one `declined` event with the reason. No
+    dialog, popover or overlay at any point; nothing overflows at 390. With JavaScript disabled it works the same.
+12. **Error check** after every step: no console error, no CSP violation, no `pageerror`, no dialog.
 
 ## Cleanup
 

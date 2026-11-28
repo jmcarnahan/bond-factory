@@ -99,7 +99,7 @@ class EsignSignerMixin:
     code_sent_at = Column(DateTime, nullable=True)
     code_verified_at = Column(DateTime, nullable=True)
     code_attempts = Column(Integer, nullable=False, default=0)
-    method = Column(String, nullable=True)  # link | email_code | in_person, set at signing
+    method = Column(String, nullable=True)  # link | app_link | email_code | in_person, set at signing
     witness = Column(String, nullable=True)
     signature_kind = Column(String, nullable=True)  # typed | drawn
     typed_name = Column(String, nullable=True)

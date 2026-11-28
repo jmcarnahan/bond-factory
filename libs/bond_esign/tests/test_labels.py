@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from bond_esign.labels import CertificateLabels
 
-EVENT_KINDS = ["created", "token_issued", "viewed", "code_sent", "code_verified", "code_failed", "consent_given", "signed", "declined", "voided", "expired", "document_built", "completed", "copy_delivered", "downloaded"]
+EVENT_KINDS = ["created", "token_issued", "viewed", "code_sent", "code_verified", "code_failed", "consent_given", "signed", "declined", "voided", "expired", "document_built", "completed", "copy_delivered", "downloaded", "link_sent", "reminder_sent"]
 
 
 def test_english_defaults_and_date():

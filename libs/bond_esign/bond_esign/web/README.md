@@ -9,6 +9,17 @@ from a remote host at run time.
 | `signature_pad.umd.min.js` | vendored, unchanged |
 | `LICENSE-signature_pad` | the package's own licence file |
 
+## Decline
+
+`render_panel(view, ..., decline_url="/your/decline/route")` adds, after the sign form (a sibling, never nested), a
+`<details class="bond-esign__decline">` "Decline to sign" with its own `<form method="post">` to that URL. The
+disclosure is the confirmation step: no script, no dialog. The form posts one field,
+`bond_esign_decline_reason` (optional, at most 2000 characters). The app's route reads it with
+`bond_esign.webform.parse_decline(form)` (trimmed, control characters removed, `None` when empty) and calls
+`decline(...)`. A declined signer's page shows `PanelLabels.declined_message`. The decline block sits outside
+`.bond-esign`, so it carries its own copy of the theme custom properties (`--bond-esign-accent` and the rest):
+override them on `.bond-esign, .bond-esign__decline` together. Without `decline_url` the open panel is unchanged, but a declined signer's closed panel now always shows `declined_message`.
+
 ## signature_pad
 
 - Package: `signature_pad` by Szymon Nowak (szimek)

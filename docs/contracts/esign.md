@@ -58,11 +58,11 @@ In `position` order. Every column of the signer table except `signature_png`, `t
 | `id`, `request_id`, `position` | string, string, int | `position` is 0-based and unique within the request |
 | `name`, `email`, `role`, `key` | string or null (`email`, `key`) | as given at creation |
 | `status` | string | `pending`, `signed`, `declined` |
-| `placement`, `date_placement` | object or null | `{page, x, y, w, h}`; `page` is 1-based and already resolved; x, y, w, h are fractions of the page with the origin top-left |
+| `placement`, `date_placement` | object or null | `{page, x, y, w, h}`; `page` is 1-based and already resolved; x, y, w, h are fractions of the page with the origin top-left. The date box must be on the same page as `placement`: a `date_anchor` found on another page, or without a `placement`, is dropped and its text listed in `anchor_missing`; an explicit `date_placement` on another page is a `ValueError` |
 | `token_expires_at` | datetime or null | when the link token stops working |
 | `code_expires_at`, `code_sent_at`, `code_verified_at` | datetime or null | emailed one-time code |
 | `code_attempts` | int | wrong codes since the last code was issued |
-| `method` | string or null | `link`, `email_code`, `in_person`; set when signed |
+| `method` | string or null | `link`, `app_link` (the signer came through the app's own private link, not a token this library issued; the code rule is the same as `link`), `email_code`, `in_person`; set when signed. The certificate prints it under "Signed via" (es: "Firmado mediante") |
 | `witness` | string or null | the staff `actor` for an in-person signature |
 | `signature_kind` | string or null | `typed` or `drawn` |
 | `typed_name` | string or null | what the signer typed (also kept next to a drawn signature, when given) |
@@ -95,16 +95,23 @@ Event kinds and their `data`:
 |---|---|
 | `created` | `document_sha256`, `title`, `consent_version`, `consent_sha256`, `signers` (list of `{id, position, name, email, role, key}`), and `anchor_missing` (list of anchor texts not found) only when an anchor was not found |
 | `token_issued` | `expires_at` (datetime string or null) |
-| `viewed`, `code_sent`, `code_verified`, `expired`, `downloaded` | none (`{}`) |
+| `viewed`, `code_sent`, `code_verified`, `expired` | none (`{}`) |
+| `downloaded` | `document`: `signed` (only once the request is `completed`) or `original` (any status). An event written before the key existed has `{}` and reads as `signed` |
 | `code_failed` | `reason`: `wrong` or `expired` |
 | `consent_given` | `version`, `language`, `sha256` (of the consent text) |
 | `signed` | `kind`, `signature_sha256`, `method`, `typed_name`, `name` |
 | `declined`, `voided` | `reason` |
 | `document_built` | `sha256`, `pages`, `sealed`, `timestamped`, `timestamp_url` |
 | `completed` | `sha256` |
-| `copy_delivered` | `channel`, `reference` |
+| `copy_delivered` | `channel`, `reference` (only once the request is `completed`) |
+| `link_sent`, `reminder_sent` | `channel`, `reference` (written by `record_sent`, only while the request is `open`) |
 
 `data` holds only strings, ints, bools, null, lists and objects. A float is refused when the event is written.
+
+The certificate timeline and the chain head printed on it (the row hash of that last `signed` event, "after the last signature") use the events up to and including the last `signed`
+event (the one that made the request `signed`) and nothing after it, so events recorded later (a download of the
+original, a reminder, `document_built`) never change a rebuild: the same inputs give the same bytes as the recorded
+signed copy.
 
 ### `chain` and `check`
 
@@ -174,6 +181,7 @@ max_signature_bytes=...)` reads the post. Names, as the browser sends them:
 | `mode` | hidden | `typed` or `drawn`. The panel starts as `typed` when typed signatures are allowed, else `drawn`; the script changes it with the Draw and Type tabs |
 | `typed_name` | text, max 120 characters | the signer's full name. Required in the markup when typed signatures are allowed. Trimmed; empty reads as none |
 | `drawn_png` | hidden | empty, or a `data:` URL set by the script (below). Read only when `mode` is `drawn` |
+| `bond_esign_decline_reason` | textarea, max 2000 characters | the optional reason, in the separate decline form (`render_panel(..., decline_url=)`); `parse_decline(form)` reads it (trimmed, control characters removed, `None` when empty) |
 | any name in `hidden=` | hidden | fields the app adds (a CSRF token); the library does not read them |
 
 The `drawn_png` rule. The value must start with `data:image/png;base64,`. Anything else is refused with

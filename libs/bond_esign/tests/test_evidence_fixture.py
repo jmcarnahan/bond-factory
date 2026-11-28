@@ -80,4 +80,5 @@ def test_data_key_sets_per_event_kind_match_a_fresh_export(recorded, session, pd
         pinned.setdefault(event["kind"], set(event["data"]))
     assert set(pinned) <= set(fresh)
     for kind, keys in pinned.items():
-        assert keys == fresh[kind], kind
+        # the pinned fixture predates `downloaded.data.document` (an old event reads as the signed copy)
+        assert keys == (fresh[kind] - {"document"} if kind == "downloaded" else fresh[kind]), kind

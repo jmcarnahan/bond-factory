@@ -2,6 +2,7 @@
 
     GET  /esign/sign/{token}               the page: document link, then the library's panel (or why not)
     POST /esign/sign/{token}               the panel's form post (urlencoded); 303 back to the page
+    POST /esign/decline/{token}            the panel's decline form (urlencoded); 303 back to the page
     GET  /esign/sign/{token}/original.pdf  the document being signed
     GET  /esign/sign/{token}/signed.pdf    404 until completed; records `downloaded`
 
@@ -18,7 +19,9 @@ from urllib.parse import parse_qs
 from bond_esign import (
     EsignError,
     asset_tags,
+    decline,
     find_signer_by_token,
+    parse_decline,
     parse_submission,
     policy_of,
     record_download,
@@ -73,7 +76,8 @@ def _show(request: Request, token: str, error: str | None) -> HTMLResponse:
             return _not_found()
         row = session.get(TABLES.request, signer.request_id)
         view = signing_view(session, TABLES, signer, ctx=request_context(request), now=now)
-        panel = render_panel(view, action_url=f"/esign/sign/{token}", error=MESSAGES.get(error or ""))
+        panel = render_panel(view, action_url=f"/esign/sign/{token}", error=MESSAGES.get(error or ""),
+                             decline_url=f"/esign/decline/{token}")
         after = ""
         if view.signer_status == "signed":
             if row.status == "completed":
@@ -105,6 +109,20 @@ def _post(request: Request, token: str, form: dict[str, str]) -> RedirectRespons
     return RedirectResponse(back, status_code=303)
 
 
+def _decline(request: Request, token: str, form: dict[str, str]) -> RedirectResponse:
+    now = request.app.state.clock.utcnow_naive()
+    back = f"/esign/sign/{token}"
+    with session_scope(request.app.state.session_factory) as session:
+        signer = find_signer_by_token(session, TABLES, token, now=now)
+        if signer is None:
+            raise ApiError("not_found", "Not found.", status=404)
+        try:
+            decline(session, TABLES, signer, reason=parse_decline(form), ctx=request_context(request), now=now)
+        except EsignError as exc:  # refused: nothing was written (an expiry the check noticed is kept)
+            return RedirectResponse(f"{back}?error={exc.code}", status_code=303)
+    return RedirectResponse(back, status_code=303)
+
+
 def _pdf(request: Request, token: str, *, signed: bool) -> Response:
     now = request.app.state.clock.utcnow_naive()
     with session_scope(request.app.state.session_factory) as session:
@@ -122,6 +140,24 @@ def _pdf(request: Request, token: str, *, signed: bool) -> Response:
                                                    "Cache-Control": "no-store", "Content-Security-Policy": CSP})
 
 
+async def _read_form(request: Request) -> dict[str, str]:
+    if not (request.headers.get("content-type") or "").startswith("application/x-www-form-urlencoded"):
+        raise ApiError("unsupported_media_type", "Send the form as application/x-www-form-urlencoded.", status=415)
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_FORM_BYTES:
+        raise ApiError("too_large", "That form is too large.", status=413)
+    raw = b""
+    async for chunk in request.stream():  # a chunked body is cut off as soon as it passes the cap
+        raw += chunk
+        if len(raw) > MAX_FORM_BYTES:
+            raise ApiError("too_large", "That form is too large.", status=413)
+    try:
+        fields = parse_qs(raw.decode("utf-8", errors="replace"), keep_blank_values=True, max_num_fields=20)
+    except ValueError:
+        raise ApiError("invalid_form", "That form could not be read.", status=400) from None
+    return {key: values[0] for key, values in fields.items()}
+
+
 def register(app: FastAPI) -> None:
     @app.get("/esign/sign/{token}")
     def sign_page(token: str, request: Request, error: str | None = None) -> HTMLResponse:
@@ -129,22 +165,11 @@ def register(app: FastAPI) -> None:
 
     @app.post("/esign/sign/{token}")
     async def sign_post(token: str, request: Request) -> RedirectResponse:
-        if not (request.headers.get("content-type") or "").startswith("application/x-www-form-urlencoded"):
-            raise ApiError("unsupported_media_type", "Send the form as application/x-www-form-urlencoded.", status=415)
-        declared = request.headers.get("content-length", "")
-        if declared.isdigit() and int(declared) > MAX_FORM_BYTES:
-            raise ApiError("too_large", "That form is too large.", status=413)
-        raw = b""
-        async for chunk in request.stream():  # a chunked body is cut off as soon as it passes the cap
-            raw += chunk
-            if len(raw) > MAX_FORM_BYTES:
-                raise ApiError("too_large", "That form is too large.", status=413)
-        try:
-            fields = parse_qs(raw.decode("utf-8", errors="replace"), keep_blank_values=True, max_num_fields=20)
-        except ValueError:
-            raise ApiError("invalid_form", "That form could not be read.", status=400) from None
-        form = {key: values[0] for key, values in fields.items()}
-        return await run_in_threadpool(_post, request, token, form)
+        return await run_in_threadpool(_post, request, token, await _read_form(request))
+
+    @app.post("/esign/decline/{token}")
+    async def decline_post(token: str, request: Request) -> RedirectResponse:
+        return await run_in_threadpool(_decline, request, token, await _read_form(request))
 
     @app.get("/esign/sign/{token}/original.pdf")
     def original_pdf(token: str, request: Request) -> Response:

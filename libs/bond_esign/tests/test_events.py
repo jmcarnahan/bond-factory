@@ -14,11 +14,12 @@ def make(session, pdf_bytes):
     return request
 
 
-def test_kinds_are_the_fifteen_of_the_contract():
-    assert len(KINDS) == 15 and len(set(KINDS)) == 15
+def test_kinds_are_the_seventeen_of_the_contract():
+    assert len(KINDS) == 17 and len(set(KINDS)) == 17
     assert set(KINDS) == {
         "created", "token_issued", "viewed", "code_sent", "code_verified", "code_failed", "consent_given",
         "signed", "declined", "voided", "expired", "document_built", "completed", "copy_delivered", "downloaded",
+        "link_sent", "reminder_sent",
     }  # fmt: skip
 
 

@@ -48,15 +48,15 @@ def _image(c, png: bytes, box) -> None:
     c.drawImage(reader, left, bottom, width=iw * scale, height=ih * scale, mask="auto")
 
 
-def _caption(c, text: str, box, page_right: float) -> None:
+def _caption(c, text: str, box, page_right: float, font_path: str | None = None) -> None:
     from reportlab.pdfbase.pdfmetrics import stringWidth
 
     left, bottom, _, _ = box
-    text = _text.safe(text)
+    font, text = _text.font_for(text, "Helvetica", font_path)
     room = page_right - _MARGIN - left
-    while text and stringWidth(text, "Helvetica", _CAPTION_SIZE) > room:
+    while text and stringWidth(text, font, _CAPTION_SIZE) > room:
         text = text[:-1]
-    c.setFont("Helvetica", _CAPTION_SIZE)
+    c.setFont(font, _CAPTION_SIZE)
     c.drawString(left, bottom + 0.5, text)
 
 
@@ -76,7 +76,7 @@ def _overlay(items: list[Stamp], x0: float, y0: float, width: float, height: flo
             _text.require_renderable(s.typed_name, font_path)
             _typed(c, s.typed_name, above, font_path)
         if s.caption:
-            _caption(c, s.caption, box, x0 + width)
+            _caption(c, s.caption, box, x0 + width, font_path)
         if s.date_text and s.date_placement is not None:  # without a box of its own the date is not drawn
             dbox = _box(s.date_placement, x0, y0, width, height)
             c.setFont("Helvetica", _DATE_SIZE)

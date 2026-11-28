@@ -33,6 +33,7 @@ class SignerSpec:
     placement: Placement | None = None  # wins over anchor
     anchor: AnchorRule | None = None
     date_placement: Placement | None = None
+    date_anchor: AnchorRule | None = None  # used when date_placement is not given
 
 
 @dataclass(frozen=True)
@@ -183,6 +184,7 @@ class CertificateEvent:
     at: datetime  # naive UTC
     kind: str
     signer_name: str | None = None
+    detail: str | None = None  # e.g. which document a `downloaded` event was about
 
 
 @dataclass(frozen=True)
@@ -197,5 +199,5 @@ class CertificateData:
     consent_text: str
     signers: tuple[CertificateSigner, ...]
     events: tuple[CertificateEvent, ...]
-    chain_head: str  # row_hash of the last event at build time
+    chain_head: str  # row_hash of the last `signed` event (the last one the certificate lists)
     zone: str = "UTC"  # IANA name for the second, local, time column

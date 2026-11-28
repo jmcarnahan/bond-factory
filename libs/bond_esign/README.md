@@ -54,11 +54,12 @@ helper `certs.py` and pyHanko's seal time use the wall clock. Every function flu
 |---|---|
 | 1. Open a request for the PDF | `create_request(session, t, pdf=, title=, signers=[SignerSpec], consent=, now=, ...)` |
 | 2. Make the signer's link | `issue_token(session, t, signer, now=)` returns the raw token once; only its hash is stored (or skip it: see `find_signer_by_key` below) |
+| 2b. Send the link | the app emails or texts it, then `record_sent(session, t, request, channel=, reference=, now=)` |
 | 3. Signer opens the link | `find_signer_by_token(session, t, token, now=)` or `find_signer_by_key(session, t, request_id, key)`, then `signing_view(session, t, signer, ctx=, now=)` and `render_panel(view, action_url=)` |
 | 4. Signer posts the form | `parse_submission(form, max_signature_bytes=)`, then `sign(session, t, signer, pdf=, ...)` |
 | 5. Job: build | `build_signed_pdf(session, t, request, pdf=original)` is a pure read; safe to retry |
 | 6. Job: keep and record | store both PDFs, then `complete(session, t, request, signed=)` |
-| 7. Send the copy | the app mails it, then `record_delivery(session, t, request, channel=, reference=, now=)` |
+| 7. Send the copy | the app mails it, then `record_delivery(session, t, request, channel=, reference=, now=)` (only once the request is `completed`) |
 | Later | `record_download`, `evidence`, `verify_chain`, `verify_evidence`, `verify_seal` |
 | Other endings | `decline(session, t, signer, reason=, ctx=, now=)`, `void(session, t, request, reason=, ctx=, now=)`, `expire_due(session, t, now=)` |
 | With the emailed code | `issue_code(session, t, signer, now=)` returns the 6 digits (you email them); `verify_code(session, t, signer, code, ctx=, now=)` |
@@ -72,8 +73,23 @@ Full keyword lists (all after `session, t`; `*` marks the end of positional argu
 - `create_request(session, t, *, pdf, title, signers, consent, now, policy=Policy(), subject_type=None, subject_id=None,
   expires_at=None, company_id=None, meta=None, ctx=None)`
 - `sign(session, t, signer, *, pdf, consent_version, consent_accepted, typed_name, drawn_png, ctx, now, method="link")`
-- `record_download(session, t, request, *, signer=None, ctx=None, now)`
-- `record_delivery(session, t, request, *, channel, reference=None, signer=None, ctx=None, now)`
+- `issue_token(session, t, signer, *, now, ttl_seconds=None)`: `ttl_seconds` is how long the link works. `None` (the
+  default) means the link never expires by itself (the request's `expires_at` still closes it). With a number, the
+  token stops resolving at `now + ttl_seconds`: `find_signer_by_token` then returns None.
+- `signing_view(session, t, signer, *, ctx, now, record_view=True)`: pass `record_view=False` for a link preview, a
+  HEAD request or a bot, so no `viewed` event is written. It still flips an overdue request to `expired` (one
+  `expired` event), so commit after it.
+- `record_sent(session, t, request, *, channel, reference=None, signer=None, reminder=False, ctx=None, now)`: call it
+  after the app sends the link, and again with `reminder=True` after every resend. Only while the request is `open`
+  (else `expired` or `not_open`). On an overdue request it flips the request to `expired` and raises `expired`:
+  commit after catching the error so the flip is kept. `signer`, when given, must belong to the request
+  (`ValueError`). `channel` is cut to 200 characters and `reference` to 500.
+- `record_download(session, t, request, *, signer=None, document="signed", ctx=None, now)`: `document="signed"` needs a
+  `completed` request (else `not_ready`); `document="original"` works in any status. Call it when the
+  app serves the file.
+- `record_delivery(session, t, request, *, channel, reference=None, signer=None, ctx=None, now)`: refused with
+  `not_ready` until the request is `completed` (the signed copy exists only then), because the certificate prints "Signed copy delivered".
+- `parse_decline(form) -> str | None` returns the cleaned decline reason; pair it with `decline(...)`.
 
 `create_request` takes the PDF (at most `Policy.max_pdf_bytes`, 25,000,000 by default; encrypted PDFs are
 `invalid_pdf`), 1 to `Policy.max_signers` signers (10 by default), and `expires_at`, `subject_type`/`subject_id` (your
@@ -88,6 +104,26 @@ creation (`document_mismatch`); consent was ticked and its version is current; t
 the policy or `method="email_code"` asks for it; an in-person signature has `ctx.actor`; a signature is present and
 allowed. It then writes `consent_given` and `signed` events. When every signer has signed, the request becomes
 `signed`.
+
+## Time
+
+**Every `now` and every `expires_at` is naive UTC.** An aware datetime is converted to UTC. A naive LOCAL time is taken
+as UTC without a warning, and it puts wrong times in the legal record (the library cannot tell the difference). The one
+correct line:
+
+```python
+now = datetime.now(UTC).replace(tzinfo=None)
+```
+
+To turn a calendar "valid until" date into `expires_at`, use the end of that day in the business's zone, then convert:
+
+```python
+from datetime import UTC, datetime, time
+from zoneinfo import ZoneInfo
+
+end = datetime.combine(valid_until, time(23, 59, 59), tzinfo=ZoneInfo("America/Los_Angeles"))
+expires_at = end.astimezone(UTC).replace(tzinfo=None)
+```
 
 ## The three tables
 
@@ -106,8 +142,9 @@ long text is `TEXT`; "JSON" is the generic `JSON`. Columns are NOT NULL unless m
 
 Defaults are SQLAlchemy column defaults, not database `DEFAULT` clauses, so a migration needs none: `id` is a uuid4
 string; `sealed` and `timestamped` are false; `meta` is `{}`; `code_attempts` is 0; `data` is `{}`. `created_at` and
-`updated_at` default to `func.now()` (`updated_at` also on update); the service sets both explicitly from your `now`,
-so the stored values are your clock's. `status` has no column default: the service sets `open` and `pending`.
+`updated_at` default to `func.now()` (`updated_at` also `onupdate=func.now()`); the service sets both explicitly from
+your `now` on its own writes, so those values are your clock's. If the app edits its own extra columns on these tables
+through the ORM, `updated_at` is stamped with the database wall clock. `updated_at` is not part of the hash chain. `status` has no column default: the service sets `open` and `pending`.
 
 ```python
 import bond_esign as es
@@ -120,10 +157,14 @@ class EsignEvent(es.EsignEventMixin, Base): ...
 T = es.Tables(request=EsignRequest, signer=EsignSigner, event=EsignEvent)
 ```
 
+**Metadata.** Import the three mapped classes where the app's metadata is assembled (the module Alembic's
+`env.py` loads, or the schema-drift check reads). A class nobody imports is invisible to autogenerate and to drift
+checks.
+
 **Migration.** The library ships none: write your own to match. Constraints and indexes the mixins declare:
 `esign_requests` primary key `id` and index `ix_esign_requests_subject` on `(subject_type, subject_id)` (plus
 `ix_esign_requests_company_id` with the tenant mixin); `esign_signers` primary key `id`, foreign key `request_id` to
-`esign_requests.id` ON DELETE CASCADE with an index on it, unique `uq_esign_signers_request_position` on
+`esign_requests.id` ON DELETE CASCADE with index `ix_esign_signers_request_id` on it, unique `uq_esign_signers_request_position` on
 `(request_id, position)`, unique `token_sha256`; `esign_events` primary key `id`, foreign key `request_id` to
 `esign_requests.id` ON DELETE CASCADE, unique `uq_esign_events_request_seq` on `(request_id, seq)`. `esign_events`
 has no separate `request_id` index: that unique's leading column serves. The unique on `token_sha256` is unnamed
@@ -137,11 +178,11 @@ Request status: `open`; `signed` (every signer signed); `completed` (`complete` 
 document has already been signed."); open (also partly signed), declined and expired requests can be voided; on a voided
 request it changes nothing. `expire_due` turns open requests past `expires_at` into `expired`; `signing_view`, `sign`
 and `issue_token` do the same for the request they touch. Signer status: `pending`, `signed`, `declined`. Signing
-`method`: `link`, `email_code`, `in_person`.
+`method`: `link` (a token from `issue_token`), `app_link` (the signer came through the app's own private link), `email_code`, `in_person`.
 
 Event kinds (constants and `KINDS`): `created`, `token_issued`, `viewed` (at most one per signer per
 `Policy.view_event_gap_seconds`, 3600), `code_sent`, `code_verified`, `code_failed`, `consent_given`, `signed`,
-`declined`, `voided`, `expired`, `document_built`, `completed`, `copy_delivered`, `downloaded`. Their `data` keys are
+`declined`, `voided`, `expired`, `document_built`, `completed`, `copy_delivered`, `downloaded`, `link_sent`, `reminder_sent`. Their `data` keys are
 in the contract. `data` takes only strings, ints, bools, null, lists and dicts; a float raises `TypeError`.
 
 `EsignError(code, message)`: `message` is plain English fit to show a signer. Codes are in `bond_esign.errors.CODES`.
@@ -163,7 +204,7 @@ in the contract. `data` takes only strings, ints, bools, null, lists and dicts; 
 | `document_mismatch` | the PDF given differs from the one the request was made for |
 | `invalid_pdf` | unreadable, encrypted, no pages, or over `max_pdf_bytes` |
 | `too_many_signers` | more than `Policy.max_signers` |
-| `not_ready` | build or `complete` before every signer signed |
+| `not_ready` | build or `complete` before every signer signed; `record_delivery` or a signed `record_download` before the request is `completed` |
 | `hash_conflict` | `complete` again with a different final PDF |
 | `seal_failed` | the seal certificate or timestamp step failed |
 | `evidence_mismatch` | `build_signed_pdf` found rows that disagree with the hashed events |
@@ -189,7 +230,8 @@ rule = es.AnchorRule("Accepted by (customer)")                  # find printed t
 spec = es.SignerSpec("Pat Example", "pat@example.com", anchor=rule, date_placement=None)
 ```
 
-A `placement` wins over an `anchor`; with neither, the signer appears on the certificate only. An anchor is resolved
+`SignerSpec.date_anchor` (an `AnchorRule`) finds the printed text beside the date blank; `date_placement` wins over it.
+It is resolved once at `create_request`; text that is not found is recorded in the `created` event's `anchor_missing`, the same as a missing signature anchor, and no date is drawn. A `placement` wins over an `anchor`; with neither, the signer appears on the certificate only. An anchor is resolved
 once, at `create_request`. If the text is not found the signer has no placement and the `created` event lists the
 text under `anchor_missing`. `AnchorRule` fields: `occurrence` (0-based over all pages in reading order; -1 last),
 `dx`, `dy` (box origin from the text's right edge and baseline), `w`, `h`, `case_sensitive`. Limits in v1: pages with a
@@ -203,7 +245,8 @@ a Letter page, so the caption starts about 7.8 pt below it: a ruled line 2 to 6 
 of the caption, and the signature area ends 5 pt below the baseline, on the line.
 
 The stamp: a drawn image is scaled to fit and anchored bottom-left; a typed name is set in Times-Italic and shrunk to
-fit. A caption ("Signed electronically by <name>, <date>, ref <first 8 of the signer id>") takes an 8 pt band at the
+fit. A caption ("Signed electronically by <name>, <date>, ref <first 8 of the signer id>"; the name is cut at 40
+characters plus "...", the certificate keeps the full name) takes an 8 pt band at the
 bottom of the box. A `date_placement` adds the date as text.
 
 ## Typed or drawn
@@ -222,11 +265,16 @@ signed = es.build_signed_pdf(session, T, request, pdf=original, labels=es.Certif
                              brand=es.Brand(name="Example Co", accent_rgb=(31, 79, 216)), zone="America/Los_Angeles")
 ```
 
-`Brand` (certificate and stamp only): `name`, `logo_png`, `accent_rgb`, `font_path`. `zone` is an IANA name for the
+`Brand` (certificate and stamp only): `name`, `logo_png`, `accent_rgb`, `font_path`. `font_path` also draws names that
+the standard fonts cannot, in the stamp caption, the certificate name fields and the timeline, instead of "?". `zone` is an IANA name for the
 local time column on the certificate (UTC stays). The certificate holds the title and request id, the original
-document's SHA-256 and page count, one block per signer (name, email, role, how verified, witness, times, IP, device,
+document's SHA-256 and page count, one block per signer (name, email, role, signed via, witness, times, IP, device,
 consent version and hash, signature), the event timeline, the consent text and a "how to verify" line with the chain
 head.
+
+**Signed via.** The certificate prints how the signer arrived: "Private signing link" (`link`), "Private link issued by the
+sender" (`app_link`), `email_code`, or `in_person`. The library does NOT verify who the signer is with the link
+methods: the link is the credential, and it is the app's. An emailed code or `in_person` adds a check; the others do not.
 
 ## What the app must do
 
@@ -237,7 +285,16 @@ head.
   seal would differ from the recorded hash). Serve the signed copy only when its sha256 equals
   `request.signed_sha256`; otherwise answer 404.
 - **Send the signed copy and record it.** The library never sends mail. Email the final PDF, then call
-  `record_delivery`.
+  `record_delivery` (only once the request is `completed`). Call `record_sent` after you send the signing link and after each resend.
+- **Own the one-open-request rule.** The library does not stop a second open request for the same subject. Void the
+  old one first.
+- **Several signers and a decline.** If one signer declines after another has signed, that signature stays recorded,
+  the request becomes `declined` and no signed PDF is built.
+- **Store a sealed build safely.** An unsealed `build_signed_pdf` is deterministic, so two workers store the same bytes.
+  A SEALED build differs every time, so two concurrent builds can leave stored bytes that do not match the recorded
+  hash. Call `complete` first and store only if it accepted your hash, or store under a key that includes
+  `signed.sha256`. Before serving, always compare the stored bytes' sha256 with `request.signed_sha256`
+  (`services/legacy_host/legacy_host/esign_native.py` does).
 - **Pass a real client IP.** Fill `RequestContext(ip=, user_agent=)` from the request. Behind a proxy or load balancer
   use your framework's trusted-proxy setting; an audit row holding the proxy's address is worthless. The library
   stores what you pass (at most 64 characters).
@@ -254,11 +311,13 @@ head.
 
 ## The web panel
 
-`render_panel(view, *, action_url, labels=PanelLabels(), hidden=None, error=None, id_prefix="bond-esign")` returns an
+`render_panel(view, *, action_url, labels=PanelLabels(), hidden=None, error=None, id_prefix="bond-esign", decline_url=None)` returns an
 HTML fragment, escaped, no template engine: a `<form method="post">` with the consent text in the page, the consent
 checkbox, "Your full name", Draw and Type tabs (only the allowed modes), a canvas with Clear, an error line and the
 submit button. When signing is not possible it returns one sentence instead (signed, expired, not ready, needs a
-code). Form fields: `docs/contracts/esign.md`.
+code). With `decline_url`, an open panel ends with a "Decline to sign" `<details>` block: an optional reason field and a
+"Decline" button in its own form that posts to that URL (no script, no popup). Read it with `parse_decline(form)`, then call
+`decline`. Form fields: `docs/contracts/esign.md`.
 
 Serve the files from `asset_names()` (`bond-esign.css`, `bond-esign.js`, `signature_pad.umd.min.js`,
 `LICENSE-signature_pad`) from the paths `asset_path(name)` gives, and put `asset_tags("/your/static")` in the page head. Each URL from `asset_tags` ends in
@@ -299,10 +358,9 @@ from a certificate authority your readers trust is the way to a green tick.
 Make a throwaway certificate: `python -m bond_esign.certs --cn "Example Co Seal" --org "Example Co" --out seal.p12`
 (prompts for the passphrase; writes the file with mode 600; prints the base64 for a secret store). Never commit it.
 
-Unsealed builds are byte-deterministic: the build uses the events before `document_built`, so a retried job gets
-the same bytes and hash. An app must still never rebuild or overwrite a completed request's stored copy: an event
-appended between the first build and `complete` (a new token, say) changes a later rebuild. Sealed output is not (the signature carries a
-time), so seal once and store that file; `complete` then refuses a different one (`hash_conflict`).
+Unsealed builds are byte-deterministic: the certificate uses the events up to and including the last `signed` event, so a retried job, or a rebuild after
+`complete`, gets the same bytes and hash whatever was recorded in between. An app should still serve the stored copy and never overwrite it. Sealed output is not (the signature carries a
+time), so seal once and store that file; `complete` then refuses a different one (`hash_conflict`). See "Store a sealed build safely" above.
 
 ## A minimal wiring
 

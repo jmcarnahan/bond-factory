@@ -6,7 +6,7 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from bond_esign import events
-from bond_esign._rows import EXPIRED, iso, lock, request_of, utc
+from bond_esign._rows import EXPIRED, clean, iso, lock, request_of, utc
 from bond_esign.errors import EXPIRED as EXPIRED_CODE
 from bond_esign.errors import EsignError
 from bond_esign.lifecycle import expire_if_due
@@ -53,6 +53,7 @@ def find_signer_by_token(session, t: Tables, token: str, *, now):
 
 def find_signer_by_key(session, t: Tables, request_id: str, key: str):
     """The signer of that request whose ``key`` is the app's reference (lowest position if several), or None."""
+    key = clean(key, 500)  # the same cleaning create_request applies when it stores SignerSpec.key
     if not request_id or not key:
         return None
     return session.execute(

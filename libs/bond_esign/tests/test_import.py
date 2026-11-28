@@ -66,7 +66,7 @@ def test_the_public_names_of_the_contract_are_exported():
         "TenantEsignRequestMixin", "EsignSignerMixin", "EsignEventMixin", "KINDS", "append", "chain",
         "verify_chain", "create_request", "issue_token", "find_signer_by_token", "find_signer_by_key", "signing_view", "issue_code",
         "verify_code", "sign", "decline", "void", "expire_due", "build_signed_pdf", "complete", "record_delivery",
-        "record_download", "evidence", "normalise_png", "default_consent", "sha256_hex", "page_count",
+        "record_download", "record_sent", "parse_decline", "evidence", "normalise_png", "default_consent", "sha256_hex", "page_count",
         "find_anchor", "stamp", "certificate_pages", "render_panel", "parse_submission", "PanelLabels",
         "Submission", "asset_path", "asset_names", "asset_tags", "Sealer", "verify_seal", "make_self_signed_pkcs12",
         "__version__",

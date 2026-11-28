@@ -1,5 +1,6 @@
 """The signed PDF: gather what the rows say (``build_signed_pdf``), then record it (``complete``)."""
 
+import unicodedata
 from datetime import UTC
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -35,11 +36,17 @@ def _stamp(signer, labels: CertificateLabels, zone: ZoneInfo) -> Stamp | None:
     local = signer.signed_at.replace(tzinfo=UTC).astimezone(zone).date()
     date_text = labels.format_date(local)
     drawn = signer.signature_kind == "drawn" and signer.signature_png
+    name = signer.name
+    if len(name) > 40:  # the certificate keeps it whole
+        cut = name[:40]
+        while cut and (unicodedata.combining(cut[-1]) or cut[-1] == " "):
+            cut = cut[:-1]  # never end on a stranded combining mark or a space
+        name = cut + "..."
     return Stamp(
         placement=Placement(**signer.placement),
         png=signer.signature_png if drawn else None,
         typed_name=None if drawn else signer.typed_name,
-        caption=labels.stamp_caption.format(name=signer.name, date=date_text, ref=signer.id[:8]),
+        caption=labels.stamp_caption.format(name=name, date=date_text, ref=signer.id[:8]),
         date_text=date_text if signer.date_placement else None,
         date_placement=Placement(**signer.date_placement) if signer.date_placement else None,
     )
@@ -48,12 +55,20 @@ def _stamp(signer, labels: CertificateLabels, zone: ZoneInfo) -> Stamp | None:
 _DEFAULT_LABELS = CertificateLabels()
 
 
+def _detail(event) -> str | None:
+    """Which document a ``downloaded`` event was about; an old event without it reads as the signed copy."""
+    if event.kind != events.DOWNLOADED:
+        return None
+    return (event.data or {}).get("document")
+
+
 def build_signed_pdf(session, t: Tables, request, *, pdf: bytes, labels: CertificateLabels = _DEFAULT_LABELS,
                      brand: Brand | None = None, zone: str = "UTC", sealer=None) -> SignedDocument:
     """Stamp the signatures, add the certificate pages, optionally seal. Writes no event, changes no row.
 
-    The certificate timeline and its chain head use only the events before the first ``document_built`` event
-    (all of them when there is none), so building again after ``complete`` gives the same bytes.
+    The certificate timeline and its chain head use the events up to and including the last ``signed`` event
+    (the one that made the request signed), nothing after it, so an event recorded between the last signature
+    and ``complete`` (a download of the original, a reminder) never changes the bytes of a rebuild.
     """
     if request.status not in (SIGNED, COMPLETED):
         raise EsignError(NOT_READY, "This document is not fully signed yet.")
@@ -68,9 +83,9 @@ def build_signed_pdf(session, t: Tables, request, *, pdf: bytes, labels: Certifi
     signers = _signers(session, t, request)
     names = {s.id: s.name for s in signers}
     rows = events.chain(session, t, request)
-    built = next((e.seq for e in rows if e.kind == events.DOCUMENT_BUILT), None)
-    if built is not None:  # a rebuild after complete() must see what the first build saw
-        rows = [e for e in rows if e.seq < built]
+    last = max((e.seq for e in rows if e.kind == events.SIGNED), default=None)
+    if last is not None:  # a rebuild after complete() must see what the first build saw
+        rows = [e for e in rows if e.seq <= last]
     certificate = CertificateData(
         request_id=request.id, title=request.title, document_sha256=request.document_sha256,
         page_count=request.page_count, consent_version=request.consent_version,
@@ -85,7 +100,7 @@ def build_signed_pdf(session, t: Tables, request, *, pdf: bytes, labels: Certifi
             )
             for s in signers
         ),
-        events=tuple(CertificateEvent(e.seq, e.at, e.kind, names.get(e.signer_id)) for e in rows),
+        events=tuple(CertificateEvent(e.seq, e.at, e.kind, names.get(e.signer_id), _detail(e)) for e in rows),
         chain_head=rows[-1].row_hash if rows else events.ZERO_HASH, zone=zone,
     )
     stamps = [s for s in (_stamp(signer, labels, tz) for signer in signers) if s is not None]

@@ -93,8 +93,8 @@ def _timeline(f: Flow, data: CertificateData) -> None:
                 cells.append((130, f"{z:%Y-%m-%d %H:%M:%S}"))
             except (ZoneInfoNotFoundError, ValueError):
                 cells.append((130, ""))
-        cells.append((250 if local else 140, labels.event_label(ev.kind)))
-        cells.append((signer_x, (ev.signer_name or "")[:30]))
+        cells.append((250 if local else 140, labels.event_label(ev.kind, ev.detail)))
+        cells.append((signer_x, (ev.signer_name or "")[:30], f.brand.font_path if f.brand else None))
         f.row(cells)
 
 

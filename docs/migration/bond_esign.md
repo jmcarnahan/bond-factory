@@ -72,7 +72,7 @@ Rehearsed in `services/legacy_host` (`esign_seam.py`, `tests/test_esign_adopter_
   and skips `issue_token`.
 - The client IP is the signature's evidence: check the proxy setting that makes it real (for uvicorn,
   `--forwarded-allow-ips`), or every signer appears to sign from the proxy.
-- Send the signed copy from the app's own mail path, then call `record_delivery`.
+- Send the signed copy from the app's own mail path, then call `record_delivery`. It is refused (`not_ready`) until the request is `completed` (the signed copy exists only then): the certificate prints "Signed copy delivered".
 - Dependencies: Pillow 12.3+, reportlab 5.0+, pypdf 7.2+. An unsealed build is byte-identical only for the same versions of
   pypdf, reportlab and Pillow: do not rebuild a completed request after an upgrade.
 
@@ -82,6 +82,33 @@ Rehearsed in `services/legacy_host` (`esign_seam.py`, `tests/test_esign_adopter_
   stored copy) and `make -C libs/bond_esign test`.
 - In your app: a signed request becomes `completed` after one `fetch_signed_pdf`; a second call returns the same bytes; a
   tampered stored file is refused; an overdue open request reads `expired`; old vendor rows still answer through their provider.
+
+## 4a. What the adopter still has to build
+
+A dry-run integration into an adopter found these gaps. Each is app work, not library work. Tick them off before launch.
+
+- [ ] A signed-copy route on the public page. It serves the stored signed PDF only after comparing its sha256 with `request.signed_sha256`, and calls `record_download` (why: the log should show who fetched it, and a changed file must never be served).
+- [ ] Email the signed copy to the signer, then `record_delivery` (why: the consent text promises a copy, and the outside signing vendor's completion email no longer exists).
+- [ ] `record_download(document="original")` where the public page serves the original PDF (why: the log shows what the signer was able to read).
+- [ ] `record_sent` when the link is emailed or texted, and again with `reminder=True` on every resend (why: the certificate timeline then shows when the signer was reached).
+- [ ] `sign(..., method="app_link")` when the signer arrives through the app's own share link instead of a token from `issue_token` (why: the certificate says "Private link issued by the sender", which is true; the library does not verify who the signer is with link methods, the app's link is the credential).
+- [ ] `signing_view(..., record_view=False)` for HEAD requests and link-preview fetches (why: a mail scanner or chat preview is not the signer viewing).
+- [ ] Page state after signing: show "signed, your copy is being prepared" from the library's signer status, and offer the signed copy once the request is `completed`. A reload must never offer signing again. Render from the view's `can_sign`, not from the app's own older status column (why: the old column lags the job).
+- [ ] Map `expired`, `not_open` and `document_mismatch` to plain messages for a superseded or taken-back document (why: the signer should not see a code).
+- [ ] The decline control: pass `decline_url` to `render_panel`, read the reason with `parse_decline`, call `decline`, then do what the app does on decline (status, staff notice) (why: a signer needs a way to say no).
+- [ ] Language per signer: Spanish consent text, `PanelLabels.spanish()` and `CertificateLabels.spanish()`, chosen from the signer's language and not the staff user's (why: the signer must read what they agree to).
+- [ ] Brand colour: override `--bond-esign-accent` and the other four panel properties in a rule for `.bond-esign` that comes after the library stylesheet (`libs/bond_esign/bond_esign/web/README.md`).
+- [ ] The consent text needs the business name and a non-blank paper-contact line. Take both from the app's settings and pass them to `default_consent`; the provider seam passes only a session (why: a blank contact line makes the paper alternative empty).
+- [ ] Privacy and terms pages that name the outside vendor: change them, in both languages (why: they would be wrong after cutover).
+- [ ] Register the new provider name in config validation and startup checks. Keep the vendor's webhook route for old envelopes (why: old envelopes still complete through it).
+- [ ] The migration for the three tables, plus every "list of all tables" guard the app has: demo-data purge classification, sync or export allowlists, schema-drift pins (why: a missed list silently skips or deletes evidence). Import the three mapped classes where the metadata is assembled.
+- [ ] An asset route for the panel files with long immutable caching (the URLs carry a content hash), and a rate limit keyed by IP, not by link. If the app forbids blocking work in async routes, run the sign POST's PDF work in a threadpool (why: the link is the credential, and PDF work blocks).
+- [ ] Dependencies: the library brings pypdf and reportlab. Re-lock. The Pillow floor is 12.3.
+- [ ] The date blank: `SignerSpec.date_anchor`. Printed text extraction usually merges a table row into one run, so a short label such as "Date" cannot be found by itself: anchor on the signature label with a larger `dx`. For the default acceptance block (fixture `fixtures/esign/weasy_acceptance.pdf`) the measured rule is `AnchorRule("Accepted by (customer)", dx=0.505, dy=-0.014, w=0.12, h=0.02)`; the test `test_date_anchor_lands_in_the_date_blank_on_the_signature_row` pins it. Re-measure if the template's columns change.
+- [ ] No demo shortcut: tests complete a request by posting the panel form (why: a shortcut hides a broken page).
+- [ ] One open request per subject is the app's rule: void the old request before creating a new one (the library does not stop a second).
+- [ ] Time: pass naive UTC for every `now` and `expires_at`; a "valid until" date becomes the end of that day in the business's zone, converted to UTC (`libs/bond_esign/README.md`, "Time").
+- [ ] Before launch: one hand test on a real phone; open a sealed file in Acrobat if sealing is switched on; legal review of the consent text.
 
 ## 5. Known limits
 

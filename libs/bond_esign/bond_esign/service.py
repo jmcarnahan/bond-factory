@@ -15,7 +15,7 @@ from bond_esign.codes import issue_code, verify_code
 from bond_esign.documents import build_signed_pdf, complete
 from bond_esign.errors import INVALID_PDF, TOO_MANY_SIGNERS, EsignError
 from bond_esign.evidence_export import evidence
-from bond_esign.lifecycle import decline, expire_due, record_delivery, record_download, void
+from bond_esign.lifecycle import decline, expire_due, record_delivery, record_download, record_sent, void
 from bond_esign.pdf_read import page_count, sha256_hex
 from bond_esign.signing import sign, signing_view
 from bond_esign.tokens import find_signer_by_key, find_signer_by_token, issue_token
@@ -23,7 +23,7 @@ from bond_esign.types import Consent, Placement, Policy, RequestContext, SignerS
 
 __all__ = [
     "build_signed_pdf", "complete", "create_request", "decline", "evidence", "expire_due", "find_signer_by_key",
-    "find_signer_by_token", "issue_code", "issue_token", "policy_of", "record_delivery", "record_download", "sign", "signing_view",
+    "find_signer_by_token", "issue_code", "issue_token", "policy_of", "record_delivery", "record_download", "record_sent", "sign", "signing_view",
     "verify_code", "void",
 ]
 
@@ -47,6 +47,21 @@ def _placement(p: Placement, pages: int, *, clamp: bool = False) -> dict:
     if not (0 <= x <= 1 and 0 <= y <= 1 and w > 0 and h > 0 and x + w <= 1 + _EPS and y + h <= 1 + _EPS):
         raise ValueError(f"placement {p} is outside the page (fractions of the page, 0..1)")
     return {"page": _page(p.page, pages), "x": x, "y": y, "w": w, "h": h}
+
+
+def _resolve_date(spec: SignerSpec, pdf: bytes, pages: int, missing: list[str]) -> dict | None:
+    if spec.date_placement is not None:
+        return _placement(spec.date_placement, pages)
+    if spec.date_anchor is None:
+        return None
+    found = anchor.find_anchor(pdf, spec.date_anchor)
+    if found is not None:
+        try:
+            return _placement(found, pages, clamp=True)
+        except ValueError:
+            pass
+    missing.append(spec.date_anchor.text)
+    return None
 
 
 def _resolve(spec: SignerSpec, pdf: bytes, pages: int, missing: list[str]) -> dict | None:
@@ -82,11 +97,17 @@ def create_request(session, t: Tables, *, pdf: bytes, title: str, signers: Seque
         raise EsignError(TOO_MANY_SIGNERS, f"A document can have at most {policy.max_signers} signers.")
     now = utc(now)
     missing: list[str] = []
-    resolved = [
-        (spec, _resolve(spec, pdf, pages, missing),
-         _placement(spec.date_placement, pages) if spec.date_placement is not None else None)
-        for spec in signers
-    ]
+    resolved = []
+    for spec in signers:
+        box = _resolve(spec, pdf, pages, missing)
+        date_box = _resolve_date(spec, pdf, pages, missing)
+        if date_box is not None and (box is None or date_box["page"] != box["page"]):
+            if spec.date_placement is not None and box is not None:
+                raise ValueError("date_placement must be on the same page as the signature placement")
+            if spec.date_anchor is not None and spec.date_placement is None:
+                missing.append(spec.date_anchor.text)
+            date_box = None  # the date is drawn on the signature's page, so a box elsewhere cannot be used
+        resolved.append((spec, box, date_box))
     request = t.request(
         status=OPEN, title=clean(title, 500), subject_type=subject_type, subject_id=subject_id,
         document_sha256=sha256_hex(pdf), document_bytes=len(pdf), page_count=pages,

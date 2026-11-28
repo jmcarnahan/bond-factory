@@ -22,6 +22,9 @@ _EN_EVENTS = (
     ("completed", "Completed"),
     ("copy_delivered", "Signed copy delivered"),
     ("downloaded", "Signed copy downloaded"),
+    ("downloaded:original", "Original document downloaded"),
+    ("link_sent", "Signing link sent"),
+    ("reminder_sent", "Reminder sent"),
 )
 _ES_EVENTS = (
     ("created", "Solicitud creada"),
@@ -39,10 +42,19 @@ _ES_EVENTS = (
     ("completed", "Completado"),
     ("copy_delivered", "Copia firmada entregada"),
     ("downloaded", "Copia firmada descargada"),
+    ("downloaded:original", "Documento original descargado"),
+    ("link_sent", "Enlace de firma enviado"),
+    ("reminder_sent", "Recordatorio enviado"),
 )
-_EN_METHODS = (("link", "Private signing link"), ("email_code", "Emailed one-time code"), ("in_person", "In person"))
+_EN_METHODS = (
+    ("link", "Private signing link"),
+    ("app_link", "Private link issued by the sender"),
+    ("email_code", "Emailed one-time code"),
+    ("in_person", "In person"),
+)
 _ES_METHODS = (
     ("link", "Enlace de firma privado"),
+    ("app_link", "Enlace privado emitido por el remitente"),
     ("email_code", "Codigo de un solo uso por correo"),
     ("in_person", "En persona"),
 )
@@ -67,7 +79,7 @@ class CertificateLabels:
     email: str = "Email"
     role: str = "Role"
     status: str = "Status"
-    method: str = "Verified by"
+    method: str = "Signed via"
     witness: str = "Witnessed by"
     signed_at: str = "Signed at"
     ip: str = "IP address"
@@ -87,7 +99,7 @@ class CertificateLabels:
     verify_heading: str = "How to verify"
     verify_text: str = (
         "The SHA-256 of the final file is recorded by the issuing system. The event record is a hash chain; "
-        "the head hash at the time this document was built is {head}."
+        "the head hash after the last signature is {head}."
     )
     page_of: str = "Certificate page {n} of {m}"
     zone_label: str = "UTC"
@@ -103,8 +115,10 @@ class CertificateLabels:
         """``YYYY-MM-DD HH:MM:SS <zone label>`` for a datetime that is already in the wanted zone."""
         return f"{moment:%Y-%m-%d %H:%M:%S} {zone_label or self.zone_label}"
 
-    def event_label(self, kind: str) -> str:
-        return dict(self.event_kinds).get(kind, kind)
+    def event_label(self, kind: str, detail: str | None = None) -> str:
+        """The label of an event kind; ``kind:detail`` is tried first (e.g. ``downloaded:original``)."""
+        known = dict(self.event_kinds)
+        return known.get(f"{kind}:{detail}", known.get(kind, kind)) if detail else known.get(kind, kind)
 
     def method_label(self, method: str | None) -> str:
         return "" if method is None else dict(self.methods).get(method, method)
@@ -128,7 +142,7 @@ class CertificateLabels:
             email="Correo",
             role="Funcion",
             status="Estado",
-            method="Verificado mediante",
+            method="Firmado mediante",
             witness="Presenciado por",
             signed_at="Firmado el",
             ip="Direccion IP",
@@ -147,7 +161,7 @@ class CertificateLabels:
             verify_heading="Como verificar",
             verify_text=(
                 "El SHA-256 del archivo final lo registra el sistema emisor. El registro de eventos es una "
-                "cadena de hashes; el hash de cabecera al generar este documento es {head}."
+                "cadena de hashes; el hash de cabecera tras la ultima firma es {head}."
             ),
             page_of="Página del certificado {n} de {m}",
             continued="(continuacion)",

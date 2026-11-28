@@ -276,14 +276,15 @@ def test_complete_with_a_different_hash_is_a_conflict_and_other_states_are_not_r
 
 def test_delivery_and_download_are_recorded_without_changing_state(session, pdf_bytes):
     request, signer = signed_request(session, pdf_bytes)
+    complete(session, T, request, signed=build_signed_pdf(session, T, request, pdf=pdf_bytes), now=at(4))
     record_delivery(session, T, request, channel="email", reference="msg-1", signer=signer, ctx=CTX, now=at(5))
     record_download(session, T, request, signer=signer, ctx=RequestContext(ip="198.51.100.2"), now=at(6))
     delivered, downloaded = events_of(session, request)[-2:]
     assert (delivered.kind, delivered.data, delivered.signer_id) == ("copy_delivered", {"channel": "email", "reference": "msg-1"}, signer.id)
-    assert (downloaded.kind, downloaded.ip, downloaded.data) == ("downloaded", "198.51.100.2", {})
+    assert (downloaded.kind, downloaded.ip, downloaded.data) == ("downloaded", "198.51.100.2", {"document": "signed"})
     record_delivery(session, T, request, channel="mail", now=at(7))
     assert events_of(session, request)[-1].data == {"channel": "mail", "reference": None}
-    assert request.status == "signed"
+    assert request.status == "completed"
 
 
 def test_build_after_complete_download_and_delivery_gives_the_same_pdf_and_complete_stays_a_no_op(session, pdf_bytes):

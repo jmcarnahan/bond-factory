@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from . import errors
 from .errors import EsignError
 from .types import SigningView
+from .webform_labels import PanelLabels
 
 _ASSETS = ("LICENSE-signature_pad", "bond-esign.css", "bond-esign.js", "signature_pad.umd.min.js")
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -29,55 +30,6 @@ _TRUE = ("1", "on", "true")
 
 def _e(value: object) -> str:
     return html.escape(str(value), quote=True)
-
-
-@dataclass(frozen=True)
-class PanelLabels:
-    """Every visible string of the panel. ``signing_as`` may contain ``{name}``."""
-
-    heading: str = "Sign this document"
-    signing_as: str = "Signing as {name}"
-    name_label: str = "Your full name"
-    consent_label: str = "I have read the above and I agree to sign this document electronically."
-    mode_label: str = "How do you want to sign?"
-    draw_tab: str = "Draw"
-    type_tab: str = "Type"
-    canvas_label: str = "Draw your signature in the box"
-    clear: str = "Clear"
-    submit: str = "Sign and accept"
-    typed_preview_label: str = "Your signature will look like this"
-    signed_message: str = "Thank you. This document is signed."
-    not_available_expired: str = "This signing link has expired. Please ask for a new one."
-    not_available_not_open: str = "This document can no longer be signed."
-    not_available_generic: str = "This document cannot be signed right now."
-    code_needed: str = "Please enter the code we sent you before signing."
-    noscript_hint: str = "Without JavaScript you can sign by typing your full name."
-    noscript_draw_only: str = "JavaScript is needed to draw your signature. Please turn it on and reload this page."
-
-    @classmethod
-    def spanish(cls) -> PanelLabels:
-        return cls(
-            heading="Firme este documento",
-            signing_as="Firmando como {name}",
-            name_label="Su nombre completo",
-            consent_label="He leído lo anterior y acepto firmar este documento electrónicamente.",
-            mode_label="¿Cómo desea firmar?",
-            draw_tab="Dibujar",
-            type_tab="Escribir",
-            canvas_label="Dibuje su firma en el recuadro",
-            clear="Borrar",
-            submit="Firmar y aceptar",
-            typed_preview_label="Su firma se verá así",
-            signed_message="Gracias. Este documento está firmado.",
-            not_available_expired="Este enlace de firma ha vencido. Pida uno nuevo.",
-            not_available_not_open="Este documento ya no se puede firmar.",
-            not_available_generic="Este documento no se puede firmar en este momento.",
-            code_needed="Ingrese el código que le enviamos antes de firmar.",
-            noscript_hint="Sin JavaScript puede firmar escribiendo su nombre completo.",
-            noscript_draw_only=(
-                "Se necesita JavaScript para dibujar su firma. Actívelo y vuelva a cargar esta página."
-            ),
-        )
 
 
 @dataclass(frozen=True)
@@ -151,11 +103,17 @@ def render_panel(
     hidden: Mapping[str, str] | None = None,
     error: str | None = None,
     id_prefix: str = "bond-esign",
+    decline_url: str | None = None,
 ) -> str:
-    """The signing panel as an HTML fragment, or a one-sentence closed notice when signing is not possible."""
+    """The signing panel as an HTML fragment, or a one-sentence closed notice when signing is not possible.
+
+    With ``decline_url`` the open panel ends with a ``<details>`` holding its own decline form (a sibling of the
+    sign form, never nested). The disclosure is the two-step confirmation: no script, no dialog."""
     if not view.can_sign:
         if view.signer_status == "signed":
             return _closed(labels.signed_message)
+        if view.signer_status == "declined":
+            return _closed(labels.declined_message)
         by_reason = {errors.EXPIRED: labels.not_available_expired, errors.NOT_OPEN: labels.not_available_not_open}
         return _closed(by_reason.get(view.reason or "", labels.not_available_generic))
     if view.needs_code and not view.code_verified:
@@ -215,7 +173,21 @@ def render_panel(
     hint = labels.noscript_hint if view.allow_typed else labels.noscript_draw_only
     parts.append(f'<noscript><p class="bond-esign__hint">{_e(hint)}</p></noscript>')
     parts.append("</form>")
+    if decline_url:
+        parts.append(_decline_block(p, labels, decline_url))
     return "\n".join(parts)
+
+
+def _decline_block(p: str, labels: PanelLabels, decline_url: str) -> str:
+    return (
+        f'<details class="bond-esign__decline"><summary>{_e(labels.decline_summary)}</summary>'
+        f'<form method="post" action="{_e(decline_url)}" class="bond-esign__decline-form">'
+        f'<label for="{p}-decline-reason">{_e(labels.decline_reason_label)}</label>'
+        f'<textarea id="{p}-decline-reason" name="bond_esign_decline_reason" maxlength="2000" rows="3">'
+        "</textarea>"
+        f'<button type="submit" class="bond-esign__decline-submit">{_e(labels.decline_submit)}</button>'
+        "</form></details>"
+    )
 
 
 def _text(form: Mapping[str, object], key: str) -> str:
@@ -249,3 +221,12 @@ def parse_submission(form: Mapping[str, str], *, max_signature_bytes: int) -> Su
         typed_name=typed,
         drawn_png=png,
     )
+
+
+_CONTROLS = {c: None for c in [*range(9), *range(11, 32), 127]}  # C0 and DEL; tab and newline stay
+
+
+def parse_decline(form: Mapping[str, object]) -> str | None:
+    """The optional reason from the decline form: trimmed, control characters removed, at most 2000 characters."""
+    reason = _text(form, "bond_esign_decline_reason").translate(_CONTROLS).strip()[:2000].strip()
+    return reason or None

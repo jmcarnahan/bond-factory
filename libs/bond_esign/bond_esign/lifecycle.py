@@ -17,9 +17,14 @@ from bond_esign._rows import (
     request_of,
     utc,
 )
-from bond_esign.errors import ALREADY_COMPLETED, NOT_OPEN, EsignError
+from bond_esign.errors import ALREADY_COMPLETED, NOT_OPEN, NOT_READY, EsignError
 from bond_esign.errors import EXPIRED as EXPIRED_CODE
 from bond_esign.types import RequestContext, Tables
+
+
+def _own(request, signer) -> None:
+    if signer is not None and signer.request_id != request.id:
+        raise ValueError("signer does not belong to this request")
 
 
 def expire_if_due(session, t: Tables, request, now) -> bool:
@@ -94,12 +99,49 @@ def void(session, t: Tables, request, *, reason: str, ctx: RequestContext | None
     return request
 
 
+def record_sent(session, t: Tables, request, *, channel: str, reference: str | None = None, signer=None,
+                reminder: bool = False, ctx: RequestContext | None = None, now) -> None:
+    """Record that the signing link (or a reminder) was sent (the app sends it; the library only records).
+
+    Only while the request is open: an overdue one flips to ``expired`` and raises ``expired``; any other
+    status raises ``not_open``.
+    """
+    _own(request, signer)
+    now = utc(now)
+    data = {"channel": clean(channel, 200), "reference": clean(reference, 500)}
+    ctx = clean_ctx(ctx)
+    lock(session, t, request)
+    require_open(session, t, request, now)
+    events.append(session, t, request, events.REMINDER_SENT if reminder else events.LINK_SENT, signer=signer,
+                  ctx=ctx, data=data, now=now)
+
+
 def record_delivery(session, t: Tables, request, *, channel: str, reference: str | None = None, signer=None,
                     ctx: RequestContext | None = None, now) -> None:
-    """Record that the signed copy was handed to the signer (the app sends it; the library only records)."""
-    events.append(session, t, request, events.COPY_DELIVERED, signer=signer, ctx=ctx,
-                  data={"channel": clean(channel, 200), "reference": clean(reference, 500)}, now=now)
+    """Record that the signed copy was handed to the signer (the app sends it; the library only records).
+
+    Refused with ``not_ready`` until the request is ``completed``: no signed copy exists before that."""
+    _own(request, signer)
+    now = utc(now)
+    data = {"channel": clean(channel, 200), "reference": clean(reference, 500)}
+    ctx = clean_ctx(ctx)
+    lock(session, t, request)
+    if request.status != COMPLETED:
+        raise EsignError(NOT_READY, "This document is not fully signed yet.")
+    events.append(session, t, request, events.COPY_DELIVERED, signer=signer, ctx=ctx, data=data, now=now)
 
 
-def record_download(session, t: Tables, request, *, signer=None, ctx: RequestContext | None = None, now) -> None:
-    events.append(session, t, request, events.DOWNLOADED, signer=signer, ctx=ctx, data={}, now=now)
+def record_download(session, t: Tables, request, *, signer=None, ctx: RequestContext | None = None,
+                    document: str = "signed", now) -> None:
+    """Record a download. ``document`` is ``"signed"`` (needs a completed request, else ``not_ready``)
+    or ``"original"`` (any status). Anything else is a ``ValueError``."""
+    if document not in ("signed", "original"):
+        raise ValueError(f"document must be 'signed' or 'original', not {document!r}")
+    _own(request, signer)
+    now = utc(now)
+    ctx = clean_ctx(ctx)
+    lock(session, t, request)
+    if document == "signed" and request.status != COMPLETED:
+        raise EsignError(NOT_READY, "This document is not fully signed yet.")
+    events.append(session, t, request, events.DOWNLOADED, signer=signer, ctx=ctx, data={"document": document},
+                  now=now)
