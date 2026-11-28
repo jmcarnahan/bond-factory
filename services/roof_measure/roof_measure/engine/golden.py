@@ -60,9 +60,8 @@ def _planes_view(res: EngineResult, st: Stages) -> dict[str, Any]:
 def _outline_view(res: EngineResult, st: Stages) -> dict[str, Any]:
     d = res.diagnostics
     return {"ring": _ring(st.outline), "area_m2": round(st.outline.area, 2), "source": d.get("outline_source"),
-            "overhang_measured_m": d.get("overhang_measured_m"), "overhang_applied_m": d.get("overhang_applied_m"),
-            "support_area_m2": d.get("support_area_m2"), "extra_parts": d.get("extra_parts"),
-            "scale_used": d.get("overhang_scale_used")}
+            "edge_offset_measured_m": d.get("edge_offset_measured_m"), "edge_offset_applied_m": d.get("edge_offset_applied_m"),
+            "support_area_m2": d.get("support_area_m2")}
 
 
 def _facets_edges_view(res: EngineResult, st: Stages) -> dict[str, Any]:
@@ -71,8 +70,7 @@ def _facets_edges_view(res: EngineResult, st: Stages) -> dict[str, Any]:
                "points": f.points, "polygon": _ring(f.polygon)} for f in st.facets]
     edges = [{"type": e.type, "length_ft": round(e.length_ft, 1), "facets": list(e.facets),
               "p0": [round(v, 2) for v in e.p0], "p1": [round(v, 2) for v in e.p1]} for e in st.edges]
-    keys = ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft",
-            "roofing_pitched_sqft", "roofing_flat_sqft", "complexity")
+    keys = ("area_sqft", "planes_pitch_weighted", "eave_rake_ft", "ridge_hip_ft", "roofing_pitched_sqft", "roofing_flat_sqft")
     return {"facets": facets, "edges": edges, "totals": {k: res.totals.get(k) for k in keys},
             "verdict": res.quality.verdict}
 
@@ -146,8 +144,8 @@ def compare(name: str, got: dict, want: dict) -> list[str]:
         _num(got["support_area_m2"], want["support_area_m2"], 1.0, 0.03, "support area", out)
         if _poly_iou(got["ring"], want["ring"]) < 0.97:
             out.append("outline ring differs from the golden one")
-        if len(got["overhang_applied_m"] or []) != len(want["overhang_applied_m"] or []):
-            out.append("overhang_applied_m: different number of sides")
+        if len(got["edge_offset_applied_m"] or []) != len(want["edge_offset_applied_m"] or []):
+            out.append("edge_offset_applied_m: different number of sides")
     elif name == "partition_summary":
         if got["grid"] != want["grid"]:
             out.append(f"grid {got['grid']} vs {want['grid']}")

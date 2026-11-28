@@ -24,9 +24,13 @@ String sqft(double a) {
   return b.toString();
 }
 
-/// 0.19 -> "Flat" (rise <= 0.5); 3.9 -> "4/12"; 4.6 -> "4.5/12" (nearest whole or half).
+/// The pitch as roofers say it: the whole number (half up), with the fitted value beside it when the two differ at
+/// the tenth. 4.31 -> "4/12 (4.3)", 5.0 -> "5/12", 4.5 -> "5/12 (4.5)", 0.19 -> "Flat" (rise <= 0.5).
 String pitchLabel(double rise, {RoofLabels labels = const RoofLabels()}) {
-  if (!(rise > 0.5)) return labels.pitchFlat;
-  final p = (rise * 2).round() / 2;
-  return p == p.truncateToDouble() ? '${p.toInt()}/12' : '$p/12';
+  // Not a pitch (NaN, infinite, absurdly large) reads like "no pitch", never an exception.
+  if (!(rise > 0.5) || rise > 1000) return labels.pitchFlat;
+  final whole = (rise + 0.5).floor();
+  final tenths = (rise * 10 + 0.5).floor();
+  if (tenths == whole * 10) return '$whole/12';
+  return '$whole/12 (${tenths ~/ 10}.${tenths % 10})';
 }

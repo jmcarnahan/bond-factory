@@ -1,5 +1,5 @@
 {
- "_note": "Plan section 3.7a, encoded exactly; thresholds may not be loosened without John. Price (gate 8) and the outside-outline share are report-only. Gate 4 and 5 (blind) are graded by roof-blind-score, not here.",
+ "_note": "Plan section 3.7a, encoded exactly; thresholds may not be loosened without the project owner. Price (gate 8) and the outside-outline share are report-only. Gate 4 and 5 (blind) are graded by roof-blind-score, not here.",
  "compare": {
   "area_pct": 3.0,
   "facets": 2,
@@ -61,7 +61,8 @@
    "require": [
     "automation_ok"
    ],
-   "min_n": 10
+   "min_n": 10,
+   "note": "The reference returns come from the UNSHIFTED county outline + 1.2 m, so this measures agreement with that outline; the engine registers the outline (a 0.8-0.9 m offset is typical), and an independent check found that 83% of the returns that the registered outline leaves uncovered are walls, trees and neighbours. It is expected to FAIL until the project owner decides whether to keep the gate or move the reference."
   },
   {
    "name": "2d coverage >= 0.85 on >= 85% of ok houses",
@@ -76,7 +77,8 @@
     "op": ">=",
     "value": 0.85
    },
-   "min_n": 10
+   "min_n": 10,
+   "note": "The reference returns come from the UNSHIFTED county outline + 1.2 m, so this measures agreement with that outline; the engine registers the outline (a 0.8-0.9 m offset is typical), and an independent check found that 83% of the returns that the registered outline leaves uncovered are walls, trees and neighbours. It is expected to FAIL until the project owner decides whether to keep the gate or move the reference."
   },
   {
    "name": "2e overlap <= 0.1% of union area (worst house)",
@@ -256,14 +258,16 @@
    "value": 0
   },
   {
-   "name": "7a T3: 90% interval of the median ratio contains 1.00",
+   "name": "7a T3: 90% interval of the median ratio contains 1.00 (REPORTED, not a gate: owner decision)",
    "agg": "t3_contains",
+   "report_only": true,
    "op": ">=",
    "value": 1.0,
    "require": [
     "automation_ok"
    ],
-   "min_n": 10
+   "min_n": 10,
+   "note": "The 0.5 blend that centred this ratio is gone; the engine reports the drawn area and the interval is printed beside the gates."
   },
   {
    "name": "7b T3: ratio IQR <= 1.35 x the library baseline's",

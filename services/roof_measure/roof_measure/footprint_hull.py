@@ -37,7 +37,6 @@ AMBIGUOUS_GAP_M = 10.0
 MAX_AREA_RATIO = 1.5
 DROP_CLASSES = (2, 3, 4, 5, 7, 9, 18)  # ground, vegetation, noise, water
 HULL_NOTE = "Footprint derived from the LiDAR point cloud only; check that the outline is the right building."
-VEGETATION = (3, 4, 5)
 
 
 @dataclass

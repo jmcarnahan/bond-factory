@@ -161,6 +161,14 @@ def _best_neighbour(i: int, items: list, planes: list, q: np.ndarray, inside: np
     return best
 
 
+def _longest_neighbour(i: int, items: list) -> int | None:
+    """Index of the neighbour sharing the most boundary with facet i (at least 0.5 m), else None."""
+    pg = items[i][1]
+    shared = [(pg.buffer(0.05).intersection(p2.boundary).length, j) for j, (_, p2) in enumerate(items) if j != i]
+    shared = [t for t in shared if t[0] >= 0.5]
+    return None if not shared else max(shared)[1]
+
+
 def merge_small_facets(items: list, planes: list, q: np.ndarray, ctx: Ctx) -> tuple[list, int]:
     """A facet under ``small_facet_m2`` merges into the neighbour whose residual rms rises least."""
     p = ctx.p
@@ -177,8 +185,10 @@ def merge_small_facets(items: list, planes: list, q: np.ndarray, ctx: Ctx) -> tu
             if _keeps_small(i, items, planes, q, inside, p):
                 continue
             best = _best_neighbour(i, items, planes, q, inside, p)
-            if best is not None:
-                j = best[1]
+            j = None if best is None else best[1]
+            if j is None and inside.sum() < p.plane_min_pts:  # too few returns to be a plane of its own: the longest shared boundary takes it
+                j = _longest_neighbour(i, items)
+            if j is not None:
                 u = unary_union([items[j][1].buffer(0.003), pg.buffer(0.003)]).buffer(-0.003)
                 if u.geom_type == "Polygon":
                     items[j][1] = _exact(u)
@@ -187,6 +197,38 @@ def merge_small_facets(items: list, planes: list, q: np.ndarray, ctx: Ctx) -> tu
                     done = False
                     break
         if done:
+            break
+    return items, merged
+
+
+def merge_off_plane_facets(items: list, planes: list, returns: np.ndarray, ctx: Ctx) -> tuple[list, int]:
+    """A facet under ``small_facet_m2`` whose returns (all of them inside it, assigned to a plane or not) have a median residual
+    over its own plane above ``off_plane_facet_mad_m`` is not a roof plane of its own (a tree crown or clutter that took a
+    neighbour's plane): the neighbour sharing the most boundary takes it, so no area is lost. Returns (items, number merged)."""
+    p = ctx.p
+    items = [list(x) for x in items]
+    merged = 0
+    while len(items) > 1:
+        ctx.check()
+        for i, (label, pg) in enumerate(items):
+            if pg.area >= p.small_facet_m2:
+                continue
+            pts = returns[shapely.contains_xy(pg, returns[:, 0], returns[:, 1])]
+            if len(pts) < p.plane_min_pts or float(np.median(np.abs(pres(planes[label], pts)))) <= p.off_plane_facet_mad_m:
+                continue
+            nb = _longest_neighbour(i, items)
+            if nb is None:
+                continue
+            u = unary_union([items[nb][1], pg])  # facets share exact vertices: a plain union first, a closed one if not
+            if u.geom_type != "Polygon":
+                u = unary_union([items[nb][1].buffer(0.02), pg.buffer(0.02)]).buffer(-0.02)
+            if u.geom_type != "Polygon":
+                continue
+            items[nb][1] = _exact(u)
+            del items[i]
+            merged += 1
+            break
+        else:
             break
     return items, merged
 
@@ -236,7 +278,10 @@ def _find_coplanar_pair(items: list, planes: list, p: EngineParams) -> tuple[int
 def close_gaps(items: list, outline: Polygon, p: EngineParams) -> tuple[list, int]:
     """Thin channels between facets inside the outline (narrower than ``gap_close_width_m``: twice area over perimeter)
     are given to the facet that shares the most boundary with them, so the facets tile the roof. A real hole (wider)
-    stays. Returns (items, number of gaps closed)."""
+    stays. A gap with holes of its own is a frame round facets, not a channel between them: it stays (a hairline frame
+    round the whole roof, given to one facet, swallowed every other facet). A merge that would cover other facets by more
+    than ``gap_close_min_m2`` is refused; up to that, the 0.2 m closing may spill a sliver into a neighbour (0.035 m2 on
+    one tuning house): gate 2e (overlap <= 0.1% of the roof) bounds it. Returns (items, number of gaps closed)."""
     if not items:
         return items, 0
     items = [list(x) for x in items]
@@ -244,7 +289,8 @@ def close_gaps(items: list, outline: Polygon, p: EngineParams) -> tuple[list, in
     gap = outline.difference(union)
     n = 0
     for g in (gap.geoms if hasattr(gap, "geoms") else [gap]):
-        if g.geom_type != "Polygon" or g.area < p.gap_close_min_m2 or 2 * g.area / max(g.length, 1e-6) >= p.gap_close_width_m:
+        if g.geom_type != "Polygon" or list(g.interiors) or g.area < p.gap_close_min_m2 \
+                or 2 * g.area / max(g.length, 1e-6) >= p.gap_close_width_m:
             continue
         shares = [(g.buffer(0.2).intersection(items[j][1].boundary).length, j) for j in range(len(items))]
         shares = [(s, j) for s, j in shares if s > 0]
@@ -252,7 +298,12 @@ def close_gaps(items: list, outline: Polygon, p: EngineParams) -> tuple[list, in
             continue
         j = max(shares)[1]
         u = unary_union([items[j][1].buffer(0.2), g.buffer(0.2)]).buffer(-0.2)
-        if u.geom_type == "Polygon" and u.is_valid:
-            items[j][1] = _exact(u)
-            n += 1
+        if u.geom_type != "Polygon" or not u.is_valid:
+            continue
+        merged = _exact(u)
+        others = [items[k][1] for k in range(len(items)) if k != j]
+        if others and merged.intersection(unary_union(others)).area > p.gap_close_min_m2:
+            continue  # the merge would cover a neighbour (its exterior closes round it)
+        items[j][1] = merged
+        n += 1
     return items, n

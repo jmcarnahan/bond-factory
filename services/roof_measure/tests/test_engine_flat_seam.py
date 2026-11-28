@@ -10,8 +10,9 @@ from test_engine_edges import CTX, M2FT, facet, points_on
 
 from roof_measure.engine import measure_roof, synth_points
 from roof_measure.engine.edge_measure import seam_is_level, seam_offsets
-from roof_measure.engine.edges import build_edges, totals_of
+from roof_measure.engine.edges import build_edges
 from roof_measure.engine.load import roof_points_from_arrays
+from roof_measure.engine.totals import roof_totals
 
 LEFT = [(0, 0), (20, 0), (20, 5), (0, 5)]  # a 20 m long seam at y = 5 between two flat decks
 RIGHT = [(0, 5), (20, 5), (20, 10), (0, 10)]
@@ -69,11 +70,13 @@ def test_a_constant_two_foot_parapet_like_step_with_a_tight_spread_stays_a_level
     assert seam_types(facets, q) == ["level_change"]
 
 
-def test_a_sloped_lower_deck_cut_in_pieces_is_a_flat_seam_even_when_the_points_show_a_jump():
-    # the fitted planes meet at the seam (y = 5); the points beside it still show 0.6 m: roughness, not a step
+def test_a_sloped_lower_deck_cut_in_pieces_is_no_step_even_when_the_points_beside_the_seam_are_far_off_their_planes():
+    # the fitted planes meet at the seam (y = 5); the points beside it lie 0.6 m over their facet's plane: roughness (a return
+    # that far off its own plane is not measured), not a step. Before slice B the jump (0.6 m) was measured and the seam drawn as
+    # a flat_seam; now nothing is measured there and the two pieces of one deck share no line (``mergeable``).
     facets, q = two_decks((0.0, 0.03, 3.0 - 0.15), (0.0, 0.0, 3.0), upper_pts=(0.0, 0.03, 3.0 + 0.45))
     types = seam_types(facets, q)
-    assert types == ["flat_seam"], types
+    assert types == [], types
 
 
 def test_planes_that_are_apart_on_under_70_percent_of_the_seam_make_a_flat_seam():
@@ -86,8 +89,8 @@ def test_a_flat_seam_is_in_no_total():
     facets, q = two_decks((0.02, 0.0, 3.0), upper_pts=(0.0, 0.0, 3.5))
     edges = build_edges(facets, q, CTX)
     assert any(e.type == "flat_seam" and e.jump_ft is None for e in edges)
-    lengths = totals_of(facets, edges)["lengths_ft"]
-    assert "flat_seam" not in lengths and lengths["level_change"] == 0.0
+    t = roof_totals(facets, edges, set())
+    assert "flat_seam_ft" not in t and t["level_change_ft"] == 0.0
 
 
 def test_the_stations_are_at_least_twelve_and_never_more_than_half_a_metre_apart():
@@ -128,7 +131,7 @@ def test_flat_share_is_the_flat_part_of_the_priced_area():
 
 
 def test_a_model_with_a_flat_seam_validates_and_keeps_it_out_of_the_totals():
-    from roof_measure.classify import BlockSet
+    from roof_measure.blockset import BlockSet
     from roof_measure.engine.adapter import engine_model
 
     roof = synth_points.flat_two_level()
@@ -140,7 +143,7 @@ def test_a_model_with_a_flat_seam_validates_and_keeps_it_out_of_the_totals():
     for e in res.edges:
         if e.type == "level_change":
             e.type = "flat_seam"
-            e.jump_ft = None
+            e.jump_ft = e.upper = None
     base = BlockSet(address={"formatted": "x"}, origin={"lat": 0.0, "lng": 0.0}, frame={}, footprint_ft=[],
                     footprint_meta={"provider": "county", "id": "x", "area_sqft": 1000.0})
     model = engine_model(res, base, float(rp.ground_z))
@@ -179,23 +182,3 @@ def test_a_non_finite_plane_never_gives_a_nan_jump():
     bad = b.__class__(**{**b.__dict__, "plane": (0.0, 0.0, float("nan"))})
     assert seam_is_level(a, bad, SEAM0, SEAM1) == (False, 0.0)
     assert seam_is_level(a, b, SEAM0, SEAM1)[1] == pytest.approx(1.0)
-
-
-def test_the_priced_pass_repeats_the_drawn_verdict_on_a_ramping_offset():
-    # plane offset 0.6 m at x = 0 falling to 0 at x = 28.4 (>= 0.3 m up to x = 14.2: 71% of a 20 m seam)
-    upper = (-0.6 / 28.4, 0.0, 3.0 + 0.6)
-
-    def decks(x0):
-        a = facet("f1", [(x0, 0), (20, 0), (20, 5), (x0, 5)], (0.0, 0.0, 3.0))
-        b = facet("f2", [(x0, 5), (20, 5), (20, 10), (x0, 10)], upper)
-        return [a, b]
-
-    drawn = decks(0.0)
-    q = np.vstack([points_on(facet("p1", LEFT, (0, 0, 3.0)), 1600, 1), points_on(facet("p2", RIGHT, (0, 0, 3.5)), 1600, 2)])
-    ctx = type(CTX)(CTX.p)
-    assert [e.type for e in build_edges(drawn, q, ctx) if len(e.facets) == 2] == ["level_change"]
-    clipped = decks(3.0)  # the priced clip loses the high-offset end: 66% of its stations are >= 0.3 m
-    alone = [e.type for e in build_edges(clipped, q, type(CTX)(CTX.p)) if len(e.facets) == 2]
-    assert alone == ["flat_seam"]  # judged afresh it would differ ...
-    again = [e.type for e in build_edges(clipped, q, ctx, reuse_verdicts=True) if len(e.facets) == 2]
-    assert again == ["level_change"]  # ... the priced pass re-uses the drawn verdict

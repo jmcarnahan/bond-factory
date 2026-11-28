@@ -17,11 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, TextIO
 
-CAPS = {"OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "RAYON_NUM_THREADS": "2",
-        "MPLBACKEND": "Agg"}
-AGENT_METHODS = ("lidar_agent", "solar_agent")
-AGENT_HANG_SHARE = 0.6  # of the time left when the model stage starts: the pipeline's own budget for the agent
-AGENT_HANG_SLACK_S = 10.0  # for the rule fallback and the model build that follow the agent
+CAPS = {"OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "RAYON_NUM_THREADS": "2"}
 _PROTO: TextIO | None = None  # the protocol stream: a private copy of the original stdout
 
 
@@ -44,31 +40,10 @@ def _watch_parent(ppid: int, interval: float = 0.5, getppid=os.getppid, die=os._
             die(3)
 
 
-def _agent_hang(die=os._exit) -> None:
-    from ._isolate import AGENT_HANG_EXIT
-
-    sys.stderr.write("roof_measure: the agent stage did not finish within its time budget; stopping the process\n")
-    sys.stderr.flush()
-    die(AGENT_HANG_EXIT)
-
-
-def _stage_hook(method: str, deadline: Any, emit=_emit, hang=_agent_hang):
-    """The ``on_stage`` callback: relays stages and, for an agent method, stops the process if the agent stage hangs.
-
-    A hang inside native code (CGAL) cannot be interrupted from Python and the pipeline's own deadline checks never
-    run, so a timer armed when the model stage starts ends the process; the parent sees ``ChildCrashed`` and can
-    retry as ``lidar_skeleton`` while time remains. Any later stage disarms the timer.
-    """
-    timer: list[threading.Timer] = []
+def _stage_hook(emit=_emit):
+    """The ``on_stage`` callback: relays each stage to the parent."""
 
     def on_stage(name: str) -> None:
-        while timer:
-            timer.pop().cancel()
-        if name == "model" and method in AGENT_METHODS:
-            t = threading.Timer(deadline.remaining() * AGENT_HANG_SHARE + AGENT_HANG_SLACK_S, hang)
-            t.daemon = True
-            t.start()
-            timer.append(t)
         emit({"t": "stage", "name": name})
 
     return on_stage
@@ -82,7 +57,7 @@ def _start_watchdog() -> threading.Thread:
 
 def main() -> int:
     global _PROTO
-    faulthandler.enable(file=sys.stderr, all_threads=True)  # a native crash (CGAL) leaves a traceback in child.stderr
+    faulthandler.enable(file=sys.stderr, all_threads=True)  # a native crash leaves a traceback in child.stderr
     _PROTO = os.fdopen(os.dup(1), "w", buffering=1)
     os.dup2(2, 1)  # any print from a library lands on stderr, never in the protocol stream
     sys.stdout = sys.stderr
@@ -100,21 +75,17 @@ def main() -> int:
     from .pipeline import run_pipeline
 
     rt = req["runtime"]
-    runtime = config.Runtime(cache_dir=Path(rt["cache_dir"]), anthropic_api_key=rt["anthropic_api_key"],
-                             google_solar_api_key=rt["google_solar_api_key"],
+    runtime = config.Runtime(cache_dir=Path(rt["cache_dir"]),
                              overpass_urls=tuple(rt["overpass_urls"]) if rt["overpass_urls"] else None)
     log = logging.getLogger("roof_measure")
     try:
         with config.use(runtime), cache.force_scope(req["force"]):
             deadline = Deadline.after(req["deadline_s"])
-            res = run_pipeline(req["address"], req["work_dir"], req["method"], blocks_path=req["blocks_path"],
-                               solar_fixture=req["solar_fixture"], deadline=deadline,
+            res = run_pipeline(req["address"], req["work_dir"], deadline=deadline,
                                lat_lng=tuple(req["lat_lng"]) if req["lat_lng"] else None,
-                               on_stage=_stage_hook(req["method"], deadline), verify=req["verify"],
-                               render=False, include_other_buildings=bool(req.get("include_other_buildings")),
+                               on_stage=_stage_hook(), include_other_buildings=bool(req.get("include_other_buildings")),
                                building_outline_id=req.get("building_outline_id"),
-                               engine=req.get("engine", "blocks"), points_path=req.get("points_path"),
-                               hints=req.get("hints"))
+                               points_path=req.get("points_path"))
         _emit({"t": "ok", "envelope": res.envelope})
     except Exception as exc:
         log.warning("measurement failed: %s", type(exc).__name__)  # no traceback at WARNING: urls hold the address

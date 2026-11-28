@@ -6,18 +6,18 @@
  "planes": [
   {
    "a": 0.0004,
-   "b": 0.0006,
-   "c": 3.0,
-   "n_points": 531,
+   "b": 0.001,
+   "c": 3.001,
+   "n_points": 533,
    "pitch_rise": 0.01,
-   "aspect_deg": 215.4,
+   "aspect_deg": 203.3,
    "rms_m": 0.028
   },
   {
    "a": 0.0002,
    "b": -0.5007,
    "c": 6.66,
-   "n_points": 397,
+   "n_points": 396,
    "pitch_rise": 6.01,
    "aspect_deg": 360.0,
    "rms_m": 0.03
@@ -26,7 +26,7 @@
    "a": -0.0,
    "b": 0.4994,
    "c": 3.002,
-   "n_points": 379,
+   "n_points": 378,
    "pitch_rise": 5.99,
    "aspect_deg": 180.0,
    "rms_m": 0.03

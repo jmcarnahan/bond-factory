@@ -27,13 +27,8 @@ enum ReportLayout {
   /// Smallest edge-length or facet label text, in scene pixels, before the label is hidden.
   final double minLabelSize;
 
-  /// Legend rows per column for the ten edge types (wide 4 + 3 + 3, compact 5 + 5).
-  List<int> get legendRows => this == wide ? const [4, 3, 3] : const [5, 5];
-
-  /// Legend rows per column for [count] entries: the ten edge types of contract 0.2 keep their
-  /// layout; an engine model lists only the types it has (fewer or more), filled column by column.
+  /// Legend rows per column for [count] entries, filled column by column.
   List<int> legendRowsFor(int count) {
-    if (count == 10) return legendRows;
     final perCol = (count + legendColumns - 1) ~/ legendColumns;
     var left = count;
     return [

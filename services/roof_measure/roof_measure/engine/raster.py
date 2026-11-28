@@ -9,6 +9,7 @@ import shapely
 from scipy.spatial import cKDTree
 from shapely.geometry import Point, Polygon
 
+from .anchor import anchor_of
 from .errors import Ctx
 from .graphcut import graphcut_swap
 from .params import EngineParams
@@ -86,17 +87,26 @@ def trace_polys(mask: np.ndarray, x0: float, y0: float, h: float) -> list[Polygo
     return [Polygon(s[1], hole_of[i]) for i, s in enumerate(shells)]
 
 
-def grid_domain(outline: Polygon, h: float) -> tuple[float, float, int, int, np.ndarray, np.ndarray]:
-    """Cell grid over the outline's bounds plus a 3-cell margin: (minx, miny, nx, ny, X, Y) of the cell centres."""
-    minx, miny, maxx, maxy = outline.bounds
-    minx -= 3 * h
-    miny -= 3 * h
-    nx = math.ceil((maxx + 3 * h - minx) / h)
-    ny = math.ceil((maxy + 3 * h - miny) / h)
-    xs = minx + (np.arange(nx) + 0.5) * h
-    ys = miny + (np.arange(ny) + 0.5) * h
-    gx, gy = np.meshgrid(xs, ys)
-    return minx, miny, nx, ny, gx, gy
+def grid_domain(outline: Polygon, q: np.ndarray, h: float, p: EngineParams
+                ) -> tuple[float, float, np.ndarray, np.ndarray, np.ndarray]:
+    """Lattice and cells of the labelling: ``(minx, miny, X, Y, domain)`` with the cell centres and a mask of the cells to label.
+
+    The lattice is anchored on the median of the inlier points, so it sits on the same points whatever the outline (or the
+    frame's origin) is. The cells are those within ``cost_radius_m`` of an inlier point (the reach of the data cost) and
+    those inside the outline: the outline only decides which cells are kept afterwards, not what is labelled."""
+    ax, ay = anchor_of(q)
+    reach = p.cost_radius_m
+    ob = outline.bounds
+    lo = np.minimum(q[:, :2].min(0) - reach, [ob[0] - 3 * h, ob[1] - 3 * h])
+    hi = np.maximum(q[:, :2].max(0) + reach, [ob[2] + 3 * h, ob[3] + 3 * h])
+    minx = ax + math.floor((lo[0] - ax) / h) * h
+    miny = ay + math.floor((lo[1] - ay) / h) * h
+    nx = math.ceil((hi[0] - minx) / h)
+    ny = math.ceil((hi[1] - miny) / h)
+    gx, gy = np.meshgrid(minx + (np.arange(nx) + 0.5) * h, miny + (np.arange(ny) + 0.5) * h)
+    cells = np.c_[gx.ravel(), gy.ravel()]
+    near = cKDTree(q[:, :2]).query(cells, k=1, distance_upper_bound=reach)[0].reshape(gx.shape) <= reach
+    return minx, miny, gx, gy, near | shapely.contains_xy(outline.buffer(p.label_clip_m), gx, gy)
 
 
 def data_costs(cells: np.ndarray, q: np.ndarray, qlab: np.ndarray, planes: list, p: EngineParams) -> np.ndarray:
@@ -142,18 +152,21 @@ def _grid_edges(idx: np.ndarray, beta: float) -> tuple[np.ndarray, np.ndarray]:
 
 def label_raster(outline: Polygon, q: np.ndarray, qlab: np.ndarray, planes: list, h: float, beta: float,
                  ctx: Ctx) -> tuple[np.ndarray, tuple[float, float, float]]:
-    """Global labelling of the outline's cells: data cost + Potts smoothness, solved by alpha-beta swaps.
+    """Global labelling of the cells round the roof: data cost + Potts smoothness, solved by alpha-beta swaps.
 
-    Returns (label raster, -1 outside the outline, and the grid origin ``(minx, miny, h)``)."""
-    minx, miny, _, _, gx, gy = grid_domain(outline, h)
-    dom = shapely.contains_xy(outline.buffer(0.10), gx, gy)
+    The labelling does not depend on the outline's exact position (see ``grid_domain``); afterwards the cells outside
+    the outline (plus ``label_clip_m``) are cleared. Returns (label raster, -1 outside the outline, and the grid origin
+    ``(minx, miny, h)``)."""
+    p = ctx.p
+    minx, miny, gx, gy, dom = grid_domain(outline, q, h, p)
     idx = -np.ones(dom.shape, int)
     idx[dom] = np.arange(dom.sum())
     cells = np.c_[gx[dom], gy[dom]]
-    cost = data_costs(cells, q, qlab, planes, ctx.p)
+    cost = data_costs(cells, q, qlab, planes, p)
     lab = cost.argmin(1)
     edges, w_edge = _grid_edges(idx, beta)
     lab = graphcut_swap(cost, edges, w_edge, lab.copy(), ctx)
     out = -np.ones(dom.shape, int)
     out[dom] = lab
+    out[~shapely.contains_xy(outline.buffer(p.label_clip_m), gx, gy)] = -1
     return out, (minx, miny, h)

@@ -269,6 +269,8 @@ ports 8078 and 8012 are free. State lives in `services/sdk_example/out/` (gitign
 
 # Web walk recipe: demos/roof_demo
 
+> The roof service was removed in 0.6.0; this recipe no longer applies.
+
 The roof demo is a Flutter web harness for `bond_roof_ui` against the `roof_measure` service. Run everything from
 the repo root. Written from the 2026-11-11 roof-module-v1 walk.
 

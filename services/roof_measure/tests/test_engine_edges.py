@@ -20,6 +20,7 @@ from roof_measure.engine.types import Facet
 M2FT = 1 / 0.3048
 CTX = Ctx(DEFAULT, None)
 TYPES = ("eave", "rake", "ridge", "hip", "valley", "flat_edge", "level_change", "transition")
+STEPS = ("level_change", "step_flashing", "wall_flashing")  # the names of a step between two roofs (the exact roofs say level_change)
 
 
 def facet(fid: str, ring, plane, points: int = 0) -> Facet:
@@ -30,11 +31,13 @@ def facet(fid: str, ring, plane, points: int = 0) -> Facet:
                  plan_area_sqft=0.0, area_sqft=0.0, points=points, rms_m=0.0)
 
 
-def by_type(edges, *, exterior=None):
+def by_type(edges, *, exterior=None, steps_as_one=False):
+    """Feet per edge type; ``steps_as_one`` counts sidewall and headwall flashing as ``level_change`` (the exact roofs' name)."""
     out: dict[str, float] = {}
     for e in edges:
         if exterior is None or (len(e.facets) == 1) == exterior:
-            out[e.type] = out.get(e.type, 0.0) + e.length_ft
+            t = "level_change" if steps_as_one and e.type in STEPS else e.type
+            out[t] = out.get(t, 0.0) + e.length_ft
     return out
 
 
@@ -81,7 +84,7 @@ def test_a_flat_facets_outline_is_flat_edge():
     assert t == {"flat_edge": pytest.approx(28 * M2FT, rel=1e-3)}
 
 
-def test_pitched_beside_flat_at_one_height_is_a_transition_and_a_step_is_a_level_change():
+def test_pitched_beside_flat_at_one_height_is_a_transition_and_a_step_up_to_it_is_a_headwall():
     flat = facet("f1", [(0, 0), (10, 0), (10, 4), (0, 4)], (0, 0, 3.0))
     slope = facet("f2", [(0, 4), (10, 4), (10, 9), (0, 9)], (0, 0.5, 1.0))  # z = 3.0 at y = 4: meets the flat at its height
     edges = build_edges([flat, slope], None, CTX)
@@ -89,10 +92,11 @@ def test_pitched_beside_flat_at_one_height_is_a_transition_and_a_step_is_a_level
     stepped = facet("f2", [(0, 4), (10, 4), (10, 9), (0, 9)], (0, 0.5, 1.6))  # 0.6 m higher at the line
     q = np.vstack([points_on(flat), points_on(stepped, seed=1)])
     edges = build_edges([flat, stepped], q, CTX)
-    lc = [e for e in edges if e.type == "level_change"]
+    lc = [e for e in edges if e.type == "wall_flashing"]  # a pitched roof standing over a flat one: a headwall
     assert len(lc) == 1 and lc[0].jump_ft == pytest.approx(0.6 * M2FT, abs=0.15 * M2FT)
     assert lc[0].length_ft == pytest.approx(10 * M2FT, rel=1e-3)
     assert lc[0].p0[2] == pytest.approx(3.0)  # the line runs at the lower roof's height
+    assert lc[0].upper == "f2"
 
 
 def test_a_plane_gap_the_points_do_not_show_is_not_a_level_change():
@@ -163,19 +167,19 @@ def test_exact_facets_give_exact_edges(name):
     c = case(name)
     pts = c.points()
     edges = build_edges(exact_facets(c.roof), pts[pts[:, 3] == 1][:, :3], CTX)
-    got, want = by_type(edges), {}
+    got, want = by_type(edges, steps_as_one=True), {}
     for e in c.roof.edges:
         want[e.type] = want.get(e.type, 0.0) + e.length_ft
     for t in TYPES:
         a, b = got.get(t, 0.0), want.get(t, 0.0)
         assert abs(a - b) <= max(0.01 * b, 0.5), (t, a, b)
     exact_jumps = sorted(e.jump_ft for e in c.roof.edges if e.type == "level_change")
-    jumps = sorted(e.jump_ft for e in edges if e.type == "level_change")
+    jumps = sorted(e.jump_ft for e in edges if e.type in STEPS)
     assert len(jumps) == len(exact_jumps)
     for a, b in zip(jumps, exact_jumps, strict=True):
         assert abs(a - b) <= 0.15 * M2FT, (a, b)
-    assert all(e.jump_ft is not None for e in edges if e.type == "level_change")
-    assert all(e.jump_ft is None for e in edges if e.type != "level_change")
+    assert all(e.jump_ft is not None and e.upper for e in edges if e.type in STEPS)
+    assert all(e.jump_ft is None and e.upper is None for e in edges if e.type not in STEPS)
 
 
 @pytest.mark.parametrize("name", [n for n in NAMES if n.endswith("_d8")])
@@ -198,7 +202,7 @@ def test_the_typer_agrees_with_the_harness_recomputation(name):
     want: dict[str, float] = {}
     for e in rec.edges:
         want[e.type] = want.get(e.type, 0.0) + e.length_ft
-    got = by_type(edges)
+    got = by_type(edges, steps_as_one=True)  # the recomputation says "step" for a sidewall or a headwall
     for t in ("ridge", "hip", "valley", "flat_edge", "level_change", "transition"):
         assert abs(got.get(t, 0.0) - want.get(t, 0.0)) <= max(0.01 * want.get(t, 0.0), 0.5), (name, t)
     g_rim, w_rim = got.get("eave", 0.0) + got.get("rake", 0.0), want.get("eave", 0.0) + want.get("rake", 0.0)
@@ -209,30 +213,39 @@ def test_the_engine_result_carries_the_same_vocabulary():
     from engine_cases import run
 
     res = run("flat_pitched_step_d8")
-    assert {e.type for e in res.edges} <= set(TYPES)
-    assert [e.type for e in res.edges if e.type == "level_change"] and all(
-        e.jump_ft is not None for e in res.edges if e.type == "level_change")
+    assert {e.type for e in res.edges} <= set(TYPES) | set(STEPS)
+    steps = [e for e in res.edges if e.type in STEPS]  # a pitched roof draining down into a higher flat deck's wall
+    assert [e.type for e in steps] == ["step_flashing"] and all(e.jump_ft is not None and e.upper for e in steps)
     shed = run("shed_d8")
     assert "ridge" not in {e.type for e in shed.edges} and sum(e.high_edge for e in shed.edges) == 1
-    assert "level_change" in res.totals["lengths_ft"] and "step" not in res.totals["lengths_ft"]
+    assert {"level_change_ft", "step_flashing_ft", "wall_flashing_ft"} <= set(res.totals) and "step" not in {e.type for e in res.edges}
+    assert res.totals["step_flashing_ft"] > 0
 
 
 # ----------------------------------------------------------------------------- the harness's measurement
 def test_the_jump_measurement_is_the_harness_measurement():
-    """engine.edge_measure.points_jump and tools.roof_eval.m_fit.edge_jump_m are one rule (0.2-1.5 m each side, a local
-    linear fit evaluated on the line, None under 5 points a side): equal on random clouds, steps and gaps included."""
+    """The harness measures a jump with the engine's own rule (``points_jump``: 0.2-1.5 m each side, a local linear fit evaluated on
+    the line, returns far off the side's plane left out, None under 5 points a side): ``m_fit.edge_jump_m`` finds the sides
+    and calls it, whichever way the edge is drawn."""
     from roof_measure.engine.edge_measure import points_jump
+    from tools.roof_eval.geom import Facet as HFacet
     from tools.roof_eval.m_fit import edge_jump_m
 
     rng = np.random.default_rng(7)
+    left = HFacet("l", Polygon([(-5, 0), (5, 0), (5, 5), (-5, 5)]), (0.3, 0.0, 3.0))  # y > 0 side of an edge along +x
+    right = HFacet("r", Polygon([(-5, -5), (5, -5), (5, 0), (-5, 0)]), (0.3, 0.0, 3.5))
     for k in range(12):
         n = int(rng.integers(40, 900))
         xy = rng.uniform(-4, 4, (n, 2))
-        z = 3 + 0.3 * xy[:, 0] + np.where(xy[:, 1] > 0, rng.uniform(0, 1.2), 0.0) + rng.normal(0, 0.02, n)
+        z = np.where(xy[:, 1] > 0, 3.0, 3.5) + 0.3 * xy[:, 0] + rng.normal(0, 0.02, n)
         q = np.c_[xy, z]
-        p0, p1 = np.array([-3.0, 0.0]), np.array([3.0 + (k % 3), 0.2 * k])
-        a, b = points_jump(q, p0, p1), edge_jump_m(q, (*p0, 0.0), (*p1, 0.0))
-        assert (a is None) == (b is None) and (a is None or abs(a - b) < 1e-9)
+        p0, p1 = np.array([-3.0, 0.0]), np.array([3.0 + (k % 3), 0.0])
+        for a, b, fwd in ((left, right, True), (right, left, True), (left, right, False)):
+            e0, e1 = (p0, p1) if fwd else (p1, p0)
+            got = edge_jump_m(q, (*e0, 0.0), (*e1, 0.0), (a, b))
+            want = points_jump(q, e0, e1, left.plane if fwd else right.plane, right.plane if fwd else left.plane, DEFAULT)
+            assert (got is None) == (want is None) and (got is None or abs(got - want) < 1e-9)
+            assert got is None or abs(got - 0.5) < 0.1  # the real step, whichever order the facets and the line are given in
 
 
 def test_jump_points_follow_the_reference_rule():
@@ -295,6 +308,6 @@ def test_an_empty_point_array_falls_back_to_the_plane_gap_like_no_points():
     a = facet("a", [(0, 0), (6, 0), (6, 6), (0, 6)], (0, 0, 3.0))
     b = facet("b", [(6, 0), (12, 0), (12, 6), (6, 6)], (0, 0, 3.8))
     p0, p1 = np.array([6.0, 0.0]), np.array([6.0, 6.0])
-    assert measured_jump(a, b, p0, p1, np.zeros((0, 3))) == pytest.approx(0.8) == measured_jump(a, b, p0, p1, None)
-    assert measured_jump(a, b, p0, p1, points_on(a)) == 0.0  # points exist, side b has none: unverifiable
+    assert measured_jump(a, b, p0, p1, np.zeros((0, 3)), DEFAULT) == pytest.approx(0.8) == measured_jump(a, b, p0, p1, None, DEFAULT)
+    assert measured_jump(a, b, p0, p1, points_on(a), DEFAULT) == 0.0  # points exist, side b has none: unverifiable
     assert [e.type for e in build_edges([a, b], np.zeros((0, 3)), CTX) if len(e.facets) == 2] == ["level_change"]

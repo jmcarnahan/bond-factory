@@ -5,10 +5,15 @@ Rules (plan 3.1 / contract 0.4):
   * a pitched facet's outline edge is an ``eave`` where it faces down the slope, a ``rake`` along the slope, and a
     ``rake`` with ``high_edge=True`` where it is the level high side (a shed or lean-to wall line): never a ridge;
   * a flat facet's outline edge is a ``flat_edge``;
-  * a seam shared by two facets is a ``level_change`` (with ``jump_ft``) when the height jump measured from the points
-    on both sides is 0.3 m or more, a ``transition`` where pitched meets flat at one height, else a ridge, hip or
-    valley from the two planes; coplanar facets (flat membrane included) share no edge (``coplanar_seams`` lists them:
-    those facets should have been merged);
+  * a seam shared by two facets is a STEP when the height jump measured from the points on both sides (robustly: returns far
+    off a side's own plane are left out) is 0.3 m or more and, between two pitched facets, their fitted planes are apart too;
+    a step is named by how its line meets the lower roof's slope (``steps``: ``step_flashing`` down the slope, ``wall_flashing``
+    across it or onto a low-slope roof, ``level_change`` between two low-slope facets), carries ``jump_ft`` and the id of the
+    higher facet (``upper``). Else a ``transition`` where pitched meets flat at one height, else a ridge, hip or valley from the
+    two planes (a ridge when the line where they meet is level); coplanar facets (flat membrane included) share no edge
+    (``coplanar_seams`` lists them: those facets should have been merged);
+  * a piece of a seam that reads as no edge or as clutter but touches a line of the same two facets is the end of that line
+    and keeps its type (``ends``);
   * a ``level_change`` between two FLAT facets must also hold along the seam (``edge_measure.seam_is_level``: the
     two facets' fitted planes are at least 0.3 m apart at 70% of the stations along the seam, and ``jump_ft`` is their median offset); otherwise it is a ``flat_seam``: drawn,
     never priced, in no total (0.5.1);
@@ -20,54 +25,46 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import shapely
 from shapely.ops import unary_union
 
-from .edge_measure import measured_jump, ridge_check, seam_is_level, seg_split
+from .edge_measure import (
+    crease_slope,
+    into,
+    measured_jump,
+    ridge_check,
+    seam_is_level,
+    seg_split,
+)
+from .ends import adopt_end_pieces, resolve_steps
 from .errors import Ctx
 from .params import EngineParams
 from .plane_math import zat
+from .steps import step_type
 from .types import Edge, Facet
 
 M2F = 1 / 0.3048
 SHARE_TOL_M = 1e-3  # facets of one partition share vertices exactly: boundaries this close are the same line
 
 
-def _into(f: Facet, p0: np.ndarray, p1: np.ndarray) -> np.ndarray:
-    """Unit plan normal of the segment p0-p1 pointing into facet ``f`` (probed just beside the segment, so it is right
-    for a concave facet whose far parts lie on both sides of the segment's line)."""
-    d = p1 - p0
-    n = np.array([-d[1], d[0]]) / max(float(np.hypot(*d)), 1e-12)
-    mid = (p0 + p1) / 2
-    for step in (0.05, 0.15, 0.4):
-        if f.polygon.contains(shapely.Point(*(mid + step * n))):
-            return n
-        if f.polygon.contains(shapely.Point(*(mid - step * n))):
-            return -n
-    c = np.array(f.polygon.representative_point().coords[0])
-    return n if float(np.dot(c - mid, n)) >= 0 else -n
-
-
 def _crease(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, p: EngineParams) -> str:
     """ridge / hip / valley / transition from the slopes of the two planes across the segment: both fall away from it
-    (ridge when it is level, else hip), both rise towards it (valley), else one slope carries on across it."""
-    n = _into(fa, p0, p1)
+    (a ridge when the line where the two planes meet is level, else a hip: that line does not depend on where the partition
+    drew the boundary), both rise towards it (valley), else one slope carries on across it."""
+    n = into(fa, p0, p1)
     eps = 0.5 * p.seam_gdiff
     sa = fa.plane[0] * n[0] + fa.plane[1] * n[1]  # slope going into A
     sb = -(fb.plane[0] * n[0] + fb.plane[1] * n[1])  # slope going into B
     if sa < -eps and sb < -eps:
-        length = float(np.hypot(*(p1 - p0)))
-        dz = zat(fa.plane, *p1) - zat(fa.plane, *p0)
-        return "ridge" if abs(dz) / max(length, 1e-6) < p.ridge_slope else "hip"
+        return "ridge" if crease_slope(fa.plane, fb.plane) < p.ridge_slope else "hip"
     if sa > eps and sb > eps:
         return "valley"
     return "transition"
 
 
 def _planes_agree_pitched(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, p: EngineParams) -> bool:
-    """The ``steps=False`` hint: two PITCHED facets whose fitted planes meet (differ by less than ``level_change_m`` at the
-    segment middle) are one roof folded, whatever the points near the seam say. Never true without the hint."""
-    if p.pitched_steps or fa.roof_type != "pitched" or fb.roof_type != "pitched":
+    """Two PITCHED facets whose fitted planes meet (differ by less than ``level_change_m`` at both ends and the middle of the
+    segment) are one roof folded, whatever the points near the seam say: a step needs the planes apart too."""
+    if fa.roof_type != "pitched" or fb.roof_type != "pitched":
         return False
     # at both ends and the middle: planes crossing the seam diagonally can agree at the middle while a real step exists at the ends
     return all(abs(zat(fa.plane, *pt) - zat(fb.plane, *pt)) < p.level_change_m for pt in (p0, (p0 + p1) / 2, p1))
@@ -83,7 +80,7 @@ def seg_type_interior(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, q: n
     flat facet of real size (``big_flat`` ids; None = every flat facet counts); otherwise the planes decide (ridge, hip,
     valley) or the line is dropped."""
     pa, pb = fa.plane, fb.plane
-    jump = measured_jump(fa, fb, p0, p1, q)
+    jump = measured_jump(fa, fb, p0, p1, q, p)
     flat_a, flat_b = fa.roof_type == "flat", fb.roof_type == "flat"
     if jump >= p.level_change_m and not _planes_agree_pitched(fa, fb, p0, p1, p):
         return "level_change", jump, ""
@@ -111,6 +108,7 @@ def real_flats(facets: list[Facet], p: EngineParams) -> set[str]:
             and f.polygon.area >= p.transition_min_flat_share * total}
 
 
+STEPS = ("level_change", "step_flashing", "wall_flashing")  # a step between two roofs, by name
 HIGH_EDGE = "rake_high"  # inside this module only: a rake that is the level high side of a pitched facet
 
 
@@ -134,9 +132,11 @@ def seg_type_exterior(f: Facet, p0: np.ndarray, p1: np.ndarray) -> str:
 
 
 def _raw_segments(facets: list[Facet], q: np.ndarray | None, p: EngineParams, seams: list | None = None) -> list:
-    """(type, a, b, facet-index tuple) for every boundary piece: shared ones typed by seg_type_interior. Pieces that
-    are no edge are appended to ``seams`` as (facet ids, length m, why) when it is given."""
+    """(type, a, b, facet-index tuple) for every boundary piece: shared ones typed by seg_type_interior; a piece that is no
+    edge but ends a line of the same two facets takes that line's type (``ends.adopt_end_pieces``). Pieces that stay no edge are
+    appended to ``seams`` as (facet ids, length m, why, a, b, facet-index pair) when it is given."""
     big = real_flats(facets, p)
+    dropped: list = []
     polys = [f.polygon for f in facets]
     bufs = [g.buffer(SHARE_TOL_M) for g in polys]
     raw = []
@@ -152,12 +152,15 @@ def _raw_segments(facets: list[Facet], q: np.ndarray | None, p: EngineParams, se
                     tt, _, why = seg_type_interior(fa, fb, a, b, q, p, big)
                     if tt is not None:
                         raw.append((tt, a, b, (i, j)))
-                    elif seams is not None:
-                        seams.append(((fa.id, fb.id), float(np.hypot(*(b - a))), why))
+                    else:
+                        dropped.append(((fa.id, fb.id), float(np.hypot(*(b - a))), why, a, b, (i, j)))
         ext = bd.difference(unary_union(others)) if others else bd
         for a, b in seg_split(ext):
             raw.append((seg_type_exterior(fa, a, b), a, b, (i,)))
-    return raw
+    added, dropped = adopt_end_pieces(raw, dropped, p)
+    if seams is not None:
+        seams.extend(dropped)
+    return raw + added
 
 
 def _unit(v: np.ndarray) -> np.ndarray:
@@ -235,65 +238,60 @@ def _refine_step(t: str, facets: list[Facet], fs: tuple, p0: np.ndarray, p1: np.
     return t
 
 
-def _seam_verdict(fa: Facet, fb: Facet, p0: np.ndarray, p1: np.ndarray, ctx: Ctx, reuse: bool) -> tuple[bool, float]:
-    """``seam_is_level`` for one flat/flat chain, remembered per facet-id pair (drawn pass) or looked up there (priced pass:
-    the drawn chain of the same pair within 0.5 m of this chain's middle; none: judged afresh)."""
-    key = (fa.id, fb.id)
-    mid = (p0 + p1) / 2
-    if reuse:
-        best = None
-        for a, b, verdict in ctx.seam_memo.get(key, ()):
-            d = shapely.distance(shapely.LineString([a, b]), shapely.Point(*mid))
-            if d <= 0.5 and (best is None or d < best[0]):
-                best = (d, verdict)
-        if best is not None:
-            return best[1]
-    verdict = seam_is_level(fa, fb, p0, p1, ctx.p.level_change_m)
-    if not reuse:
-        ctx.seam_memo.setdefault(key, []).append((p0.copy(), p1.copy(), verdict))
-    return verdict
+def _is_stub(p0: np.ndarray, p1: np.ndarray, jm: float, p: EngineParams) -> bool:
+    """A step or flat seam too short (or short and low) to be a real line: clutter."""
+    plan_m = float(np.hypot(*(p1 - p0)))
+    return plan_m < p.stub_min_len_m or (jm < p.stub_jump_m and plan_m < p.stub_len_m)
 
 
-def build_edges(facets: list[Facet], q: np.ndarray | None, ctx: Ctx, absorbed: list | None = None,
-                reuse_verdicts: bool = False) -> list[Edge]:
+def _jump_m(facets: list[Facet], fs: tuple, p0: np.ndarray, p1: np.ndarray, q: np.ndarray | None, p: EngineParams) -> float | None:
+    """The measured height jump (m) of a two-facet chain, rounded; None for an outline chain."""
+    if len(fs) != 2:
+        return None
+    return round(float(measured_jump(facets[fs[0]], facets[fs[1]], p0, p1, q, p)), 3)  # a real error surfaces: no silent zero
+
+
+def build_edges(facets: list[Facet], q: np.ndarray | None, ctx: Ctx, absorbed: list | None = None) -> list[Edge]:
     """All typed edges of the facet partition. ``q`` are the points jumps and ridge checks are measured from.
     A level change that is clutter (shorter than ``stub_min_len_m``, or under ``stub_jump_m`` and shorter than
-    ``stub_len_m``) is not an edge: the neighbouring chains carry on; it is appended to ``absorbed`` when given.
-    Flat/flat seam verdicts are remembered in ``ctx.seam_memo``; the priced pass (``reuse_verdicts``) re-uses the drawn
-    pass's verdict for the same facet pair at the same place, so a seam cannot be a level change in the drawing and a
-    flat seam in the priced totals."""
+    ``stub_len_m``) is not an edge: the neighbouring chains carry on; it is appended to ``absorbed`` when given. Unless it
+    touches a line of the same two facets: then it is the end of that line and takes its type (``ends.resolve_steps``, which also
+    keeps a jog of the boundary between two creases of the same facets a crease)."""
     ctx.check()
+    p = ctx.p
+    chains = _chains(_raw_segments(facets, q, p), p)
+    jumps = [_jump_m(facets, fs, p0, p1, q, p) for _t, fs, p0, p1 in chains]
+    stubs = [t == "level_change" and _is_stub(p0, p1, jm or 0.0, p) for (t, _fs, p0, p1), jm in zip(chains, jumps, strict=True)]
+    resolved = resolve_steps(chains, jumps, stubs, p)
     edges = []
-    for t, fs, p0, p1 in _chains(_raw_segments(facets, q, ctx.p), ctx.p):
+    for k, (t, fs, p0, p1) in enumerate(chains):
+        jm, continued = jumps[k], resolved[k] is not None
+        if resolved[k] is not None:
+            t = resolved[k][0]
+            jm = resolved[k][1] if t == "level_change" else jm  # the end of a step is as high as the step
         z0, z1 = _end_heights(t, facets, fs, p0, p1)  # (heights of the typer's first answer: kept as they were before 0.5.1)
         t = _refine_step(t, facets, fs, p0, p1, q)
-        plane_gap = None
+        upper = None
+        if t == "level_change" and len(fs) == 2:  # a step: sidewall, headwall or (two low-slope facets) a level change
+            t, upper = step_type(facets[fs[0]], facets[fs[1]], p0, p1, p)
         if t == "level_change" and len(fs) == 2 and facets[fs[0]].roof_type == "flat" and facets[fs[1]].roof_type == "flat":
-            level, plane_gap = _seam_verdict(facets[fs[0]], facets[fs[1]], p0, p1, ctx, reuse_verdicts)
-            if not level:
-                t = "flat_seam"  # two flat pieces of one deck: a drawn line, never priced (the fitted planes nearly meet)
-                plane_gap = None
+            level, plane_gap = seam_is_level(facets[fs[0]], facets[fs[1]], p0, p1, ctx.p.level_change_m)
+            if level:
+                jm = round(plane_gap, 3)  # a flat/flat level change: its height is the median offset of the two fitted planes
+            else:
+                t, upper = "flat_seam", None  # two flat pieces of one deck: a drawn line, never priced (the fitted planes nearly meet)
         high = t == HIGH_EDGE
         t = "rake" if high else t
         length = math.sqrt((p1[0] - p0[0]) ** 2 + (p1[1] - p0[1]) ** 2 + (z1 - z0) ** 2) * M2F
-        jm = None
-        if len(fs) == 2:
-            try:
-                jm = round(float(measured_jump(facets[fs[0]], facets[fs[1]], p0, p1, q)), 3)
-            except (ValueError, IndexError):
-                jm = None
-        if plane_gap is not None:
-            jm = round(plane_gap, 3)  # a flat/flat level change: its height is the median offset of the two fitted planes
-        plan_m = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
-        if t in ("level_change", "flat_seam") and (plan_m < ctx.p.stub_min_len_m or ((jm or 0.0) < ctx.p.stub_jump_m and plan_m < ctx.p.stub_len_m)):
+        if t in (*STEPS, "flat_seam") and not continued and _is_stub(p0, p1, jm or 0.0, p):
             if absorbed is not None:
-                absorbed.append({"type": t, "facets": [facets[k].id for k in fs], "length_ft": round(length, 1),
+                absorbed.append({"type": t, "facets": [facets[i].id for i in fs], "length_ft": round(length, 1),
                                  "jump_ft": None if jm is None else round(jm / 0.3048, 2)})
             continue
         edges.append(Edge(type=t, p0=(float(p0[0]), float(p0[1]), float(z0)), p1=(float(p1[0]), float(p1[1]), float(z1)),
-                          length_ft=float(length), facets=tuple(facets[k].id for k in fs), jump_m=jm,
-                          jump_ft=round(jm / 0.3048, 2) if t == "level_change" and jm is not None else None,
-                          high_edge=high))
+                          length_ft=float(length), facets=tuple(facets[i].id for i in fs), jump_m=jm,
+                          jump_ft=round(jm / 0.3048, 2) if t in STEPS and jm is not None else None,
+                          high_edge=high, upper=upper))
     return edges
 
 
@@ -305,7 +303,7 @@ def edge_diagnostics(facets: list[Facet], p: EngineParams, q: np.ndarray | None 
     seams: list = []
     _raw_segments(facets, q, p, seams)
     by: dict[tuple[str, tuple[str, str]], float] = {}
-    for ids, length_m, why in seams:
+    for ids, length_m, why, *_ in seams:
         by[(why, ids)] = by.get((why, ids), 0.0) + length_m
     out: dict[str, list[dict]] = {"mergeable": [], "kinks": [], "small_flat": []}
     key = {"seam": "mergeable", "kink": "kinks", "small_flat": "small_flat"}
@@ -321,28 +319,3 @@ def edge_diagnostics(facets: list[Facet], p: EngineParams, q: np.ndarray | None 
 def coplanar_seams(facets: list[Facet], p: EngineParams) -> list[dict]:
     """Neighbouring facets that share a boundary but no edge and should be one facet (``edge_diagnostics`` ``mergeable``)."""
     return edge_diagnostics(facets, p)["mergeable"]
-
-
-def totals_of(facets: list[Facet], edges: list[Edge]) -> dict:
-    """Area and length totals of a facet / edge set (priced or drawn)."""
-    tot = {"area_sqft": 0.0, "pitched_area_sqft": 0.0, "flat_area_sqft": 0.0}
-    pitch_w: dict[float, float] = {}
-    for f in facets:
-        tot["area_sqft"] += f.area_sqft
-        if f.roof_type == "flat":
-            tot["flat_area_sqft"] += f.area_sqft
-        else:
-            tot["pitched_area_sqft"] += f.area_sqft
-            key = round(f.pitch_rise * 2) / 2
-            pitch_w[key] = pitch_w.get(key, 0) + f.area_sqft
-    tot["squares"] = tot["area_sqft"] / 100.0
-    tot["predominant_pitch"] = float(max(pitch_w, key=pitch_w.get)) if pitch_w else 0.0
-    tot["facet_count"] = len(facets)
-    lengths = {k: 0.0 for k in ("eave", "rake", "ridge", "hip", "valley", "level_change", "flat_edge", "transition")}
-    for e in edges:
-        if e.type != "flat_seam":  # drawn, never priced: in no total
-            lengths[e.type] = lengths.get(e.type, 0.0) + e.length_ft
-    tot["lengths_ft"] = {k: round(v, 1) for k, v in lengths.items()}
-    for k in ("area_sqft", "pitched_area_sqft", "flat_area_sqft", "squares"):
-        tot[k] = round(tot[k], 1)
-    return tot

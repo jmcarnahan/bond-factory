@@ -8,7 +8,7 @@ import 'model_parts.dart' show EdgeType;
 /// languages with [RoofLabels.fromMap], keyed by [keys]. Keys it leaves out keep the English
 /// text. Template strings carry `{name}` placeholders that [fill] replaces.
 ///
-/// Service text (confidence notes, warnings, verifier notes) is not translated here.
+/// Service text (confidence notes, warnings) is not translated here.
 class RoofLabels {
   /// The English labels.
   const RoofLabels() : _m = roofLabelDefaults;
@@ -53,7 +53,6 @@ class RoofLabels {
         EdgeType.valley => legendValley,
         EdgeType.stepFlashing => legendStepFlashing,
         EdgeType.wallFlashing => legendWallFlashing,
-        EdgeType.parapet => legendParapet,
         EdgeType.transition => legendTransition,
         EdgeType.unspecified => legendUnspecified,
         EdgeType.flatEdge => legendFlatEdge,
@@ -81,20 +80,28 @@ class RoofLabels {
   String get legendValley => _m['legend_valley']!;
   String get legendStepFlashing => _m['legend_step_flashing']!;
   String get legendWallFlashing => _m['legend_wall_flashing']!;
-  String get legendParapet => _m['legend_parapet']!;
   String get legendTransition => _m['legend_transition']!;
   String get legendUnspecified => _m['legend_unspecified']!;
   String get legendFlatEdge => _m['legend_flat_edge']!;
   String get legendLevelChange => _m['legend_level_change']!;
   String get lowSlopeMarker => _m['low_slope_marker']!;
   String get legendFlatSeam => _m['legend_flat_seam']!;
-  String get levelChangeJump => _m['level_change_jump']!;
+  String get legendChimney => _m['legend_chimney']!;
+  String get legendLantern => _m['legend_lantern']!;
+  String get markChimney => _m['mark_chimney']!;
+  String get markLantern => _m['mark_lantern']!;
   String get levelChangeStep => _m['level_change_step']!;
   String get totalsRoofingPitched => _m['totals_roofing_pitched']!;
   String get totalsRoofingFlat => _m['totals_roofing_flat']!;
   String get totalsLowSlopeConfirm => _m['totals_low_slope_confirm']!;
-  String get totalsPricedArea => _m['totals_priced_area']!;
-  String get totalsAsDrawn => _m['totals_as_drawn']!;
+  String get totalsEaveRake => _m['totals_eave_rake']!;
+  String get totalsExposedEdge => _m['totals_exposed_edge']!;
+  String get totalsRidgeHip => _m['totals_ridge_hip']!;
+  String get totalsSidewall => _m['totals_sidewall']!;
+  String get totalsHeadwall => _m['totals_headwall']!;
+  String get totalsTransition => _m['totals_transition']!;
+  String get totalsChimneys => _m['totals_chimneys']!;
+  String get totalsLanterns => _m['totals_lanterns']!;
   String get lengthTitle => _m['length_title']!;
   String get lengthCaption => _m['length_caption']!;
   String get areaTitle => _m['area_title']!;
@@ -103,20 +110,9 @@ class RoofLabels {
   String get summaryPageTitle => _m['summary_page_title']!;
   String get addressMissing => _m['address_missing']!;
   String get totalArea => _m['total_area']!;
-  String get squares => _m['squares']!;
-  String get pitchedArea => _m['pitched_area']!;
-  String get flatArea => _m['flat_area']!;
-  String get predominantPitch => _m['predominant_pitch']!;
+  String get pitch => _m['pitch']!;
   String get facets => _m['facets']!;
-  String get edgeTotal => _m['edge_total']!;
   String get confidence => _m['confidence']!;
-  String get totalPitchedArea => _m['total_pitched_area']!;
-  String get totalFlatArea => _m['total_flat_area']!;
-  String get predominantPitchArea => _m['predominant_pitch_area']!;
-  String get twoStoryArea => _m['two_story_area']!;
-  String get twoLayerArea => _m['two_layer_area']!;
-  String get unspecifiedPitchArea => _m['unspecified_pitch_area']!;
-  String get notAvailable => _m['not_available']!;
   String get pitchFlat => _m['pitch_flat']!;
   String get unitFt => _m['unit_ft']!;
   String get unitIn => _m['unit_in']!;
@@ -129,15 +125,9 @@ class RoofLabels {
   String get footprintArea => _m['footprint_area']!;
   String get sourceLidar => _m['source_lidar']!;
   String get lidarPoints => _m['lidar_points']!;
-  String get sourceSolar => _m['source_solar']!;
-  String get solarSegments => _m['solar_segments']!;
   String get modelGenerated => _m['model_generated']!;
   String get unknown => _m['unknown']!;
   String get methodLidarSkeleton => _m['method_lidar_skeleton']!;
-  String get methodLidarAgent => _m['method_lidar_agent']!;
-  String get methodSolarAgent => _m['method_solar_agent']!;
-  String get methodManual => _m['method_manual']!;
-  String get methodFixture => _m['method_fixture']!;
   String get confidenceNotesHeading => _m['confidence_notes_heading']!;
   String get warnings => _m['warnings']!;
   String get excludedOpeningsHeading => _m['excluded_openings_heading']!;
@@ -157,13 +147,5 @@ class RoofLabels {
   String get statusShared => _m['status_shared']!;
   String get statusFailed => _m['status_failed']!;
   String get totalsHeading => _m['totals_heading']!;
-  String get variantDripEdgeEave => _m['variant_drip_edge_eave']!;
-  String get variantDripEdgeEaveRake => _m['variant_drip_edge_eave_rake']!;
-  String get variantRidgeCapRidge => _m['variant_ridge_cap_ridge']!;
-  String get variantRidgeCapRidgeHip => _m['variant_ridge_cap_ridge_hip']!;
-  String get verification => _m['verification']!;
-  String get verdictPass => _m['verdict_pass']!;
-  String get verdictAdjusted => _m['verdict_adjusted']!;
-  String get verdictFail => _m['verdict_fail']!;
-  String get verdictUnverified => _m['verdict_unverified']!;
-  String get generated => _m['generated']!;}
+  String get generated => _m['generated']!;
+}

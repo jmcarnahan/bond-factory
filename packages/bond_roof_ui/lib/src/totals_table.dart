@@ -3,22 +3,13 @@ import 'package:bond_roof/bond_roof.dart';
 
 import 'tokens.dart';
 
-/// The measurement as inline text rows: area, pitch, facets, each edge total, the two paired
-/// variants (drip edge: eave / eave + rake; ridge cap: ridge / ridge + hip), confidence, the
-/// verification verdict with its first note, and when it was generated. No popups.
+/// The measurement as inline text rows: the totals the roof has (area, pitch, each length, the chimney count: see
+/// [totalRows]), confidence, and when it was generated. A roof never gets a row for a thing it does not have. No popups.
 class RoofTotalsTable extends StatelessWidget {
   const RoofTotalsTable(this.measurement, {super.key, this.labels = const RoofLabels()});
 
   final RoofMeasurement measurement;
   final RoofLabels labels;
-
-  /// The verdict as text from [labels]; an unknown verdict reads as not verified.
-  static String verdictLabel(RoofVerdict v, RoofLabels l) => switch (v) {
-        RoofVerdict.pass => l.verdictPass,
-        RoofVerdict.adjusted => l.verdictAdjusted,
-        RoofVerdict.fail => l.verdictFail,
-        RoofVerdict.unverified || RoofVerdict.unknown => l.verdictUnverified,
-      };
 
   static String _generated(DateTime t) {
     final u = t.toUtc();
@@ -29,47 +20,10 @@ class RoofTotalsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final t = measurement.totals;
-    String ft(double v) => feetInches(v, labels: labels);
-    String area(double sqftValue, double? squares) =>
-        '${sqft(sqftValue)} ${labels.unitSqft}${squares == null ? '' : '  (${squares.toStringAsFixed(2)} ${labels.unitSquares})'}';
-    Iterable<(String, String)> roofingRows(RoofEngineTotals? e) sync* {
-      if (e == null || !e.hasRoofing) return;
-      final pitched = e.roofingPitchedSqft ?? (e.roofingPitchedSquares ?? 0) * 100;
-      final flat = e.roofingFlatSqft ?? (e.roofingFlatSquares ?? 0) * 100;
-      yield (labels.totalsRoofingPitched, area(pitched, e.roofingPitchedSquares ?? pitched / 100));
-      yield (labels.totalsRoofingFlat, area(flat, e.roofingFlatSquares ?? flat / 100));
-      final low = e.lowSlopeConfirmSqft;
-      if (low != null && low > 0) yield (labels.totalsLowSlopeConfirm, area(low, null));
-    }
-
-    final rows = <(String, String)>[
-      // With the 0.4 priced area the headline is that area (it equals pitched + flat below); the drawn
-      // area follows on its own row so the two are never mixed up.
-      if (t.engine case final e? when e.hasRoofing && e.planesSurfaceAreaSqft != null) ...[
-        (labels.totalsPricedArea, area(e.planesSurfaceAreaSqft!, e.planesSurfaceAreaSqft! / 100)),
-        (labels.totalsAsDrawn, area(e.areaSqftRoofEdge ?? t.areaSqft, null)),
-      ] else
-        (labels.totalArea, '${sqft(t.areaSqft)} ${labels.unitSqft}  (${t.squares.toStringAsFixed(2)} ${labels.unitSquares})'),
-      // Envelope 0.4: pitched and flat roofing on separate rows. Nothing is added without the keys.
-      ...roofingRows(t.engine),
-      (labels.predominantPitch, pitchLabel(t.predominantPitch, labels: labels)),
-      (labels.facets, '${t.facets}'),
-      (labels.legendEave, ft(t.eaveFt)),
-      (labels.legendRake, ft(t.rakeFt)),
-      (labels.legendRidge, ft(t.ridgeFt)),
-      (labels.legendHip, ft(t.hipFt)),
-      (labels.legendValley, ft(t.valleyFt)),
-      (labels.legendStepFlashing, ft(t.stepFlashingFt)),
-      (labels.variantDripEdgeEave, ft(t.dripEdgeEaveFt)),
-      (labels.variantDripEdgeEaveRake, ft(t.dripEdgeEaveRakeFt)),
-      (labels.variantRidgeCapRidge, ft(t.ridgeCapRidgeFt)),
-      (labels.variantRidgeCapRidgeHip, ft(t.ridgeFt + t.hipFt)),
+    final rows = [
+      for (final r in totalRows(measurement.model, labels, envelope: measurement.totals)) (r.label, r.value),
       (labels.confidence, '${(measurement.confidenceScore * 100).round()}%'),
     ];
-    final v = measurement.verification;
-    final verdict = verdictLabel(v.verdict, labels);
-    final verification = v.notes.isEmpty ? verdict : '$verdict - ${v.notes.first}';
     final generated = measurement.generatedAt;
     return Semantics(
       container: true,
@@ -81,7 +35,6 @@ class RoofTotalsTable extends StatelessWidget {
           const SizedBox(height: RoofUiTokens.gap / 2),
           for (final (label, value) in rows) _Row(label, value),
           const SizedBox(height: RoofUiTokens.gap / 2),
-          _Row(labels.verification, verification, bold: false),
           if (generated != null) _Row(labels.generated, _generated(generated), bold: false),
         ],
       ),

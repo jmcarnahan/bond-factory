@@ -1,5 +1,14 @@
 # Roof measurement service contract 0.2
 
+> **Superseded by [contract-0.6.md](contract-0.6.md).** The job API (HTTP, auth, job store, runner), the block path, the agent methods, the verifier, Solar, the `method` / `verify` / `blocks_path` arguments and the old totals keys described here were removed in 0.6.0. Kept as the record of the shape before.
+
+> **Removed in 0.6 (library cleanup, no change to the plane engine's output).** The block-path engine, the methods
+> `lidar_agent` and `solar_agent`, the LLM verifier (the `verification` block of an engine result says `unverified`,
+> `skipped: engine`), Google Solar evidence and the Solar footprint link, the test hooks `blocks_path` and `solar_fixture`
+> and the whole standalone job service (the HTTP API, auth, job store, runner, Dockerfile) are gone; only
+> `roof_measure.measure(...)` remains, with the plane engine. Sections below that describe them are history; git keeps the code.
+> The four `roof_measurement_0.2_*` fixtures stay as files for the Dart readers but nothing regenerates them.
+
 `bond.roof_model/0.2` is the result envelope of the `roof_measure` service. The pipeline is reachable two ways, with the same
 envelope: the job API of §1 (the private service, deployed as a Docker image) or in-process through the Python
 library of §3. Both link the GPL straight skeleton through compas_cgal. This document is what an app copies: the API, the envelope, the error codes, the environment variables and one example. The model
@@ -789,6 +798,8 @@ When a call is configured, the library does not read keys or `ROOF_MEASURE_*` se
 Run one replica only: the job store is on the local volume.
 
 ## Appendix B. Label keys
+
+> Superseded by 0.6: the label set was reworked (verification, variant, parapet, predominant-pitch and Solar keys removed; sidewall, headwall, chimney, lantern, eave + rake keys added). The key list of `packages/bond_roof/lib/src/labels_defaults.dart` is the current one.
 
 The Dart packages draw every user-visible string from a `RoofLabels` object with English defaults. An app builds it
 from its own strings with `RoofLabels.fromMap(Map<String, String>)`; unknown keys are ignored. Service text

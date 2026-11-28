@@ -7,7 +7,6 @@ import 'package:bond_roof/bond_roof.dart';
 
 import 'labels_es.dart';
 import 'model_panel.dart';
-import 'service_client.dart';
 import 'tokens.dart';
 
 class _Loaded {
@@ -16,43 +15,28 @@ class _Loaded {
   final RoofMeasurement measurement;
 }
 
-/// The single screen: address, method, measure, fixtures, report.
+/// The single screen: fixtures, language, report. It reads the bundled fixtures only; no service is called.
 class DemoPage extends StatefulWidget {
-  const DemoPage({super.key, this.service});
-
-  /// The service client; tests pass one backed by a fake HTTP client.
-  final ServiceClient? service;
+  const DemoPage({super.key});
 
   @override
   State<DemoPage> createState() => _DemoPageState();
 }
 
 class _DemoPageState extends State<DemoPage> {
-  final _address = TextEditingController(text: DemoTokens.defaultAddress);
-  late final ServiceClient _service = widget.service ?? ServiceClient();
-  MeasureMethod _method = MeasureMethod.auto;
-  bool _busy = false;
   bool _spanish = false;
-  String? _status;
   String? _error;
   _Loaded? _loaded;
   List<String> _bundled = const [];
-  List<String> _remote = const [];
   String? _selected;
 
   @override
   void initState() {
     super.initState();
-    _loadFixtureLists();
+    _loadFixtureList();
   }
 
-  @override
-  void dispose() {
-    _address.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadFixtureLists() async {
+  Future<void> _loadFixtureList() async {
     try {
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
       final names = manifest
@@ -65,67 +49,26 @@ class _DemoPageState extends State<DemoPage> {
     } catch (e) {
       if (mounted) setState(() => _error = 'Could not list bundled fixtures: $e');
     }
-    final remote = await _service.fixtures();
-    if (!mounted) return;
-    setState(() {
-      final have = {for (final n in _bundled) ServiceClient.fixtureStem(n)};
-      _remote = remote.where((n) => !have.contains(n)).toList();
-    });
   }
 
-  Future<void> _run(String label, Future<Map<String, dynamic>> Function() job) async {
+  Future<void> _load(String name) async {
     setState(() {
-      _busy = true;
+      _selected = name;
       _error = null;
     });
     try {
-      final json = await job();
-      // Envelopes (0.2) and bare models (0.1) both load.
-      final measurement = RoofMeasurement.parseAny(json);
+      final text = await rootBundle.loadString('${DemoTokens.fixtureAssetDir}$name');
+      // Envelopes and bare models both load.
+      final measurement = RoofMeasurement.parseAny(jsonDecode(text) as Map<String, dynamic>);
       if (!mounted) return;
-      setState(() => _loaded = _Loaded(label, measurement));
+      setState(() => _loaded = _Loaded(name, measurement));
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = '$e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _status = null;
-        });
-      }
+      setState(() {
+        _loaded = null;
+        _error = '$e';
+      });
     }
-  }
-
-  Future<void> _measure() {
-    // A new measurement starts from a clean page: no stale report under an error.
-    setState(() {
-      _selected = null;
-      _loaded = null;
-    });
-    return _run(
-      _method.label,
-      () => _service.measure(
-        _address.text.trim(),
-        _method,
-        onStatus: (s) {
-          if (mounted) setState(() => _status = s);
-        },
-      ),
-    );
-  }
-
-  Future<void> _loadBundled(String name) {
-    setState(() => _selected = name);
-    return _run(name, () async {
-      final text = await rootBundle.loadString('${DemoTokens.fixtureAssetDir}$name');
-      return jsonDecode(text) as Map<String, dynamic>;
-    });
-  }
-
-  Future<void> _loadRemote(String name) {
-    setState(() => _selected = 'remote:$name');
-    return _run(name, () => _service.fixtureJson(name));
   }
 
   @override
@@ -141,33 +84,11 @@ class _DemoPageState extends State<DemoPage> {
           child: ListView(
             padding: const EdgeInsets.all(DemoTokens.pad),
             children: [
-              TextField(
-                controller: _address,
-                decoration: const InputDecoration(
-                  labelText: 'Address',
-                  border: OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => _busy ? null : _measure(),
-              ),
-              const SizedBox(height: DemoTokens.gap),
               Wrap(
                 spacing: DemoTokens.gap,
                 runSpacing: DemoTokens.gap,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SegmentedButton<MeasureMethod>(
-                    showSelectedIcon: false,
-                    segments: [
-                      for (final m in MeasureMethod.values)
-                        ButtonSegment(value: m, label: Text(m.label)),
-                    ],
-                    selected: {_method},
-                    onSelectionChanged: (s) => setState(() => _method = s.first),
-                  ),
-                  FilledButton(
-                    onPressed: _busy ? null : _measure,
-                    child: const Text('Measure'),
-                  ),
                   SegmentedButton<bool>(
                     showSelectedIcon: false,
                     segments: const [
@@ -190,27 +111,11 @@ class _DemoPageState extends State<DemoPage> {
                     ChoiceChip(
                       label: Text(n.replaceAll('.json', '')),
                       selected: _selected == n,
-                      onSelected: _busy ? null : (_) => _loadBundled(n),
+                      onSelected: (_) => _load(n),
                     ),
-                  for (final n in _remote)
-                    ChoiceChip(
-                      label: Text('${n.replaceAll('.json', '')} (service)'),
-                      selected: _selected == 'remote:$n',
-                      onSelected: _busy ? null : (_) => _loadRemote(n),
-                    ),
-                  if (_bundled.isEmpty && _remote.isEmpty)
-                    Text('No fixtures bundled. Run make sync-fixtures.',
-                        style: theme.textTheme.bodySmall),
+                  if (_bundled.isEmpty) Text('No fixtures bundled. Run make sync-fixtures.', style: theme.textTheme.bodySmall),
                 ],
               ),
-              const SizedBox(height: DemoTokens.gap),
-              if (_busy)
-                const LinearProgressIndicator(minHeight: DemoTokens.progressHeight),
-              if (_status != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: DemoTokens.gap / 2),
-                  child: Text(_status!, style: theme.textTheme.bodyMedium),
-                ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: DemoTokens.gap / 2),
@@ -229,13 +134,10 @@ class _DemoPageState extends State<DemoPage> {
                   measurement: loaded.measurement,
                   labels: _spanish ? RoofLabels.fromMap(roofLabelsEs) : const RoofLabels(),
                 ),
-              ] else if (!_busy)
+              ] else
                 Padding(
                   padding: const EdgeInsets.only(top: DemoTokens.gapLarge),
-                  child: Text(
-                    'Pick a fixture or press Measure to see the diagrams.',
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  child: Text('Pick a fixture to see the diagrams.', style: theme.textTheme.bodyMedium),
                 ),
             ],
           ),

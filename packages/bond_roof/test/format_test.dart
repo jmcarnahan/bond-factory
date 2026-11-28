@@ -28,13 +28,42 @@ void main() {
     expect(sqft(1000), '1,000');
   });
 
-  test('pitchLabel', () {
-    expect(pitchLabel(0.19), 'Flat');
-    expect(pitchLabel(0.5), 'Flat');
-    expect(pitchLabel(0.6), '0.5/12');
-    expect(pitchLabel(3.9), '4/12');
-    expect(pitchLabel(4.6), '4.5/12');
-    expect(pitchLabel(4.2), '4/12');
-    expect(pitchLabel(12), '12/12');
+  group('pitchLabel: the whole number (half up), the fit beside it when it differs at the tenth', () {
+    test('the examples of the contract', () {
+      expect(pitchLabel(4.31), '4/12 (4.3)');
+      expect(pitchLabel(5.0), '5/12');
+    });
+
+    test('a fit within 0.05 of the whole number shows only the whole number', () {
+      expect(pitchLabel(4.04), '4/12');
+      expect(pitchLabel(3.96), '4/12');
+      expect(pitchLabel(6.02), '6/12');
+      expect(pitchLabel(12), '12/12');
+    });
+
+    test('0.05 or more away shows the fit', () {
+      expect(pitchLabel(4.06), '4/12 (4.1)');
+      expect(pitchLabel(3.94), '4/12 (3.9)');
+      expect(pitchLabel(5.89), '6/12 (5.9)');
+    });
+
+    test('the whole number rounds half up', () {
+      expect(pitchLabel(4.5), '5/12 (4.5)');
+      expect(pitchLabel(4.49), '4/12 (4.5)');
+      expect(pitchLabel(7.5), '8/12 (7.5)');
+    });
+
+    test('a rise that is not a pitch never throws: it reads as flat', () {
+      for (final v in [double.infinity, double.negativeInfinity, double.nan, 1e300]) {
+        expect(pitchLabel(v), 'Flat', reason: '$v');
+      }
+    });
+
+    test('flat is a rise of half a unit or less; the word is a label', () {
+      expect(pitchLabel(0.19), 'Flat');
+      expect(pitchLabel(0.5), 'Flat');
+      expect(pitchLabel(0.6), '1/12 (0.6)');
+      expect(pitchLabel(0.2, labels: RoofLabels.fromMap({'pitch_flat': 'Plano'})), 'Plano');
+    });
   });
 }

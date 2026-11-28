@@ -114,7 +114,6 @@ def gate9(name: str, density: float, rec: dict[str, Any], tol: dict[str, float] 
     ok = bool(rec.get("automation_ok"))
     out: dict[str, Any] = {"case": name, "density": density, "verdict": rec.get("verdict"), "has_result": bool(rec.get("automation")),
                            "area_err_pct": t.get("squares.err_pct")}
-    out["priced_ratio"] = t.get("squares.priced_ratio")  # report-only: priced area over exact area
     errs, worst = {}, 0.0
     for k in LEN_KEYS:
         tr, ab = t.get(f"lengths.{k}.truth"), t.get(f"lengths.{k}.abs_diff")
@@ -168,7 +167,7 @@ def tables(recs: list[dict[str, Any]], gates: list[dict[str, Any]], tol: dict[st
              "| shape | " + " | ".join(f"{d}/m2" for d in dens) + " |", "|---|" + "---|" * len(dens)]
     lines += [f"| {s} | " + " | ".join(cell.get((s, d), "") for d in dens) + " |" for s in shapes]
     lines += ["", "cell = gate 9 result, area error, worst of ridge/hip/valley/perimeter error beyond the length floor", "",
-              "| case | pass | verdict | area % | priced/exact | fit_all | fit_covered | IoU | flat/pitched | false lvl |", "|---|---|---|---|---|---|---|---|---|---|"]
+              "| case | pass | verdict | area % | fit_all | fit_covered | IoU | flat/pitched | false lvl |", "|---|---|---|---|---|---|---|---|---|"]
     byid = {r["id"]: r for r in recs}
     for g in gates:
         if NAME_RE.match(g["case"]).group(3) or not g["pass"]:
@@ -176,7 +175,7 @@ def tables(recs: list[dict[str, Any]], gates: list[dict[str, Any]], tol: dict[st
             m, t = r.get("m") or {}, (r.get("truth") or {}).get("T6", {})
             f = lambda x, n=2: "-" if x is None else f"{x:.{n}f}"
             lines.append(f"| {g['case']} | {'PASS' if g['pass'] else 'FAIL'} | {g['verdict']} | {f(g['area_err_pct'], 1)} | "
-                         f"{f(t.get('squares.priced_ratio'), 3)} | {f(m.get('fit_all'))} | {f(m.get('fit_covered'))} | {f(t.get('facet_iou.mean_iou'))} | "
+                         f"{f(m.get('fit_all'))} | {f(m.get('fit_covered'))} | {f(t.get('facet_iou.mean_iou'))} | "
                          f"{f(t.get('flat_pitched_agreement'))} | {f(m.get('false_level_change_share'), 3)} |")
     return "\n".join(lines) + "\n"
 

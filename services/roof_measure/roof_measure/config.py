@@ -1,29 +1,23 @@
-"""Per-call runtime settings for library use: keys and directories as arguments, not environment variables.
+"""Per-call runtime settings for library use: directories and mirrors as arguments, not environment variables.
 
-WHY a Runtime is authoritative: the isolated child inherits the parent's environment, so a caller that passes
-``anthropic_api_key=None`` must get "no key", never a paid key that happens to sit in the environment. When no
-Runtime is set (the service, the CLI, the tests) every reader falls back to the environment exactly as before.
+A Runtime carries the cache directory and the Overpass mirrors of one call, so a caller's arguments win over the
+process environment. When no Runtime is set (the tests) every reader falls back to the environment.
 A ContextVar is used so concurrent threads each see their own Runtime; a plain ``Thread`` does not inherit it
 (run it under ``contextvars.copy_context().run``), a child interpreter starts empty and sets it first.
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 
-SOLAR_KEY_ENV = ("GOOGLE_SOLAR_API_KEY",)  # only this key enables billable Solar calls
-
 
 @dataclass(frozen=True)
 class Runtime:
     cache_dir: Path
-    anthropic_api_key: str | None = None
-    google_solar_api_key: str | None = None
     overpass_urls: tuple[str, ...] | None = None
     footprint_stage_s: float | None = None
 
@@ -46,21 +40,6 @@ def use(runtime: Runtime) -> Iterator[None]:
         yield
     finally:
         _current.reset(token)
-
-
-def anthropic_key() -> str | None:
-    rt = _current.get()
-    return rt.anthropic_api_key if rt else os.environ.get("ANTHROPIC_API_KEY")
-
-
-def solar_key() -> str | None:
-    rt = _current.get()
-    if rt:
-        return rt.google_solar_api_key
-    for name in SOLAR_KEY_ENV:
-        if os.environ.get(name):
-            return os.environ[name]
-    return None
 
 
 def cache_root() -> Path | None:

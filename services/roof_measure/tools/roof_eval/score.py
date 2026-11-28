@@ -2,7 +2,8 @@
 
 Edges are not taken on trust: ``roof.edges`` is replaced by the set recomputed from the facets (``edges_re``) before any
 length, perimeter, level-change or cleanliness metric; the engine's own list is kept as ``roof.engine_edges`` for the
-disagreement, false and unmarked level-change metrics. Engine-only wall types (step, wall flashing, parapet) are carried over.
+disagreement, false and unmarked level-change metrics. The engine-only parapet type is carried over; a step it names sidewall or
+headwall is the recomputed ``level_change``.
 """
 
 from __future__ import annotations
@@ -12,10 +13,10 @@ from typing import Any
 import numpy as np
 from shapely.geometry import Polygon
 
-from . import edges_re, m_fit, m_shape, m_truth, priced
+from . import edges_re, m_fit, m_shape, m_truth
 from .geom import FLAT_RISE, Roof, load_roof
 
-KEEP_ENGINE_TYPES = ("step_flashing", "wall_flashing", "parapet")
+KEEP_ENGINE_TYPES = ("parapet",)  # a step is recomputed (as ``level_change``: sidewall and headwall are the engine's names for it)
 
 
 def verdict_ok(roof: Roof) -> bool:
@@ -32,8 +33,6 @@ def metrics(roof: Roof, ref: np.ndarray, foot: Polygon, facet_ref: float | None 
     roof.edges = rc.edges + [e for e in roof.engine_edges if e.type in KEEP_ENGINE_TYPES]
     fp, ln, cl = m_shape.flat_pitched(roof), m_shape.lengths(roof), m_shape.cleanliness(roof, foot)
     declared = roof.declared.get("area_sqft")
-    pr = priced.priced(roof)
-    pc = priced.consistency(roof, pr)
     wrong = sum(1 for f in roof.facets if f.declared_type in ("flat", "pitched") and (f.declared_type == "flat") != f.is_flat)
     union_sqft = roof.union.area * 10.763910416709722
     ov, gap = m_fit.overlap_sqft(roof), m_fit.tiling_gap_sqft(roof)
@@ -50,7 +49,6 @@ def metrics(roof: Roof, ref: np.ndarray, foot: Polygon, facet_ref: float | None 
             "false_unmarked_ft": fl["false_ft"] + es["unmarked_level_change_ft"], **es,
             **fp, "perimeter_ft": ln["perimeter"], "ridge_hip_ft": ln["ridge_hip"], "valley_ft": ln["valley"],
             "level_change_ft": ln["level_change"], "lengths": ln,
-            "priced": pr, "priced_consistent": pc["ok"], "priced_inconsistent": int(pc["ok"] is False), "priced_why": pc["why"],
             "declared_area_err_pct": m_truth.pct(declared, fp["area_sqft"]) if declared else None,
             "roof_type_label_wrong": wrong, "invalid_facets": roof.invalid_facets, "flat_cut": FLAT_RISE}
 

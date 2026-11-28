@@ -13,18 +13,9 @@ import json
 import math
 from dataclasses import asdict, dataclass, fields
 
-_MAY_BE_NEGATIVE = frozenset({"overhang_floor_m"})
-
 
 @dataclass(frozen=True)
 class EngineParams:
-    # ---- priced versus drawn roof edge (plan 3.7a)
-    overhang_scale: float = 0.5  # ratio: PRICED roof edge = measured overhang x this (cost-sheet totals)
-    overhang_scale_draw: float = 1.0  # ratio: DRAWN roof edge (facets, diagram) on county (wall-line) outlines
-    overhang_scale_roofedge: float = 0.25  # ratio: cap on the drawn scale when the outline is not a county wall line
-    overhang_cap_m: float = 1.0  # m: per-side overhang upper clamp
-    overhang_floor_m: float = -0.3  # m: per-side overhang lower clamp
-    overhang_default_m: float = 0.3  # m: overhang assumed when no side could be measured
     # ---- step 2: flat roofs, steep strips and pitched patches
     s2_flat: bool = True
     s2_steep_rise: float = 2.0  # rise: narrow outline strips at least this steep are examined by the eave-evidence test (_has_own_eave: level outer edge, normal point density); a strip that fails is absorbed. Not a pitch cutoff any more
@@ -56,11 +47,13 @@ class EngineParams:
     mismatch_lo: float = 0.70  # ratio: roof support / outline below this: outline_mismatch
     mismatch_hi: float = 1.30  # ratio: ... above this: outline_mismatch
     mismatch_shift: float = 0.17  # ratio: outline_shift at or above this: outline_mismatch
+    no_evidence_share: float = 0.20  # ratio: edge_no_evidence_share at or above this: outline_no_evidence (160 houses: 3 at 0.29-0.47, next 0.11)
+    roof_continues_share: float = 0.10  # ratio: edge_end_share at or above this: roof_continues (160 houses: max 0.03; an attached roof along a tenth of the outline)
+    part_missed_min_sqft: float = 32.3  # sq ft: roof_part_missed_sqft at or above this (the objects step's own 3 m2 gate): roof_part_missed
     planes_min_assigned_pct: float = 50.0  # percent: fewer returns on detected planes than this (or none found): poor_fit, reason planes_not_found (synthetic 14/12 cross gable at 8 pts/m2 before the steep fix drew one flat facet)
     fit_floor: float = 0.55  # ratio: fit_all below this: poor_fit
+    fit_outline_margin_m: float = 0.3  # m: fit_all / fit_covered count the returns inside the drawn outline grown by this (the edge regularisation tolerance 0.15 m plus the finder's per-side noise, about 0.15 m)
     supported_floor: float = 70.0  # percent: supported area below this: poor_fit
-    cut_up_facets: int = 14  # facets at or above this: complexity "cut_up"
-    cut_up_hv_per_sq: float = 7.0  # ft of hip+valley per roofing square at or above this: "cut_up"
     # ---- input preparation
     crop_buffer_m: float = 1.3  # m: points kept within this of the footprint
     thin_above_pts: int = 9000  # pts: voxel-thin a crop denser than this
@@ -132,47 +125,66 @@ class EngineParams:
     final_snap_deg: float = 12.0  # deg: the same for the final roof outline
     final_tol_m: float = 0.15  # m
     ring_min_edge_m: float = 0.6  # m: shorter outline edges are removed
-    support_h_m: float = 0.1  # m: raster step of the roof-point support polygon
-    support_reach_m: float = 0.50  # m: a cell is supported when a point is this close
-    support_erode_m: float = 0.35  # m: support is eroded by this
-    support_hole_m2: float = 4.0  # m2: holes in the support smaller than this are filled
-    support_part_m2: float = 1.0  # m2: support parts smaller than this are dropped
-    support_buffer_m: float = 1.0  # m: support is limited to the footprint grown by this
-    edge_min_len_m: float = 1.5  # m: outline edges shorter than this get no overhang measurement
-    edge_rays: int = 15  # rays across the edge (7 gave +-0.06 m noise on the synthetic roofs)
-    edge_ray_quantile: float = 0.5  # ratio: quantile of the ray positions taken as the edge (0.75 had less synthetic noise but +0.4 m tails on ragged real edges: tuning, 1334 edges)
-    edge_ray_in_m: float = 1.2  # m: rays start this far inside the ring edge ...
-    edge_ray_out_m: float = 1.5  # m: ... and end this far outside it
     offset_parallel_det: float = 0.08  # ratio: consecutive offset lines closer to parallel than this (|det|) use the mean offset
     offset_corner_max_m: float = 3.0  # m: an offset corner further than this from the original corner falls back to the mean offset
     offset_area_lo: float = 0.7  # ratio: an offset outline under this x the ring area is rejected (buffer fallback)
-    offset_area_hi: float = 1.6  # ratio: ... or over this
     footprint_area_lo: float = 0.8  # ratio: an orthogonalised footprint under this x the original is rejected
     footprint_area_hi: float = 1.2  # ratio: ... or over this
     footprint_simplify_m: float = 0.1  # m: fallback simplification of the footprint
     final_area_lo: float = 0.9  # ratio: a regularised final outline under this x the unregularised one is rejected
     final_area_hi: float = 1.1  # ratio: ... or over this
-    notch_support_buffer_m: float = 0.3  # m: roof points this near count as supporting the outline when cutting notches
-    notch_core_shrink_m: float = 0.02  # m: cut-out shrink so the cut does not nick the core
-    extra_zone_buffer_m: float = 0.45  # m: supported roof beyond the outline by more than this is an extra part (and its regrowth)
-    extra_open_m: float = 0.25  # m: morphological opening of extra parts
-    extra_support_buffer_m: float = 0.2  # m: extra parts are limited to the support grown by this
     outline_close_m: float = 0.15  # m: slits in the roof outline narrower than twice this are closed (the harness's own closing is 0.5 m wide)
-    bridge_m: float = 0.1  # m: parts of a multipart outline are bridged with this closing
-    edge_ray_lo: float = 0.15  # ratio: the first ray stands this far along the edge (the last at 1 - this)
-    edge_ray_step_m: float = 0.025  # m: sampling step along a ray (0.05 quantised the answer)
-    support_gap_share: float = 0.72  # ratio: support boundary error grows by this x the point spacing. EVIDENCE: simulator (jittered grid, 6 seeds, d16/d8/d4), not real LiDAR. FRAGILE for the 2% area gate: +-20% moves gate 9 from 87 to 79 / 54 of 103; tuning T3 moves <= 0.006
-    support_edge_bias_m: float = 0.25  # m: ... less this constant (same fit). FRAGILE like support_gap_share: +-20% gives 48 / 73 of 103; tuning T3 moves <= 0.006. Re-fit if the simulator changes
-    spacing_strip_m: float = 1.0  # m: half width of the strip along an edge whose point density gives the spacing
-    spacing_min_m: float = 0.15  # m: spacing clamp (below: 40 pts/m2)
-    spacing_max_m: float = 0.60  # m: spacing clamp (above: under 3 pts/m2)
-    notch_min_area_m2: float = 1.5  # m2: an unsupported notch bigger than this is cut out
-    notch_min_width_m: float = 0.8  # m: ... when at least this wide
-    extra_min_area_m2: float = 5.0  # m2: supported roof parts outside the outline are added above this
-    min_part_area_m2: float = 3.0  # m2: smaller outline parts are dropped
+    final_min_edge_m: float = 0.3  # m: shorter edges are removed from the FINAL outline (below the 0.45 m step a side is split at, so a measured eave jog stays)
+    # ---- roof-edge finder (edge_finder.py): strips across each ring side, the run of returns on the roof plane
+    edge_hag_m: float = 1.0  # m: a non-ground return this far above the local ground may be roof
+    edge_ground_k: int = 6  # pts: the local ground is the median z of this many nearest ground returns
+    edge_min_side_m: float = 1.2  # m: shorter ring sides get no strips (filled from the sides facing the same way)
+    edge_step_m: float = 0.9  # m: strip spacing along a side
+    edge_half_m: float = 0.45  # m: strip half width
+    edge_in_m: float = 2.7  # m: strips start this far inside the ring side ...
+    edge_out_m: float = 3.0  # m: ... and end this far outside it
+    edge_inner_from_m: float = 1.5  # m: the inner window (local plane height, inner spacing, start of the walk) runs from this far inside ...
+    edge_inner_to_m: float = 0.3  # m: ... to this far inside; the plane of a return is that of the nearest roof point inside this
+    edge_plane_pad_m: float = 0.3  # m: roof points this far past a strip's ends may lend it their plane
+    edge_plane_share: float = 0.25  # ratio: only planes holding this share of a strip's inner-window roof points lend it a plane (a cover's own plane reaching inside the ring does not)
+    edge_min_plane_pts: int = 4  # pts: a strip with fewer roof points inside the edge has no plane (rejected)
+    edge_min_strip_pts: int = 6  # pts: a strip with fewer candidate returns is rejected (10 rejected most strips of a 35%-thinned house)
+    edge_warp_min_pts: int = 3  # pts: inner returns needed to correct the plane's local height
+    edge_tol_m: float = 0.15  # m: a return within this of the local plane is a roof return
+    edge_min_roof_pts: int = 4  # pts: a strip with fewer roof returns past the inner start is rejected
+    edge_gap_m: float = 0.45  # m: the run of roof returns ends at the first gap longer than this ...
+    edge_gap_k: float = 4.0  # returns: ... or than this many inner spacings (1 / returns per metre), whichever is longer: sparse roofs keep their area
+    edge_gap_lam_floor: float = 0.5  # returns per m: floor of the inner rate in that spacing
+    edge_end_margin_m: float = 0.3  # m: a run that reaches this close to the window end is no edge (cover, neighbour)
+    edge_extend_m: float = 3.0  # m: a strip whose run reaches the window end looks this much further once; there the run's end counts only with a visible drop ...
+    edge_extend_dn_min: int = 1  # pts: ... at least this many returns edge_dn_m below the surface within edge_up_win_m of the run's end
+    edge_knee_m: float = 0.9  # m: the return rate at the run's end is counted over this last stretch ...
+    edge_allow: float = 0.75  # spacings: ... and the edge lies this many spacings (1 / that rate) past the last roof return. 1.0 is unbiased for Poisson sampling; airborne LiDAR is stratified (scan lines), where the last of n returns across a strip lies n / (n + 1) spacings in (n about 2.5 at 8 pts/m2 in a 0.9 m strip); 1.0 put the synthetic d8 roofs 1.5-2.6% over
+    edge_lam_min: float = 1.0  # returns per m: floor of that rate
+    edge_up_m: float = 0.45  # m: a return this far ABOVE the plane just past the run ...
+    edge_up_win_m: float = 0.76  # m: ... within this of the last roof return ...
+    edge_up_max: int = 3  # pts: ... more than this many reject the strip (a tree over the edge) ...
+    edge_dn_m: float = 0.45  # m: ... unless returns this far BELOW the plane ...
+    edge_dn_win_m: float = 0.3  # m: ... within this of the last roof return ...
+    edge_dn_min: int = 2  # pts: ... number at least this many (ground or wall seen: the edge is visible)
+    edge_dev_m: float = 0.3  # m: a strip further than max(this, 3 MAD) from its side's median is dropped
+    edge_min_strips: int = 2  # strips: a side needs this many kept strips for an offset
+    edge_same_facing_deg: float = 25.0  # deg: sides whose normals agree within this face the same way (fill, registration)
+    edge_shift_max_m: float = 2.0  # m: a registration shift longer than this is refused (the ring stays put)
+    edge_split_m: float = 0.45  # m: a side whose strips form two runs further apart than this is split at the step ...
+    edge_split_min_strips: int = 3  # strips: ... each run at least this many strips (2 split 66 sides in 56 of 151 houses, about half of the shortest false) ...
+    edge_split_share: float = 0.75  # ratio: ... with at least this share of each run within edge_dev_m of its median
+    edge_clamp_lo_m: float = 0.6  # m: a filled or tree-only side moves inward at most this far (a measured side keeps its measurement)
+    edge_clamp_hi_m: float = 1.5  # m: a filled or tree-only side of a county (wall-line) outline moves outward at most this far
+    edge_clamp_hi_roofedge_m: float = 0.5  # m: the same for an outline that already traces the roof edge (OpenStreetMap, LiDAR hull)
+    support_buffer_m: float = 1.0  # m: the roof-point support (quality: roof_cover_of_outline) counts within the wall line grown by this
+    support_cell_k: float = 1.0  # spacings: its cell edge is this many point spacings (1.0 in the registered frame matches the old support-polygon ratio: 160-house median 1.071 against 1.070) ...
+    support_cell_max_m: float = 1.0  # m: ... at most this (and at least support_cell_m)
     # ---- labelling raster and graph cut
     grid_min_m: float = 0.12  # m: label raster step (never finer)
     grid_cells_target: float = 22000.0  # cells: step = sqrt(outline area / this)
+    grid_quantum_m: float = 0.01  # m: the step is rounded up to a multiple of this, so a centimetre of outline does not change it
+    label_clip_m: float = 0.10  # m: the labelled cells are kept inside the outline grown by this
     cost_tau_m: float = 0.25  # m: residual saturation in the data cost
     cost_nbrs: int = 5  # pts: neighbours per cell in the data cost
     cost_sigma_m: float = 0.30  # m: weight falloff
@@ -223,6 +235,7 @@ class EngineParams:
     sliver_thin_area_m2: float = 4.0  # m2: ... or smaller than this and thinner than ...
     sliver_width_m: float = 0.45  # m
     small_facet_m2: float = 12.0  # m2: facets below this may merge into a neighbour
+    off_plane_facet_mad_m: float = 0.35  # m: a small facet whose returns (all of them, assigned or not) have a median residual over its plane above this is not a roof plane: the neighbour with the longest shared boundary takes it (tree crown, clutter). EVIDENCE: 3 of 237 small facets of the tuning houses lie between 0.25 and 0.5; a real small hip end 0.16, a tree facet 0.75
     small_merge_rms_m: float = 0.045  # m: ... when the neighbour's rms rises by less than this
     coplanar_facet_gtol: float = 0.05  # gradient: adjacent facets merge when planes differ by less ...
     coplanar_facet_gap_m: float = 0.2  # m: ... and their mean gap is below this
@@ -284,14 +297,41 @@ class EngineParams:
     supported_reach_m: float = 0.5  # m
     chain_angle_deg: float = 7.0  # deg: edge segments chain when collinear within this
     edge_min_seg_m: float = 0.12  # m: shorter raw segments are dropped
+    jump_outlier_m: float = 0.3  # m: a return this far off its own side's plane is not measured (a tree over the seam)
+    jump_trim_m: float = 0.15  # m: after the fit, returns further than this (or 3 robust sigmas) from it are left out and it is refitted
+    end_touch_m: float = 0.15  # m: a boundary piece with no line of its own that touches a line of the same two facets this closely takes its type
+    step_along_deg: float = 30.0  # deg: a step line within this of the lower facet's fall line is sidewall (step) flashing
+    step_up_cos: float = 0.3  # a step line across the lower slope with the upper roof up-slope of it (cos over this) is headwall flashing
     # ---- outputs
     fit_tol_m: float = 0.15  # m: a point fits its facet's plane within this (fit_all / fit_covered)
-    # ---- hints (caller answers; skipped from stable_hash while at their default)
-    pitched_steps: bool = True  # False: a step line between two pitched facets whose planes agree at the seam is typed from the planes
+    # ---- objects standing on the roof (engine.objects.find_objects): chimneys, flues, lanterns; never trees
+    obj_hag_m: float = 1.0  # m: a return is a candidate only above the local ground by more than this ...
+    obj_reach_m: float = 3.0  # m: ... and within this of the roof outline
+    obj_above_plane_m: float = 0.3  # m: ... and above the plane of the facet under it by more than this
+    obj_link_min_m: float = 0.35  # m: candidates link into one blob within max(this, obj_link_spacings x mean spacing)
+    obj_link_spacings: float = 1.6  # ratio of the mean return spacing (1/sqrt(density)) that still links two returns
+    obj_min_points: int = 4  # pts: fewer returns is noise, not an object
+    obj_pad_spacings: float = 0.15  # ratio of the mean spacing: the footprint is the rectangle of the returns grown by this (the outermost returns of a surface lie a fraction of a spacing inside its edge)
+    obj_align_ratio: float = 1.6  # ratio: the footprint follows the walls unless the free minimum rectangle is this much smaller
+    obj_max_aspect: float = 3.0  # ratio: long side over short side above this is a seam or ridge line, not an object (on the 160 tuning houses nine blobs 1.7-2.0 ft wide and 7-9 ft long lay along facet seams and ridges; no chimney or lantern is that thin)
+    obj_min_side_m: float = 0.5  # m: a blob thinner than this is a seam or edge error of the facets (a line), not an object
+    obj_edge_m: float = 0.4  # m: a blob this close to the roof edge is a parapet, wall or gutter line, not a chimney
+    obj_min_area_m2: float = 0.25  # m2: a smaller footprint is dropped
+    obj_tree_outside_share: float = 0.3  # ratio of a blob's returns outside the outline above which it is a tree
+    obj_tree_reach_m: float = 1.5  # m: a blob this close to a tree blob is part of the same tree (its edge over the roof)
+    obj_tree_h95_m: float = 4.0  # m: a blob whose 95th percentile height is above this is a tree
+    obj_on_plane_m: float = 0.15  # m: a return this close to a facet plane is ON the roof (for the layered test)
+    obj_layered_share: float = 0.35  # ratio: more roof returns than this inside the blob's footprint ...
+    obj_layered_spread_m: float = 0.5  # m: ... with a height spread (std) above this is canopy with the roof seen through it
+    obj_lantern_max_h_m: float = 0.9  # m: lower than this and at least obj_lantern_min_area_m2 wide is a lantern ...
+    obj_lantern_min_area_m2: float = 2.0  # m2: the footprint is the rectangle of the returns (a roof lantern is about 2.4 m2; rooftop units on flat commercial roofs read 1.5-2.7)
+    obj_chimney_max_area_m2: float = 3.0  # m2: ... at least obj_lantern_max_h_m high and at most this wide is a chimney
+    obj_mislabel_area_m2: float = 3.0  # m2: a planar blob wider than this is a roof part the facets left out (mislabelled)
+    obj_planar_rms_m: float = 0.08  # m: ... planar means a plane fit with an rms under this
 
     def __post_init__(self) -> None:
         """Canonical values (an int where a float is declared is stored as a float, so 1 and 1.0 hash alike) and sanity
-        checks (finite, not negative except the overhang floor, at least one smoothness weight)."""
+        checks (finite, not negative, at least one smoothness weight)."""
         for f in fields(self):
             v = getattr(self, f.name)
             default = f.default
@@ -303,18 +343,14 @@ class EngineParams:
             if isinstance(v, int | float):
                 if not math.isfinite(v):
                     raise ValueError(f"{f.name}: {v!r} is not finite")
-                if v < 0 and f.name not in _MAY_BE_NEGATIVE:
+                if v < 0:
                     raise ValueError(f"{f.name}: {v!r} is negative")
         if self.knn_k < 1 or self.grow_nbrs < 1 or not self.beta_schedule or min(self.beta_schedule) <= 0:
             raise ValueError("knn_k, grow_nbrs and beta_schedule must be positive")
 
     def stable_hash(self) -> str:
         """sha256 of the sorted fields: the result-cache and harness key."""
-        d = asdict(self)
-        for name in HINT_FIELDS:  # a hint at its default must not change the key every cached result already has
-            if d[name] == _FIELD_DEFAULTS[name]:
-                del d[name]
-        blob = json.dumps(d, sort_keys=True, separators=(",", ":"))
+        blob = json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode()).hexdigest()
 
     def replace(self, **kw: object) -> EngineParams:
@@ -323,10 +359,5 @@ class EngineParams:
 
         return replace(self, **kw)
 
-
-# Changing the DEFAULT of a hint field changes what an unhinted request means, but the hash skips defaults: it then needs a
-# PIPELINE_VERSION bump (tests/test_engine_hints.py pins the defaults).
-HINT_FIELDS = ("pitched_steps",)
-_FIELD_DEFAULTS = {f.name: f.default for f in fields(EngineParams)}
 
 DEFAULT = EngineParams()

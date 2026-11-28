@@ -1,4 +1,4 @@
-"""Unit tests of the phase 2b pieces: plane-island dropping, flat-roof junk absorption, spacing-corrected edge position."""
+"""Unit tests of the phase 2b pieces: plane-island dropping, flat-roof junk absorption."""
 
 import numpy as np
 from shapely.geometry import Polygon, box
@@ -6,7 +6,6 @@ from shapely.geometry import Polygon, box
 from roof_measure.engine.errors import Ctx
 from roof_measure.engine.grow import drop_islands
 from roof_measure.engine.junk import absorb_flat_junk
-from roof_measure.engine.outline import local_spacing
 from roof_measure.engine.params import DEFAULT
 
 PLANES = [np.array([0.0, 0.0, 3.0])]
@@ -70,16 +69,6 @@ def test_a_flat_facet_over_the_size_limit_stays():
     assert n == 0 and len(out) == 2
 
 
-def test_local_spacing_follows_the_point_density():
-    rng = np.random.default_rng(1)
-    sup = box(0, 0, 10, 8)
-    a, b = np.array([0.0, 0.0]), np.array([10.0, 0.0])
-    dense = np.c_[rng.uniform(0, 10, 1280), rng.uniform(0, 8, 1280), np.zeros(1280)]  # 16 pts/m2
-    thin = np.c_[rng.uniform(0, 10, 320), rng.uniform(0, 8, 320), np.zeros(320)]  # 4 pts/m2
-    assert abs(local_spacing(dense, sup, a, b, DEFAULT) - 0.25) < 0.03
-    assert abs(local_spacing(thin, sup, a, b, DEFAULT) - 0.5) < 0.06
-
-
 def test_a_sub_millimetre_pinch_does_not_become_a_self_intersecting_ring_in_the_result():
     """Rounding the ring to the millimetre folded a 0.4 mm pinch into a bow-tie (9 of 160 tuning houses had one)."""
     from roof_measure.engine.result_json import _ring
@@ -120,3 +109,36 @@ def test_flat_facets_merge_only_when_one_plane_keeps_the_fit():
     planes = [np.array([0.0, 0.0, 3.0]), np.array([0.15, 0.0, 3.0 - 0.75])]
     tilted = merge_flat_fitting(items, planes, _flat_pair_points(0.15), Ctx(DEFAULT, None))
     assert tilted[1] == 0 and len(tilted[0]) == 2
+
+
+def _overlap(items):
+    from shapely.ops import unary_union
+    return sum(g.area for _, g in items) - unary_union([g for _, g in items]).area
+
+
+def test_close_gaps_leaves_a_hairline_frame_round_the_facets_alone():
+    """Two facets tile a 10 x 8 m box, each shrunk by 2 mm: the gap is a 0.07 m2 frame round both (over
+    gap_close_min_m2, so 1e-6 would not reach the rule). Given to one facet, the frame's hole swallowed the other
+    (one tuning house: overlap 80% of the union). The facets must not overlap, and each keeps its own area."""
+    from shapely.geometry import box
+
+    from roof_measure.engine.cleanup import close_gaps
+
+    items = [[0, box(0, 0, 5, 8).buffer(-0.002, join_style=2)], [1, box(5, 0, 10, 8).buffer(-0.002, join_style=2)]]
+    out, _ = close_gaps(items, box(0, 0, 10, 8), DEFAULT)
+    assert _overlap(out) <= 1e-6
+    assert all(abs(g.area - 40.0) <= 0.1 for _, g in out)
+
+
+def test_close_gaps_refuses_a_merge_that_would_cover_another_facet():
+    """A channel that wraps round a small facet: giving it to the big neighbour would make the big facet cover the
+    small one (4 m2), far over gap_close_min_m2, so the merge is refused and the facets do not overlap."""
+    from shapely.geometry import box
+
+    from roof_measure.engine.cleanup import close_gaps
+
+    outline = box(0, 0, 10, 8)
+    small = box(3, 3, 5, 5)
+    big = outline.difference(box(2.8, 2.8, 5.2, 5.2))  # a 0.2 m channel round the small facet
+    out, _ = close_gaps([[0, big], [1, small]], outline, DEFAULT)
+    assert _overlap(out) <= 1e-6

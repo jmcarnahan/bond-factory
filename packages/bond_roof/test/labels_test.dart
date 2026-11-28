@@ -53,7 +53,7 @@ void main() {
       expect(l.legendRake, d.legendRake);
       expect(l.legendRidge, d.legendRidge);
       expect(l.legendHip, 'Limas');
-      expect(d.copyWith({'legend_hip': null, 'squares': ''}), d);
+      expect(d.copyWith({'legend_hip': null, 'pitch': ''}), d);
     });
 
     test('equality follows the text; copyWith applies overrides', () {
@@ -61,8 +61,8 @@ void main() {
       expect(es, isNot(const RoofLabels()));
       expect(es, RoofLabels.fromMap(spanishLabels));
       expect(es.hashCode, RoofLabels.fromMap(spanishLabels).hashCode);
-      expect(const RoofLabels().copyWith({'squares': 'Sq'}).squares, 'Sq');
-      expect(const RoofLabels().copyWith({'squares': 'Sq'}).facets, 'Facets');
+      expect(const RoofLabels().copyWith({'pitch': 'Slope'}).pitch, 'Slope');
+      expect(const RoofLabels().copyWith({'pitch': 'Slope'}).facets, 'Facets');
       expect(() => const RoofLabels()['nope'], throwsArgumentError);
     });
 
@@ -76,27 +76,48 @@ void main() {
       expect(RoofLabels.fromMap(spanishLabels).toMap(), spanishLabels);
     });
 
-    test('feetInches, pitchLabel and the n/a cell use the labels', () {
+    test('feetInches, pitchLabel and the area header use the labels', () {
       final es = RoofLabels.fromMap(spanishLabels);
       expect(feetInches(209.67), '209ft 8in');
       expect(feetInches(209.67, labels: es), '209pies 8pulg');
       expect(pitchLabel(0.2), 'Flat');
       expect(pitchLabel(0.2, labels: es), 'Plano');
-      final m = loadModels().first;
-      final enArea = sceneToSvg(AreaDiagram.build(m));
-      final esArea = sceneToSvg(AreaDiagram.build(m, labels: es));
-      expect(enArea, contains('>n/a<'));
-      expect(esArea, contains('>n/d<'));
-      expect(esArea, isNot(contains('>n/a<')));
+      final m = sampleModel();
+      expect(textsOf(AreaDiagram.build(m)), containsAll(['Total area', 'Pitch', 'Chimneys']));
+      final t = textsOf(AreaDiagram.build(m, labels: es));
+      expect(t, containsAll(['Área total', 'Pendiente', 'Chimeneas']));
+      expect(t, isNot(contains('Pitch')));
+    });
+
+    test('the new keys of 0.6 are all there and in English the owner\'s words', () {
+      const l = RoofLabels();
+      expect(l.legendStepFlashing, 'Sidewall flashing');
+      expect(l.legendWallFlashing, 'Headwall flashing');
+      expect([l.legendChimney, l.legendLantern, l.markChimney, l.markLantern], ['Chimney', 'Roof lantern', 'C', 'L']);
+      expect([l.totalsEaveRake, l.totalsExposedEdge, l.totalsRidgeHip], ['Eave + rake', 'Exposed edges inside the roof', 'Ridge + hip']);
+      expect([l.totalsSidewall, l.totalsHeadwall, l.totalsTransition, l.totalsChimneys],
+          ['Sidewall flashing', 'Headwall flashing', 'Transitions', 'Chimneys']);
+    });
+
+    test('the keys of removed totals and removed things are gone', () {
+      const gone = [
+        'legend_parapet', 'totals_priced_area', 'totals_as_drawn', 'predominant_pitch', 'predominant_pitch_area', 'two_story_area',
+        'two_layer_area', 'unspecified_pitch_area', 'variant_drip_edge_eave', 'variant_drip_edge_eave_rake',
+        'variant_ridge_cap_ridge', 'variant_ridge_cap_ridge_hip', 'verification', 'verdict_pass', 'verdict_adjusted', 'verdict_fail',
+        'verdict_unverified', 'edge_total', 'source_solar', 'solar_segments', 'method_lidar_agent', 'method_solar_agent',
+      ];
+      for (final k in gone) {
+        expect(RoofLabels.keys, isNot(contains(k)), reason: k);
+      }
     });
   });
 
   group('Spanish labels render every fixture in both layouts', () {
     final es = RoofLabels.fromMap(spanishLabels);
-    for (final f in loadFixtures()) {
+    for (final f in [(name: 'sample_0.6', json: sampleJson()['model'] as Map<String, dynamic>), ...loadOldFixtures()]) {
       for (final layout in ReportLayout.values) {
         test('${f.name} ${layout.name}', () {
-          final m = RoofModel.fromJson(f.json);
+          final m = RoofMeasurement.parseAny(f.json).model;
           final enLen = LengthDiagram.build(m, layout: layout);
           final enArea = AreaDiagram.build(m, layout: layout);
           final scenes = [
@@ -108,7 +129,8 @@ void main() {
             expectFits(s);
             expectWellFormedSvg(sceneToSvg(s));
           }
-          // Longer text must not push labels off the plan: numeric labels hide exactly as in English.
+          // Longer text must not push labels off the plan: numeric labels hide exactly as in English (the facet labels
+          // are numbers too, so they hide the same unless a longer legend moves the plan).
           expect(scenes[0].hiddenLabels, enLen.hiddenLabels);
           expect(scenes[1].hiddenLabels, enArea.hiddenLabels);
           if (layout == ReportLayout.wide) {
@@ -126,8 +148,10 @@ void main() {
             expect(_texts(scenes[0]), _texts(enLen), reason: 'same text count as English compact, modulo ellipsis');
           }
           final svg = sceneToSvg(scenes[0]);
-          expect(svg, contains('Aleros'));
-          expect(svg, contains(feetInches(m.totals.lengthsFt[EdgeType.eave]!, labels: es)));
+          if (m.edges.any((e) => e.type == EdgeType.eave)) {
+            expect(svg, contains('Aleros'));
+            expect(svg, contains(feetInches(RoofFigures.of(m).lengths[EdgeType.eave]!, labels: es)));
+          }
           expect(sceneToSvg(scenes[2]), contains('Fuente'));
           expect(sceneToSvg(scenes[2]), isNot(contains('>Source<')));
         });
@@ -135,7 +159,7 @@ void main() {
     }
 
     test('a Spanish report builds a PDF', () async {
-      final m = loadModels().first;
+      final m = sampleModel();
       final bytes = await scenesToPdf([
         LengthDiagram.build(m, labels: es),
         AreaDiagram.build(m, labels: es),

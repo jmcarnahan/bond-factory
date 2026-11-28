@@ -1,6 +1,5 @@
-"""The pipeline switch: ``measure(..., engine="planes")`` runs the plane engine end to end on synthetic data (footprint
-chain and LiDAR stood in by fakes), keeps the block path as the default and untouched, raises the block path's error
-codes, and never falls back to the blocks silently."""
+"""The pipeline: ``measure(...)`` runs the plane engine end to end on synthetic data (footprint chain and LiDAR stood in
+by fakes), raises the job error codes, and never falls back to another engine."""
 
 from __future__ import annotations
 
@@ -13,11 +12,11 @@ from engine_cases import case
 from shapely import affinity
 from shapely.geometry import Polygon
 
-from roof_measure import cache, footprint, lidar, lot, normalize, pipeline, pipeline_engine
-from roof_measure.deadline import Deadline
+from roof_measure import cache, footprint, lidar
 from roof_measure.footprint_types import Footprint, FootprintError
 from roof_measure.frame import project_geometry
 from roof_measure.library import MeasureError, measure
+from roof_measure.model import TOTALS_KEYS
 from roof_measure.version import PIPELINE_VERSION
 
 EPSG = 32611
@@ -106,7 +105,7 @@ def world(monkeypatch):
 
 def run(w: World, tmp_path, **kw):
     lat, lng = w.point()
-    args = {"method": "auto", "verify": False, "cache_dir": tmp_path / "cache", "isolate": False, "engine": "planes"}
+    args = {"cache_dir": tmp_path / "cache", "isolate": False}
     return measure(ADDR, lat=lat, lng=lng, **(args | kw))
 
 
@@ -114,8 +113,8 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     w = world(main="flat_pitched_step_d8")
     stages: list[str] = []
     env = run(w, tmp_path, on_stage=stages.append)
-    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.5.1"
-    assert env["method_used"] == "lidar_skeleton" and env["footprint_source"] == "lariac"
+    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.6.0"
+    assert env["method_used"] == "planes" and env["footprint_source"] == "lariac"
     assert env["verification"]["verdict"] == "unverified"
     m, t = env["model"], env["totals"]
     from roof_measure.engine.params import DEFAULT
@@ -124,12 +123,11 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     assert m["quality"]["engine_params"] == DEFAULT.stable_hash() and "tree_cover_pct" in m["quality"] and "fit_clear" in m["quality"]
     assert m["source"]["building"]["parcel_id"] == "P1" and m["source"]["building"]["outline_id"] == "B1"
     assert m["source"]["lidar"]["density_per_m2"] >= 6 and m["source"]["footprint"]["provider"].startswith("lacounty")
-    for k in ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft",
-              "roofing_flat_sqft", "roofing_pitched_sqft", "area_sqft_wall_line", "area_sqft_roof_edge", "complexity"):
-        assert k in t, k
-    assert t["roofing_flat_sqft"] > 100 and t["roofing_pitched_sqft"] > 100
-    assert t["area_sqft_wall_line"] <= t["planes_surface_area_sqft"] <= t["area_sqft_roof_edge"]
-    assert m["totals"]["lengths_ft"]["level_change"] > 0 and m["planes"] and "model_from_planes" not in env["warning_codes"]
+    assert tuple(t) == TOTALS_KEYS and m["objects"] == []
+    assert t["roofing_flat_sqft"] > 100 and t["roofing_pitched_sqft"] > 100 and t["area_sqft"] == t["area_sqft_roof_edge"]
+    # a pitched roof draining into the higher flat deck's wall: sidewall flashing
+    assert t["level_change_ft"] + t["step_flashing_ft"] + t["wall_flashing_ft"] > 0
+    assert m["planes"] and "model_from_planes" not in env["warning_codes"]
     assert "lidar" in stages and "model" in stages and "blocks" not in stages
     json.dumps(env, allow_nan=False)
 
@@ -152,17 +150,6 @@ def test_the_work_dir_keeps_the_model_and_the_engine_result(world, tmp_path):
     run(w, tmp_path, work_dir=work)
     files = sorted(p.name for p in work.iterdir())
     assert any(f.endswith("_model.json") for f in files) and any(f.endswith("_engine.json") for f in files)
-
-
-def test_the_block_path_is_the_default_and_the_engine_is_not_touched(monkeypatch, tmp_path):
-    monkeypatch.setattr(pipeline_engine, "run_planes", lambda *a, **k: pytest.fail("the engine ran by default"))
-    from conftest import FIXTURES
-
-    env = measure(ADDR, method="lidar_skeleton", verify=False, cache_dir=tmp_path / "c", blocks_path=FIXTURES / "site1_blocks.json",
-                  isolate=False)
-    q = env["model"].get("quality") or {}
-    assert "engine" not in q and set(env["model"]["totals"]["lengths_ft"]) == {
-        "eave", "rake", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "parapet", "transition", "unspecified"}
 
 
 def test_low_density_becomes_a_warning_with_its_code(world, tmp_path):
@@ -198,7 +185,7 @@ def test_a_borderline_low_slope_roof_gets_the_low_slope_confirm_warning(world, t
     assert "low_slope_confirm" not in clean["warning_codes"] and clean["totals"]["low_slope_confirm_sqft"] == 0
 
 
-def test_under_four_points_per_m2_is_refused_with_the_block_paths_code(world, tmp_path):
+def test_under_four_points_per_m2_is_refused_with_lidar_too_sparse(world, tmp_path):
     w = world(main="gable_d16", thin=5)  # about 3 per m2
     with pytest.raises(MeasureError) as ei:
         run(w, tmp_path)
@@ -227,13 +214,10 @@ def test_no_footprint_and_an_expired_deadline_keep_their_codes(world, monkeypatc
     assert ei.value.code == "timeout"
 
 
-def test_an_engine_failure_is_measurement_failed_and_never_falls_back_to_the_blocks(world, monkeypatch, tmp_path):
-    from roof_measure import blocks, classify
+def test_an_engine_failure_is_measurement_failed(world, monkeypatch, tmp_path):
     from roof_measure.engine import errors as eng_errors
 
     w = world()
-    monkeypatch.setattr(blocks, "segment_blocks", lambda *a, **k: pytest.fail("fell back to the blocks"))
-    monkeypatch.setattr(classify, "classify_blocks", lambda *a, **k: pytest.fail("fell back to the blocks"))
     import roof_measure.engine as engine_pkg
 
     def boom(*a, **k):
@@ -257,61 +241,6 @@ def test_an_engine_refusal_is_reported_not_swallowed(world, monkeypatch, tmp_pat
     assert ei.value.code == "no_lidar_coverage"
 
 
-def test_arguments_the_engine_cannot_serve_are_refused_up_front(tmp_path):
-    kw = {"cache_dir": tmp_path / "c", "isolate": False, "lat": 1.0, "lng": 2.0}
-    with pytest.raises(ValueError, match="engine must be one of"):
-        measure(ADDR, engine="skeleton", **kw)
-    with pytest.raises(ValueError, match="live LiDAR"):
-        measure(ADDR, engine="planes", method="lidar_agent", **kw)
-    with pytest.raises(ValueError, match="live LiDAR"):
-        measure(ADDR, engine="planes", method="solar_agent", **kw)
-    f = tmp_path / "b.json"
-    f.write_text("{}")
-    with pytest.raises(ValueError, match="live LiDAR"):
-        measure(ADDR, engine="planes", blocks_path=f, **kw)
-    with pytest.raises(pipeline.PipelineError):
-        pipeline.run_pipeline(ADDR, tmp_path, "lidar_agent", engine="planes")
-
-
-def test_the_engine_travels_to_the_child_process(monkeypatch, tmp_path):
-    from roof_measure import _isolate
-
-    seen = []
-    monkeypatch.setattr(_isolate, "run_isolated", lambda req, on_stage, grace: seen.append(req) or {"ok": True})
-    measure(ADDR, lat=1.0, lng=2.0, cache_dir=tmp_path / "c", engine="planes")
-    measure(ADDR, lat=1.0, lng=2.0, cache_dir=tmp_path / "c")
-    assert [r["engine"] for r in seen] == ["planes", "blocks"]
-
-
-def test_the_result_cache_key_depends_on_the_engine_and_only_then():
-    base = {"normalized_address": "A", "lat": None, "lng": None, "method": "auto", "verify": True,
-            "pipeline_version": PIPELINE_VERSION, "solar_key": False, "anthropic_key": False}
-    blocks = normalize.cache_key(**base)
-    assert blocks == normalize.cache_key(**base, engine="blocks")
-    assert blocks == __import__("hashlib").sha256(json.dumps(["A", "auto", True, PIPELINE_VERSION, False, False]).encode()).hexdigest()
-    planes = normalize.cache_key(**base, engine="planes", engine_params="a" * 64)
-    assert planes != blocks and planes != normalize.cache_key(**base, engine="planes", engine_params="b" * 64)
-    from roof_measure.engine.params import DEFAULT
-
-    assert planes != normalize.cache_key(**base, engine="planes", engine_params=DEFAULT.stable_hash())
-    from roof_measure import keys
-
-    req = {"address": "A", "method": "auto", "verify": True, "lat": 1.0, "lng": 2.0}
-    assert keys.request_key(req) != keys.request_key({**req, "engine": "planes"})
-    assert keys.request_key(req) == keys.request_key({**req, "engine": "blocks"})
-
-
-def test_the_service_request_accepts_the_engine_and_rejects_others():
-    from pydantic import ValidationError
-
-    from roof_measure.api import MeasureRequest
-
-    assert MeasureRequest(address="x").engine == "blocks"
-    assert MeasureRequest(address="x", engine="planes").engine == "planes"
-    with pytest.raises(ValidationError):
-        MeasureRequest(address="x", engine="magic")
-
-
 # ----------------------------------------------------------------------------- the other buildings on the lot
 def test_other_buildings_are_measured_with_the_same_engine(world, tmp_path):
     w = world(main="gable_d8", other="flat_d8")
@@ -331,82 +260,14 @@ def test_an_other_building_that_cannot_be_measured_fails_alone(world, tmp_path):
     assert env["model"]["quality"]["engine"] == "planes/1"
 
 
-def test_lot_measure_one_defaults_to_the_block_path(monkeypatch, tmp_path):
-    monkeypatch.setattr(pipeline_engine, "run_planes_outline", lambda *a, **k: pytest.fail("engine used by default"))
-    c = lot.Candidate(Polygon([(0, 0), (1, 0), (1, 1)]), "lacounty_lariac_2020", "B2", 424.0)
-    out = lot.measure_one(1, c, {"epsg": EPSG, "x0_m": 0.0, "y0_m": 0.0}, {"formatted": "x"}, tmp_path,
-                          Deadline.after(5), builder=lambda *a: (_ for _ in ()).throw(RuntimeError("stop")))
-    assert out["status"] == "failed"
-
-
-# ----------------------------------------------------------------------------- the verifier
-def test_the_plane_engine_never_calls_the_llm_verifier_or_the_api(world, monkeypatch, tmp_path):
-    import roof_measure.verify as verify_mod
-
-    def boom(*a, **k):
-        raise AssertionError("the verifier or the Anthropic client was called")
-    monkeypatch.setattr(verify_mod, "verify", boom)
-    monkeypatch.setattr(pipeline, "_verify", boom)
-    anthropic = pytest.importorskip("anthropic")
-    monkeypatch.setattr(anthropic, "Anthropic", boom)
+# ----------------------------------------------------------------------------- the removed arguments
+def test_no_verifier_runs(world, tmp_path):
     w = world()
-    env = run(w, tmp_path, verify=True, anthropic_api_key="sk-not-a-real-key")
+    env = run(w, tmp_path)
     assert env["verification"]["verdict"] == "unverified" and env["verification"]["skipped"] == "engine"
     assert env["verification"]["rounds"] == 0 and env["verification"]["usage"] == {"input_tokens": 0, "output_tokens": 0}
     assert "verifier_unverified" not in env["warning_codes"]  # nothing was meant to verify an engine result
-
-
-def test_a_verifier_api_failure_on_the_block_path_degrades_to_unverified(monkeypatch, tmp_path):
-    from conftest import FIXTURES
-
-    import roof_measure.verify as verify_mod
-
-    def limit(*a, **k):
-        raise RuntimeError("invalid_request_error: You have reached your specified API usage limits")
-    monkeypatch.setattr(verify_mod, "verify", limit)
-    env = measure(ADDR, method="lidar_skeleton", verify=True, anthropic_api_key="sk-not-a-real-key",
-                  cache_dir=tmp_path / "c", blocks_path=FIXTURES / "site1_blocks.json", isolate=False)
-    assert env["verification"]["verdict"] == "unverified" and "could not run" in env["verification"]["notes"][0]
-    assert "verifier_unverified" in env["warning_codes"] and env["model"]["facets"]
-
-
-# ----------------------------------------------------------------------------- the job service
-def test_the_job_service_runs_engine_planes_and_keeps_engine_results_apart(world, tmp_path):
-    from fastapi.testclient import TestClient
-    from test_jobs_api import wait
-
-    from roof_measure import api
-    from roof_measure.settings import Settings
-
-    w = world()
-    lat, lng = w.point()
-    token = "t" * 32
-    app = api.create_app(Settings(data_dir=tmp_path, debug=False), token=token)  # the real runner, fakes underneath
-    client = TestClient(app, headers={"Authorization": f"Bearer {token}"})
-    body = {"address": ADDR, "lat": lat, "lng": lng, "method": "auto", "verify": False, "engine": "planes"}
-    job = client.post("/v1/measurements", json=body)
-    assert job.status_code in (200, 202), job.text
-    done = wait(client, job.json()["id"], secs=60)
-    assert done["status"] == "done", done
-    env = done["result"]
-    assert env["model"]["quality"]["engine"] == "planes/1" and env["pipeline_version"] == PIPELINE_VERSION
-    assert env["verification"]["skipped"] == "engine" and "verifier_unverified" not in env["warning_codes"]
-    from roof_measure import keys
-
-    req = {**body, "engine": "blocks"}
-    assert keys.request_key(body) != keys.request_key(req)
-    assert client.post("/v1/measurements", json={**body, "engine": "nope"}).status_code == 422
-
-
-def test_the_request_key_follows_the_engine_parameters(monkeypatch):
-    from roof_measure import keys
-    from roof_measure.engine import params
-
-    req = {"address": "A", "method": "auto", "verify": False, "lat": 1.0, "lng": 2.0, "engine": "planes"}
-    before = keys.request_key(req)
-    monkeypatch.setattr(params, "DEFAULT", params.DEFAULT.replace(fit_floor=0.5))
-    assert keys.request_key(req) != before
-    assert keys.request_key({**req, "engine": "blocks"}) == keys.request_key({**req, "engine": "blocks"})
+    assert env["model"]["quality"]["engine"] == "planes/1"
 
 
 def test_model_origin_carries_the_epsg_and_projects_back_to_the_frame_origin(world, tmp_path):
@@ -421,3 +282,23 @@ def test_model_origin_carries_the_epsg_and_projects_back_to_the_frame_origin(wor
     x, y = Transformer.from_crs(4326, o["epsg"], always_xy=True).transform(o["lng"], o["lat"])
     minx, miny, _, _ = w.main_wall.bounds
     assert abs(x - minx) < 0.01 and abs(y - miny) < 0.01
+
+
+def test_a_failing_object_finder_leaves_the_measurement_standing_and_says_the_count_is_unknown(world, tmp_path, monkeypatch):
+    from roof_measure.engine import finish
+
+    def boom(*a, **k):
+        raise RuntimeError("synthetic failure")
+
+    w = world(main="flat_pitched_step_d8")
+    good = run(w, tmp_path / "ok")
+    monkeypatch.setattr(finish, "find_objects", boom)
+    env = run(w, tmp_path / "bad")
+    assert env["model"]["objects"] == [] and env["totals"]["chimney_count"] == env["totals"]["lantern_count"] == 0
+    assert "objects_failed" in env["warning_codes"] and "objects_failed" not in good["warning_codes"]
+    assert env["totals"]["area_sqft"] == good["totals"]["area_sqft"] and len(env["model"]["facets"]) == len(good["model"]["facets"])
+
+
+def test_the_envelope_totals_are_exactly_the_contract_keys_of_model_totals(world, tmp_path):
+    env = run(world(main="complex_hip_d8"), tmp_path)
+    assert env["totals"] == {k: env["model"]["totals"][k] for k in TOTALS_KEYS}

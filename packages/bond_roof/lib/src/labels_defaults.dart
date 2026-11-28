@@ -1,19 +1,23 @@
 /// English defaults for every [RoofLabels] key. Templates use `{name}` placeholders.
 const Map<String, String> roofLabelDefaults = {
-  // Legend names, one per edge type.
+  // Legend names, one per edge type, then one per kind of object on the roof.
   'legend_eave': 'Eaves',
   'legend_rake': 'Rakes',
   'legend_ridge': 'Ridges',
   'legend_hip': 'Hips',
   'legend_valley': 'Valleys',
-  'legend_step_flashing': 'Step flashing',
-  'legend_wall_flashing': 'Wall flashing',
-  'legend_parapet': 'Parapet walls',
+  'legend_step_flashing': 'Sidewall flashing',
+  'legend_wall_flashing': 'Headwall flashing',
   'legend_transition': 'Transitions',
   'legend_unspecified': 'Unspecified',
   'legend_flat_edge': 'Flat roof edges',
   'legend_level_change': 'Level changes',
   'legend_flat_seam': 'Flat roof seams',
+  'legend_chimney': 'Chimney',
+  'legend_lantern': 'Roof lantern',
+  // The one-letter mark drawn on a chimney and on a lantern.
+  'mark_chimney': 'C',
+  'mark_lantern': 'L',
   // Diagram titles and captions.
   'length_title': 'Roof length diagram',
   'length_caption': 'Length diagram',
@@ -22,33 +26,26 @@ const Map<String, String> roofLabelDefaults = {
   'summary_caption': 'Roof measurement summary',
   'summary_page_title': 'Summary',
   'address_missing': 'Address not given',
-  // Figures (summary block, area header, totals table).
+  // Figures (summary block, area header, totals table). Each length row exists only when the roof has it.
   'total_area': 'Total area',
-  'squares': 'Squares',
-  'pitched_area': 'Pitched area',
-  'flat_area': 'Flat area',
-  'predominant_pitch': 'Predominant pitch',
+  'pitch': 'Pitch',
   'facets': 'Facets',
-  'edge_total': 'Edge total',
   'confidence': 'Confidence',
-  'total_pitched_area': 'Total pitched area',
-  'total_flat_area': 'Total flat area',
-  'predominant_pitch_area': 'Predominant pitch area',
-  'two_story_area': 'Two-story area',
-  'two_layer_area': 'Two-layer area',
-  'unspecified_pitch_area': 'Unspecified pitch area',
-  'not_available': 'n/a',
   'pitch_flat': 'Flat',
-  // Envelope 0.4: flat and pitched roofing, low slope marker, level change. {ft} is a feet-and-inches length.
   'low_slope_marker': 'Low slope',
-  'level_change_jump': 'Step {ft}',
   // A level change's label: its length, then the jump when it is 3 ft or more. {len} is the bare whole-feet length like every edge label, {jump} the step with its unit, e.g. "24, 5 ft step".
   'level_change_step': '{len}, {jump} step',
   'totals_roofing_pitched': 'Pitched roofing',
   'totals_roofing_flat': 'Flat roofing',
   'totals_low_slope_confirm': 'Low slope, confirm',
-  'totals_priced_area': 'Total roofing area',
-  'totals_as_drawn': 'As drawn (to the roof edge)',
+  'totals_eave_rake': 'Eave + rake',
+  'totals_exposed_edge': 'Exposed edges inside the roof',
+  'totals_ridge_hip': 'Ridge + hip',
+  'totals_sidewall': 'Sidewall flashing',
+  'totals_headwall': 'Headwall flashing',
+  'totals_transition': 'Transitions',
+  'totals_chimneys': 'Chimneys',
+  'totals_lanterns': 'Roof lanterns',
   // Units.
   'unit_ft': 'ft',
   'unit_in': 'in',
@@ -62,16 +59,10 @@ const Map<String, String> roofLabelDefaults = {
   'footprint_area': '{area} sq ft',
   'source_lidar': 'LiDAR: {project}, acquired {date}',
   'lidar_points': '{n} points on the roof',
-  'source_solar': 'Solar imagery: {date}, quality {quality}',
-  'solar_segments': '{n} segments',
   'model_generated': 'Model generated: {date}',
   'unknown': 'unknown',
-  // Method names.
+  // Method name (the plane engine and the older LiDAR path both read this way).
   'method_lidar_skeleton': 'LiDAR point cloud + building footprint',
-  'method_lidar_agent': 'LiDAR point cloud + agent',
-  'method_solar_agent': 'Google Solar data + agent',
-  'method_manual': 'Manual digitisation',
-  'method_fixture': 'Test fixture',
   // Headings. {items} is a comma separated list.
   'confidence_notes_heading': 'Confidence notes',
   'warnings': 'Warnings',
@@ -80,8 +71,7 @@ const Map<String, String> roofLabelDefaults = {
   // Footers, compass, PDF.
   'footer_length': 'Measurements in diagram are rounded for display. '
       'Some edge lengths may be hidden to avoid overcrowding.',
-  'footer_area': 'Areas in diagram are rounded to the nearest square foot for display. '
-      'Pitch is rounded to the nearest half.',
+  'footer_area': 'Areas in diagram are rounded to the nearest square foot for display.',
   'compass_north': 'N',
   'pdf_title': 'Roof measurement report',
   // Actions and inline status. {error} is the failure text.
@@ -95,16 +85,7 @@ const Map<String, String> roofLabelDefaults = {
   'status_sharing_pdf': 'Opening share...',
   'status_shared': 'PDF shared.',
   'status_failed': 'Failed: {error}',
-  // Totals table: paired variants, verification, timestamps.
+  // Totals table.
   'totals_heading': 'Totals',
-  'variant_drip_edge_eave': 'Drip edge (eave only)',
-  'variant_drip_edge_eave_rake': 'Drip edge (eave + rake)',
-  'variant_ridge_cap_ridge': 'Ridge cap (ridge only)',
-  'variant_ridge_cap_ridge_hip': 'Ridge cap (ridge + hip)',
-  'verification': 'Verification',
-  'verdict_pass': 'Verified',
-  'verdict_adjusted': 'Adjusted after review',
-  'verdict_fail': 'Failed verification',
-  'verdict_unverified': 'Not verified',
   'generated': 'Generated',
 };

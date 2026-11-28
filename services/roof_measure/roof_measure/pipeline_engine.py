@@ -1,10 +1,8 @@
-"""The pipeline with ``engine="planes"``: address -> footprint -> LiDAR -> plane engine -> model -> 0.2 envelope.
+"""The pipeline: address -> footprint -> LiDAR -> plane engine -> model -> 0.2 envelope.
 
-Same stages, same errors and same envelope as the block pipeline; only the modelling step differs. There is no silent
-fallback to the block path (a fallback would hide a failure): when the engine refuses or fails, the caller gets the
-error code the block path would have given (``lidar_too_sparse``, ``no_footprint``, ``timeout``,
-``measurement_failed``) and chooses the engine itself. The verifier and the agents do not apply: the diagram comes
-straight from the measured planes and is labelled unverified.
+There is no fallback to another engine (a fallback would hide a failure): when the engine refuses or fails, the caller
+gets an error code (``lidar_too_sparse``, ``no_footprint``, ``timeout``, ``measurement_failed``). No verifier runs: the
+diagram comes straight from the measured planes and is labelled unverified.
 """
 
 from __future__ import annotations
@@ -15,20 +13,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .classify import BlockSet
+from .blockset import BlockSet
 from .deadline import Deadline, DeadlineExceeded
 from .envelope import build_envelope
 from .lidar import MIN_ROOF_DENSITY, LidarError, LidarTooSparse
 from .model import write_model
 from .pipeline_notes import collect_warnings
+from .pipeline_result import PipelineResult, no_verification
 from .text import slug
 
 log = logging.getLogger("roof_measure.pipeline_engine")
 
-ENGINES = ("blocks", "planes")
-METHOD = "lidar_skeleton"  # the validated method name an engine result carries (see model.METHODS)
-MIN_HAG_M = 1.5  # a return lower than this above local ground is a car, a bush or the ground (as blocks.MIN_HAG_M)
-MAX_OVERHANG_M = 0.6  # roof returns kept this far past the footprint (blocks.OVERHANG_M); the engine's data was cut the same way
+METHOD = "planes"  # the method name an engine result carries (see model.METHODS)
+MIN_HAG_M = 1.5  # a return lower than this above local ground is a car, a bush or the ground
+MAX_OVERHANG_M = 0.6  # roof returns kept this far past the footprint; the engine's data was cut the same way
 CONTEXT_RING_M = 8.0  # the wider cloud handed to the engine's ring signal
 
 
@@ -38,6 +36,7 @@ def _warning_text(code: str, res: Any, low_slope_sqft: float = 0.0) -> str:
             "outline_mismatch": "The roof points do not match the building outline closely; the outline may be a different "
                                 "building or a different roof.",
             "poor_fit": "The measured planes fit the roof points poorly; the diagram may be rough.",
+            "objects_failed": "The chimneys and lanterns on this roof could not be looked for: their count is unknown, not zero.",
             "low_slope_confirm": f"About {low_slope_sqft:.0f} sq ft of the roof is close to flat (about 2/12): "
                                  "confirm the roof type at the site."}[code]
 
@@ -45,6 +44,8 @@ def _warning_text(code: str, res: Any, low_slope_sqft: float = 0.0) -> str:
 def engine_warnings(res: Any) -> list[tuple[str, str]]:
     """(code, text) for the verdict reasons the engine raised and for borderline low-slope facets."""
     out = [(c, _warning_text(c, res)) for c in res.quality.reasons if c in ("low_density", "outline_mismatch", "poor_fit")]
+    if res.diagnostics.get("objects_error"):
+        out.append(("objects_failed", _warning_text("objects_failed", res)))
     low = float(res.totals.get("low_slope_confirm_sqft") or 0.0)
     if low > 0:
         out.append(("low_slope_confirm", _warning_text("low_slope_confirm", res, low)))
@@ -55,8 +56,7 @@ def measure_points(points: Any, fp_m: Any, frame: Any, base: BlockSet, *, deadli
                    params: Any = None, parcel_match: str | None = None) -> tuple[Any, float, dict[str, Any]]:
     """Run the engine on one building. Returns ``(EngineResult, ground_z_m, lidar meta)``.
 
-    ``points`` is the LiDAR ``PointCloud`` in ``frame.epsg``, ``fp_m`` the footprint in the same CRS. Raises the block
-    path's errors: ``LidarTooSparse`` under 4 points/m2 on the roof, ``DeadlineExceeded``, ``FootprintError``.
+    ``points`` is the LiDAR ``PointCloud`` in ``frame.epsg``, ``fp_m`` the footprint in the same CRS. Raises ``LidarTooSparse`` under 4 points/m2 on the roof, ``DeadlineExceeded``, ``FootprintError``.
     """
     import numpy as np
     from shapely import affinity
@@ -72,7 +72,7 @@ def measure_points(points: Any, fp_m: Any, frame: Any, base: BlockSet, *, deadli
     fpl = orient(affinity.translate(fp_m, -frame.x0_m, -frame.y0_m), 1.0)
     xyzc = np.column_stack([np.asarray(points.x) - frame.x0_m, np.asarray(points.y) - frame.y0_m,
                             np.asarray(points.z), np.asarray(points.classification)])
-    # the same reach the block segmenter and the regression data use: min(0.6 m, 8% of the footprint's side). A wider reach
+    # the same reach the regression data uses: min(0.6 m, 8% of the footprint's side). A wider reach
     # (an earlier 1.3 m) pulled trees and the neighbour's wall into the planes and wrecked roofs the harness measured fine.
     reach = min(MAX_OVERHANG_M, 0.08 * float(np.sqrt(fpl.area)))
     rp = roof_points(xyzc, fpl, overhang_m=reach, min_height_m=MIN_HAG_M)
@@ -109,29 +109,22 @@ def measure_points(points: Any, fp_m: Any, frame: Any, base: BlockSet, *, deadli
 
 
 def build_result(res: Any, ground_z: float, lidar_meta: dict[str, Any], base: BlockSet, fpinfo: dict[str, Any],
-                 out: Path, tag: str, params: Any = None, extra_notes: list[str] | None = None,
-                 hints: dict[str, Any] | None = None) -> Any:
+                 out: Path, tag: str, params: Any = None, extra_notes: list[str] | None = None) -> Any:
     """Model, assessment and envelope of an engine result; writes ``<tag>_model.json`` and ``<tag>_engine.json``."""
     import json
 
     from .engine.adapter import engine_model
-    from .pipeline import PipelineResult, _no_verification
     from .quality import assess_engine
 
     base.lidar = lidar_meta
     model = engine_model(res, base, ground_z, {"method": METHOD}, params or _default_params(), extra_notes)
     if fpinfo.get("building"):  # contract 0.4: which building was measured
         model.setdefault("source", {})["building"] = fpinfo["building"]
-    if hints:  # the answers this measurement was made with (present only when given)
-        model.setdefault("source", {})["hints"] = dict(hints)
-    # the LLM verifier never runs on the engine path, whatever ``verify`` says: it only checks edge-sum arithmetic and
-    # passed a wrong roof; the engine's own signals and verdict replace it. ``skipped`` tells readers it was not tried.
-    verification = {**_no_verification(model, "The diagram comes straight from the measured planes; the verifier "
-                                              "does not run on it."), "skipped": "engine"}
+    # no verifier exists: the engine's own signals and verdict (model.quality) replace it. ``skipped`` tells readers it was not tried.
+    verification = {**no_verification("The diagram comes straight from the measured planes; there is no verifier."),
+                    "skipped": "engine"}
     density = lidar_meta["density_per_m2"]
-    warnings, codes = collect_warnings(model, fpinfo, verification, density, None, METHOD, engine_warnings(res))
-    keep = [i for i, c in enumerate(codes) if c != "verifier_unverified"]  # nothing was meant to verify an engine result
-    warnings, codes = [warnings[i] for i in keep], [codes[i] for i in keep]
+    warnings, codes = collect_warnings(model, fpinfo, density, engine_warnings(res))
     assessment = assess_engine(res, model, codes)
     envelope = build_envelope(model, method_used=METHOD, footprint_source=fpinfo["source"], verification=verification,
                               warnings=warnings, warning_codes=codes, density_pts_m2=density, assessment=assessment)
@@ -154,9 +147,8 @@ def _default_params() -> Any:
 
 def run_planes(address: str, out_dir: str | Path, *, deadline: Deadline | None, lat_lng: tuple[float, float] | None,
                on_stage: Callable[[str], None], building_outline_id: str | None = None, pinned: bool = True,
-               params: Any = None, points_path: str | Path | None = None,
-               hints: dict[str, Any] | None = None) -> Any:
-    """The whole pipeline for one address with the plane engine (``run_pipeline(..., engine="planes")``)."""
+               params: Any = None, points_path: str | Path | None = None) -> Any:
+    """The whole pipeline for one address with the plane engine (``run_pipeline``)."""
     from . import cache
     from .pipeline_stages import _stage_points, _stage_points_dir
 
@@ -174,7 +166,7 @@ def run_planes(address: str, out_dir: str | Path, *, deadline: Deadline | None, 
     on_stage("model")
     res, ground_z, lidar_meta = measure_points(points, fp_m, frame, base, deadline=deadline, params=params,
                                                parcel_match=fpinfo.get("match"))
-    result = build_result(res, ground_z, lidar_meta, base, fpinfo, Path(out_dir), slug(address), params, hints=hints)
+    result = build_result(res, ground_z, lidar_meta, base, fpinfo, Path(out_dir), slug(address), params)
     log.info("planes pipeline done verdict=%s facets=%d ms=%d", res.quality.verdict, len(res.facets),
              int((time.monotonic() - started) * 1000))
     return result

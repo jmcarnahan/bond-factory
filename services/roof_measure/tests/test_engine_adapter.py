@@ -11,18 +11,18 @@ import pytest
 from engine_cases import _cases, case, run
 from shapely.geometry import Polygon
 
-from roof_measure.classify import BlockSet
+from roof_measure.blockset import BlockSet
 from roof_measure.engine import adapter, synth_points
 from roof_measure.engine.load import roof_points_from_arrays
 from roof_measure.envelope import WARNING_CODES, build_envelope
-from roof_measure.model import CORE_EDGE_TYPES, EDGE_TYPES, ModelError, _totals, validate
+from roof_measure.model import CORE_EDGE_TYPES, EDGE_TYPES, TOTALS_KEYS, ModelError, validate
 from roof_measure.quality import assess_engine
 
 FT = 1 / 0.3048
+STEPS = ("level_change", "step_flashing", "wall_flashing")
 SHAPES = [n for n in _cases() if n.endswith("_d8")]
 KNOWN_GEOMETRY_LIMIT = {
-    "complex_hip_d8": "a 20-facet roof: the partition (not the adapter) misses valley and hip length",
-    "dutch_gable_d8": "the partition leaves a 4 ft sliver of rake beside the small gable (engine geometry, not typing)"}
+    "complex_hip_d8": "a 20-facet roof: the partition (not the adapter) misses valley and hip length"}
 
 
 def base() -> BlockSet:
@@ -54,35 +54,30 @@ def test_every_shape_becomes_a_valid_model_with_finite_totals(name):
     for f in model["facets"]:
         assert {"roof_type", "pitch_fit", "pitch_sigma", "borderline", "supported_pct", "points", "rms_ft", "plane_eq"} <= set(f)
         assert (f["kind"] == "flat") == (f["pitch_rise"] < 0.5) and (f["aspect_deg"] is None) == (f["kind"] == "flat")
-    t = adapter.engine_totals(res)
-    assert finite(t)
-    json.dumps({"model": model, "totals": t}, allow_nan=False)
+    assert finite(model["totals"]) and model["objects"] == res.objects
+    json.dumps(model, allow_nan=False)
 
 
 @pytest.mark.parametrize("name", SHAPES)
-def test_the_cost_sheet_keys_are_present_priced_and_consistent(name):
+def test_the_totals_are_the_contract_keys_and_each_is_the_sum_of_the_model(name):
     model, res = model_of(name)
-    t = adapter.engine_totals(res)
-    for k in ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft"):
-        assert isinstance(t[k], (int, float)) and math.isfinite(t[k]), k
-    drawn = model["totals"]["total_area_sqft"]
-    assert t["area_sqft_roof_edge"] == pytest.approx(drawn, abs=0.2)  # the drawn (measured roof edge) area
-    assert t["area_sqft_wall_line"] - 0.5 <= t["planes_surface_area_sqft"] <= t["area_sqft_roof_edge"] + 0.5  # priced between
-    assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["planes_surface_area_sqft"], abs=0.2)
-    assert t["roofing_pitched_squares"] + t["roofing_flat_squares"] == pytest.approx(t["planes_surface_area_sqft"] / 100, abs=0.03)
-    lengths = model["totals"]["lengths_ft"]
-    assert t["flat_edge_ft"] == pytest.approx(lengths["flat_edge"], rel=0.05, abs=2.0)
-    if name not in KNOWN_GEOMETRY_LIMIT:  # the priced clip trims what the partition got wrong on those two
-        assert t["level_change_ft"] == pytest.approx(lengths["level_change"], rel=0.05, abs=2.0)
-    assert t["ridge_cap_ridge_hip_ft"] == pytest.approx(lengths["ridge"] + lengths["hip"], rel=0.08, abs=2.0)
-    perimeter = lengths["eave"] + lengths["rake"] + lengths["flat_edge"]
-    assert t["outline_perimeter_ft"] <= perimeter + 0.5 and t["outline_perimeter_ft"] >= 0.85 * perimeter  # priced edge
-    assert set(t["complexity"]) == {"facets", "hip_valley_ft_per_square", "hint"} and t["complexity"]["hint"] in ("simple", "cut_up")
-    assert t["plane_count"] == len(model["facets"])
+    mt = model["totals"]
+    t = {k: mt[k] for k in TOTALS_KEYS}  # model.totals carries every contract key (plus the model-only shape keys)
+    assert all(isinstance(v, (int, float)) and math.isfinite(v) for v in t.values())
+    # one function, one answer: the model adds up ITS rows; the engine's own totals differ only where the adapter removed a
+    # spike or collapsed a sliver (a few hundredths of a square foot per facet), so each key is within 0.1 (the largest gap over the 45 measured synthetic cases is 0.1: one rounding step of area_sqft)
+    assert all(t[k] == pytest.approx(res.totals[k], abs=0.1) for k in TOTALS_KEYS), {k: (t[k], res.totals[k]) for k in TOTALS_KEYS}
+    assert t["area_sqft_roof_edge"] == t["area_sqft"] == mt["total_area_sqft"]  # one roof, one area
+    assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["area_sqft"], abs=0.2)
+    lengths = mt["lengths_ft"]
+    for k in ("eave", "rake", "ridge", "hip", "valley", "flat_edge", "level_change", "step_flashing", "wall_flashing", "transition"):
+        assert t[f"{k}_ft"] == pytest.approx(lengths[k], abs=0.06), k  # every length is the sum of its edges
+    assert t["ridge_hip_ft"] == pytest.approx(t["ridge_ft"] + t["hip_ft"], abs=0.02)
+    assert t["exposed_edge_ft"] == pytest.approx(t["step_flashing_ft"] + t["wall_flashing_ft"], abs=0.02)  # no lantern here
+    assert t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"] + t["flat_edge_ft"] + t["exposed_edge_ft"], abs=0.03)
+    assert t["plane_count"] == len(model["facets"]) and t["chimney_count"] == t["lantern_count"] == 0
     if t["roofing_pitched_sqft"]:
         assert 2.0 <= t["planes_pitch_weighted"] <= 12.0
-    # the engine's own kept keys keep their 0.5/12 meaning: pitched_area + flat_area = total in the MODEL totals
-    mt = model["totals"]
     assert mt["pitched_area_sqft"] + mt["flat_area_sqft"] == pytest.approx(mt["total_area_sqft"], abs=0.5)
 
 
@@ -115,9 +110,11 @@ def test_edge_lengths_are_within_5_percent_of_exact_and_jumps_within_015_m(name)
         want[e.type] = want.get(e.type, 0.0) + e.length_ft
     for t in ("eave", "rake", "ridge", "hip", "valley", "flat_edge", "level_change", "transition"):
         a, b = got.get(t, 0.0), want.get(t, 0.0)
+        if t == "level_change":  # the exact roofs call every step level_change; the engine names it (sidewall, headwall)
+            a = sum(got.get(k, 0.0) for k in STEPS)
         assert abs(a - b) <= max(0.05 * b, 1.0), (t, a, b)
     exact = [e for e in c.roof.edges if e.type == "level_change"]
-    mine = [e for e in model["edges"] if e["type"] == "level_change"]
+    mine = [e for e in model["edges"] if e["type"] in STEPS]
     for e in mine:
         mid = ((e["points"][0][0] + e["points"][1][0]) / 2, (e["points"][0][1] + e["points"][1][1]) / 2)
         near = min(exact, key=lambda x: math.dist(mid, ((x.p0[0] + x.p1[0]) / 2 * FT, (x.p0[1] + x.p1[1]) / 2 * FT)))
@@ -130,11 +127,11 @@ def test_a_shed_high_side_is_a_rake_flagged_high_edge_in_the_model():
     assert sum(1 for e in model["edges"] if e.get("high_edge")) == 1
 
 
-def test_a_level_change_edge_carries_its_jump_and_only_that_type_does():
+def test_a_step_edge_carries_its_jump_and_only_that_type_does():
     model, _ = model_of("two_level_d8")
-    lc = [e for e in model["edges"] if e["type"] == "level_change"]
+    lc = [e for e in model["edges"] if e["type"] in STEPS]
     assert lc and all(e["jump_ft"] > 0.3 * FT for e in lc)
-    assert not any("jump_ft" in e for e in model["edges"] if e["type"] != "level_change")
+    assert not any("jump_ft" in e for e in model["edges"] if e["type"] not in STEPS)
 
 
 def test_the_model_planes_and_the_height_datum_are_feet_above_ground():
@@ -177,13 +174,13 @@ def test_the_engine_quality_and_assessment_for_the_envelope():
     model, res = model_of("l_shape_d8")
     a = assess_engine(res, model, ["parcel_street_match"])
     q = a["quality"]
-    assert q["engine"] == "planes/1" and q["verdict"] == "ok" and q["overhang_scale"] == 0.5
+    assert q["engine"] == "planes/1" and q["verdict"] == "ok" and "overhang_scale" not in q
     for k in ("fit_covered", "fit_all", "coverage", "supported_pct", "density_pts_m2", "parcel_match", "outline_source"):
         assert k in q
     for k in ("plane_mismatch_pct", "outline_covered_pct", "model_uncovered_pct", "level_spread_ft", "planes_lidar", "facets_model"):
         assert k in q  # the 0.3 keys, with engine analogues
     assert q["facets_model"] == len(model["facets"]) and "parcel_street_match" in q["reasons"]
-    assert len(a["planes"]) == len(model["facets"]) and a["totals"]["planes_surface_area_sqft"] > 0
+    assert len(a["planes"]) == len(model["facets"]) and "totals" not in a and q["roof_part_missed_sqft"] == 0.0
 
 
 def test_the_envelope_carries_everything_and_serialises():
@@ -191,16 +188,14 @@ def test_the_envelope_carries_everything_and_serialises():
     assessment = assess_engine(res, model, [])
     verification = {"verdict": "unverified", "notes": [], "adjustments": [], "original_totals": {}, "model": None, "rounds": 0,
                     "usage": {"input_tokens": 0, "output_tokens": 0}}
-    env = build_envelope(model, method_used="lidar_skeleton", footprint_source="lariac", verification=verification,
+    env = build_envelope(model, method_used="planes", footprint_source="lariac", verification=verification,
                          warnings=["Low slope."], warning_codes=["low_slope_confirm"], density_pts_m2=8.0, assessment=assessment)
     json.dumps(env, allow_nan=False)
     t = env["totals"]
-    for k in ("area_sqft", "squares", "planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft",
-              "ridge_cap_ridge_hip_ft", "area_sqft_roof_edge", "area_sqft_wall_line", "roofing_flat_sqft", "complexity"):
-        assert k in t, k
-    assert t["planes_surface_area_sqft"] == t["area_sqft"] < t["area_sqft_roof_edge"]  # priced (overhang scale 0.5), drawn above
+    assert tuple(t) == TOTALS_KEYS
+    assert t["area_sqft"] == t["area_sqft_roof_edge"]  # one roof, one area
     assert env["warning_codes"] == ["low_slope_confirm"] and env["model"]["quality"]["engine"] == "planes/1"
-    assert env["model"]["planes"] and env["model"]["totals"]["lengths_ft"]["level_change"] > 0
+    assert env["model"]["planes"] and env["model"]["totals"]["lengths_ft"]["step_flashing"] > 0  # the pitched roof drains into the flat deck's wall
     for code in ("low_slope_confirm", "outline_mismatch", "poor_fit", "low_density"):
         assert code in WARNING_CODES
 
@@ -216,23 +211,20 @@ def test_a_borderline_low_slope_roof_is_flagged_for_confirmation():
     res = measure_roof(roof_points_from_arrays(pts[pts[:, 3] == 1][:, :3], wall, pts), wall, outline_source="county", context=pts)
     assert not res.refused
     flagged = [f for f in res.facets if f.borderline]
-    drawn = sum(f.area_sqft for f in flagged)  # the total is priced (clipped to the priced roof edge): a little less
-    assert flagged and 0.8 * drawn <= res.totals["low_slope_confirm_sqft"] <= drawn + 0.5
+    drawn = sum(f.area_sqft for f in flagged)
+    assert flagged and res.totals["low_slope_confirm_sqft"] == pytest.approx(drawn, abs=0.1)
     model = adapter.engine_model(res, base(), 0.0)
     assert any(f["borderline"] for f in model["facets"])
     q = assess_engine(res, model, [])["quality"]
     assert "low_slope_confirm" in q["reasons"]
-    assert adapter.engine_totals(res)["low_slope_confirm_sqft"] > 0
+    assert model["totals"]["low_slope_confirm_sqft"] == pytest.approx(drawn, abs=0.5)
 
 
 # ----------------------------------------------------------------------------- model.py: the two new edge types
-def test_the_block_path_keeps_its_ten_length_keys_and_the_new_types_only_appear_when_used():
-    facets = [{"area_sqft": 100.0, "kind": "flat", "pitch_rise": 0.0}]
-    ten = _totals(facets, [{"type": "eave", "length_ft": 10.0}])
-    assert set(ten["lengths_ft"]) == set(CORE_EDGE_TYPES)
-    assert set(_totals(facets, [{"type": "eave", "length_ft": 10.0}], engine=True)["lengths_ft"]) == set(EDGE_TYPES)
-    with_new = _totals(facets, [{"type": "flat_edge", "length_ft": 10.0}])
-    assert with_new["lengths_ft"]["flat_edge"] == 10.0 and "level_change" in with_new["lengths_ft"]
+def test_totals_carry_all_twelve_length_keys():
+    model, _ = model_of("flat_d8")
+    lengths = model["totals"]["lengths_ft"]
+    assert set(lengths) == set(EDGE_TYPES) and lengths["flat_edge"] > 0 and lengths["level_change"] == 0
     assert EDGE_TYPES[:10] == CORE_EDGE_TYPES and EDGE_TYPES[10:] == ("flat_edge", "level_change")
 
 
@@ -267,31 +259,72 @@ def test_the_saved_0_2_example_envelopes_still_validate():
         assert set(env["model"]["totals"]["lengths_ft"]) >= set(CORE_EDGE_TYPES)
 
 
-def check_one_area(env_totals, model_totals):
-    t = env_totals
-    priced = t["planes_surface_area_sqft"]
-    assert t["area_sqft"] == priced and t["squares"] * 100 == pytest.approx(priced, abs=0.5)
-    assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(priced, abs=0.05)
-    assert t["roofing_pitched_squares"] + t["roofing_flat_squares"] == pytest.approx(priced / 100, abs=0.011)
-    assert t["area_sqft_wall_line"] - 0.5 <= priced <= t["area_sqft_roof_edge"] + 0.5
-    assert model_totals["total_area_sqft"] == pytest.approx(t["area_sqft_roof_edge"], abs=0.2)  # the model is the drawn roof
-    assert "DRAWN" in model_totals["note"]
-
-
 @pytest.mark.parametrize("name", [n for n in _cases() if n.endswith(("_d8", "_d16"))])
-def test_the_envelope_has_one_priced_area_on_every_synthetic_case(name):
+def test_the_envelope_has_one_area_on_every_synthetic_case(name):
     model, res = model_of(name)
-    totals = {**adapter.engine_totals(res)}
-    env = build_envelope(model, method_used="lidar_skeleton", footprint_source="lariac",
+    env = build_envelope(model, method_used="planes", footprint_source="lariac",
                          verification={"verdict": "unverified", "notes": [], "adjustments": [], "original_totals": {}, "model": None,
                                        "rounds": 0, "usage": {"input_tokens": 0, "output_tokens": 0}},
                          warnings=[], warning_codes=[], density_pts_m2=8.0, assessment=assess_engine(res, model, []))
-    check_one_area(env["totals"], env["model"]["totals"])
-    assert totals["area_sqft"] == env["totals"]["area_sqft"]
+    t = env["totals"]
+    assert tuple(t) == TOTALS_KEYS and t["area_sqft"] == t["area_sqft_roof_edge"] == env["model"]["totals"]["total_area_sqft"]
+    assert t["squares"] * 100 == pytest.approx(t["area_sqft"], abs=0.5)
+    assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["area_sqft"], abs=0.05)
+    for k, v in t.items():  # no number in the envelope disagrees with the model's
+        assert env["model"]["totals"][k] == v, k
+        assert not isinstance(v, float) or math.isfinite(v)
 
 
-def test_the_shipped_example_has_one_priced_area():
-    from conftest import FIXTURES
+# ----------------------------------------------------------------------------- 0.6.0: upper, objects
+def test_a_step_edge_names_its_higher_facet_and_no_other_edge_does():
+    model, _ = model_of("two_level_d8")
+    steps = [e for e in model["edges"] if e["type"] in STEPS]
+    assert steps and all(e["upper"] in e["facets"] and e["jump_ft"] > 0.3 * FT for e in steps)
+    assert not any("upper" in e for e in model["edges"] if e["type"] not in STEPS)
+    for e in steps:  # the named facet is the higher one: its plane is above the other's at the middle of the edge
+        mid = [(e["points"][0][i] + e["points"][1][i]) / 2 for i in (0, 1)]
+        h = {i: next(f for f in model["facets"] if f["id"] == i)["plane_eq"] for i in e["facets"]}
+        z = {i: q[0] * mid[0] + q[1] * mid[1] + q[2] for i, q in h.items()}
+        assert z[e["upper"]] >= max(z.values()) - 0.05
 
-    env = json.loads((FIXTURES / "roof_engine" / "roof_measurement_0.4_engine.json").read_text())
-    check_one_area(env["totals"], env["model"]["totals"])
+
+def test_the_model_carries_the_objects_and_their_totals():
+    # the cached cases are bare roofs: build one with a chimney and a lantern
+    roof = synth_points.flat_pitched(level_change_m=0.6)
+    pts = synth_points.simulate(roof, density=8, seed=1)
+    pts = synth_points.add_box(pts, roof, (9.0, 5.5), (1.0, 1.2), 1.6, density=8, seed=11)
+    pts = synth_points.add_box(pts, roof, (3.5, 3.6576), (1.6, 1.6), 0.4, density=8, seed=12)  # a lantern on the pitched ridge
+    wall = roof.wall_polygon()
+    from roof_measure.engine import measure_roof
+
+    res = measure_roof(roof_points_from_arrays(pts[pts[:, 3] == 1][:, :3], wall, pts), wall, outline_source="county", context=pts)
+    model = adapter.engine_model(res, base(), 0.0)
+    assert sorted(o["kind"] for o in model["objects"]) == ["chimney", "lantern"]
+    ids = {f["id"] for f in model["facets"]}
+    assert all(o["facet"] in ids and o["id"] in ("o1", "o2") for o in model["objects"])
+    t = model["totals"]
+    lantern = next(o for o in model["objects"] if o["kind"] == "lantern")
+    chimney = next(o for o in model["objects"] if o["kind"] == "chimney")
+    assert t["chimney_count"] == t["lantern_count"] == 1
+    assert t["chimney_perimeter_ft"] == pytest.approx(2 * sum(chimney["size_ft"]), abs=0.02)
+    assert t["exposed_edge_ft"] == pytest.approx(t["step_flashing_ft"] + t["wall_flashing_ft"] + 2 * sum(lantern["size_ft"]), abs=0.03)
+    assert t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"] + t["flat_edge_ft"] + t["exposed_edge_ft"], abs=0.03)
+    assert all(t[k] == pytest.approx(res.totals[k], abs=0.1) for k in TOTALS_KEYS) and res.roof_part_missed_sqft == 0.0
+    bad = json.loads(json.dumps(model))
+    bad["objects"][0]["kind"] = "tower"
+    with pytest.raises(ModelError):
+        validate(bad)
+
+
+def test_a_hand_built_model_with_a_parapet_or_unspecified_edge_validates_and_counts_it_in_lengths_only():
+    model, _ = model_of("gable_d8")
+    plain = {k: model["totals"][k] for k in TOTALS_KEYS}
+    eave = next(e for e in model["edges"] if e["type"] == "eave")
+    extra = [{**eave, "id": "e900", "type": "parapet"}, {**eave, "id": "e901", "type": "unspecified"}]
+    built = json.loads(json.dumps(model))
+    built["edges"] += extra
+    built["totals"] = {**adapter._model_totals(built["facets"], built["edges"], built["objects"]), "note": "x"}
+    validate(built)  # the totals add the new edges up under their own type
+    assert built["totals"]["lengths_ft"]["parapet"] == built["totals"]["lengths_ft"]["unspecified"] == pytest.approx(eave["length_ft"], abs=0.01)
+    assert {k: built["totals"][k] for k in TOTALS_KEYS} == plain  # in no contract total
+    assert model["totals"]["lengths_ft"]["parapet"] == model["totals"]["lengths_ft"]["unspecified"] == 0.0  # an engine model: zero

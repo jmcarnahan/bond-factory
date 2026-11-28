@@ -7,14 +7,13 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import FIXTURES
+from house_helpers import house
 
 import roof_measure._isolate as isolate
 import roof_measure.library
 from roof_measure.library import MeasureError, measure
 
 ENTRY = Path(__file__).with_name("crash_child_entry.py")
-BLOCKS = FIXTURES / "site1_blocks.json"
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +35,7 @@ def crashing_child(monkeypatch):
 
 
 def run(tmp_path, **kw):
-    args = {"method": "lidar_skeleton", "verify": False, "cache_dir": tmp_path / "cache", "blocks_path": BLOCKS,
+    args = {"cache_dir": tmp_path / "cache", "points_path": house(tmp_path),
             "work_dir": tmp_path / "work"}
     return measure("100 Example Ave, Sampletown, CA 90000", **(args | kw))
 
@@ -63,61 +62,22 @@ def test_child_stderr_file_keeps_the_python_traceback(tmp_path, crashing_child):
     assert "Fatal Python error: Segmentation fault" in text and "crash_child_entry.py" in text
 
 
-def test_a_hang_in_the_agent_stage_stops_the_child_with_a_clear_error(tmp_path, monkeypatch):
-    """solar_agent is not retried, so the error itself is visible: the child stopped itself, it did not time out."""
-    monkeypatch.setattr(isolate, "_child_argv", lambda: [sys.executable, "-P", str(ENTRY), "hang"])
-    monkeypatch.setattr(roof_measure.library, "KILL_GRACE_S", 5.0)
-    stages = []
-    with pytest.raises(isolate.ChildCrashed, match="agent stage did not finish") as e:
-        measure("100 Example Ave, Sampletown, CA 90000", method="solar_agent", verify=False, deadline_s=60.0,
-                cache_dir=tmp_path / "cache", blocks_path=BLOCKS, solar_fixture=FIXTURES / "synthetic_solar_response.json",
-                on_stage=stages.append)
-    assert e.value.code == "measurement_failed" and not e.value.retryable and e.value.signal_number == 0
-    assert "stopping the process" in e.value.message  # the child's own stderr line is in the message
-    assert stages == ["model"]
-
-
-class FakeDeadline:
-    def __init__(self, left):
-        self.left = left
-
-    def remaining(self):
-        return self.left
-
-
-def test_stage_hook_arms_on_model_for_agent_methods_and_disarms_on_the_next_stage():
-    import time
-
+def test_the_stage_hook_relays_every_stage():
     from roof_measure import _child
 
-    emitted, fired = [], []
-    hook = _child._stage_hook("lidar_agent", FakeDeadline(0.0), emit=emitted.append, hang=lambda: fired.append(1))
-    old = _child.AGENT_HANG_SLACK_S
-    _child.AGENT_HANG_SLACK_S = 0.2
-    try:
-        hook("model")
-        hook("render")  # a later stage disarms the timer
-        time.sleep(0.5)
-        assert fired == []
-        hook("model")
-        time.sleep(0.6)
-        assert fired == [1]
-        fired.clear()
-        quiet = _child._stage_hook("lidar_skeleton", FakeDeadline(0.0), emit=emitted.append, hang=lambda: fired.append(1))
-        quiet("model")
-        time.sleep(0.5)
-        assert fired == []  # rule methods are never stopped early
-    finally:
-        _child.AGENT_HANG_SLACK_S = old
-    assert [m["name"] for m in emitted] == ["model", "render", "model", "model"]
+    emitted = []
+    hook = _child._stage_hook(emit=emitted.append)
+    for name in ("geocode", "model"):
+        hook(name)
+    assert emitted == [{"t": "stage", "name": "geocode"}, {"t": "stage", "name": "model"}]
 
 
 def test_a_normal_nonzero_exit_is_not_a_crash(tmp_path, monkeypatch):
     fake = Path(__file__).with_name("fake_child_script.py")
     monkeypatch.setattr(isolate, "_child_argv", lambda: [sys.executable, "-P", str(fake)])
     with pytest.raises(MeasureError) as e:
-        measure("stderr-exit-3", lat=1.0, lng=1.0, method="lidar_skeleton", verify=False,
-                cache_dir=tmp_path / "cache", blocks_path=BLOCKS)
+        measure("stderr-exit-3", lat=1.0, lng=1.0,
+                cache_dir=tmp_path / "cache", points_path=house(tmp_path))
     assert not isinstance(e.value, isolate.ChildCrashed) and "exited with code 3" in e.value.message
 
 

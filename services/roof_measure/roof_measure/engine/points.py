@@ -1,7 +1,6 @@
 """Roof point selection: which LiDAR returns belong to the roof of one building.
 
-Moved out of ``blocks.segment_blocks`` unchanged (the numbers are identical, pinned by ``tests/test_engine_points.py``)
-so the plane engine and the block segmenter choose roof points the same way.
+The numbers are pinned by ``tests/test_engine_points.py``.
 
 A return is a roof point when it is not ground (class 2) and stands more than ``min_height_m`` above the LOCAL ground
 (the median of the 8 nearest class-2 returns; the site ground when there is none) and lies within ``overhang_m`` of

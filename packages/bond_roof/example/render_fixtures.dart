@@ -12,7 +12,7 @@ Future<void> main(List<String> args) async {
   final font = args.isNotEmpty ? File(args.first).readAsBytesSync() : null;
   final out = Directory('../../tmp/render')..createSync(recursive: true);
   var count = 0;
-  for (final dirPath in ['test/fixtures', '../../fixtures']) {
+  for (final dirPath in ['../../fixtures', '../../fixtures/roof_engine']) {
     final dir = Directory(dirPath);
     if (!dir.existsSync()) continue;
     final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList()

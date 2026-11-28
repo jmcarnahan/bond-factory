@@ -11,7 +11,11 @@ Map<String, dynamic> _json({bool roofTypes = true}) {
   final m = j['model'] as Map<String, dynamic>;
   final facets = (m['facets'] as List).cast<Map<String, dynamic>>();
   facets[0]['pitch_rise'] = 0.6;
-  if (!roofTypes) for (final f in facets) f.remove('roof_type');
+  if (!roofTypes) {
+    for (final f in facets) {
+      f.remove('roof_type');
+    }
+  }
   final t = m['totals'] as Map<String, dynamic>;
   t['pitched_area_sqft'] = 1020.0;
   t['flat_area_sqft'] = 2040.0;

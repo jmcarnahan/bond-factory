@@ -1,4 +1,4 @@
-"""Runtime config: authoritative when set, environment fallback when not (library use, plan D1)."""
+"""Runtime config: authoritative when set, environment fallback when not (library use)."""
 
 import contextvars
 import threading
@@ -13,26 +13,13 @@ from roof_measure.deadline import Deadline
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
-    for name in ("ANTHROPIC_API_KEY", "GOOGLE_SOLAR_API_KEY", "ROOF_MEASURE_CACHE", "ROOF_MEASURE_OVERPASS_URLS"):
+    for name in ("ROOF_MEASURE_CACHE", "ROOF_MEASURE_OVERPASS_URLS"):
         monkeypatch.delenv(name, raising=False)
 
 
-def test_without_a_runtime_the_helpers_read_the_environment(monkeypatch):
+def test_without_a_runtime_the_helpers_read_the_environment():
     assert config.current() is None
-    assert config.anthropic_key() is None and config.solar_key() is None
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "env-a")
-    monkeypatch.setenv("GOOGLE_SOLAR_API_KEY", "env-g")
-    assert config.anthropic_key() == "env-a" and config.solar_key() == "env-g"
     assert config.cache_root() is None and config.overpass_urls() is None and config.footprint_stage_s() is None
-
-
-def test_a_runtime_is_final_even_when_the_environment_has_keys(monkeypatch, tmp_path):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "env-a")
-    monkeypatch.setenv("GOOGLE_SOLAR_API_KEY", "env-g")
-    with config.use(Runtime(cache_dir=tmp_path)):  # keys None: "no key", never the paid key in the environment
-        assert config.anthropic_key() is None and config.solar_key() is None
-    with config.use(Runtime(cache_dir=tmp_path, anthropic_api_key="arg-a", google_solar_api_key="arg-g")):
-        assert config.anthropic_key() == "arg-a" and config.solar_key() == "arg-g"
 
 
 def test_use_resets_after_the_block_and_after_an_exception(tmp_path):

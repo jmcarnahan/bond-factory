@@ -7,11 +7,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from shapely.geometry import Polygon, box, shape
+from shapely.geometry import Polygon, box
 
-from roof_measure import blocks, cache, lidar
-from roof_measure.blocks import BlocksError, segment_blocks
-from roof_measure.frame import Frame
+from roof_measure import cache, lidar
 from roof_measure.lidar import LidarTooSparse, PointCloud
 
 X0, Y0 = 377000.0, 3742000.0
@@ -30,113 +28,6 @@ def gable(pitch: float, density: float, w: float = 10.0, length: float = 15.0, s
     cl[roof] = 1
     z[~roof] += rng.normal(0, 0.02, (~roof).sum())
     return PointCloud(x + X0, y + Y0, z, cl, np.zeros(n), {"epsg": 32611, "project": "synthetic", "year": 2024})
-
-
-def run_gable(pitch: float, density: float = 20.0):
-    fp = box(X0, Y0, X0 + 15, Y0 + 10)
-    return segment_blocks(gable(pitch, density), fp, Frame.from_footprint_m(fp, 32611)), fp
-
-
-def opposite(a: float, b: float) -> bool:
-    return abs((a - b + 180) % 360 - 180) > 160
-
-
-@pytest.mark.parametrize("pitch", [4, 9, 12])
-def test_synthetic_gable_gives_two_opposite_faces_at_any_pitch(pitch):
-    bs, fp = run_gable(pitch)
-    sloped = [b for b in bs.blocks if b.kind == "sloped"]
-    assert len(bs.blocks) == 2 and len(sloped) == 2
-    assert opposite(sloped[0].aspect_deg, sloped[1].aspect_deg)
-    assert all(abs(b.pitch_rise - pitch) < 0.3 for b in sloped)
-    cover = sum(b.plan_area_sqft for b in bs.blocks) / (fp.area * 10.7639)
-    assert 0.9 <= cover <= 1.12
-
-
-def test_synthetic_gable_plan_area_within_5_percent_of_truth():
-    bs, fp = run_gable(5)
-    true_sqft = fp.area * 10.7639
-    total = sum(b.plan_area_sqft for b in bs.blocks)
-    assert true_sqft <= total <= 1.05 * true_sqft
-    assert sum(b.plan_area_in_footprint_sqft for b in bs.blocks) == pytest.approx(true_sqft, rel=0.03)
-    assert all(b.plan_area_in_footprint_sqft <= b.plan_area_sqft + 1e-6 for b in bs.blocks)
-
-
-def test_eight_square_metre_shed_is_86_to_110_sqft():
-    fp = box(X0, Y0, X0 + 4.0, Y0 + 2.0)  # 8 m2 = 86 sq ft, pitch 4/12 shed-sized gable
-    bs = segment_blocks(gable(4, 60, w=2.0, length=4.0), fp, Frame.from_footprint_m(fp, 32611))
-    assert 86 * 0.97 <= sum(b.plan_area_sqft for b in bs.blocks) <= 110
-
-
-def test_sparse_cloud_raises_with_project_year_and_density():
-    fp = box(X0, Y0, X0 + 15, Y0 + 10)
-    with pytest.raises(LidarTooSparse, match=r"synthetic \(2024\).*points/m2") as e:
-        segment_blocks(gable(5, 2.0), fp, Frame.from_footprint_m(fp, 32611))
-    assert e.value.density < 4
-
-
-def test_blocks_error_when_too_few_points_or_nothing_survives():
-    fp = box(X0, Y0, X0 + 15, Y0 + 10)
-    frame = Frame.from_footprint_m(fp, 32611)
-    tiny = PointCloud(np.array([X0 + 1]), np.array([Y0 + 1]), np.array([5.0]), np.array([1], np.uint8),
-                      np.zeros(1), {})
-    with pytest.raises(BlocksError):
-        segment_blocks(tiny, fp, frame)
-    # dense noise: every cell non-planar, so no block survives; must raise, not return an empty set
-    rng = np.random.default_rng(0)
-    n = 20000
-    x, y = rng.uniform(0, 15, n), rng.uniform(0, 10, n)
-    noise = PointCloud(x + X0, y + Y0, 3 + rng.uniform(-1.0, 1.0, n), np.ones(n, np.uint8), np.zeros(n), {})
-    with pytest.raises(BlocksError, match="No roof block"):
-        segment_blocks(noise, fp, frame)
-
-
-def _grid(n=20, cell=0.25):
-    xs = (np.arange(n) + 0.5) * cell
-    return np.meshgrid(xs, xs)
-
-
-def test_merge_coplanar_joins_one_plane_and_keeps_a_step():
-    gx, gy = _grid()
-    val = 0.3 * gx + 3.0  # one sloped plane (aspect 270, pitch ~3.6/12)
-    lab = np.where(gx < 2.5, 0, 1)
-    flab = lab.copy()
-    blocks._merge_coplanar(lab, flab, val, gx, gy, 0.25)
-    assert len(np.unique(lab)) == 1 and len(np.unique(flab)) == 1
-    stepped = val + np.where(gx >= 2.5, 0.4, 0.0)  # same slope, 0.4 m higher on the right: a real step
-    lab = np.where(gx < 2.5, 0, 1)
-    flab = lab.copy()
-    blocks._merge_coplanar(lab, flab, stepped, gx, gy, 0.25)
-    assert len(np.unique(lab)) == 2
-    other = np.where(gx < 2.5, 0.3 * gx, -0.3 * gx + 1.5) + 3.0  # opposite aspects meeting at a ridge
-    lab = np.where(gx < 2.5, 0, 1)
-    flab = lab.copy()
-    blocks._merge_coplanar(lab, flab, other, gx, gy, 0.25)
-    assert len(np.unique(lab)) == 2
-
-
-def _house(tag: str, local_data):
-    fp = shape(json.loads(local_data(f"{tag}_footprint.geojson").read_text())["geometry"])
-    frame, fp_m = Frame.for_footprint(fp)
-    pc = PointCloud.from_npz(local_data(f"{tag}_roof.pts"))
-    return segment_blocks(pc, fp_m, frame), fp_m
-
-
-def test_site3_gable_is_two_aspect_families_and_covers_the_footprint(local_data):
-    bs, fp_m = _house("site3", local_data)
-    cover = sum(b.plan_area_sqft for b in bs.blocks) / (fp_m.area * 10.7639)
-    assert 0.97 <= cover <= 1.12
-    assert all(b.kind == "sloped" and 2.8 <= b.pitch_rise <= 3.6 for b in bs.blocks)
-    families = {round(b.aspect_deg / 90) % 4 for b in bs.blocks}
-    assert families == {1, 3}  # east and west
-
-
-def test_site2_hip_has_four_faces_and_covers_the_footprint(local_data):
-    bs, fp_m = _house("site2", local_data)
-    cover = sum(b.plan_area_sqft for b in bs.blocks) / (fp_m.area * 10.7639)
-    assert 0.97 <= cover <= 1.12
-    faces = [b for b in bs.blocks if b.kind == "sloped" and b.plan_area_sqft > 150 and 3.0 <= b.pitch_rise <= 4.5]
-    assert {round(b.aspect_deg / 90) % 4 for b in faces} == {0, 1, 2, 3}
-    assert len(bs.blocks) <= 6
 
 
 # ---------------------------------------------------------------- lidar choice and box size

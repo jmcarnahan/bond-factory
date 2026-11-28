@@ -16,7 +16,8 @@ value and pass/fail are the ``all`` mean; it ALSO fails, loudly, when the high a
 ``max_conf_gap`` (default 0.15, only when both groups have a house): the numbers are reported and the director decides.
 ``where``: manifest filters (``key=a,b`` / ``key!=a``); ``require``: flags that must be true for a house to count.
 ``min_n`` counts the houses of the population that have a numeric value for the metric (``n_value``; ``n`` is the whole
-population). Fewer than ``min_n`` fails the gate unless ``"on_insufficient": "skip"``.
+population). Fewer than ``min_n`` fails the gate unless ``"on_insufficient": "skip"``. ``"report_only": true`` evaluates the gate and
+prints its value but never fails it.
 """
 
 from __future__ import annotations
@@ -172,5 +173,8 @@ def evaluate(spec: dict[str, Any], recs: list[dict[str, Any]], baseline_t3=None)
             res["value"] = v
             res["passed"] = v is not None and OPS[g["op"]](v, g["value"])
             res["note"] = "" if v is not None else "no value"
+        if g.get("report_only"):  # a figure printed with the gates, never a failure (and never a skip: it is evaluated)
+            res["note"] = (res["note"] + " " if res["note"] else "") + "REPORTED ONLY: not a gate"
+            res["passed"], res["skipped"] = True, False
         out.append(res)
     return out

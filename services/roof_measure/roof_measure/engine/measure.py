@@ -1,7 +1,7 @@
 """The engine pipeline: roof points + footprint in, facets / edges / totals / quality out.
 
 Stages: building frame -> plane detection -> roof-edge outline -> global labelling (partition) -> facets and edges ->
-priced edge and cost-sheet totals -> quality verdict -> back to the world frame. Metres in, feet in the totals.
+cost-sheet totals -> quality verdict -> back to the world frame. Metres in, feet in the totals.
 """
 
 from __future__ import annotations
@@ -20,9 +20,8 @@ from . import axes
 from .detect import detect_planes
 from .edge_measure import jump_points
 from .errors import Ctx, EngineInputError
-from .facets import SQM2SQFT as SQM
 from .finish import assemble, facets_stage, quality_stage
-from .outline import build_outline, overhang_per_side
+from .outline import build_outline
 from .params import EngineParams
 from .partition import build_partition
 from .ring import ring_filter
@@ -31,7 +30,8 @@ from .types import EngineResult, Quality, RoofPoints
 
 
 def is_county_outline(source: str) -> bool:
-    """County (wall-line) outlines get the measured overhang; OSM / Overture / hull outlines are already roof-edge-ish."""
+    """County outlines are wall lines (the roof edge lies up to 1.5 m out); OSM / Overture / hull outlines are already
+    near the roof edge (a tighter outward clamp)."""
     s = (source or "").lower()
     return "county" in s or "lacounty" in s or "lariac" in s
 
@@ -115,26 +115,20 @@ def _detect_stage(run: Run, thetas: list[float]) -> tuple[list, np.ndarray, np.n
     return planes, crop, plab
 
 
-def _outline_stage(run: Run, q: np.ndarray, theta: float) -> Polygon:
+def _outline_stage(run: Run, q: np.ndarray, qlab: np.ndarray, theta: float) -> Polygon:
     p = run.ctx.p
-    draw = p.overhang_scale_draw
-    scale = draw if run.county else min(draw, p.overhang_scale_roofedge)
     run.diag["outline_provider"] = run.source
-    run.diag["overhang_scale_used"] = scale
-    o, od = build_outline(q, run.wall, theta, scale, p)
+    wide = None
+    if run.context is not None:
+        wide = np.asarray(run.context, float)[:, :4].copy()
+        if p.s3_axis:
+            wide[:, :2] = axes.to_building_frame(wide[:, :2], run.ang)
+    o, od = build_outline(q, qlab, run.stages.planes, run.wall, theta, run.county, wide,
+                          run.pts_all, p)
     run.diag.update(od)
     if o.geom_type != "Polygon":
         o = max(o.geoms, key=lambda g: g.area)
     return Polygon(o.exterior)
-
-
-def _outline_sensitivity(run: Run, o: Polygon) -> None:
-    d = run.diag
-    d["overhang_m_per_side"] = overhang_per_side(run.wall, o)
-    d["outline_area_sqft_footprint"] = round(run.wall.area * SQM, 0)
-    d["outline_area_sqft_points"] = round(o.area * SQM, 0)
-    d["outline_sens_sqft_minus015"] = round(o.buffer(-0.15, join_style=2).area * SQM, 0)
-    d["outline_sens_sqft_plus015"] = round(o.buffer(0.15, join_style=2).area * SQM, 0)
 
 
 def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: EngineParams, deadline: float | None,
@@ -166,7 +160,7 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     diag["axes_deg"] = [round(theta, 1)]
     stages.theta, stages.frame_deg = theta, ang
     run = Run(ctx, wall, wall_world, pts_all, stages, diag, is_county_outline(outline_source), outline_source,
-               parcel_match, context, ang, timings)
+               parcel_match, context, ang, timings, ground_z=float(points.ground_z))
     jp = jump_points(context, wall_world)
     if jp is not None and p.s3_axis and len(jp):
         jp = jp.copy()
@@ -180,25 +174,25 @@ def measure_stages(points: RoofPoints, footprint_m: BaseGeometry, *, params: Eng
     t = run.tick("planes", t)
     ok = plab >= 0
     q, qlab = crop[ok], plab[ok]
-    o = _outline_stage(run, q, theta)
+    o = _outline_stage(run, q, qlab, theta)
     stages.outline = o
     dens0 = float(shapely.contains_xy(o, pts_all[:, 0], pts_all[:, 1]).sum() / max(o.area, 1.0))
     if dens0 < p.density_refuse and p.refuse_sparse:
         return refused("lidar_too_sparse", p, round(dens0, 1), outline_source), stages
-    _outline_sensitivity(run, o)
     t = run.tick("outline", t)
-    best, h = build_partition(o, q, qlab, planes, theta, ctx)
+    best, h = build_partition(o, q, qlab, planes, theta, ctx, crop)
     stages.run = best
     diag["grid_m"] = round(h, 3)
     diag.update(best.diag)
     diag["beta_used"] = best.beta
     t = run.tick("partition", t)
-    facets, edges, tot, o_p = facets_stage(run, best, q, o, theta)
+    facets, edges = facets_stage(run, best, q, o)
     t = run.tick("facets", t)
     quality_ = quality_stage(run, facets, o, crop, plab)
-    flat_sq, pitched_sq = tot.get("roofing_flat_sqft"), tot.get("roofing_pitched_sqft")
-    if flat_sq is not None and pitched_sq is not None and flat_sq + pitched_sq > 0:  # the PRICED split (0.5.1)
+    flat_sq = round(sum(f.area_sqft for f in facets if f.roof_type == "flat"), 1)
+    pitched_sq = round(sum(f.area_sqft for f in facets if f.roof_type != "flat"), 1)
+    if flat_sq + pitched_sq > 0:  # the pitched / flat split of the drawn roof
         quality_.flat_share = flat_sq / (flat_sq + pitched_sq)  # UNROUNDED: round(0.8996, 3) would cross a 0.90 line
-    res = assemble(run, facets, edges, tot, o, o_p, best, q, best.qlab, quality_)
+    res = assemble(run, facets, edges, o, best, q, best.qlab, quality_)
     run.tick("finish", t)
     return res, stages

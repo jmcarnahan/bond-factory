@@ -3,7 +3,7 @@ LIBS = $(wildcard libs/*)
 
 .PHONY: test-service setup-service setup-py test-libs lint-libs test-example serve-example test-legacy-host
 
-test-service: ## Run the roof_measure service tests
+test-service: ## Run the roof_measure library tests
 	$(MAKE) -C services/roof_measure test
 
 setup-service: ## Create the roof_measure virtualenv

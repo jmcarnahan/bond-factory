@@ -1,5 +1,11 @@
 # roof_measure envelope 0.3 (additive to 0.2)
 
+> **Superseded by [contract-0.6.md](contract-0.6.md).** The block path, `planes_only` results, the agent fallback, the four plane totals made by plane snapping and the old totals keys described here were removed in 0.6.0. Kept as the record of the shape before.
+
+> **Removed in 0.6.** The block path (and with it the `planes_only` result and the block-path quality object, `model.planes`
+> snapping and the four plane totals it made), the agent methods, the verifier, Solar and the job service. See the note at the
+> top of contract-0.2.md. The plane engine's quality, planes and totals (contract-0.4.md) remain.
+
 `PIPELINE_VERSION` is `0.4.0` (0.3.0 added the keys below; 0.3.1 adds the planes-only result and a sliver repair, see the end of this file; 0.4.0 adds the optional `other_buildings` key, see "Other buildings on the lot"); the contract name stays `bond.roof_model/0.2` and every 0.2 key keeps its meaning and its
 value. 0.3 only ADDS optional keys and three warning codes (`parcel_street_match`, `agent_failed_fell_back`, `model_failed`; and the street-match note moves from `other` to the first). A parser that ignores unknown keys (the Dart `RoofMeasurement`
 does) needs no change. `method_used` never gains a new value: a retry or a fallback is a reason code, not a method.
@@ -127,8 +133,7 @@ as before.
 A consumer that draws the roof diagram must not draw it from a planes-only model (`facets` is empty): draw
 `model.planes` instead. The Dart `RoofModel.fromJson`, `LengthDiagram`, `AreaDiagram`, `SummaryBlock` and
 `RoofReport.pages` accept such a model without throwing (they draw a page with the legends and no roof;
-`packages/bond_roof/test/planes_only_test.dart`). Example: `fixtures/roof_planes_only/roof_measurement_0.3_planes_only.json`
-(kept apart from the 0.2 examples so that code that loads every envelope in `fixtures/` does not meet zero facets).
+`packages/bond_roof/test/planes_only_test.dart`; the test and the example file were removed with the 0.6 round, superseded).
 
 ### Sliver repair (pipeline 0.3.1)
 

@@ -1,20 +1,15 @@
 # roof_demo
 
-A single-screen Flutter app (web and iOS) that exercises `bond_roof` and `bond_roof_ui`
-end to end. Not shipped.
+A single-screen Flutter app (web and iOS) that exercises `bond_roof` and `bond_roof_ui` end to end. Not shipped. It reads the bundled
+fixtures only: no service is called, no address is typed, nothing is measured.
 
 What it does:
 
-- Address field, a segmented control for the method (LiDAR, LiDAR + agent, Solar + agent)
-  and a Measure button that POSTs `{"address", "method", "verify"}` to `/v1/measurements` on the Python service
-  (`services/roof_measure`, port 8011), polls the job every 2 s and renders the returned 0.2 envelope.
-  An EN/ES switch shows the label-override seam with a sample Spanish map.
-- Fixture chips that load bundled copies of `fixtures/*.json` (roof-model schema only), so
-  the app works with no service running. Chips for fixtures the live service offers are
-  added when it is reachable.
-- An inline report: a collapsible raw-model panel, Print and Save PDF (through
-  `bond_roof_ui`), the length diagram and the area diagram. Progress and errors are inline
-  text. No popups, no dialogs, no toasts.
+- Fixture chips that load bundled copies of `fixtures/*.json` and `fixtures/roof_engine/*.json` (bare models and envelopes). Start with
+  `roof_measurement_0.6_sample`, the hand-written 0.6 envelope; the older ones show how an envelope of an old shape opens and draws less.
+- An EN/ES switch that shows the label-override seam with a sample Spanish map (a value for every `RoofLabels.keys` key).
+- An inline report: a collapsible raw-model panel, Print and Save PDF (through `bond_roof_ui`), the totals table, the length diagram, the
+  area diagram and the summary. Errors are inline text. No popups, no dialogs, no toasts.
 
 ## Run
 
@@ -26,15 +21,10 @@ make build-web     # release build in build/web; serve it with python3 -m http.s
 make demo-ios      # flutter run on the booted iOS simulator
 ```
 
-Both targets first run `tool/sync_fixtures.sh` (also `make sync-fixtures`), which copies the
-roof-model fixtures into `assets/fixtures/`. Re-run it whenever `fixtures/` changes.
+Both targets first run `tool/sync_fixtures.sh` (also `make sync-fixtures`), which copies the roof-model fixtures into `assets/fixtures/`.
+Re-run it whenever `fixtures/` changes.
 
-The service URL defaults to `http://127.0.0.1:8011`; override at build or run time with
-`--dart-define=ROOF_SERVICE=http://host:port`. The bearer token is `--dart-define=ROOF_TOKEN=...` (local development only; a real app keeps the token on its backend). Start the service with `make serve` in
-`services/roof_measure`.
+## Tests
 
-## Status (POC)
-
-- Web build and iOS simulator build verified; the web app was driven in a browser.
-- Print and Save PDF are wired through `printing` but were not exercised by hand on iOS.
-- `flutter test` covers the page's controls and the service client's fixture-list parsing.
+`flutter test` covers the page's controls (no Measure button), picking the 0.6 sample and an old envelope, the EN/ES switch, and the
+Spanish sample's keys.

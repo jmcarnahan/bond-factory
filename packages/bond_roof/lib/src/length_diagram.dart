@@ -1,11 +1,13 @@
 import 'dart:math' as math;
 
 import 'facet_draw.dart';
+import 'figures.dart';
 import 'format.dart';
 import 'labels.dart';
 import 'layout.dart';
 import 'metrics.dart';
 import 'model.dart';
+import 'object_draw.dart';
 import 'polylabel.dart';
 import 'report_layout.dart';
 import 'scene.dart';
@@ -23,17 +25,58 @@ bool isHoleOutlineEdge(RoofModel m, RoofEdge e) {
   return false;
 }
 
-/// A level change shows its length like every other edge ("24"); a jump of [levelChangeStepMinFt] or more
-/// is added ("24, 5 ft step").
-String _levelChangeText(RoofEdge e, RoofLabels labels) {
+/// A step edge (level change, sidewall or headwall flashing) shows its length like every other edge ("24"); a jump of
+/// [levelChangeStepMinFt] or more is added ("24, 5 ft step").
+String _stepText(RoofEdge e, RoofLabels labels) {
   final len = wholeFeet(e.lengthFt);
   final jump = e.jumpFt;
   if (jump == null || !(jump >= levelChangeStepMinFt)) return len;
   return RoofLabels.fill(labels.levelChangeStep, {'len': len, 'jump': '${wholeFeet(jump)} ${labels.unitFt}'});
 }
 
-/// Plan view with every edge coloured by type, a whole-foot label on each edge that has room,
-/// a legend of totals at the top (three columns wide, two compact), a compass rose and the
+/// One row of the legend: an edge type (coloured swatch), a derived total (no swatch), or a kind of object (its mark).
+class _LegendRow {
+  const _LegendRow(this.name, this.value, {this.type, this.object});
+  final String name, value;
+  final EdgeType? type;
+  final ObjectKind? object;
+}
+
+const _edgeOfRow = <String, EdgeType>{
+  'eave': EdgeType.eave,
+  'rake': EdgeType.rake,
+  'flat_edge': EdgeType.flatEdge,
+  'ridge': EdgeType.ridge,
+  'hip': EdgeType.hip,
+  'valley': EdgeType.valley,
+  'step_flashing': EdgeType.stepFlashing,
+  'wall_flashing': EdgeType.wallFlashing,
+  'transition': EdgeType.transition,
+  'level_change': EdgeType.levelChange,
+  'unspecified': EdgeType.unspecified,
+};
+
+/// The totals rows that are lengths or objects: the legend prints exactly these, in the same order as the totals table.
+bool _inLegend(TotalRow r) => _edgeOfRow.containsKey(r.id) || const {'exposed_edge', 'eave_rake', 'ridge_hip', 'chimneys', 'lanterns'}.contains(r.id);
+
+/// The ids of the legend's rows (the totals rows of [totalRows] that are lengths or objects).
+List<String> legendRowIds(RoofModel m) => [for (final r in totalRows(m, const RoofLabels())) if (_inLegend(r)) r.id];
+
+/// The legend of the roof, built from the same rows as the totals table: edge rows (swatch), the derived sums (no swatch)
+/// and the objects (their mark and count).
+List<_LegendRow> _legendRows(RoofModel m, RoofLabels l) => [
+      for (final r in totalRows(m, l))
+        if (_inLegend(r))
+          switch (r.id) {
+            'chimneys' => _LegendRow(l.legendChimney, r.value, object: ObjectKind.chimney),
+            'lanterns' => _LegendRow(l.legendLantern, r.value, object: ObjectKind.lantern),
+            final id when _edgeOfRow.containsKey(id) => _LegendRow(l.edgeName(_edgeOfRow[id]!), r.value, type: _edgeOfRow[id]),
+            _ => _LegendRow(r.label, r.value),
+          },
+    ];
+
+/// Plan view with every edge coloured by type, a whole-foot label on each edge that has room, the chimneys and lanterns
+/// as marks, a legend of totals at the top (three columns wide, two compact), a compass rose and the
 /// rounding footer. All text comes from [labels]; [layout] picks the page geometry (the
 /// default size is the layout's design size).
 class LengthDiagram {
@@ -53,7 +96,7 @@ class LengthDiagram {
     final sp = LayoutSpec(layout, k);
     final prims = <Prim>[];
 
-    // Header: address, then the legend in columns (wide 4 + 3 + 3 rows, compact 5 + 5).
+    // Header: address, then the legend in columns, filled column by column.
     final title = m.address.display.isEmpty ? labels.lengthTitle : m.address.display;
     prims
       ..add(TextPrim(
@@ -73,48 +116,40 @@ class LengthDiagram {
       ));
     final cols = layout.legendColumns;
     final colW = (width - 2 * sp.margin) / cols;
-    // The ten edge types of contract 0.2 always; the 0.4 types only when the model has them.
-    final legacyTypes = [
-      ...EdgeType.legacy,
-      for (final t in EdgeType.values)
-        if (t.isNew04 && t != EdgeType.flatSeam && (m.edges.any((e) => e.type == t) || (m.totals.lengthsFt[t] ?? 0) > 0)) t,
-    ];
-    // An engine model (facets carry a roof type) lists only the types that have length: a flat roof is not shown a column of
-    // zeros. A model without roof types keeps the ten legacy rows. Never an empty legend.
-    final present = [
-      for (final t in [...EdgeType.legacy, ...EdgeType.values.where((t) => t.isNew04)])
-        if (t != EdgeType.flatSeam && (m.totals.lengthsFt[t] ?? 0) > 0) t,
-    ];
-    final legendTypes = m.facets.any((f) => f.roofType != null) && present.isNotEmpty ? present : legacyTypes;
-    final perCol = layout.legendRowsFor(legendTypes.length);
+    final legend = _legendRows(m, labels);
+    final perCol = layout.legendRowsFor(legend.length);
     var idx = 0;
     for (var c = 0; c < cols; c++) {
       for (var r = 0; r < perCol[c]; r++) {
-        final t = legendTypes[idx++];
+        final row = legend[idx++];
         final x0 = sp.margin + c * colW, y = sp.legendTop + r * sp.legendPitch;
-        final value = feetInches(m.totals.lengthsFt[t] ?? 0, labels: labels);
         final valueX = x0 + colW - sp.legendValueInset;
         final nameX = x0 + sp.legendTextX;
-        prims
-          ..add(LinePrim(
+        final type = row.type, object = row.object;
+        if (type != null) {
+          prims.add(LinePrim(
             a: (x: x0, y: y),
             b: (x: x0 + sp.swatchLen, y: y),
-            color: style.colorOf(t),
+            color: style.colorOf(type),
             width: style.strokeWidth * k,
-            dashed: style.dashedTypes.contains(t),
-          ))
+            dashed: style.dashedTypes.contains(type),
+          ));
+        } else if (object != null) {
+          addObjectMark(prims, (x: x0 + sp.swatchLen / 2, y: y), sp.legendSize * 1.35, object, style, labels, sp.legendSize, k);
+        }
+        prims
           ..add(TextPrim(
             at: (x: nameX, y: y),
             text: layout == ReportLayout.wide
-                ? labels.edgeName(t)
-                : ellipsize(labels.edgeName(t), valueX - textWidth(value, sp.legendSize, bold: true) - 6 - nameX, sp.legendSize),
+                ? row.name
+                : ellipsize(row.name, valueX - textWidth(row.value, sp.legendSize, bold: true) - 6 - nameX, sp.legendSize),
             size: sp.legendSize,
             color: style.textColor,
             anchor: TextAnchor.start,
           ))
           ..add(TextPrim(
             at: (x: valueX, y: y),
-            text: value,
+            text: row.value,
             size: sp.legendSize,
             color: style.textColor,
             anchor: TextAnchor.end,
@@ -125,7 +160,7 @@ class LengthDiagram {
 
     // Plan.
     final footer = footerLines(labels.footerLength, width, sp);
-    final legendBottom = sp.legendTop + (perCol.reduce(math.max) - 1) * sp.legendPitch + sp.legendPlanPad;
+    final legendBottom = sp.legendTop + (math.max(perCol.reduce(math.max), 1) - 1) * sp.legendPitch + sp.legendPlanPad;
     final bottomReserve = layout == ReportLayout.wide ? sp.planBottomMin : math.max(sp.planBottomMin, footerHeight(footer, sp));
     final area = (l: sp.planSide, t: legendBottom, r: width - sp.planSide, b: height - bottomReserve);
     final fit = PlanFit(m,
@@ -156,10 +191,15 @@ class LengthDiagram {
       ));
     }
 
+    final marks = objectMarks(m, fit, objectMinSide(layout, k));
+    addObjectMarks(prims, marks, style, labels, layout, k);
+
     // Labels, longest edge first.
     final size = layout == ReportLayout.wide ? math.max(layout.minLabelSize, style.fontSize * k) : layout.minLabelSize;
     final placer = LabelPlacer(
-        edges: segs, area: (l: sp.labelAreaSide, t: area.t, r: width - sp.labelAreaSide, b: area.b + sp.labelAreaSide));
+        edges: segs,
+        area: (l: sp.labelAreaSide, t: area.t, r: width - sp.labelAreaSide, b: area.b + sp.labelAreaSide),
+        reserved: [for (final mk in marks) mk.box]);
     final centroid = fit.map(roofCentroid(m));
     final order = [for (var i = 0; i < m.edges.length; i++) i]
       ..sort((a, b) => segs[b].length.compareTo(segs[a].length));
@@ -172,8 +212,8 @@ class LengthDiagram {
       if (onHole[i]) continue;
       final e = m.edges[i];
       if (e.type == EdgeType.flatSeam) continue; // drawn thin, never labelled
-      // A level change shows its length, plus the step height when the jump is tall.
-      final text = e.type == EdgeType.levelChange ? _levelChangeText(e, labels) : wholeFeet(e.lengthFt);
+      // A step edge shows its length, plus the step height when the jump is tall.
+      final text = e.type.hasJump ? _stepText(e, labels) : wholeFeet(e.lengthFt);
       Obb? box;
       if (segs[i].length >= style.minLabelPx * k) {
         box = placer.placeAlong(segs[i], textWidth(text, size, bold: true), size, centroid,

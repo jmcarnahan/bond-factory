@@ -58,6 +58,7 @@ class Run:
     context: np.ndarray | None
     ang: float
     timings: dict[str, float]
+    ground_z: float = 0.0  # m: the site ground height of the roof points (the fallback of the object finder)
     jump_pts: np.ndarray | None = None  # building frame; the points level changes are measured from (None: use the plane inliers)
 
     def tick(self, name: str, t0: float) -> float:

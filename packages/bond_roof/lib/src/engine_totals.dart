@@ -1,135 +1,153 @@
 import 'json_util.dart';
 
-/// `totals.complexity` of envelope 0.4: how cut-up the roof is.
-class RoofComplexity {
-  const RoofComplexity({this.facets, this.hipValleyFtPerSquare, this.hint});
-
-  factory RoofComplexity.fromJson(Map<String, dynamic> j, [String path = 'totals.complexity']) => RoofComplexity(
-        facets: numOrNull(j, 'facets', path)?.round(),
-        hipValleyFtPerSquare: numOrNull(j, 'hip_valley_ft_per_square', path),
-        hint: j['hint'] is String ? j['hint'] as String : null,
-      );
-
-  final int? facets;
-  final double? hipValleyFtPerSquare;
-
-  /// `simple` or `cut_up` (a value this package does not know is kept as is).
-  final String? hint;
-
-  Map<String, dynamic> toJson() => {
-        if (facets != null) 'facets': facets,
-        if (hipValleyFtPerSquare != null) 'hip_valley_ft_per_square': hipValleyFtPerSquare,
-        if (hint != null) 'hint': hint,
-      };
-
-  @override
-  bool operator ==(Object other) =>
-      other is RoofComplexity &&
-      other.facets == facets &&
-      other.hipValleyFtPerSquare == hipValleyFtPerSquare &&
-      other.hint == hint;
-
-  @override
-  int get hashCode => Object.hash(facets, hipValleyFtPerSquare, hint);
-}
-
-/// The totals keys envelope 0.4 adds (and the cost-sheet keys 0.3 added), all nullable: a missing
-/// key means "not available", never zero. Read from the envelope `totals` and from `model.totals`.
+/// The `totals` of a 0.6 envelope (and of `model.totals` when it carries the same keys): one set of figures for the one
+/// roof, every one the sum of drawn edges or facets. Every field is nullable: a key the service did not send is "not
+/// available", never zero. A key this package does not know is ignored.
 class RoofEngineTotals {
   const RoofEngineTotals({
+    this.areaSqft,
+    this.squares,
     this.roofingPitchedSqft,
     this.roofingFlatSqft,
-    this.roofingPitchedSquares,
-    this.roofingFlatSquares,
     this.lowSlopeConfirmSqft,
-    this.areaSqftWallLine,
-    this.areaSqftRoofEdge,
-    this.outlinePerimeterWallFt,
-    this.overhangFtMedian,
-    this.flatEdgeFt,
-    this.levelChangeFt,
-    this.complexity,
-    this.planesSurfaceAreaSqft,
     this.planesPitchWeighted,
-    this.outlinePerimeterFt,
+    this.planeCount,
+    this.eaveFt,
+    this.rakeFt,
+    this.flatEdgeFt,
+    this.exposedEdgeFt,
+    this.eaveRakeFt,
+    this.ridgeFt,
+    this.hipFt,
+    this.valleyFt,
+    this.ridgeHipFt,
+    this.stepFlashingFt,
+    this.wallFlashingFt,
+    this.transitionFt,
+    this.levelChangeFt,
+    this.chimneyCount,
+    this.chimneyPerimeterFt,
+    this.lanternCount,
+    this.areaSqftRoofEdge,
   });
 
   /// Null when [j] has none of the keys.
   static RoofEngineTotals? fromJson(Map<String, dynamic> j, [String path = 'totals']) {
     if (!_keys.any((k) => j[k] != null)) return null;
-    double? n(String key) => numOrNull(j, key, path);
     return RoofEngineTotals(
-      roofingPitchedSqft: n('roofing_pitched_sqft'),
-      roofingFlatSqft: n('roofing_flat_sqft'),
-      roofingPitchedSquares: n('roofing_pitched_squares'),
-      roofingFlatSquares: n('roofing_flat_squares'),
-      lowSlopeConfirmSqft: n('low_slope_confirm_sqft'),
-      areaSqftWallLine: n('area_sqft_wall_line'),
-      areaSqftRoofEdge: n('area_sqft_roof_edge'),
-      outlinePerimeterWallFt: n('outline_perimeter_wall_ft'),
-      overhangFtMedian: n('overhang_ft_median'),
-      flatEdgeFt: n('flat_edge_ft'),
-      levelChangeFt: n('level_change_ft'),
-      complexity: j['complexity'] == null
-          ? null
-          : RoofComplexity.fromJson(asMap(j['complexity'], '$path.complexity'), '$path.complexity'),
-      planesSurfaceAreaSqft: n('planes_surface_area_sqft'),
-      planesPitchWeighted: n('planes_pitch_weighted'),
-      outlinePerimeterFt: n('outline_perimeter_ft'),
+      areaSqft: numOrNull(j, 'area_sqft', path),
+      squares: numOrNull(j, 'squares', path),
+      roofingPitchedSqft: numOrNull(j, 'roofing_pitched_sqft', path),
+      roofingFlatSqft: numOrNull(j, 'roofing_flat_sqft', path),
+      lowSlopeConfirmSqft: numOrNull(j, 'low_slope_confirm_sqft', path),
+      planesPitchWeighted: numOrNull(j, 'planes_pitch_weighted', path),
+      planeCount: numOrNull(j, 'plane_count', path)?.round(),
+      eaveFt: numOrNull(j, 'eave_ft', path),
+      rakeFt: numOrNull(j, 'rake_ft', path),
+      flatEdgeFt: numOrNull(j, 'flat_edge_ft', path),
+      exposedEdgeFt: numOrNull(j, 'exposed_edge_ft', path),
+      eaveRakeFt: numOrNull(j, 'eave_rake_ft', path),
+      ridgeFt: numOrNull(j, 'ridge_ft', path),
+      hipFt: numOrNull(j, 'hip_ft', path),
+      valleyFt: numOrNull(j, 'valley_ft', path),
+      ridgeHipFt: numOrNull(j, 'ridge_hip_ft', path),
+      stepFlashingFt: numOrNull(j, 'step_flashing_ft', path),
+      wallFlashingFt: numOrNull(j, 'wall_flashing_ft', path),
+      transitionFt: numOrNull(j, 'transition_ft', path),
+      levelChangeFt: numOrNull(j, 'level_change_ft', path),
+      chimneyCount: numOrNull(j, 'chimney_count', path)?.round(),
+      chimneyPerimeterFt: numOrNull(j, 'chimney_perimeter_ft', path),
+      lanternCount: numOrNull(j, 'lantern_count', path)?.round(),
+      areaSqftRoofEdge: numOrNull(j, 'area_sqft_roof_edge', path),
     );
   }
 
   static const _keys = [
-    'roofing_pitched_sqft', 'roofing_flat_sqft', 'roofing_pitched_squares', 'roofing_flat_squares',
-    'low_slope_confirm_sqft', 'area_sqft_wall_line', 'area_sqft_roof_edge', 'outline_perimeter_wall_ft',
-    'overhang_ft_median', 'flat_edge_ft', 'level_change_ft', 'complexity', 'planes_surface_area_sqft',
-    'planes_pitch_weighted', 'outline_perimeter_ft',
+    'area_sqft', 'squares', 'roofing_pitched_sqft', 'roofing_flat_sqft', 'low_slope_confirm_sqft',
+    'planes_pitch_weighted', 'plane_count', 'eave_ft', 'rake_ft', 'flat_edge_ft', 'exposed_edge_ft',
+    'eave_rake_ft', 'ridge_ft', 'hip_ft', 'valley_ft', 'ridge_hip_ft', 'step_flashing_ft', 'wall_flashing_ft',
+    'transition_ft', 'level_change_ft', 'chimney_count', 'chimney_perimeter_ft', 'lantern_count',
+    'area_sqft_roof_edge',
   ];
 
-  /// Pitched and flat roofing (split at 2.0/12), square feet and squares.
-  final double? roofingPitchedSqft, roofingFlatSqft, roofingPitchedSquares, roofingFlatSquares;
+  /// Key by key: every value of [primary], and of [fallback] where [primary] has none. Null when both are.
+  static RoofEngineTotals? merge(RoofEngineTotals? primary, RoofEngineTotals? fallback) =>
+      fromJson({...?fallback?.toJson(), ...?primary?.toJson()});
 
+  /// The wire keys this class reads (a test helper asserts an envelope uses no other).
+  static const List<String> knownKeys = _keys;
+
+  /// Sloped area of all facets, square feet.
+  final double? areaSqft;
+  /// `areaSqft / 100`.
+  final double? squares;
+  /// Pitched and low-slope ("flat") roofing area, split at 2/12.
+  final double? roofingPitchedSqft;
+  final double? roofingFlatSqft;
   /// Area of the borderline ("low slope, confirm") facets.
   final double? lowSlopeConfirmSqft;
-
-  /// Area to the wall line, and the area AS DRAWN to the roof edge. Neither is the priced area: that is
-  /// [planesSurfaceAreaSqft] (priced, equals pitched + flat roofing).
-  final double? areaSqftWallLine, areaSqftRoofEdge;
-
-  /// Outline perimeter at the wall line (`outlinePerimeterFt` is the roof-edge one).
-  final double? outlinePerimeterWallFt;
-  final double? overhangFtMedian, flatEdgeFt, levelChangeFt;
-  final RoofComplexity? complexity;
-
-  /// The cost-sheet keys: the PRICED surface area (pitched + flat roofing), area-weighted pitch of pitched
-  /// facets, roof-edge perimeter.
-  final double? planesSurfaceAreaSqft, planesPitchWeighted, outlinePerimeterFt;
-
-  /// True when the pitched and flat squares are both known (the totals table then lists them
-  /// on separate rows).
-  bool get hasRoofing => roofingPitchedSquares != null || roofingFlatSquares != null;
+  /// Area-weighted fitted pitch (rise per 12) of the pitched facets.
+  final double? planesPitchWeighted;
+  /// Number of facets.
+  final int? planeCount;
+  /// Outer roof edge by type.
+  final double? eaveFt;
+  final double? rakeFt;
+  final double? flatEdgeFt;
+  /// The free edge of an upper roof at every step, plus the sides of a lantern.
+  final double? exposedEdgeFt;
+  /// `eave + rake + flat edge + exposed edge`.
+  final double? eaveRakeFt;
+  /// Inner lines.
+  final double? ridgeFt;
+  final double? hipFt;
+  final double? valleyFt;
+  /// `ridge + hip`.
+  final double? ridgeHipFt;
+  /// Sidewall flashing: a step that runs down the lower slope.
+  final double? stepFlashingFt;
+  /// Headwall flashing: a step across the lower slope, or onto a low-slope section.
+  final double? wallFlashingFt;
+  /// Pitched meets low-slope with no height step.
+  final double? transitionFt;
+  /// A step between two low-slope sections.
+  final double? levelChangeFt;
+  /// From `model.objects`.
+  final int? chimneyCount;
+  final double? chimneyPerimeterFt;
+  final int? lanternCount;
+  /// Equal to [areaSqft]; kept for one release (phone builds in the field use its presence).
+  final double? areaSqftRoofEdge;
 
   Map<String, dynamic> toJson() => {
+        if (areaSqft != null) 'area_sqft': areaSqft,
+        if (squares != null) 'squares': squares,
         if (roofingPitchedSqft != null) 'roofing_pitched_sqft': roofingPitchedSqft,
         if (roofingFlatSqft != null) 'roofing_flat_sqft': roofingFlatSqft,
-        if (roofingPitchedSquares != null) 'roofing_pitched_squares': roofingPitchedSquares,
-        if (roofingFlatSquares != null) 'roofing_flat_squares': roofingFlatSquares,
         if (lowSlopeConfirmSqft != null) 'low_slope_confirm_sqft': lowSlopeConfirmSqft,
-        if (areaSqftWallLine != null) 'area_sqft_wall_line': areaSqftWallLine,
-        if (areaSqftRoofEdge != null) 'area_sqft_roof_edge': areaSqftRoofEdge,
-        if (outlinePerimeterWallFt != null) 'outline_perimeter_wall_ft': outlinePerimeterWallFt,
-        if (overhangFtMedian != null) 'overhang_ft_median': overhangFtMedian,
-        if (flatEdgeFt != null) 'flat_edge_ft': flatEdgeFt,
-        if (levelChangeFt != null) 'level_change_ft': levelChangeFt,
-        if (complexity != null) 'complexity': complexity!.toJson(),
-        if (planesSurfaceAreaSqft != null) 'planes_surface_area_sqft': planesSurfaceAreaSqft,
         if (planesPitchWeighted != null) 'planes_pitch_weighted': planesPitchWeighted,
-        if (outlinePerimeterFt != null) 'outline_perimeter_ft': outlinePerimeterFt,
+        if (planeCount != null) 'plane_count': planeCount,
+        if (eaveFt != null) 'eave_ft': eaveFt,
+        if (rakeFt != null) 'rake_ft': rakeFt,
+        if (flatEdgeFt != null) 'flat_edge_ft': flatEdgeFt,
+        if (exposedEdgeFt != null) 'exposed_edge_ft': exposedEdgeFt,
+        if (eaveRakeFt != null) 'eave_rake_ft': eaveRakeFt,
+        if (ridgeFt != null) 'ridge_ft': ridgeFt,
+        if (hipFt != null) 'hip_ft': hipFt,
+        if (valleyFt != null) 'valley_ft': valleyFt,
+        if (ridgeHipFt != null) 'ridge_hip_ft': ridgeHipFt,
+        if (stepFlashingFt != null) 'step_flashing_ft': stepFlashingFt,
+        if (wallFlashingFt != null) 'wall_flashing_ft': wallFlashingFt,
+        if (transitionFt != null) 'transition_ft': transitionFt,
+        if (levelChangeFt != null) 'level_change_ft': levelChangeFt,
+        if (chimneyCount != null) 'chimney_count': chimneyCount,
+        if (chimneyPerimeterFt != null) 'chimney_perimeter_ft': chimneyPerimeterFt,
+        if (lanternCount != null) 'lantern_count': lanternCount,
+        if (areaSqftRoofEdge != null) 'area_sqft_roof_edge': areaSqftRoofEdge,
       };
 
   @override
-  bool operator ==(Object other) =>
-      other is RoofEngineTotals && _same(other.toJson(), toJson());
+  bool operator ==(Object other) => other is RoofEngineTotals && _same(other.toJson(), toJson());
 
   @override
   int get hashCode => Object.hashAll([for (final e in toJson().entries) Object.hash(e.key, '${e.value}')]);

@@ -150,7 +150,7 @@ def test_parcel_without_house_number_is_flagged_nearest(site1):
 
 def test_area_sqft_is_in_square_feet():
     poly = shape({"type": "Polygon", "coordinates": [_sq(-118.0, 33.0, 0.0001, 0.0001)]})  # ~9.3 m x 11.1 m
-    assert 1000 < footprint._area_sqft(poly) < 1250
+    assert 1000 < footprint.area_sqft(poly) < 1250
 
 
 def test_footprint_second_call_is_cached(fake_net, site1):

@@ -1,7 +1,7 @@
 [project]
 name = "roof-measure"
-version = "0.2.0"
-description = "Address -> roof measurement (footprint + USGS 3DEP LiDAR, optional Google Solar, LLM verifier) as an importable library or async job API."
+version = "0.6.0"
+description = "Address -> roof measurement (county or OpenStreetMap footprint + USGS 3DEP LiDAR + a plane engine) as an importable library."
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12,<3.14"
 dependencies = [
@@ -11,17 +11,12 @@ dependencies = [
     "pyproj>=3.6",
     "laspy[lazrs]>=2.5",
     "requests>=2.32",
-    "compas_cgal>=0.10.0",
-    "anthropic>=0.60",
 ]
 
 [project.optional-dependencies]
-service = ["fastapi>=0.115", "uvicorn>=0.30"]  # the async job API
-render = ["matplotlib>=3.9"]  # the debug PNG
-dev = ["pytest>=8.3", "ruff>=0.6", "httpx>=0.27"]  # httpx: fastapi TestClient
-
-[project.scripts]
-roof-measure = "roof_measure.cli:main"
+render = ["matplotlib>=3.9"]  # tools/roof_eval pictures (not the library)
+label = ["anthropic>=0.60"]  # tools/roof_eval/label only (offline labelling of the regression set; never the library)
+dev = ["pytest>=8.3", "ruff>=0.6"]
 
 [build-system]
 requires = ["setuptools>=70", "wheel"]

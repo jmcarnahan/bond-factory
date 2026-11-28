@@ -1,5 +1,10 @@
 # roof_measure envelope 0.4 (additive to 0.2 and 0.3): the plane engine and the building choice
 
+> **Superseded by [contract-0.6.md](contract-0.6.md).** The `engine="blocks"` choice, the `hints` argument (`steps`), the priced-versus-drawn totals and the old totals keys described here were removed in 0.6.0. Kept as the record of the shape before.
+
+> **Removed in 0.6.** What this file calls "the block path" and "the verifier" no longer exists in the library; the plane engine
+> described here is the only engine. `roof_measure.pipeline`, `model` and `quality` keep only what the engine uses.
+
 Emitted since pipeline `0.5.0` (the plane engine). These are the changes since pipeline `0.4.0`, released as `0.5.0`:
 the library preparation (building choice, below) and the engine arrive together; `0.4.1` was only a working label for the
 preparation and was never released. The contract name stays
@@ -12,8 +17,8 @@ with `engine="planes"` (see "Choosing the engine"). Every key in this document i
 
 ## Choosing the engine
 
-`measure(..., engine="blocks" | "planes")` (HTTP request field `engine`, same values). `"blocks"` is the default and the
-old rectangle-and-skeleton path, unchanged. `"planes"` is the plane engine: one facet per measured roof plane, flat and
+`measure(..., engine="blocks" | "planes")` (HTTP request field `engine`, same values). Until 0.5.1 `"blocks"` was the default: the
+old rectangle-and-skeleton path, since removed. `"planes"` is the plane engine: one facet per measured roof plane, flat and
 pitched told apart at 2/12, the totals and quality below. It needs live LiDAR and `method` `"auto"` or `"lidar_skeleton"`
 (no agent, no `blocks_path`, no `solar_fixture`: a `ValueError`); it has no verifier (`verification.verdict` is
 `unverified`) and NO fallback to the block path: when it refuses or fails the caller gets the same job codes

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'figures.dart';
 import 'format.dart';
 import 'labels.dart';
 import 'layout.dart';
@@ -8,16 +9,14 @@ import 'report_layout.dart';
 import 'scene.dart';
 import 'style.dart';
 
+/// The plane engine (`planes`) and the older LiDAR path (`lidar_skeleton`) both read as the LiDAR + footprint method; any
+/// other method is shown as the service wrote it.
 String _methodName(String m, RoofLabels l) => switch (m) {
-      'lidar_skeleton' => l.methodLidarSkeleton,
-      'lidar_agent' => l.methodLidarAgent,
-      'solar_agent' => l.methodSolarAgent,
-      'manual' => l.methodManual,
-      'fixture' => l.methodFixture,
+      'lidar_skeleton' || 'planes' => l.methodLidarSkeleton,
       _ => m,
     };
 
-/// The "Source" lines: method, footprint, LiDAR, Solar imagery and the model date.
+/// The "Source" lines: method, footprint, LiDAR and the model date.
 List<String> sourceLines(RoofModel m, RoofLabels l) {
   final raw = m.source.raw;
   String known(Object? v) => v == null ? l.unknown : '$v';
@@ -37,17 +36,12 @@ List<String> sourceLines(RoofModel m, RoofLabels l) {
         : '';
     lines.add('${RoofLabels.fill(l.sourceLidar, {'project': known(lidar['project']), 'date': known(lidar['acquired'])})}$pts');
   }
-  final solar = raw['solar'];
-  if (solar is Map) {
-    final seg = solar['segments'] != null ? ', ${RoofLabels.fill(l.solarSegments, {'n': '${solar['segments']}'})}' : '';
-    lines.add('${RoofLabels.fill(l.sourceSolar, {'date': known(solar['imagery_date']), 'quality': known(solar['imagery_quality'])})}$seg');
-  }
   final gen = m.extra['generated_at'];
   if (gen is String) lines.add(RoofLabels.fill(l.modelGenerated, {'date': gen}));
   return lines;
 }
 
-/// A text report: address, source and data dates, areas, pitch, confidence and warnings.
+/// A text report: address, the totals the roof has, source and data dates, confidence and warnings.
 /// The height is computed from the content. Text comes from [labels]; [layout] picks four
 /// figure columns (wide) or two (compact).
 class SummaryBlock {
@@ -97,20 +91,9 @@ class SummaryBlock {
     final address = m.address.display.isEmpty ? labels.addressMissing : m.address.display;
     text(address, fitSize(address, textW, sp.sumTitleSize, sp.titleMin, bold: true), bold: true, gapAfter: sp.sumTitleGap);
 
-    // Key figures in columns.
-    final t = m.totals;
-    String sq(double v) => '${sqft(v)} ${labels.unitSqft}';
+    // Key figures in columns: the totals the roof has, then the confidence.
     final figs = <(String, String)>[
-      (labels.totalArea, sq(t.totalAreaSqft)),
-      (labels.squares, t.squares.toStringAsFixed(2)),
-      (labels.pitchedArea, sq(m.pitchedAreaSqftByRoofType)),
-      (labels.flatArea, sq(m.flatAreaSqftByRoofType)),
-      (
-        labels.predominantPitch,
-        '${pitchLabel(t.predominantPitchRise, labels: labels)}  (${sq(t.predominantPitchAreaSqft)})'
-      ),
-      (labels.facets, '${m.facets.length}'),
-      (labels.edgeTotal, feetInches(t.lengthsFt.entries.fold(0.0, (a, e) => e.key == EdgeType.flatSeam ? a : a + e.value), labels: labels)),
+      for (final r in totalRows(m, labels)) (r.label, r.value),
       (labels.confidence, m.confidence.overall),
     ];
     final cols = layout.figureColumns;
@@ -118,7 +101,9 @@ class SummaryBlock {
     final compact = layout == ReportLayout.compact;
     for (var row = 0; row < ReportLayout.rowsFor(figs.length, cols); row++) {
       for (var c = 0; c < cols; c++) {
-        final (cap, val) = figs[row * cols + c];
+        final at = row * cols + c;
+        if (at >= figs.length) break;
+        final (cap, val) = figs[at];
         final x = left + c * colW;
         prims
           ..add(TextPrim(

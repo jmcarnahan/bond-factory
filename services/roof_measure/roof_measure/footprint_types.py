@@ -1,4 +1,4 @@
-"""Footprint value types and helpers shared by the footprint links (county, OSM, Solar, LiDAR hull)."""
+"""Footprint value types and helpers shared by the footprint links (county, OSM, LiDAR hull)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from shapely.geometry.polygon import orient
 from .frame import FT_PER_M, project_geometry, utm_epsg_for
 
 SQFT_PER_M2 = FT_PER_M**2
-SOURCES = ("lariac", "osm", "solar", "lidar_hull")
 
 
 class FootprintError(RuntimeError):
@@ -39,7 +38,7 @@ class Footprint:
     match: str = "exact"  # exact | street | nearest: how well the address matched the chosen parcel/building
     warnings: list[str] = field(default_factory=list)
     warning_codes: list[str] = field(default_factory=list)  # parallel to warnings (closed list, see envelope)
-    source: str = "lariac"  # one of SOURCES: which link of the chain produced it
+    source: str = "lariac"  # lariac, osm or lidar_hull: which link of the chain produced it
     transient: bool = False  # a link was unreachable: do not cache this result (an outage must not outlive itself)
 
     def warn(self, code: str, text: str) -> None:

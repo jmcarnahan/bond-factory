@@ -52,3 +52,30 @@ void expectWellFormedSvg(String svg) {
   }
   expect(depth, '</'.allMatches(svg).length);
 }
+
+/// The length labels of [s] are upright, overlap nothing and touch no edge (the hatch is fill, not an edge). The plan starts
+/// at the first facet polygon; the legend is drawn before it.
+void expectLengthLabelsClean(Scene s) {
+  const st = DiagramStyle.report;
+  final facetFills = {st.flatFill, st.slopedFill, st.flatRoofFill};
+  final plan = s.prims.skipWhile((p) => !(p is PolyPrim && facetFills.contains(p.fill))).toList();
+  final labels = [
+    for (final p in plan)
+      if (p is TextPrim && RegExp(r'^\d+(, \d+ ft step)?$').hasMatch(p.text)) p
+  ];
+  expect(labels.length, s.placedLabels);
+  final edges = [for (final p in plan) if (p is LinePrim && p.color != st.hatchColor) p];
+  final boxes = <Obb>[];
+  for (final l in labels) {
+    expect(l.angleDeg, greaterThan(-90));
+    expect(l.angleDeg, lessThanOrEqualTo(90));
+    final b = textBox(l);
+    for (final o in boxes) {
+      expect(b.overlaps(o), isFalse, reason: 'label ${l.text} overlaps another label');
+    }
+    for (final e in edges) {
+      expect(b.crossesSegment(e.a, e.b), isFalse, reason: 'label ${l.text} touches an edge');
+    }
+    boxes.add(b);
+  }
+}

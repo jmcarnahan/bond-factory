@@ -1,67 +1,55 @@
-"""The 0.2 envelope: 14 totals keys, variants, the confidence rule, warning codes."""
-
-import json
+"""The envelope: the contract-0.6 totals keys, the confidence rule, warning codes. Models come from the engine on synthetic roofs."""
 
 import pytest
-from conftest import FIXTURES
+from test_engine_adapter import model_of
 
 from roof_measure.envelope import (
-    TOTALS_KEYS,
     WARNING_CODES,
     build_envelope,
     confidence_score,
     totals_from_model,
 )
+from roof_measure.model import TOTALS_KEYS
 from roof_measure.version import CONTRACT, PIPELINE_VERSION
 
-HIP = json.loads((FIXTURES / "synthetic_hip.json").read_text())
+HIP = model_of("hip_d8")[0]
 VERIF = {"verdict": "pass", "notes": [], "adjustments": [], "original_totals": {}, "model": None, "rounds": 0,
          "usage": {"input_tokens": 0, "output_tokens": 0}}
 
 
 def env(model=HIP, **kw):
-    args = {"method_used": "lidar_skeleton", "footprint_source": "osm", "verification": VERIF, "warnings": [],
+    args = {"method_used": "planes", "footprint_source": "osm", "verification": VERIF, "warnings": [],
             "warning_codes": []} | kw
     return build_envelope(model, **args)
 
 
-@pytest.mark.parametrize("name", ["synthetic_hip", "synthetic_gable", "synthetic_flat_parapet", "synthetic_flat_curbs",
-                                  "synthetic_hip_zigzag"])
-def test_totals_have_exactly_the_14_keys_and_match_the_model(name):
-    m = json.loads((FIXTURES / f"{name}.json").read_text())
+@pytest.mark.parametrize("name", ["hip_d8", "gable_d8", "flat_d8", "flat_pitched_step_d8", "l_shape_d8"])
+def test_totals_have_exactly_the_contract_keys_and_match_the_model(name):
+    m = model_of(name)[0]
     t = totals_from_model(m)
-    assert tuple(t) == TOTALS_KEYS and len(t) == 14
-    L = m["totals"]["lengths_ft"]
-    assert t["area_sqft"] == pytest.approx(m["totals"]["total_area_sqft"], abs=0.001)
-    assert t["squares"] == pytest.approx(m["totals"]["squares"], abs=0.001)
-    assert t["facets"] == len(m["facets"])
-    for key, edge in (("eave_ft", "eave"), ("rake_ft", "rake"), ("ridge_ft", "ridge"), ("hip_ft", "hip"),
-                      ("valley_ft", "valley"), ("step_flashing_ft", "step_flashing")):
-        assert t[key] == pytest.approx(L[edge], abs=0.001)
+    assert tuple(t) == TOTALS_KEYS == tuple(k for k in m["totals"] if k in TOTALS_KEYS)
+    assert t["area_sqft"] == m["totals"]["total_area_sqft"] and t["plane_count"] == len(m["facets"])
     # the totals are sums of the edges, not just copies of model.totals
-    for edge in ("eave", "ridge", "hip", "rake"):
-        assert t[f"{edge}_ft"] == pytest.approx(sum(e["length_ft"] for e in m["edges"] if e["type"] == edge), abs=0.05)
+    for edge in ("eave", "ridge", "hip", "rake", "valley", "step_flashing", "wall_flashing", "flat_edge", "level_change"):
+        assert t[f"{edge}_ft"] == pytest.approx(sum(e["length_ft"] for e in m["edges"] if e["type"] == edge), abs=0.05), edge
 
 
 def test_variant_arithmetic():
-    gable = json.loads((FIXTURES / "synthetic_gable.json").read_text())
-    t = totals_from_model(gable)
-    assert t["rake_ft"] > 0 and t["ridge_ft"] > 0
-    assert t["drip_edge_eave_ft"] == t["eave_ft"]
-    assert t["drip_edge_eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"], abs=0.002)
-    assert t["ridge_cap_ridge_ft"] == t["ridge_ft"]
-    assert t["ridge_cap_ridge_hip_ft"] == pytest.approx(t["ridge_ft"] + t["hip_ft"], abs=0.002)
+    t = totals_from_model(model_of("gable_d8")[0])
+    assert t["rake_ft"] > 0 and t["ridge_ft"] > 0 and t["hip_ft"] == 0
+    assert t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"], abs=0.02)
+    assert t["ridge_hip_ft"] == pytest.approx(t["ridge_ft"] + t["hip_ft"], abs=0.02)
     h = totals_from_model(HIP)
-    assert h["ridge_cap_ridge_hip_ft"] == pytest.approx(9.0 + h["hip_ft"], abs=0.002) and h["predominant_pitch"] == 4.0
-    flat = totals_from_model(json.loads((FIXTURES / "synthetic_flat_parapet.json").read_text()))
-    assert flat["predominant_pitch"] == 0 and flat["eave_ft"] == 0
+    assert h["ridge_hip_ft"] == pytest.approx(h["ridge_ft"] + h["hip_ft"], abs=0.02) and h["hip_ft"] > 0
+    flat = totals_from_model(model_of("flat_d8")[0])
+    assert flat["roofing_pitched_sqft"] == 0 and flat["ridge_ft"] == 0 and flat["flat_edge_ft"] > 0
 
 
 @pytest.mark.parametrize("overall,source,verdict,density,want", [
     ("high", "lariac", "pass", None, 0.9), ("medium", "lariac", "pass", 20.0, 0.7), ("low", "lariac", "pass", 20.0, 0.5),
     ("high", "osm", "pass", None, 0.85), ("medium", "osm", "pass", None, 0.7),
-    ("high", "solar", "pass", None, 0.5), ("high", "lidar_hull", "pass", None, 0.5),
-    ("high", "lariac", "adjusted", None, 0.85), ("high", "solar", "adjusted", None, 0.45),
+    ("high", "lidar_hull", "pass", None, 0.5),
+    ("high", "lariac", "adjusted", None, 0.85), ("high", "lidar_hull", "adjusted", None, 0.45),
     ("high", "lariac", "unverified", None, 0.7), ("low", "lariac", "unverified", None, 0.5),
     ("high", "lariac", "fail", None, 0.3), ("low", "lariac", "fail", None, 0.3),
     ("medium", "osm", "pass", 11.9, 0.6), ("medium", "osm", "pass", 12.0, 0.7),
@@ -72,7 +60,7 @@ def test_confidence_table(overall, source, verdict, density, want):
 
 
 def test_confidence_is_clamped():
-    assert 0.0 <= confidence_score({"confidence": {"overall": "low"}}, "solar", "fail", 0.0) <= 1.0
+    assert 0.0 <= confidence_score({"confidence": {"overall": "low"}}, "lidar_hull", "fail", 0.0) <= 1.0
     assert confidence_score({"confidence": {}}, "osm", "pass") == 0.5  # unknown overall behaves like low
 
 
@@ -96,7 +84,7 @@ def test_warnings_and_codes_must_line_up_and_unknown_codes_become_other():
 
 
 def test_degraded_footprints_can_never_pass():
-    for source in ("solar", "lidar_hull"):
+    for source in ("lidar_hull",):
         e = env(footprint_source=source)
         assert e["verification"]["verdict"] == "adjusted" and "lowered from pass" in e["verification"]["notes"][-1]
         assert e["confidence"] == 0.45
@@ -110,11 +98,9 @@ def test_bad_verdict_is_rejected():
 
 
 def test_warning_code_list_matches_the_contract():
-    assert WARNING_CODES == ("footprint_osm", "footprint_solar", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
-                             "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "method_fallback",
-                             "verifier_unverified", "verifier_adjusted", "verifier_failed", "verifier_timeout",
-                             "solar_segments_only", "agent_failed_fell_back", "flat_roof_assumed", "model_failed", "model_from_planes",
-                             "low_slope_confirm", "outline_mismatch", "poor_fit", "low_density", "other")  # 0.5.0 added four
+    assert WARNING_CODES == ("footprint_osm", "footprint_lidar_hull", "source_unreachable", "parcel_without_building",
+                             "other_buildings_on_parcel", "parcel_street_match", "low_point_density", "low_slope_confirm",
+                             "outline_mismatch", "poor_fit", "low_density", "objects_failed", "other")  # 0.6.0 removed the codes with no producer
 
 
 def test_source_unreachable_code_survives_build_envelope():

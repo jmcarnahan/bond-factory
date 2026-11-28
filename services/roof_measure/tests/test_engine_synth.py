@@ -13,7 +13,7 @@ from roof_measure.engine.errors import EngineTimeout
 SHAPES = ("gable", "hip", "l_shape", "t_shape", "cross_gable", "flat", "flat_pitched", "two_level")
 STRICT = ("gable", "hip", "flat")  # facet count within +-1 of the truth; the rest within +-2
 AREA_TOL = 0.025  # phase 2b: the roof edge is measured with a spacing correction (was 0.04 at the port)
-COST_KEYS = ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft")
+COST_KEYS = ("area_sqft", "planes_pitch_weighted", "eave_rake_ft", "ridge_hip_ft")
 GRID = [f"{s}_d{d}" for s in SHAPES for d in (16, 8)]
 
 
@@ -53,9 +53,9 @@ def test_facet_types_and_edge_types(name):
         assert kinds == {"flat", "pitched"} and "transition" in types
         assert res.totals["roofing_flat_sqft"] > 0 and res.totals["roofing_pitched_sqft"] > 0
     elif shape == "two_level":
-        assert "level_change" in types
-        assert res.totals["level_change_ft"] > 0
-        assert all(e.jump_ft is not None for e in res.edges if e.type == "level_change")
+        assert "step_flashing" in types  # two gables end to end, one 1.2 m higher: the step runs down the lower slope (sidewall)
+        assert res.totals["step_flashing_ft"] > 0
+        assert all(e.jump_ft is not None and e.upper for e in res.edges if e.type in ("level_change", "step_flashing", "wall_flashing"))
 
 
 def test_two_runs_give_byte_identical_json():
@@ -73,16 +73,16 @@ def test_the_result_json_has_the_harness_shape():
     f = out["facets"][0]
     assert {"id", "plane", "pitch_rise", "aspect_deg", "roof_type", "area_sqft", "polygon", "pitch_fit"} <= set(f)
     assert out["diagnostics"]["quality"]["verdict"] == "ok"
-    assert out["totals"]["complexity"]["hint"] in ("simple", "cut_up")
+    assert out["totals"]["plane_count"] == len(out["facets"]) and "complexity" not in out["totals"]
 
 
-def test_the_priced_area_is_below_the_drawn_area_and_both_are_reported():
-    t = run("gable_d8").totals
-    assert t["area_sqft_measured_edge"] > t["planes_surface_area_sqft"] > t["area_sqft_wall_line"] * 0.9
-    # contract 0.4: area_sqft_roof_edge is the DRAWN area (it used to repeat the priced one); the priced key is
-    # planes_surface_area_sqft. The engine totals may leave it to the adapter (engine.adapter.engine_totals).
-    assert t.get("area_sqft_roof_edge", t["area_sqft_measured_edge"]) == t["area_sqft_measured_edge"]
-    assert t["outline_perimeter_ft"] > 0 and t["outline_perimeter_wall_ft"] > 0
+def test_one_roof_one_area_and_the_roof_edge_twin_agrees():
+    res = run("gable_d8")
+    t = res.totals
+    area = sum(f.area_sqft for f in res.facets)
+    for k in ("area_sqft", "area_sqft_roof_edge"):
+        assert t[k] == pytest.approx(area, abs=0.1), k
+    assert t["eave_rake_ft"] > 0 and t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"], abs=0.02)
 
 
 def test_a_rotated_roof_is_measured_in_its_own_frame():
@@ -106,7 +106,7 @@ def test_an_expired_deadline_raises_the_typed_timeout():
 
 @pytest.mark.parametrize("change", [
     {"s3_axis": False}, {"s2_flat": False}, {"s4_gentle": False},
-    {"overhang_scale": 1.0}, {"overhang_scale": 0.0}, {"max_points": 400}, {"beta_schedule": (3.2,)}])
+    {"max_points": 400}, {"beta_schedule": (3.2,)}])
 def test_the_alternative_parameter_paths_still_measure_a_roof(change):
     from roof_measure.engine.params import DEFAULT
 

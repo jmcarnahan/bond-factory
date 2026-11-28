@@ -14,7 +14,14 @@ import numpy as np
 from shapely.geometry import Polygon
 
 from .absorb import absorb_labels
-from .cleanup import clean_facets, close_gaps, merge_coplanar_facets, merge_small_facets, repair_items
+from .cleanup import (
+    clean_facets,
+    close_gaps,
+    merge_coplanar_facets,
+    merge_off_plane_facets,
+    merge_small_facets,
+    repair_items,
+)
 from .errors import Ctx, EngineFailure
 from .junk import absorb_edge_strips, absorb_enclosed_flat, absorb_flat_junk, merge_flat_fitting
 from .raster import label_raster
@@ -43,7 +50,7 @@ def explode(items: list) -> list:
 
 
 def _attempt(outline: Polygon, q: np.ndarray, qlab: np.ndarray, planes: list, theta: float, h: float,
-             beta: float, ctx: Ctx) -> PartitionRun:
+             beta: float, ctx: Ctx, returns: np.ndarray) -> PartitionRun:
     p = ctx.p
     qlab2 = qlab.copy()
     pl2 = [pl.copy() for pl in planes]
@@ -67,19 +74,23 @@ def _attempt(outline: Polygon, q: np.ndarray, qlab: np.ndarray, planes: list, th
     diag["edge_strips_absorbed"] = n_strip
     out, n_gap = close_gaps(out, outline, p)
     diag["gaps_closed"] = n_gap
+    out, n_off = merge_off_plane_facets(out, pl2, returns, ctx)
+    diag["off_plane_facets_merged"] = n_off
     return PartitionRun(repair_items(out), pl2, qlab2, lab, origin, beta, diag)
 
 
 def build_partition(outline: Polygon, q: np.ndarray, qlab: np.ndarray, planes: list, theta: float,
-                    ctx: Ctx) -> tuple[PartitionRun, float]:
-    """Label the outline's cells and produce the clean facet polygons. Returns (chosen run, grid step m)."""
+                    ctx: Ctx, returns: np.ndarray) -> tuple[PartitionRun, float]:
+    """Label the outline's cells and produce the clean facet polygons. ``returns`` are all the roof returns (assigned to a
+    plane or not) the planes were detected from. Returns (chosen run, grid step m)."""
     p = ctx.p
     h = max(p.grid_min_m, math.sqrt(outline.area / p.grid_cells_target))
+    h = math.ceil(round(h / p.grid_quantum_m, 6)) * p.grid_quantum_m
     allowed = outline.area / p.beta_m2_per_facet + p.beta_extra_facets
     best: PartitionRun | None = None
     for beta in p.beta_schedule:
         ctx.check()
-        run = _attempt(outline, q, qlab, planes, theta, h, beta, ctx)
+        run = _attempt(outline, q, qlab, planes, theta, h, beta, ctx, returns)
         if best is None or len(run.items) < len(best.items) * p.beta_keep_ratio:
             best = run
         if len(run.items) <= allowed:
