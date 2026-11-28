@@ -127,7 +127,9 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
         assert k in t, k
     assert t["roofing_flat_sqft"] > 100 and t["roofing_pitched_sqft"] > 100
     assert t["area_sqft_wall_line"] <= t["planes_surface_area_sqft"] <= t["area_sqft_roof_edge"]
-    assert m["totals"]["lengths_ft"]["level_change"] > 0 and m["planes"] and "model_from_planes" not in env["warning_codes"]
+    lengths = m["totals"]["lengths_ft"]  # a pitched roof draining into the higher flat deck's wall: sidewall flashing
+    assert lengths["level_change"] + lengths["step_flashing"] + lengths["wall_flashing"] > 0
+    assert m["planes"] and "model_from_planes" not in env["warning_codes"]
     assert "lidar" in stages and "model" in stages and "blocks" not in stages
     json.dumps(env, allow_nan=False)
 

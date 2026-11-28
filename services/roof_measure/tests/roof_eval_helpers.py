@@ -122,6 +122,21 @@ def all_flat(res):
     return r
 
 
+def pitched_step(jump=1.0, x=6.0):
+    """(result, points): two 6/12 pitched facets side by side, the east one ``jump`` metres higher at the line x = ``x`` (a wall
+    between them), one level_change edge on the line, and returns exactly on both planes (the engine's step on a real roof)."""
+    west = (RISE, 0.0, EAVE)  # z = RISE x + EAVE
+    east = (RISE, 0.0, EAVE + jump)
+    res = gable_result()
+    res["facets"] = [facet("f1", rect(0, 0, x, D), west), facet("f2", rect(x, 0, W, D), east)]
+    z = RISE * x + EAVE
+    res["edges"].append(edge("level_change", (x, 0.5, z), (x, 7.5, z), ["f1", "f2"]))
+    xs, ys = np.arange(0.25, W, 0.5), np.arange(0.25, D, 0.5)
+    X, Y = np.meshgrid(xs, ys)
+    Z = RISE * X + EAVE + np.where(X < x, 0.0, jump)
+    return res, np.stack([X.ravel(), Y.ravel(), Z.ravel()], 1)
+
+
 def two_level_points(jump=1.0):
     """Two flat decks 1 m apart meeting at x = 6 (true level change)."""
     xs, ys = np.arange(0.25, W, 0.5), np.arange(0.25, D, 0.5)

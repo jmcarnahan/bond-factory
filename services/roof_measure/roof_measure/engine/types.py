@@ -108,7 +108,7 @@ class Facet:
 class Edge:
     """A typed edge between two facets (or a facet and the outside); p0, p1 are (x, y, z) in metres."""
 
-    type: str  # eave rake ridge hip valley flat_edge level_change flat_seam transition (and "step" inside the engine)
+    type: str  # eave rake ridge hip valley flat_edge level_change step_flashing wall_flashing flat_seam transition
     p0: tuple[float, float, float]
     p1: tuple[float, float, float]
     length_ft: float
@@ -116,6 +116,7 @@ class Edge:
     jump_m: float | None = None
     jump_ft: float | None = None
     high_edge: bool = False  # exterior high edge of a pitched facet (typed ridge, never a wall type)
+    upper: str | None = None  # a step (level_change, step_flashing, wall_flashing): the id of the HIGHER facet
 
 
 @dataclass

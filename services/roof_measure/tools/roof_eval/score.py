@@ -2,7 +2,8 @@
 
 Edges are not taken on trust: ``roof.edges`` is replaced by the set recomputed from the facets (``edges_re``) before any
 length, perimeter, level-change or cleanliness metric; the engine's own list is kept as ``roof.engine_edges`` for the
-disagreement, false and unmarked level-change metrics. Engine-only wall types (step, wall flashing, parapet) are carried over.
+disagreement, false and unmarked level-change metrics. The engine-only parapet type is carried over; a step it names sidewall or
+headwall is the recomputed ``level_change``.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from shapely.geometry import Polygon
 from . import edges_re, m_fit, m_shape, m_truth, priced
 from .geom import FLAT_RISE, Roof, load_roof
 
-KEEP_ENGINE_TYPES = ("step_flashing", "wall_flashing", "parapet")
+KEEP_ENGINE_TYPES = ("parapet",)  # a step is recomputed (as ``level_change``: sidewall and headwall are the engine's names for it)
 
 
 def verdict_ok(roof: Roof) -> bool:

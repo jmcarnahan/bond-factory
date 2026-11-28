@@ -69,11 +69,13 @@ def test_a_constant_two_foot_parapet_like_step_with_a_tight_spread_stays_a_level
     assert seam_types(facets, q) == ["level_change"]
 
 
-def test_a_sloped_lower_deck_cut_in_pieces_is_a_flat_seam_even_when_the_points_show_a_jump():
-    # the fitted planes meet at the seam (y = 5); the points beside it still show 0.6 m: roughness, not a step
+def test_a_sloped_lower_deck_cut_in_pieces_is_no_step_even_when_the_points_beside_the_seam_are_far_off_their_planes():
+    # the fitted planes meet at the seam (y = 5); the points beside it lie 0.6 m over their facet's plane: roughness (a return
+    # that far off its own plane is not measured), not a step. Before slice B the jump (0.6 m) was measured and the seam drawn as
+    # a flat_seam; now nothing is measured there and the two pieces of one deck share no line (``mergeable``).
     facets, q = two_decks((0.0, 0.03, 3.0 - 0.15), (0.0, 0.0, 3.0), upper_pts=(0.0, 0.03, 3.0 + 0.45))
     types = seam_types(facets, q)
-    assert types == ["flat_seam"], types
+    assert types == [], types
 
 
 def test_planes_that_are_apart_on_under_70_percent_of_the_seam_make_a_flat_seam():

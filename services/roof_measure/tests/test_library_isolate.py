@@ -233,11 +233,11 @@ def test_the_real_child_receives_every_request_field(tmp_path, stub_child):
     folder = house(tmp_path / "src")
     env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True,
                   overpass_urls=["https://m1.example/api"], force=True, lat=1.0, lng=2.0, method="lidar_skeleton",
-                  points_path=folder, include_other_buildings=True, building_outline_id=" B7 ", hints={"steps": False})
+                  points_path=folder, include_other_buildings=True, building_outline_id=" B7 ", hints={})
     assert env == {
         "address": "x", "method": "lidar_skeleton", "overpass": ["https://m1.example/api"],
         "cache_dir": str((tmp_path / "cache").resolve()), "force": True, "lat_lng": [1.0, 2.0],
-        "points_path": str(folder.resolve()), "lot": True, "outline": "B7", "hints": {"steps": False}}
+        "points_path": str(folder.resolve()), "lot": True, "outline": "B7", "hints": None}  # {} is no hint: nothing is sent
 
 
 def test_the_real_child_defaults_are_off_and_none(tmp_path, stub_child):

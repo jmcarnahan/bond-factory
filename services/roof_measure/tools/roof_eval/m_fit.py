@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-import numpy as np
+from typing import Any
 
-from .geom import M2_TO_SQFT, UNCOUNTED_EDGE_TYPES, Roof, surface_points
+import numpy as np
+from shapely.geometry import Point
+
+from .geom import M2_TO_SQFT, STEP_TYPES, UNCOUNTED_EDGE_TYPES, Roof, surface_points
 from .seam_check import strip_step
 
 FIT_TOL_M = 0.15
 FALSE_JUMP_M = 0.3  # contract-0.4: a level_change is a jump >= 0.3 m, so a measured jump below this is false
-SIDE_NEAR_M, SIDE_FAR_M, SIDE_MIN_PTS = 0.2, 1.5, 5
 CLOSE_M = 0.3  # facets are meant to tile: a gap narrower than this between facets is a tiling defect
 
 
@@ -81,27 +83,36 @@ def outline_gap_sqft(roof: Roof) -> float | None:
     return roof.outline.difference(roof.union).area * M2_TO_SQFT
 
 
-def edge_jump_m(ref: np.ndarray, p0, p1) -> float | None:
-    """Height jump across an edge measured from the reference points only: each side's local linear fit
-    (z on across- and along-edge distance, points 0.2-1.5 m from the line) is evaluated on the line itself.
-    None when either side has fewer than 5 points in the edge's span."""
+def plane_sides(facets, p0, p1) -> tuple[Any, Any] | None:
+    """(plane of the facet on the left of p0 -> p1, plane of the one on its right) among ``facets``, found by probing just
+    beside the middle of the edge: the edge's own facet list is not taken on trust. None when a side is in no facet."""
     d = np.array([p1[0] - p0[0], p1[1] - p0[1]], float)
-    ln = float(np.hypot(*d))
-    if ln < 0.3 or len(ref) == 0:
-        return None
-    t, n = d / ln, np.array([-d[1], d[0]]) / ln
-    rel = ref[:, :2] - np.array(p0[:2])
-    u, s = rel @ t, rel @ n
-    in_span = (u >= 0) & (u <= ln)
-    z_at_line = []
+    n = np.array([-d[1], d[0]]) / max(float(np.hypot(*d)), 1e-12)
+    mid = np.array([(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2])
+    found = []
     for sign in (1, -1):
-        m = in_span & (sign * s >= SIDE_NEAR_M) & (sign * s <= SIDE_FAR_M)
-        if m.sum() < SIDE_MIN_PTS:
-            return None
-        cols = [np.ones(m.sum()), s[m]] + ([u[m] - ln / 2] if np.ptp(u[m]) > 1.0 else [])
-        coef = np.linalg.lstsq(np.stack(cols, 1), ref[m, 2], rcond=None)[0]
-        z_at_line.append(coef[0])
-    return abs(z_at_line[0] - z_at_line[1])
+        plane = None
+        for step in (0.3, 0.15, 0.6):
+            pt = Point(*(mid + sign * step * n))
+            plane = next((f.plane for f in facets if f.poly.contains(pt)), None)
+            if plane is not None:
+                break
+        found.append(plane)
+    return None if None in found else (found[0], found[1])
+
+
+def edge_jump_m(ref: np.ndarray, p0, p1, facets) -> float | None:
+    """Height jump across an edge, measured from the reference points only: the engine's own measurement
+    (``roof_measure.engine.edge_measure.points_jump``: a local linear fit each side, 0.2-1.5 m from the line, evaluated on the
+    line, returns far off the side's own plane left out; the sides' planes come from ``facets``). None when either side has
+    fewer than 5 points in the edge's span or lies in no facet."""
+    from roof_measure.engine.edge_measure import points_jump
+    from roof_measure.engine.params import DEFAULT
+
+    sides = plane_sides(facets, p0, p1)
+    if sides is None:
+        return None
+    return points_jump(ref, np.array(p0[:2], float), np.array(p1[:2], float), sides[0], sides[1], DEFAULT)
 
 
 def false_level_change(roof: Roof, ref: np.ndarray) -> dict[str, float | int | None]:
@@ -112,7 +123,7 @@ def false_level_change(roof: Roof, ref: np.ndarray) -> dict[str, float | int | N
     bad_len, bad, unver, n = 0.0, 0, 0, 0
     fl = {f.id: f for f in roof.facets}
     for e in roof.engine_edges:
-        if e.type != "level_change":
+        if e.type not in STEP_TYPES:
             continue
         n += 1
         pair = [fl[i] for i in e.facets if i in fl][:2] if len(e.facets) >= 2 else []
@@ -124,7 +135,7 @@ def false_level_change(roof: Roof, ref: np.ndarray) -> dict[str, float | int | N
                 bad += 1
                 bad_len += e.length_ft
             continue
-        j = edge_jump_m(ref, e.p0, e.p1)
+        j = edge_jump_m(ref, e.p0, e.p1, roof.facets)
         if j is None:
             unver += 1
         elif j < FALSE_JUMP_M:
