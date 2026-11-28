@@ -246,7 +246,9 @@ def _find_coplanar_pair(items: list, planes: list, p: EngineParams) -> tuple[int
 def close_gaps(items: list, outline: Polygon, p: EngineParams) -> tuple[list, int]:
     """Thin channels between facets inside the outline (narrower than ``gap_close_width_m``: twice area over perimeter)
     are given to the facet that shares the most boundary with them, so the facets tile the roof. A real hole (wider)
-    stays. Returns (items, number of gaps closed)."""
+    stays. A gap with holes of its own is a frame round facets, not a channel between them: it stays (a hairline frame
+    round the whole roof, given to one facet, swallowed every other facet). No merge may cover another facet by more
+    than ``gap_close_min_m2``. Returns (items, number of gaps closed)."""
     if not items:
         return items, 0
     items = [list(x) for x in items]
@@ -254,7 +256,8 @@ def close_gaps(items: list, outline: Polygon, p: EngineParams) -> tuple[list, in
     gap = outline.difference(union)
     n = 0
     for g in (gap.geoms if hasattr(gap, "geoms") else [gap]):
-        if g.geom_type != "Polygon" or g.area < p.gap_close_min_m2 or 2 * g.area / max(g.length, 1e-6) >= p.gap_close_width_m:
+        if g.geom_type != "Polygon" or list(g.interiors) or g.area < p.gap_close_min_m2 \
+                or 2 * g.area / max(g.length, 1e-6) >= p.gap_close_width_m:
             continue
         shares = [(g.buffer(0.2).intersection(items[j][1].boundary).length, j) for j in range(len(items))]
         shares = [(s, j) for s, j in shares if s > 0]
@@ -262,7 +265,12 @@ def close_gaps(items: list, outline: Polygon, p: EngineParams) -> tuple[list, in
             continue
         j = max(shares)[1]
         u = unary_union([items[j][1].buffer(0.2), g.buffer(0.2)]).buffer(-0.2)
-        if u.geom_type == "Polygon" and u.is_valid:
-            items[j][1] = _exact(u)
-            n += 1
+        if u.geom_type != "Polygon" or not u.is_valid:
+            continue
+        merged = _exact(u)
+        others = [items[k][1] for k in range(len(items)) if k != j]
+        if others and merged.intersection(unary_union(others)).area > p.gap_close_min_m2:
+            continue  # the merge would cover a neighbour (its exterior closes round it)
+        items[j][1] = merged
+        n += 1
     return items, n
