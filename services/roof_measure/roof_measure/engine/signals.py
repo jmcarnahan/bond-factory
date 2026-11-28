@@ -6,66 +6,18 @@ Everything here works in whatever metric frame the facets are in; areas are squa
 from __future__ import annotations
 
 import math
-from typing import Any
 
 import numpy as np
 import shapely
 from scipy import ndimage as ndi
 from scipy.spatial import cKDTree
 from shapely.geometry import Polygon
-from shapely.ops import unary_union
 
-from .edges import M2F
-from .facets import SQM2SQFT
 from .normals import knn_normals
 from .params import EngineParams
-from .types import Edge, Facet, Quality
+from .types import Facet, Quality
 
 _NOT_ROOF_CLASSES = [3, 4, 5, 7, 9]  # ASPRS vegetation, noise, water classes: never roof
-
-
-def cost_outputs(facets: list[Facet], edges: list[Edge], outline: Polygon, wall: Polygon,
-                 borderline_ids: set[str], overhang_applied_m: list[float], p: EngineParams) -> dict[str, Any]:
-    """The extra totals the cost sheet reads, from the (priced) facets and edges and the wall-line footprint."""
-    t: dict[str, Any] = {}
-    surf = sum(f.area_sqft for f in facets)
-    pitched = [f for f in facets if f.roof_type == "pitched"]
-    flat = [f for f in facets if f.roof_type == "flat"]
-    ap, af = sum(f.area_sqft for f in pitched), sum(f.area_sqft for f in flat)
-    t["planes_surface_area_sqft"] = round(surf, 1)  # roof-edge surface (priced default)
-    t["planes_pitch_weighted"] = round(sum(f.area_sqft * f.pitch_rise for f in pitched) / ap, 2) if ap > 0 else 0.0
-    ext = [e for e in edges if len(e.facets) == 1]
-    t["outline_perimeter_ft"] = round(sum(e.length_ft for e in ext if e.type in ("eave", "rake", "flat_edge")), 1)
-    flat_ids = {f.id for f in flat}  # a crease between two low-slope (under 2/12) facets takes no ridge cap
-    t["ridge_cap_ridge_hip_ft"] = round(sum(e.length_ft for e in edges if e.type in ("ridge", "hip")
-                                            and not (len(e.facets) == 2 and set(e.facets) <= flat_ids)), 1)
-    t["high_edge_ft"] = round(sum(e.length_ft for e in ext if e.high_edge), 1)  # level high sides (rake metal, no cap)
-    t["roofing_pitched_sqft"] = round(ap, 1)
-    t["roofing_flat_sqft"] = round(af, 1)
-    t["roofing_pitched_squares"] = round(ap / 100, 2)
-    t["roofing_flat_squares"] = round(af / 100, 2)
-    t["low_slope_confirm_sqft"] = round(sum(f.area_sqft for f in facets if f.id in borderline_ids), 1)
-    wl_area = 0.0
-    clipped = []
-    for f in facets:  # the same facets cut to the wall line (what the plan calls area_sqft_wall_line)
-        c = f.polygon.intersection(wall)
-        clipped.append(c)
-        wl_area += c.area * SQM2SQFT * math.sqrt(1 + (f.pitch_rise / 12.0) ** 2)
-    t["area_sqft_wall_line"] = round(wl_area, 1)
-    u = unary_union(clipped) if clipped else None
-    t["outline_perimeter_wall_ft"] = round(u.length * M2F, 1) if u is not None and not u.is_empty else None
-    oh = [v for v in overhang_applied_m if v is not None]
-    t["overhang_ft_median"] = round(float(np.median(oh)) * M2F, 2) if oh else None
-    t["flat_edge_ft"] = round(sum(e.length_ft for e in edges if e.type == "flat_edge"), 1)
-    t["level_change_ft"] = round(sum(e.length_ft for e in edges if e.type == "level_change"), 1)
-    t["roof_edge_perimeter_geom_ft"] = round(outline.length * M2F, 1)
-    hv = sum(e.length_ft for e in edges if e.type in ("hip", "valley"))
-    sq = surf / 100.0
-    hvq = hv / sq if sq > 0 else 0.0
-    cut = len(facets) >= p.cut_up_facets or hvq >= p.cut_up_hv_per_sq
-    t["complexity"] = {"facets": len(facets), "hip_valley_ft_per_square": round(hvq, 2),
-                       "hint": "cut_up" if cut else "simple"}
-    return t
 
 
 def _fit_shares(facets: list[Facet], pts: np.ndarray, p: EngineParams) -> tuple[float | None, float | None, float | None,
@@ -113,7 +65,7 @@ def _fit_shares(facets: list[Facet], pts: np.ndarray, p: EngineParams) -> tuple[
 
 
 def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygon, parcel_match: str | None,
-            provider: str, supported_pct: float | None, support_area_m2: float, overhang_scale: float,
+            provider: str, supported_pct: float | None, support_area_m2: float,
             extra: float | None, tree_pct: float | None, p: EngineParams) -> Quality:
     """Plan 3.9 signals and verdict. ``pts`` are all roof points in the frame of the facets."""
     fit_all, fit_cov, cover_pts, fit_clear, tree_cover = _fit_shares(facets, pts, p)
@@ -136,7 +88,7 @@ def quality(facets: list[Facet], pts: np.ndarray, outline: Polygon, wall: Polygo
         reasons.append("not_exact_parcel")
     return Quality(verdict=reasons[0] if reasons else "ok", reasons=reasons, fit_all=fit_all, fit_covered=fit_cov,
                    coverage=cover_pts, supported_pct=supported_pct, density=round(dens, 1), outline_shift=round(shift, 3),
-                   parcel_match=parcel_match, outline_source=provider, overhang_scale=overhang_scale,
+                   parcel_match=parcel_match, outline_source=provider,
                    roof_cover_of_outline=round(cover, 2), extra_roof_ring_ratio=None if extra is None else round(extra, 2),
                    tree_contact_pct=tree_pct, fit_clear=fit_clear, tree_cover_pct=tree_cover)
 

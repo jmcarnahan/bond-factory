@@ -15,7 +15,7 @@ def engine_quality(res: Any, model: dict[str, Any], warning_codes: Iterable[str]
     """``model.quality`` of an engine result: the contract-0.4 signals, and the older keys with their engine analogues.
 
     New keys: ``engine``, ``fit_covered``, ``fit_all``, ``coverage``, ``supported_pct``, ``density_pts_m2``,
-    ``parcel_match``, ``outline_source``, ``overhang_scale``, ``verdict``, ``outline_shift`` and ``reasons``.
+    ``parcel_match``, ``outline_source``, ``verdict``, ``outline_shift`` and ``reasons``.
     Old keys, so a reader that knows only 0.3 still gets numbers: ``plane_mismatch_pct`` = share of roof points off
     their facet's plane (100 x (1 - fit_covered)), ``outline_covered_pct`` = roof-point support over the outline,
     ``model_uncovered_pct`` = share of roof points outside every facet, ``level_spread_ft``, ``planes_lidar`` (planes
@@ -38,7 +38,7 @@ def engine_quality(res: Any, model: dict[str, Any], warning_codes: Iterable[str]
     return {
         "engine": "planes/1", "engine_params": res.params_hash, "verdict": q.verdict, "fit_covered": q.fit_covered, "fit_all": q.fit_all,
         "fit_clear": q.fit_clear, "tree_cover_pct": q.tree_cover_pct, "coverage": q.coverage, "supported_pct": q.supported_pct, "density_pts_m2": q.density,
-        "parcel_match": q.parcel_match, "outline_source": q.outline_source, "overhang_scale": q.overhang_scale,
+        "parcel_match": q.parcel_match, "outline_source": q.outline_source,
         "outline_shift": q.outline_shift, "flat_share": q.flat_share,
         "plane_mismatch_pct": None if q.fit_covered is None else round(100.0 * (1.0 - q.fit_covered), 1),
         "outline_covered_pct": None if q.roof_cover_of_outline is None else round(min(100.0, 100.0 * q.roof_cover_of_outline), 1),
@@ -50,7 +50,8 @@ def engine_quality(res: Any, model: dict[str, Any], warning_codes: Iterable[str]
 
 def assess_engine(res: Any, model: dict[str, Any], warning_codes: Iterable[str] = ()) -> dict[str, Any]:
     """The assessment ``envelope.build_envelope`` takes for an engine result: ``{"quality", "planes", "totals"}``."""
-    from .engine.adapter import engine_planes, engine_totals
+    from .engine.adapter import COST_KEYS, engine_planes
 
-    return {"quality": engine_quality(res, model, warning_codes), "planes": engine_planes(model),
-            "totals": engine_totals(res)}
+    totals = {k: model["totals"][k] for k in COST_KEYS if k in model["totals"]}
+    totals["plane_count"] = len(model["facets"])
+    return {"quality": engine_quality(res, model, warning_codes), "planes": engine_planes(model), "totals": totals}

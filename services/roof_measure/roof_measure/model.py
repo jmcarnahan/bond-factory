@@ -60,21 +60,6 @@ def predominant_pitch(facets: list[dict[str, Any]]) -> tuple[float, float]:
     return best
 
 
-def _totals(facets: list[dict[str, Any]], edges: list[dict[str, Any]]) -> dict[str, Any]:
-    """Model totals. ``lengths_ft`` has all twelve edge-type keys (the ten of 0.2 and ``flat_edge``, ``level_change``)."""
-    total = sum(f["area_sqft"] for f in facets)
-    pitched = sum(f["area_sqft"] for f in facets if f["kind"] == "sloped")
-    flat = sum(f["area_sqft"] for f in facets if f["kind"] == "flat")
-    pred = predominant_pitch(facets)
-    lengths = {k: 0.0 for k in EDGE_TYPES}
-    for e in edges:
-        if e["type"] not in UNPRICED_EDGE_TYPES:
-            lengths[e["type"]] += e["length_ft"]
-    return {"total_area_sqft": total, "pitched_area_sqft": pitched, "flat_area_sqft": flat,
-            "predominant_pitch_rise": pred[0], "predominant_pitch_area_sqft": pred[1],
-            "squares": total / 100.0, "lengths_ft": lengths}
-
-
 # ----------------------------------------------------------------------------- validate / io
 def validate(model: dict[str, Any]) -> None:
     """Check every rule of contract section 2; raise :class:`ModelError` on the first breach."""

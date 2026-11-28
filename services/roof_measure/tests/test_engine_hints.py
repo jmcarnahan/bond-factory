@@ -18,7 +18,7 @@ from roof_measure.engine.errors import Ctx
 from roof_measure.engine.params import DEFAULT, HINT_FIELDS
 
 # The default parameter hash is the key of every cached result: adding a hint field must never move it.
-DEFAULT_HASH = "a16097a199627c95a1765e98d9ca00fc105b103e6a665e37b73c80f3b4288a90"
+DEFAULT_HASH = "f21918113519719ba2224b93537d0739a1387496ff6049eea91ca797fa5de2ab"
 NO_STEPS = Ctx(DEFAULT.replace(pitched_steps=False), None)
 
 

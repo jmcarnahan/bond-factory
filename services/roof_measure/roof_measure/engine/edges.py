@@ -321,28 +321,3 @@ def edge_diagnostics(facets: list[Facet], p: EngineParams, q: np.ndarray | None 
 def coplanar_seams(facets: list[Facet], p: EngineParams) -> list[dict]:
     """Neighbouring facets that share a boundary but no edge and should be one facet (``edge_diagnostics`` ``mergeable``)."""
     return edge_diagnostics(facets, p)["mergeable"]
-
-
-def totals_of(facets: list[Facet], edges: list[Edge]) -> dict:
-    """Area and length totals of a facet / edge set (priced or drawn)."""
-    tot = {"area_sqft": 0.0, "pitched_area_sqft": 0.0, "flat_area_sqft": 0.0}
-    pitch_w: dict[float, float] = {}
-    for f in facets:
-        tot["area_sqft"] += f.area_sqft
-        if f.roof_type == "flat":
-            tot["flat_area_sqft"] += f.area_sqft
-        else:
-            tot["pitched_area_sqft"] += f.area_sqft
-            key = round(f.pitch_rise * 2) / 2
-            pitch_w[key] = pitch_w.get(key, 0) + f.area_sqft
-    tot["squares"] = tot["area_sqft"] / 100.0
-    tot["predominant_pitch"] = float(max(pitch_w, key=pitch_w.get)) if pitch_w else 0.0
-    tot["facet_count"] = len(facets)
-    lengths = {k: 0.0 for k in ("eave", "rake", "ridge", "hip", "valley", "level_change", "flat_edge", "transition")}
-    for e in edges:
-        if e.type != "flat_seam":  # drawn, never priced: in no total
-            lengths[e.type] = lengths.get(e.type, 0.0) + e.length_ft
-    tot["lengths_ft"] = {k: round(v, 1) for k, v in lengths.items()}
-    for k in ("area_sqft", "pitched_area_sqft", "flat_area_sqft", "squares"):
-        tot[k] = round(tot[k], 1)
-    return tot

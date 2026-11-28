@@ -10,8 +10,10 @@ from test_engine_edges import CTX, M2FT, facet, points_on
 
 from roof_measure.engine import measure_roof, synth_points
 from roof_measure.engine.edge_measure import seam_is_level, seam_offsets
-from roof_measure.engine.edges import build_edges, totals_of
+from roof_measure.engine.edges import build_edges
 from roof_measure.engine.load import roof_points_from_arrays
+from roof_measure.engine.params import DEFAULT
+from roof_measure.engine.totals import roof_totals
 
 LEFT = [(0, 0), (20, 0), (20, 5), (0, 5)]  # a 20 m long seam at y = 5 between two flat decks
 RIGHT = [(0, 5), (20, 5), (20, 10), (0, 10)]
@@ -86,7 +88,7 @@ def test_a_flat_seam_is_in_no_total():
     facets, q = two_decks((0.02, 0.0, 3.0), upper_pts=(0.0, 0.0, 3.5))
     edges = build_edges(facets, q, CTX)
     assert any(e.type == "flat_seam" and e.jump_ft is None for e in edges)
-    lengths = totals_of(facets, edges)["lengths_ft"]
+    lengths = roof_totals(facets, edges, set(), DEFAULT)["lengths_ft"]
     assert "flat_seam" not in lengths and lengths["level_change"] == 0.0
 
 

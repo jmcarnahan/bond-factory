@@ -15,7 +15,7 @@ from roof_measure.blockset import BlockSet
 from roof_measure.engine import adapter, synth_points
 from roof_measure.engine.load import roof_points_from_arrays
 from roof_measure.envelope import WARNING_CODES, build_envelope
-from roof_measure.model import CORE_EDGE_TYPES, EDGE_TYPES, ModelError, _totals, validate
+from roof_measure.model import CORE_EDGE_TYPES, EDGE_TYPES, ModelError, validate
 from roof_measure.quality import assess_engine
 
 FT = 1 / 0.3048
@@ -54,29 +54,28 @@ def test_every_shape_becomes_a_valid_model_with_finite_totals(name):
     for f in model["facets"]:
         assert {"roof_type", "pitch_fit", "pitch_sigma", "borderline", "supported_pct", "points", "rms_ft", "plane_eq"} <= set(f)
         assert (f["kind"] == "flat") == (f["pitch_rise"] < 0.5) and (f["aspect_deg"] is None) == (f["kind"] == "flat")
-    t = adapter.engine_totals(res)
+    t = assess_engine(res, model)["totals"]
     assert finite(t)
     json.dumps({"model": model, "totals": t}, allow_nan=False)
 
 
 @pytest.mark.parametrize("name", SHAPES)
-def test_the_cost_sheet_keys_are_present_priced_and_consistent(name):
+def test_the_cost_sheet_keys_are_present_and_consistent(name):
     model, res = model_of(name)
-    t = adapter.engine_totals(res)
+    t = assess_engine(res, model)["totals"]
     for k in ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft"):
         assert isinstance(t[k], (int, float)) and math.isfinite(t[k]), k
     drawn = model["totals"]["total_area_sqft"]
     assert t["area_sqft_roof_edge"] == pytest.approx(drawn, abs=0.2)  # the drawn (measured roof edge) area
-    assert t["area_sqft_wall_line"] - 0.5 <= t["planes_surface_area_sqft"] <= t["area_sqft_roof_edge"] + 0.5  # priced between
+    assert t["planes_surface_area_sqft"] == t["area_sqft_roof_edge"] == drawn  # one roof, one area
     assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["planes_surface_area_sqft"], abs=0.2)
     assert t["roofing_pitched_squares"] + t["roofing_flat_squares"] == pytest.approx(t["planes_surface_area_sqft"] / 100, abs=0.03)
     lengths = model["totals"]["lengths_ft"]
-    assert t["flat_edge_ft"] == pytest.approx(lengths["flat_edge"], rel=0.05, abs=2.0)
-    if name not in KNOWN_GEOMETRY_LIMIT:  # the priced clip trims what the partition got wrong on those two
-        assert t["level_change_ft"] == pytest.approx(lengths["level_change"], rel=0.05, abs=2.0)
-    assert t["ridge_cap_ridge_hip_ft"] == pytest.approx(lengths["ridge"] + lengths["hip"], rel=0.08, abs=2.0)
+    assert t["flat_edge_ft"] == pytest.approx(lengths["flat_edge"], abs=0.06)  # every length is the sum of its edges
+    assert t["level_change_ft"] == pytest.approx(lengths["level_change"], abs=0.06)
+    assert t["ridge_cap_ridge_hip_ft"] <= lengths["ridge"] + lengths["hip"] + 0.06  # less a crease between low-slope facets
     perimeter = lengths["eave"] + lengths["rake"] + lengths["flat_edge"]
-    assert t["outline_perimeter_ft"] <= perimeter + 0.5 and t["outline_perimeter_ft"] >= 0.85 * perimeter  # priced edge
+    assert t["outline_perimeter_ft"] == pytest.approx(perimeter, abs=0.1)
     assert set(t["complexity"]) == {"facets", "hip_valley_ft_per_square", "hint"} and t["complexity"]["hint"] in ("simple", "cut_up")
     assert t["plane_count"] == len(model["facets"])
     if t["roofing_pitched_sqft"]:
@@ -177,7 +176,7 @@ def test_the_engine_quality_and_assessment_for_the_envelope():
     model, res = model_of("l_shape_d8")
     a = assess_engine(res, model, ["parcel_street_match"])
     q = a["quality"]
-    assert q["engine"] == "planes/1" and q["verdict"] == "ok" and q["overhang_scale"] == 0.5
+    assert q["engine"] == "planes/1" and q["verdict"] == "ok" and "overhang_scale" not in q
     for k in ("fit_covered", "fit_all", "coverage", "supported_pct", "density_pts_m2", "parcel_match", "outline_source"):
         assert k in q
     for k in ("plane_mismatch_pct", "outline_covered_pct", "model_uncovered_pct", "level_spread_ft", "planes_lidar", "facets_model"):
@@ -198,7 +197,7 @@ def test_the_envelope_carries_everything_and_serialises():
     for k in ("area_sqft", "squares", "planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft",
               "ridge_cap_ridge_hip_ft", "area_sqft_roof_edge", "area_sqft_wall_line", "roofing_flat_sqft", "complexity"):
         assert k in t, k
-    assert t["planes_surface_area_sqft"] == t["area_sqft"] < t["area_sqft_roof_edge"]  # priced (overhang scale 0.5), drawn above
+    assert t["planes_surface_area_sqft"] == t["area_sqft"] == t["area_sqft_roof_edge"]  # one roof, one area
     assert env["warning_codes"] == ["low_slope_confirm"] and env["model"]["quality"]["engine"] == "planes/1"
     assert env["model"]["planes"] and env["model"]["totals"]["lengths_ft"]["level_change"] > 0
     for code in ("low_slope_confirm", "outline_mismatch", "poor_fit", "low_density"):
@@ -216,21 +215,20 @@ def test_a_borderline_low_slope_roof_is_flagged_for_confirmation():
     res = measure_roof(roof_points_from_arrays(pts[pts[:, 3] == 1][:, :3], wall, pts), wall, outline_source="county", context=pts)
     assert not res.refused
     flagged = [f for f in res.facets if f.borderline]
-    drawn = sum(f.area_sqft for f in flagged)  # the total is priced (clipped to the priced roof edge): a little less
-    assert flagged and 0.8 * drawn <= res.totals["low_slope_confirm_sqft"] <= drawn + 0.5
+    drawn = sum(f.area_sqft for f in flagged)
+    assert flagged and res.totals["low_slope_confirm_sqft"] == pytest.approx(drawn, abs=0.1)
     model = adapter.engine_model(res, base(), 0.0)
     assert any(f["borderline"] for f in model["facets"])
     q = assess_engine(res, model, [])["quality"]
     assert "low_slope_confirm" in q["reasons"]
-    assert adapter.engine_totals(res)["low_slope_confirm_sqft"] > 0
+    assert assess_engine(res, model, [])["totals"]["low_slope_confirm_sqft"] == pytest.approx(drawn, abs=0.5)
 
 
 # ----------------------------------------------------------------------------- model.py: the two new edge types
 def test_totals_carry_all_twelve_length_keys():
-    facets = [{"area_sqft": 100.0, "kind": "flat", "pitch_rise": 0.0}]
-    assert set(_totals(facets, [{"type": "eave", "length_ft": 10.0}])["lengths_ft"]) == set(EDGE_TYPES)
-    with_new = _totals(facets, [{"type": "flat_edge", "length_ft": 10.0}])
-    assert with_new["lengths_ft"]["flat_edge"] == 10.0 and "level_change" in with_new["lengths_ft"]
+    model, _ = model_of("flat_d8")
+    lengths = model["totals"]["lengths_ft"]
+    assert set(lengths) == set(EDGE_TYPES) and lengths["flat_edge"] > 0 and lengths["level_change"] == 0
     assert EDGE_TYPES[:10] == CORE_EDGE_TYPES and EDGE_TYPES[10:] == ("flat_edge", "level_change")
 
 
@@ -267,29 +265,33 @@ def test_the_saved_0_2_example_envelopes_still_validate():
 
 def check_one_area(env_totals, model_totals):
     t = env_totals
-    priced = t["planes_surface_area_sqft"]
-    assert t["area_sqft"] == priced and t["squares"] * 100 == pytest.approx(priced, abs=0.5)
-    assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(priced, abs=0.05)
-    assert t["roofing_pitched_squares"] + t["roofing_flat_squares"] == pytest.approx(priced / 100, abs=0.011)
-    assert t["area_sqft_wall_line"] - 0.5 <= priced <= t["area_sqft_roof_edge"] + 0.5
-    assert model_totals["total_area_sqft"] == pytest.approx(t["area_sqft_roof_edge"], abs=0.2)  # the model is the drawn roof
-    assert "DRAWN" in model_totals["note"]
+    area = t["area_sqft"]
+    assert t["planes_surface_area_sqft"] == t["area_sqft_roof_edge"] == area == model_totals["total_area_sqft"]
+    assert t["squares"] * 100 == pytest.approx(area, abs=0.5)
+    assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(area, abs=0.05)
+    assert t["roofing_pitched_squares"] + t["roofing_flat_squares"] == pytest.approx(area / 100, abs=0.011)
 
 
 @pytest.mark.parametrize("name", [n for n in _cases() if n.endswith(("_d8", "_d16"))])
-def test_the_envelope_has_one_priced_area_on_every_synthetic_case(name):
+def test_the_envelope_has_one_area_on_every_synthetic_case(name):
     model, res = model_of(name)
-    totals = {**adapter.engine_totals(res)}
     env = build_envelope(model, method_used="lidar_skeleton", footprint_source="lariac",
                          verification={"verdict": "unverified", "notes": [], "adjustments": [], "original_totals": {}, "model": None,
                                        "rounds": 0, "usage": {"input_tokens": 0, "output_tokens": 0}},
                          warnings=[], warning_codes=[], density_pts_m2=8.0, assessment=assess_engine(res, model, []))
     check_one_area(env["totals"], env["model"]["totals"])
-    assert totals["area_sqft"] == env["totals"]["area_sqft"]
+    for k, v in env["totals"].items():  # no number in the envelope disagrees with the model's
+        if k in env["model"]["totals"]:
+            assert env["model"]["totals"][k] == v, k
+        assert not isinstance(v, float) or math.isfinite(v)
 
 
-def test_the_shipped_example_has_one_priced_area():
+def test_the_shipped_example_has_one_area_figure():
+    """The shipped 0.4 example still carries the blend's values (area_sqft_roof_edge above the priced area): only the
+    arithmetic is checked here; the example is regenerated with the 0.6.0 contract."""
     from conftest import FIXTURES
 
     env = json.loads((FIXTURES / "roof_engine" / "roof_measurement_0.4_engine.json").read_text())
-    check_one_area(env["totals"], env["model"]["totals"])
+    t = env["totals"]
+    assert t["area_sqft"] == t["planes_surface_area_sqft"] and t["squares"] * 100 == pytest.approx(t["area_sqft"], abs=0.5)
+    assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["area_sqft"], abs=0.05)
