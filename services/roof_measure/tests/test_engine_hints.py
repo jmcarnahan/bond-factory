@@ -16,7 +16,7 @@ from roof_measure.engine import hints as H
 from roof_measure.engine.edges import build_edges
 from roof_measure.engine.params import DEFAULT
 
-DEFAULT_HASH = "3179382181fc3668fe54b8ffc2d1d0f72d5263c32967c795e012a11f1976665d"
+DEFAULT_HASH = "2d08a05e7fe5c0e9a75865d684e05cce0a5b1871638a6e92b6157fe893666d44"
 
 
 def test_the_default_parameter_hash_is_pinned_and_there_is_no_hint_field():

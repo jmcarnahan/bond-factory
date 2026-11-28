@@ -37,7 +37,7 @@
    "solar": null,
    "from_planes": true,
    "engine": "planes/1",
-   "engine_params": "3179382181fc3668fe54b8ffc2d1d0f72d5263c32967c795e012a11f1976665d",
+   "engine_params": "2d08a05e7fe5c0e9a75865d684e05cce0a5b1871638a6e92b6157fe893666d44",
    "building": {
     "parcel_id": "SYNTH-P1",
     "outline_id": "SYNTH-B1",
@@ -508,7 +508,7 @@
   },
   "quality": {
    "engine": "planes/1",
-   "engine_params": "3179382181fc3668fe54b8ffc2d1d0f72d5263c32967c795e012a11f1976665d",
+   "engine_params": "2d08a05e7fe5c0e9a75865d684e05cce0a5b1871638a6e92b6157fe893666d44",
    "verdict": "ok",
    "fit_covered": 0.99,
    "fit_all": 0.987,

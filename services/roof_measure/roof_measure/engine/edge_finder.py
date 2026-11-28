@@ -279,15 +279,14 @@ def _register(sides: list[dict], p: EngineParams) -> tuple[float, float, float]:
     return float(full[0]), float(full[1]), float(full[2])
 
 
-def clamp_offsets(offsets: list[float], scale: float, county: bool, sources: list[str], p: EngineParams) -> list[float]:
-    """Outward offsets times ``scale`` (inward ones as measured). A side measured from clear strips (source ``ok``)
+def clamp_offsets(offsets: list[float], county: bool, sources: list[str], p: EngineParams) -> list[float]:
+    """The offsets to apply. A side measured from clear strips (source ``ok``)
     keeps its measurement; a side filled or seen only under a tree is clamped: inward at most ``edge_clamp_lo_m``,
     outward at most ``edge_clamp_hi_m``, or ``edge_clamp_hi_roofedge_m`` for a non-county outline (OpenStreetMap,
     LiDAR hull), which already lies near the roof edge."""
     hi = p.edge_clamp_hi_m if county else p.edge_clamp_hi_roofedge_m
     out = []
     for v, src in zip(offsets, sources, strict=True):
-        v = v * scale if v > 0 else v
         out.append(v if src == "ok" else min(hi, max(-p.edge_clamp_lo_m, v)))
     return out
 
@@ -327,11 +326,10 @@ def offset_polygon(ring: Polygon, dist: list[float], p: EngineParams) -> Polygon
     return out
 
 
-def edge_polygon(ring: Polygon, offsets: list[float], scale: float, county: bool, sources: list[str],
-                 p: EngineParams) -> Polygon:
+def edge_polygon(ring: Polygon, offsets: list[float], county: bool, sources: list[str], p: EngineParams) -> Polygon:
     """The ring with clamped offsets; a plain buffer by the median offset when that polygon collapses. No upper bound:
     a measured side may lie up to edge_out_m + edge_extend_m out (a ring far inside the roof)."""
-    dist = clamp_offsets(offsets, scale, county, sources, p)
+    dist = clamp_offsets(offsets, county, sources, p)
     out = offset_polygon(ring, dist, p)
     if out.is_empty or out.geom_type != "Polygon" or out.area < p.offset_area_lo * ring.area:  # collapsed
         out = ring.buffer(float(np.median(dist)) if dist else 0.0, join_style=2)
@@ -373,7 +371,7 @@ def find_roof_edge(context: np.ndarray | None, roof_xyz: np.ndarray, q: np.ndarr
     measured = [d["off"] for d in sides]
     offsets = [d["off"] if d["off"] is not None else d["fill"] for d in sides]
     sources = [d["src"] or "fill" for d in sides]
-    poly = edge_polygon(ring_out, offsets, 1.0, county, sources, p)
+    poly = edge_polygon(ring_out, offsets, county, sources, p)
     per = sum(d["L"] for d in sides) or 1.0
     blind = sum(d["L"] for d in sides if d["why"] and set(d["why"]) <= {"few", "noroof", "noplane"}) / per
     carry = sum(d["L"] for d in sides if d["src"] != "ok" and d["why"] and 2 * d["why"].count("end") >= len(d["why"])) / per

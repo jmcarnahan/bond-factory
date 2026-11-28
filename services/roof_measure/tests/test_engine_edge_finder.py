@@ -260,10 +260,9 @@ def test_an_outline_at_the_roof_edge_is_moved_out_at_most_the_roof_edge_clamp():
 
 def test_the_clamp_holds_filled_sides_only_and_differs_for_county_and_roof_edge_outlines():
     fill = ["fill", "tree", "fill"]
-    assert clamp_offsets([2.0, -1.0, 0.4], 1.0, True, fill, DEFAULT) == [1.5, -0.6, 0.4]
-    assert clamp_offsets([2.0, -1.0, 0.4], 1.0, False, fill, DEFAULT) == [0.5, -0.6, 0.4]
-    assert clamp_offsets([2.0, -1.0], 1.0, False, ["ok", "ok"], DEFAULT) == [2.0, -1.0]  # a measured side wins
-    assert clamp_offsets([0.8, -0.2], 0.5, True, ["ok", "fill"], DEFAULT) == [0.4, -0.2]  # the scale moves outward offsets only
+    assert clamp_offsets([2.0, -1.0, 0.4], True, fill, DEFAULT) == [1.5, -0.6, 0.4]
+    assert clamp_offsets([2.0, -1.0, 0.4], False, fill, DEFAULT) == [0.5, -0.6, 0.4]
+    assert clamp_offsets([2.0, -1.0], False, ["ok", "ok"], DEFAULT) == [2.0, -1.0]  # a measured side wins
 
 
 def test_the_result_does_not_depend_on_where_the_frame_origin_is():

@@ -16,8 +16,6 @@ from dataclasses import asdict, dataclass, fields
 
 @dataclass(frozen=True)
 class EngineParams:
-    # ---- the drawn roof edge
-    overhang_scale_draw: float = 1.0  # ratio: DRAWN roof edge (facets, diagram): measured outward offset x this (inward offsets as measured)
     # ---- step 2: flat roofs, steep strips and pitched patches
     s2_flat: bool = True
     s2_steep_rise: float = 2.0  # rise: narrow outline strips at least this steep are examined by the eave-evidence test (_has_own_eave: level outer edge, normal point density); a strip that fails is absorbed. Not a pitch cutoff any more

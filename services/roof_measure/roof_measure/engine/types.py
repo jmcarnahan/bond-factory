@@ -54,7 +54,6 @@ class Outline:
     drawn: Polygon
     source: str  # the outline provider as given (e.g. "lariac")
     county: bool  # the given outline is a county wall line (so an overhang was measured and applied)
-    scale_drawn: float  # overhang scale used for the drawn edge
     overhang_measured_m: tuple[float | None, ...] = ()
     overhang_applied_m: tuple[float, ...] = ()
     support_area_m2: float = 0.0

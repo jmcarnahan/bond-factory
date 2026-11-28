@@ -119,13 +119,12 @@ def _detect_stage(run: Run, thetas: list[float]) -> tuple[list, np.ndarray, np.n
 def _outline_stage(run: Run, q: np.ndarray, qlab: np.ndarray, theta: float) -> Polygon:
     p = run.ctx.p
     run.diag["outline_provider"] = run.source
-    run.diag["overhang_scale_used"] = p.overhang_scale_draw
     wide = None
     if run.context is not None:
         wide = np.asarray(run.context, float)[:, :4].copy()
         if p.s3_axis:
             wide[:, :2] = axes.to_building_frame(wide[:, :2], run.ang)
-    o, od = build_outline(q, qlab, run.stages.planes, run.wall, theta, p.overhang_scale_draw, run.county, wide,
+    o, od = build_outline(q, qlab, run.stages.planes, run.wall, theta, run.county, wide,
                           run.pts_all, p)
     run.diag.update(od)
     if o.geom_type != "Polygon":

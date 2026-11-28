@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from shapely.geometry import LineString, Polygon
 
-from .edge_finder import clamp_offsets, edge_polygon, find_roof_edge, support_area
+from .edge_finder import clamp_offsets, find_roof_edge, support_area
 from .params import EngineParams
 from .ringfit import regularise_ring
 
@@ -43,21 +43,19 @@ def _finish(outline, theta: float, p: EngineParams) -> Any:
     return oc.simplify(p.final_tol_m)
 
 
-def build_outline(q: np.ndarray, qlab: np.ndarray, planes: list, footprint: Polygon, theta: float, scale: float,
-                  county: bool, context: np.ndarray | None, roof_xyz: np.ndarray, p: EngineParams
+def build_outline(q: np.ndarray, qlab: np.ndarray, planes: list, footprint: Polygon, theta: float, county: bool, context: np.ndarray | None, roof_xyz: np.ndarray, p: EngineParams
                   ) -> tuple[Polygon, dict[str, Any]]:
     """Roof-edge polygon for the roof points ``q`` (n, 3) assigned to ``planes`` (labels ``qlab``) and the given
-    ``footprint``; ``scale`` multiplies the measured outward offsets. ``context`` is the wide cloud (x, y, z, class) in
+    ``footprint``. ``context`` is the wide cloud (x, y, z, class) in
     the building frame (None: ``roof_xyz`` stands in). Returns (polygon, diagnostics)."""
     if len(q) == 0:
         return footprint, {"outline_source": "footprint (no points)"}
     ring = _regular_footprint(footprint, theta, p)
     res = find_roof_edge(context, roof_xyz, q, qlab, planes, ring, county, p)
-    o0 = res.polygon if scale == 1.0 else edge_polygon(res.ring, res.offsets, scale, county, res.sources, p)
-    outline = _finish(o0, theta, p)
+    outline = _finish(res.polygon, theta, p)
     diag: dict[str, Any] = {"outline_source": "points+footprint", **res.diagnostics}
     diag.update({"overhang_measured_m": [None if v is None else round(v, 2) for v in res.measured],
-                 "overhang_applied_m": [round(v, 2) for v in clamp_offsets(res.offsets, scale, county, res.sources, p)],
+                 "overhang_applied_m": [round(v, 2) for v in clamp_offsets(res.offsets, county, res.sources, p)],
                  "edge_strips": dict(sorted(res.rejected.items())),
                  "support_area_m2": round(support_area(q, footprint, p), 1),
                  "footprint_area_m2": round(float(footprint.area), 1), "outline_area_m2": round(float(outline.area), 1)})

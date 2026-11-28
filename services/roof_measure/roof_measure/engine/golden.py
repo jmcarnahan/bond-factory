@@ -61,8 +61,7 @@ def _outline_view(res: EngineResult, st: Stages) -> dict[str, Any]:
     d = res.diagnostics
     return {"ring": _ring(st.outline), "area_m2": round(st.outline.area, 2), "source": d.get("outline_source"),
             "overhang_measured_m": d.get("overhang_measured_m"), "overhang_applied_m": d.get("overhang_applied_m"),
-            "support_area_m2": d.get("support_area_m2"), "extra_parts": d.get("extra_parts"),
-            "scale_used": d.get("overhang_scale_used")}
+            "support_area_m2": d.get("support_area_m2")}
 
 
 def _facets_edges_view(res: EngineResult, st: Stages) -> dict[str, Any]:
