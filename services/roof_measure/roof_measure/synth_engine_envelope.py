@@ -1,8 +1,8 @@
-"""The plane engine's example envelope (``roof_engine/roof_measurement_0.6_engine.json``), built from a SYNTHETIC roof.
+"""The plane engine's example envelope (``roof_engine/roof_measurement_0.7_engine.json``), built from a SYNTHETIC roof.
 
 ``flat_pitched_step`` (a flat part, a gable and a 0.6 m step between them) at 8 points/m2, with a 1.0 x 1.2 m chimney on the
-gable and a 1.6 m lantern on the ridge of the pitched part, goes through the real engine, the real adapter and ``build_envelope``: every
-contract-0.6 key a reader can meet is in the file. Nothing here is a real
+gable, a 1.6 m lantern on the ridge of the pitched part and a 1.8 x 1.1 m rooftop unit on the flat part, goes through the real engine, the real adapter and ``build_envelope``: every
+contract-0.7 key a reader can meet is in the file. Nothing here is a real
 place: the address is the placeholder one, the origin is an invented grid point, the parcel and outline ids say SYNTH. Deterministic.
 """
 
@@ -22,7 +22,7 @@ ADDRESS = {"line1": "100 Example Ave", "city": "Sampletown", "state": "CA", "zip
 
 
 def engine_envelope() -> dict[str, Any]:
-    """The 0.2 envelope with the 0.6.0 totals, objects and step edges for the synthetic roof."""
+    """The 0.2 envelope with the 0.7.0 totals, objects and step edges for the synthetic roof."""
     from .engine import measure_roof, synth_points
     from .engine.load import roof_points_from_arrays
     from .pipeline_engine import build_result
@@ -30,6 +30,7 @@ def engine_envelope() -> dict[str, Any]:
     case = next(c for c in synth_points.cases() if c.name == CASE)
     pts = synth_points.add_box(case.points(), case.roof, (9.0, 5.5), (1.0, 1.2), 1.6, density=8, seed=11)  # a chimney
     pts = synth_points.add_box(pts, case.roof, (3.5, 3.6576), (1.6, 1.6), 0.4, density=8, seed=12)  # a lantern on the ridge of the pitched part
+    pts = synth_points.add_box(pts, case.roof, (7.5, -2.4), (1.8, 1.1), 0.55, density=8, seed=13)  # a rooftop unit on the flat part
     wall = case.roof.wall_polygon()
     rp = roof_points_from_arrays(pts[pts[:, 3] == 1][:, :3], wall, pts)
     res = measure_roof(rp, wall, outline_source="lacounty_lariac_2020", parcel_match="exact", context=pts)

@@ -22,7 +22,7 @@ LOW_DENSITY_PTS_M2 = 12.0
 
 
 def totals_from_model(model: dict[str, Any]) -> dict[str, Any]:
-    """The envelope totals: the keys of ``model.totals`` that contract 0.6 lists (the rest are model-only shape keys)."""
+    """The envelope totals: the keys of ``model.totals`` that contract 0.7 lists (the rest are model-only shape keys)."""
     t = model["totals"]
     return {k: t[k] for k in TOTALS_KEYS}
 

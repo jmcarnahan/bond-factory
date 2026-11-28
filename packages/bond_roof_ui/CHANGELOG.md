@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Library 0.7.0 (`docs/contract-0.7.md`): `RoofTotalsTable` prints the new rows of `totalRows` from `bond_roof` when the roof has them (rooftop units, lantern sides, lantern hips, headwall all round a raised roof); nothing in this package changed besides its tests, which read the 0.7 sample.
 - Roof accuracy round (0.6 contract; BREAKING for hosts that read the old totals): `RoofTotalsTable` prints `totalRows` of `bond_roof`: only the
   rows the roof has, sidewall and headwall flashing, eave + rake, exposed edges, ridge + hip, chimneys. The drip edge and ridge cap
   variants, the verification line, the "Total roofing area" / "As drawn" headline and the pitched / flat rows tied to the 0.4 keys are gone.

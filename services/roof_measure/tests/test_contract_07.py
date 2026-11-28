@@ -1,4 +1,4 @@
-"""docs/contract-0.6.md is read by tests: the totals table is the engine's key list, the warning codes and the call are the
+"""docs/contract-0.7.md is read by tests: the totals table is the engine's key list, the warning codes and the call are the
 code's, and the edge types the engine emits are the ones the contract lists. Synthetic data only."""
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from roof_measure.model import (
     VALID_EDGE_TYPES,
 )
 
-DOC = (Path(__file__).resolve().parents[3] / "docs" / "contract-0.6.md").read_text()
+DOC = (Path(__file__).resolve().parents[3] / "docs" / "contract-0.7.md").read_text()
 
 
 def section(title: str) -> str:
@@ -52,7 +52,23 @@ def test_the_contract_lists_exactly_the_edge_types_and_object_kinds_the_code_kno
 
 def test_the_totals_table_is_exactly_the_key_list_in_order():
     assert table_keys(section("Totals")) == list(TOTALS_KEYS)
-    assert len(set(TOTALS_KEYS)) == len(TOTALS_KEYS) == 24
+    assert len(set(TOTALS_KEYS)) == len(TOTALS_KEYS) == 26
+
+
+# the 26 keys of 0.7.0, frozen: the contract only ever adds (docs/contract-0.7.md, "Stability of this contract")
+KEYS_0_7_0 = (
+    "area_sqft", "squares", "roofing_pitched_sqft", "roofing_flat_sqft", "planes_pitch_weighted", "plane_count", "eave_ft", "rake_ft",
+    "flat_edge_ft", "exposed_edge_ft", "eave_rake_ft", "ridge_ft", "hip_ft", "valley_ft", "ridge_hip_ft", "step_flashing_ft",
+    "wall_flashing_ft", "transition_ft", "level_change_ft", "chimney_count", "chimney_perimeter_ft", "lantern_count",
+    "lantern_sides_ft", "lantern_hips_ft", "unit_count", "low_slope_confirm_sqft")
+
+
+def test_totals_keys_and_object_kinds_may_be_added_never_removed():
+    assert len(KEYS_0_7_0) == 26 and set(KEYS_0_7_0) <= set(TOTALS_KEYS)
+    assert {"chimney", "lantern", "unit", "unknown"} <= set(OBJECT_KINDS)
+    assert {"eave", "rake", "flat_edge", "ridge", "hip", "valley", "step_flashing", "wall_flashing", "transition",
+            "level_change"} <= set(VALID_EDGE_TYPES)
+    assert "Stability of this contract" in DOC and "area_sqft_roof_edge" not in TOTALS_KEYS
 
 
 @pytest.fixture(scope="module")
@@ -112,7 +128,7 @@ def test_the_call_in_the_contract_is_the_signature():
 def test_the_version_in_the_contract_is_the_package_version():
     from roof_measure.version import PIPELINE_VERSION
 
-    assert PIPELINE_VERSION == "0.6.0" and "`pipeline_version` is `0.6.0`" in DOC
+    assert PIPELINE_VERSION == "0.7.0" and "`pipeline_version` is `0.7.0`" in DOC
 
 
 def test_the_contract_quality_keys_and_reasons_are_what_engine_quality_can_write(measured):

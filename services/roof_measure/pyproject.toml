@@ -1,6 +1,6 @@
 [project]
 name = "roof-measure"
-version = "0.6.0"
+version = "0.7.0"
 description = "Address -> roof measurement (county or OpenStreetMap footprint + USGS 3DEP LiDAR + a plane engine) as an importable library."
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12,<3.14"

@@ -57,7 +57,7 @@ const _edgeOfRow = <String, EdgeType>{
 };
 
 /// The totals rows that are lengths or objects: the legend prints exactly these, in the same order as the totals table.
-bool _inLegend(TotalRow r) => _edgeOfRow.containsKey(r.id) || const {'exposed_edge', 'eave_rake', 'ridge_hip', 'chimneys', 'lanterns'}.contains(r.id);
+bool _inLegend(TotalRow r) => _edgeOfRow.containsKey(r.id) || const {'exposed_edge', 'eave_rake', 'ridge_hip', 'chimneys', 'lanterns', 'units'}.contains(r.id);
 
 /// The ids of the legend's rows (the totals rows of [totalRows] that are lengths or objects).
 List<String> legendRowIds(RoofModel m) => [for (final r in totalRows(m, const RoofLabels())) if (_inLegend(r)) r.id];
@@ -70,6 +70,7 @@ List<_LegendRow> _legendRows(RoofModel m, RoofLabels l) => [
           switch (r.id) {
             'chimneys' => _LegendRow(l.legendChimney, r.value, object: ObjectKind.chimney),
             'lanterns' => _LegendRow(l.legendLantern, r.value, object: ObjectKind.lantern),
+            'units' => _LegendRow(l.legendUnit, r.value, object: ObjectKind.unit),
             final id when _edgeOfRow.containsKey(id) => _LegendRow(l.edgeName(_edgeOfRow[id]!), r.value, type: _edgeOfRow[id]),
             _ => _LegendRow(r.label, r.value),
           },

@@ -6,7 +6,7 @@ import 'model.dart';
 
 /// The figures of one roof, read in ONE place for the legend, the area header, the summary and the totals table.
 ///
-/// A figure comes from the 0.6 totals key when the model carries it, else from the model's own facets and edges. A key
+/// A figure comes from the 0.7 totals key when the model carries it, else from the model's own facets and edges. A key
 /// the service did not send is never read as zero: where there is nothing to sum from, the figure is null or absent.
 class RoofFigures {
   const RoofFigures._({
@@ -23,6 +23,9 @@ class RoofFigures {
     required this.ridgeHipFt,
     required this.chimneys,
     required this.lanterns,
+    required this.units,
+    required this.lanternSidesFt,
+    required this.lanternHipsFt,
   });
 
   /// [envelope] is the envelope's own `totals`: read key by key, wherever the model's own totals lack the key.
@@ -68,6 +71,9 @@ class RoofFigures {
       ridgeHipFt: ridgeHip,
       chimneys: count(ObjectKind.chimney, e?.chimneyCount),
       lanterns: count(ObjectKind.lantern, e?.lanternCount),
+      units: count(ObjectKind.unit, e?.unitCount),
+      lanternSidesFt: e?.lanternSidesFt ?? 0.0,
+      lanternHipsFt: e?.lanternHipsFt ?? 0.0,
     );
   }
 
@@ -91,7 +97,11 @@ class RoofFigures {
   /// Feet per edge type (the types of [EdgeType] except a flat seam); zero when the roof has none.
   final Map<EdgeType, double> lengths;
   final double exposedEdgeFt, eaveRakeFt, ridgeHipFt;
-  final int chimneys, lanterns;
+  final int chimneys, lanterns, units;
+
+  /// The lantern perimeters (inside [exposedEdgeFt]), the estimate of the lanterns' own hips (in no ridge + hip) and the
+  /// part of the headwall that runs all round a raised roof (inside the headwall length). Zero when the roof has none.
+  final double lanternSidesFt, lanternHipsFt;
 
   /// True when the roof has both pitched and flat roofing (only then are the two split on their own rows).
   bool get hasBothKinds => pitchedSqft > 0 && flatSqft > 0;
@@ -139,6 +149,9 @@ List<TotalRow> totalRows(RoofModel m, RoofLabels l, {RoofEngineTotals? envelope}
   length('unspecified', l.legendUnspecified, f.lengths[EdgeType.unspecified]!);
   if (f.chimneys > 0) rows.add(TotalRow('chimneys', l.totalsChimneys, '${f.chimneys}'));
   if (f.lanterns > 0) rows.add(TotalRow('lanterns', l.totalsLanterns, '${f.lanterns}'));
+  length('lantern_sides', l.totalsLanternSides, f.lanternSidesFt);
+  length('lantern_hips', l.totalsLanternHips, f.lanternHipsFt);
+  if (f.units > 0) rows.add(TotalRow('units', l.totalsUnits, '${f.units}'));
   rows.add(TotalRow('facets', l.facets, '${f.facets}'));
   return rows;
 }

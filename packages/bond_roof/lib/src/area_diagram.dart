@@ -61,6 +61,7 @@ class AreaDiagram {
       if (pitch != null) (labels.pitch, pitchLabel(pitch, labels: labels)),
       if (f.chimneys > 0) (labels.totalsChimneys, '${f.chimneys}'),
       if (f.lanterns > 0) (labels.totalsLanterns, '${f.lanterns}'),
+      if (f.units > 0) (labels.totalsUnits, '${f.units}'),
     ];
     final cols = layout.figureColumns;
     final colW = (width - 2 * sp.margin) / cols;

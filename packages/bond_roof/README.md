@@ -98,7 +98,7 @@ labels placed and labels hidden per fixture and layout. On macOS, `qlmanage -t -
 
 ## Add a fixture
 
-The reference input is the hand-written `fixtures/roof_engine/roof_measurement_0.6_sample.json` (see `fixtures/README.md`). A fixture of
+The reference input is the hand-written `fixtures/roof_engine/roof_measurement_0.7_sample.json` (see `fixtures/README.md`). A fixture of
 the old shapes in `fixtures/` (shared with the Python side) is opened by `test/old_shapes_test.dart`, which builds all three scenes of
 every roof or envelope JSON there in both layouts. A generated fixture must recompute to within 0.5 sq ft and 0.05 ft.
 

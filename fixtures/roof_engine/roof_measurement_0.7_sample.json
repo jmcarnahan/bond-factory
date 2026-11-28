@@ -1,6 +1,6 @@
 {
  "contract": "bond.roof_model/0.2",
- "pipeline_version": "0.6.0",
+ "pipeline_version": "0.7.0",
  "method_used": "planes",
  "footprint_source": "lariac",
  "generated_at": "2026-11-27T00:00:00Z",
@@ -488,8 +488,46 @@
      5.0
     ],
     "height_ft": 2.0,
+    "hips_ft": 13.86,
     "facet": "f2",
     "returns": 96
+   },
+   {
+    "id": "o3",
+    "kind": "unit",
+    "center": [
+     -5.0,
+     5.0
+    ],
+    "size_ft": [
+     4.0,
+     3.0
+    ],
+    "polygon": [
+     [
+      -7.0,
+      3.5
+     ],
+     [
+      -3.0,
+      3.5
+     ],
+     [
+      -3.0,
+      6.5
+     ],
+     [
+      -7.0,
+      6.5
+     ],
+     [
+      -7.0,
+      3.5
+     ]
+    ],
+    "height_ft": 1.5,
+    "facet": "f4",
+    "returns": 30
    }
   ],
   "totals": {
@@ -516,12 +554,14 @@
    "chimney_count": 1,
    "chimney_perimeter_ft": 12.0,
    "lantern_count": 1,
-   "area_sqft_roof_edge": 1417.518
+   "lantern_sides_ft": 20.0,
+   "lantern_hips_ft": 13.86,
+   "unit_count": 1
   },
   "confidence": {
    "overall": "medium",
    "notes": [
-    "Hand-written synthetic sample of the 0.6 shape."
+    "Hand-written synthetic sample of the 0.7 shape."
    ]
   },
   "warnings": [],
@@ -563,7 +603,9 @@
   "chimney_count": 1,
   "chimney_perimeter_ft": 12.0,
   "lantern_count": 1,
-  "area_sqft_roof_edge": 1417.518
+  "lantern_sides_ft": 20.0,
+  "lantern_hips_ft": 13.86,
+  "unit_count": 1
  },
  "confidence": 0.6,
  "warnings": [],

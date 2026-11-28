@@ -12,7 +12,7 @@ There is no raster: the blobs come from point distances, so the result does not 
 (a roof translated by any offset gives the same objects). Skylights are flush with the roof and cannot be seen: not tried.
 
 Returns ``(objects, mislabelled)``. ``objects``: dicts ``id`` ("o1", ... ordered by x then y), ``kind``
-("chimney" | "lantern" | "unknown"; a lantern only on a pitched facet), ``center`` [x, y], ``size_ft`` [long, short], ``polygon`` (closed ring of [x, y]: the
+("chimney" | "lantern" | "unit" | "unknown"; any object on a facet that is not pitched is a "unit"; a lantern carries ``hips_ft``, its own four hips), ``center`` [x, y], ``size_ft`` [long, short], ``polygon`` (closed ring of [x, y]: the
 rectangle of the blob's returns, grown by 0.15 of the mean return spacing: aligned with the walls unless a free
 angle fits much better), ``height_ft`` (95th percentile above the plane),
 ``facet`` (id of the facet under the centre), ``returns`` (count); x, y in feet like the model's facets. ``mislabelled``:
@@ -146,7 +146,8 @@ def find_objects(context: np.ndarray, facets: list[Facet], outline: Outline, gro
         sel = up[lab == k]
         if len(sel) < p.obj_min_points:
             continue
-        foot = _footprint(cand[sel, :2], axis, p.obj_pad_spacings * spacing, p)
+        pad = p.obj_pad_spacings * spacing
+        foot = _footprint(cand[sel, :2], axis, pad, p)
         h95 = float(np.percentile(r[sel], 95))
         # canopy: roof returns seen through it, at the same place, with a wide height spread
         c0 = foot.centroid
@@ -156,11 +157,11 @@ def find_objects(context: np.ndarray, facets: list[Facet], outline: Outline, gro
         on_roof = float((np.abs(r[near]) < p.obj_on_plane_m).sum()) / max(len(near), 1)
         tree = ((1.0 - float(inside[sel].mean())) > p.obj_tree_outside_share or h95 > p.obj_tree_h95_m
                 or (on_roof > p.obj_layered_share and float(np.std(r[sel])) > p.obj_layered_spread_m))
-        blobs.append((sel, foot, h95, tree))
-    crowns = [foot for _, foot, _, tree in blobs if tree]
+        blobs.append((sel, foot, h95, tree, pad))
+    crowns = [foot for _, foot, _, tree, _ in blobs if tree]
     objects: list[dict[str, Any]] = []
     mislabelled: list[dict[str, Any]] = []
-    for sel, foot, h95, tree in blobs:
+    for sel, foot, h95, tree, pad in blobs:
         area = foot.area
         ring = np.array(foot.exterior.coords)
         sides = sorted((float(np.hypot(*(ring[i + 1] - ring[i]))) for i in (0, 1)), reverse=True)
@@ -186,8 +187,11 @@ def find_objects(context: np.ndarray, facets: list[Facet], outline: Outline, gro
             mislabelled.append(d)
         else:
             kind = _kind(h95, area, p)
-            if kind == "lantern" and facets[j].roof_type != "pitched":
-                kind = "unknown"  # rooftop units on a low-slope roof look the same, and a lantern's sides enter the totals
+            if facets[j].roof_type != "pitched":
+                kind = "unit"  # a box on a flat or low-slope roof is a rooftop unit, whatever its height
+            if kind == "lantern":  # its own four hips: the bare footprint (the padded one less the pad) and the height
+                a, b = (max(s - 2.0 * pad, 0.0) for s in sides)
+                d["hips_ft"] = round(4.0 * math.sqrt((a / 2) ** 2 + (b / 2) ** 2 + h95 ** 2) * FT, 2)
             objects.append({"kind": kind, **d})
     objects.sort(key=lambda o: (o["center"][0], o["center"][1]))
     mislabelled.sort(key=lambda o: (o["center"][0], o["center"][1]))

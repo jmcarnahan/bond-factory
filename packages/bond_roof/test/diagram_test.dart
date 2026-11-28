@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:bond_roof/bond_roof.dart';
 import 'package:test/test.dart';
 
@@ -70,10 +72,14 @@ void main() {
         expect(t.size * cardScale, greaterThanOrEqualTo(12), reason: '"${t.text}" ${t.size} in ${s.title}');
       }
     }
-    // Legend swatches: two columns compact, three wide.
+    // Legend swatches (an edge's line, an object's square mark): two columns compact, three wide. The object marks count
+    // since the rooftop unit row: the third column of the sample's legend can end with objects only.
     double legendCols(Scene s) => {
           for (final p in s.prims)
-            if (p is LinePrim && p.a.y < 200 && p.b.x - p.a.x > 10 && (p.b.x - p.a.x) < 60) p.a.x.round()
+            if (p is LinePrim && p.a.y < 200 && p.b.x - p.a.x > 10 && (p.b.x - p.a.x) < 60)
+              ((p.a.x + p.b.x) / 2).round()
+            else if (p is PolyPrim && p.stroke != null && DiagramStyle.report.objectColors.values.contains(p.stroke) && p.pts.first.y < 200)
+              ((p.pts.map((q) => q.x).reduce(math.min) + p.pts.map((q) => q.x).reduce(math.max)) / 2).round()
         }.length.toDouble();
     expect(legendCols(len), 2);
     expect(legendCols(LengthDiagram.build(m)), 3);

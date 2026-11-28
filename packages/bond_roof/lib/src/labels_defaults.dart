@@ -15,9 +15,11 @@ const Map<String, String> roofLabelDefaults = {
   'legend_flat_seam': 'Flat roof seams',
   'legend_chimney': 'Chimney',
   'legend_lantern': 'Roof lantern',
-  // The one-letter mark drawn on a chimney and on a lantern.
+  'legend_unit': 'Rooftop unit',
+  // The one-letter mark drawn on a chimney, a lantern and a unit.
   'mark_chimney': 'C',
   'mark_lantern': 'L',
+  'mark_unit': 'U',
   // Diagram titles and captions.
   'length_title': 'Roof length diagram',
   'length_caption': 'Length diagram',
@@ -46,6 +48,9 @@ const Map<String, String> roofLabelDefaults = {
   'totals_transition': 'Transitions',
   'totals_chimneys': 'Chimneys',
   'totals_lanterns': 'Roof lanterns',
+  'totals_units': 'Rooftop units',
+  'totals_lantern_sides': 'Roof lantern sides (in eave + rake)',
+  'totals_lantern_hips': 'Roof lantern hips (not in ridge + hip)',
   // Units.
   'unit_ft': 'ft',
   'unit_in': 'in',

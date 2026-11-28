@@ -5,7 +5,7 @@ import 'json_util.dart';
 export 'json_util.dart' show Pt;
 export 'model_facet.dart';
 
-/// The edge types the engine emits (`docs/contract-0.6.md`) and [unspecified] for anything else.
+/// The edge types the engine emits (`docs/contract-0.7.md`) and [unspecified] for anything else.
 enum EdgeType {
   /// Outer roof edge at the gutter line.
   eave('eave'),
@@ -52,6 +52,9 @@ enum ObjectKind {
   chimney('chimney'),
   lantern('lantern'),
 
+  /// A box on a flat or low-slope facet (a rooftop unit): drawn like a chimney, counted on its own.
+  unit('unit'),
+
   /// Found but not classified: kept in the model, never drawn.
   unknown('unknown');
 
@@ -59,7 +62,7 @@ enum ObjectKind {
   final String json;
 }
 
-/// One entry of `model.objects`: a chimney or flue, a roof lantern, or something unclassified.
+/// One entry of `model.objects`: a chimney or flue, a roof lantern, a rooftop unit, or something unclassified.
 class RoofObject {
   const RoofObject({
     required this.id,
@@ -68,6 +71,7 @@ class RoofObject {
     required this.sizeFt,
     this.polygon,
     this.heightFt,
+    this.hipsFt,
     this.facet,
     this.returns,
   });
@@ -114,6 +118,7 @@ class RoofObject {
       sizeFt: size,
       polygon: polygon,
       heightFt: numOrNull(j, 'height_ft', path),
+      hipsFt: numOrNull(j, 'hips_ft', path),
       facet: j['facet'] is String ? j['facet'] as String : null,
       returns: numOrNull(j, 'returns', path)?.round(),
     );
@@ -155,6 +160,9 @@ class RoofObject {
   /// Height above the roof surface, feet, when measured.
   final double? heightFt;
 
+  /// A lantern's own four hips, feet, as the service estimated them; null for any other object.
+  final double? hipsFt;
+
   /// The facet it stands on, when known.
   final String? facet;
 
@@ -168,6 +176,7 @@ class RoofObject {
         'size_ft': [sizeFt.$1, sizeFt.$2],
         if (polygon != null) 'polygon': polyJson(polygon!),
         if (heightFt != null) 'height_ft': heightFt,
+        if (hipsFt != null) 'hips_ft': hipsFt,
         if (facet != null) 'facet': facet,
         if (returns != null) 'returns': returns,
       };

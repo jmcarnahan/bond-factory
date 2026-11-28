@@ -1,7 +1,7 @@
 """The totals of a roof, computed ONCE from the drawn facets, typed edges and objects.
 
 ``roof_totals`` is the only place an area, a length by type or an object count is added up, and it writes exactly the
-keys of contract 0.6 (``docs/contract-0.6.md``, a test reads that table). The engine calls it on its facets, edges and
+keys of contract 0.7 (``docs/contract-0.7.md``, a test reads that table). The engine calls it on its facets, edges and
 objects (``finish.assemble``); the model adapter calls it on the facets, edges and objects it writes into the model (the
 same function, so the model's totals and the envelope's totals cannot disagree). Rows are read by attribute: ``id``,
 ``area_sqft``, ``roof_type``, ``pitch_rise`` for a facet and ``type``, ``length_ft`` for an edge, which both
@@ -29,8 +29,9 @@ def roof_totals(facets: Sequence[Any], edges: Sequence[Any], borderline_ids: set
     the flat cut (``roof_type``) and are rounded first, the area is their sum. Lengths are the sums of the edges of one
     type (an unpriced ``flat_seam`` is in no total, nor are ``parapet`` and ``unspecified``: the engine never emits them, but a
     stored or hand-built model may carry them and ``model.totals.lengths_ft`` counts them under their own type). ``exposed_edge_ft`` adds the two step types and the sides of the
-    lanterns; ``eave_rake_ft`` is ``eave + rake + flat_edge + exposed``. Only chimneys and lanterns are counted; an
-    ``unknown`` object is counted nowhere.
+    lanterns (``lantern_sides_ft``, written once and used in both); ``eave_rake_ft`` is ``eave + rake + flat_edge +
+    exposed``. ``lantern_hips_ft`` sums the lanterns' ``hips_ft`` (their own hips, in no ridge + hip total). Chimneys and lanterns are those on pitched facets; ``unit`` is any object
+    on a flat or low-slope facet; an ``unknown`` object is counted nowhere.
     """
     ap = sum(f.area_sqft for f in facets if f.roof_type != "flat")
     af = sum(f.area_sqft for f in facets if f.roof_type == "flat")
@@ -42,6 +43,7 @@ def roof_totals(facets: Sequence[Any], edges: Sequence[Any], borderline_ids: set
             length[e.type] += e.length_ft
     chimneys = [o for o in objects if o["kind"] == "chimney"]
     lanterns = [o for o in objects if o["kind"] == "lantern"]
+    units = [o for o in objects if o["kind"] == "unit"]
     pitch_w = sum(f.area_sqft * f.pitch_rise for f in facets if f.roof_type != "flat")
 
     def r(v: float) -> float:
@@ -49,7 +51,8 @@ def roof_totals(facets: Sequence[Any], edges: Sequence[Any], borderline_ids: set
 
     # composites are sums of the ROUNDED parts: anyone adding the published values gets the published total, exactly
     parts = {k: r(v) for k, v in length.items()}
-    exposed = r(parts["step_flashing"] + parts["wall_flashing"] + r(sum(_perimeter_ft(o) for o in lanterns)))
+    lantern_sides = r(sum((_perimeter_ft(o) for o in lanterns), 0.0))
+    exposed = r(parts["step_flashing"] + parts["wall_flashing"] + lantern_sides)
     return {
         "area_sqft": area, "squares": round(area / 100.0, 3), "roofing_pitched_sqft": pitched, "roofing_flat_sqft": flat,
         "planes_pitch_weighted": round(pitch_w / ap, 2) if ap > 0 else 0.0, "plane_count": len(facets),
@@ -61,7 +64,7 @@ def roof_totals(facets: Sequence[Any], edges: Sequence[Any], borderline_ids: set
         "step_flashing_ft": parts["step_flashing"], "wall_flashing_ft": parts["wall_flashing"],
         "transition_ft": parts["transition"], "level_change_ft": parts["level_change"],
         "chimney_count": len(chimneys), "chimney_perimeter_ft": r(sum(_perimeter_ft(o) for o in chimneys)),
-        "lantern_count": len(lanterns),
-        # kept for ONE release: phone builds in the field recognise an engine roof by the presence of this key
-        "area_sqft_roof_edge": area,
+        "lantern_count": len(lanterns), "lantern_sides_ft": lantern_sides,
+        "lantern_hips_ft": r(sum((o.get("hips_ft", 0.0) for o in lanterns), 0.0)),
+        "unit_count": len(units),
         "low_slope_confirm_sqft": round(sum(f.area_sqft for f in facets if f.id in borderline_ids), 1)}

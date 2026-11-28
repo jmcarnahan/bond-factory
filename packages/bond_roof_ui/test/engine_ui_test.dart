@@ -9,9 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The hand-written 0.6 sample envelope (no real address or geometry).
+/// The hand-written 0.7 sample envelope (no real address or geometry).
 RoofMeasurement _sample() => RoofMeasurement.parseAny(
-    jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.6_sample.json').readAsStringSync()) as Map<String, dynamic>);
+    jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.7_sample.json').readAsStringSync()) as Map<String, dynamic>);
 
 /// An envelope of the old block shape (0.2): it opens, and shows less.
 RoofMeasurement _old() => RoofMeasurement.parseAny(

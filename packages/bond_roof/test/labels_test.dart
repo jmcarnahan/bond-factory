@@ -89,7 +89,7 @@ void main() {
       expect(t, isNot(contains('Pitch')));
     });
 
-    test('the new keys of 0.6 are all there and in English the owner\'s words', () {
+    test('the new keys of 0.6 are all there (and stay) and in English the owner\'s words', () {
       const l = RoofLabels();
       expect(l.legendStepFlashing, 'Sidewall flashing');
       expect(l.legendWallFlashing, 'Headwall flashing');
@@ -97,6 +97,15 @@ void main() {
       expect([l.totalsEaveRake, l.totalsExposedEdge, l.totalsRidgeHip], ['Eave + rake', 'Exposed edges inside the roof', 'Ridge + hip']);
       expect([l.totalsSidewall, l.totalsHeadwall, l.totalsTransition, l.totalsChimneys],
           ['Sidewall flashing', 'Headwall flashing', 'Transitions', 'Chimneys']);
+    });
+
+    test('the five keys of 0.7 are all there, in English, and the label count is 80', () {
+      const l = RoofLabels();
+      expect([l.legendUnit, l.markUnit, l.totalsUnits, l.totalsLanternSides, l.totalsLanternHips], [
+        'Rooftop unit', 'U', 'Rooftop units', 'Roof lantern sides (in eave + rake)', 'Roof lantern hips (not in ridge + hip)',
+      ]);
+      expect(RoofLabels.keys.length, 80);
+      expect(spanishLabels.keys.toSet(), RoofLabels.keys.toSet());
     });
 
     test('the keys of removed totals and removed things are gone', () {

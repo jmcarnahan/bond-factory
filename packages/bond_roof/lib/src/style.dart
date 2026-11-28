@@ -25,10 +25,11 @@ const double flatSeamStrokePx = 1.2;
 /// A level change's label names the step only when the jump is at least this many feet.
 const double levelChangeStepMinFt = 3.0;
 
-/// Outline and letter colour of a chimney and a lantern: dark, so they read as objects and not as one more edge type.
+/// Outline and letter colour of a chimney, a lantern and a unit: dark, so they read as objects and not as one more edge type.
 const _defaultObjectColors = <ObjectKind, int>{
   ObjectKind.chimney: 0xFF4E342E,
   ObjectKind.lantern: 0xFF01579B,
+  ObjectKind.unit: 0xFF827717,
 };
 
 const _defaultDashed = <EdgeType>{EdgeType.stepFlashing, EdgeType.wallFlashing};

@@ -24,5 +24,5 @@ Contract: docs/contracts/roof_model.md
 
 ## Rules
 - No Flutter imports. No literal user-visible strings in scene code: add a key to labels_defaults.dart.
-- The reference fixture is `../../fixtures/roof_engine/roof_measurement_0.6_sample.json`; old shapes come from `../../fixtures/` via test/support.dart.
+- The reference fixture is `../../fixtures/roof_engine/roof_measurement_0.7_sample.json`; old shapes come from `../../fixtures/` via test/support.dart.
 - Changing the schema id or a field is a contract change: update docs/contracts/roof_model.md and the service.

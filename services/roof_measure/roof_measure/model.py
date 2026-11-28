@@ -19,14 +19,15 @@ CORE_EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "w
 SCHEMA_ONLY_EDGE_TYPES = ("parapet", "unspecified")  # valid for stored results and hand-built models; the engine emits neither; in no contract total
 NEW_EDGE_TYPES = ("flat_edge", "level_change")  # contract 0.4 (engine): a result without them reads as zero
 EDGE_TYPES = CORE_EDGE_TYPES + NEW_EDGE_TYPES  # the twelve keys of totals.lengths_ft
-OBJECT_KINDS = ("chimney", "lantern", "unknown")  # contract 0.6: things standing on the roof (never facets)
+OBJECT_KINDS = ("chimney", "lantern", "unit", "unknown")  # contract 0.7 (unit: any object on a flat or low-slope facet): things standing on the roof (never facets)
 STEP_EDGE_TYPES = ("level_change", "step_flashing", "wall_flashing")  # a step between two roofs: carries ``jump_ft`` and ``upper``
-# the totals of contract 0.6, in order: engine.totals writes exactly these; the envelope carries exactly these
+# the totals of contract 0.7, in order: engine.totals writes exactly these; the envelope carries exactly these
 TOTALS_KEYS = (
     "area_sqft", "squares", "roofing_pitched_sqft", "roofing_flat_sqft", "planes_pitch_weighted", "plane_count",
     "eave_ft", "rake_ft", "flat_edge_ft", "exposed_edge_ft", "eave_rake_ft", "ridge_ft", "hip_ft", "valley_ft",
     "ridge_hip_ft", "step_flashing_ft", "wall_flashing_ft", "transition_ft", "level_change_ft", "chimney_count",
-    "chimney_perimeter_ft", "lantern_count", "area_sqft_roof_edge", "low_slope_confirm_sqft")
+    "chimney_perimeter_ft", "lantern_count", "lantern_sides_ft", "lantern_hips_ft", "unit_count",
+    "low_slope_confirm_sqft")
 UNPRICED_EDGE_TYPES = ("flat_seam",)  # 0.5.1: drawn between two flat pieces of one deck, never priced, in no total
 VALID_EDGE_TYPES = EDGE_TYPES + UNPRICED_EDGE_TYPES  # what an edge may be typed
 # closed vocabularies. FORMS: the engine writes flat and shed; hip and gable stay because the kept synthetic models and old stored

@@ -67,7 +67,7 @@ def test_the_totals_are_the_contract_keys_and_each_is_the_sum_of_the_model(name)
     # one function, one answer: the model adds up ITS rows; the engine's own totals differ only where the adapter removed a
     # spike or collapsed a sliver (a few hundredths of a square foot per facet), so each key is within 0.1 (the largest gap over the 45 measured synthetic cases is 0.1: one rounding step of area_sqft)
     assert all(t[k] == pytest.approx(res.totals[k], abs=0.1) for k in TOTALS_KEYS), {k: (t[k], res.totals[k]) for k in TOTALS_KEYS}
-    assert t["area_sqft_roof_edge"] == t["area_sqft"] == mt["total_area_sqft"]  # one roof, one area
+    assert t["area_sqft"] == mt["total_area_sqft"]  # one roof, one area
     assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["area_sqft"], abs=0.2)
     lengths = mt["lengths_ft"]
     for k in ("eave", "rake", "ridge", "hip", "valley", "flat_edge", "level_change", "step_flashing", "wall_flashing", "transition"):
@@ -193,7 +193,7 @@ def test_the_envelope_carries_everything_and_serialises():
     json.dumps(env, allow_nan=False)
     t = env["totals"]
     assert tuple(t) == TOTALS_KEYS
-    assert t["area_sqft"] == t["area_sqft_roof_edge"]  # one roof, one area
+    assert "area_sqft_roof_edge" not in t  # removed in 0.7.0
     assert env["warning_codes"] == ["low_slope_confirm"] and env["model"]["quality"]["engine"] == "planes/1"
     assert env["model"]["planes"] and env["model"]["totals"]["lengths_ft"]["step_flashing"] > 0  # the pitched roof drains into the flat deck's wall
     for code in ("low_slope_confirm", "outline_mismatch", "poor_fit", "low_density"):
@@ -267,7 +267,7 @@ def test_the_envelope_has_one_area_on_every_synthetic_case(name):
                                        "rounds": 0, "usage": {"input_tokens": 0, "output_tokens": 0}},
                          warnings=[], warning_codes=[], density_pts_m2=8.0, assessment=assess_engine(res, model, []))
     t = env["totals"]
-    assert tuple(t) == TOTALS_KEYS and t["area_sqft"] == t["area_sqft_roof_edge"] == env["model"]["totals"]["total_area_sqft"]
+    assert tuple(t) == TOTALS_KEYS and t["area_sqft"] == env["model"]["totals"]["total_area_sqft"]
     assert t["squares"] * 100 == pytest.approx(t["area_sqft"], abs=0.5)
     assert t["roofing_pitched_sqft"] + t["roofing_flat_sqft"] == pytest.approx(t["area_sqft"], abs=0.05)
     for k, v in t.items():  # no number in the envelope disagrees with the model's
@@ -305,7 +305,10 @@ def test_the_model_carries_the_objects_and_their_totals():
     t = model["totals"]
     lantern = next(o for o in model["objects"] if o["kind"] == "lantern")
     chimney = next(o for o in model["objects"] if o["kind"] == "chimney")
-    assert t["chimney_count"] == t["lantern_count"] == 1
+    assert t["chimney_count"] == t["lantern_count"] == 1 and t["unit_count"] == 0
+    assert t["lantern_sides_ft"] == pytest.approx(2 * sum(lantern["size_ft"]), abs=0.02)
+    assert t["exposed_edge_ft"] == pytest.approx(t["step_flashing_ft"] + t["wall_flashing_ft"] + t["lantern_sides_ft"], abs=0.03)
+    assert t["lantern_hips_ft"] == lantern["hips_ft"] > 0  # the lantern's own hips, in no ridge + hip
     assert t["chimney_perimeter_ft"] == pytest.approx(2 * sum(chimney["size_ft"]), abs=0.02)
     assert t["exposed_edge_ft"] == pytest.approx(t["step_flashing_ft"] + t["wall_flashing_ft"] + 2 * sum(lantern["size_ft"]), abs=0.03)
     assert t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"] + t["flat_edge_ft"] + t["exposed_edge_ft"], abs=0.03)

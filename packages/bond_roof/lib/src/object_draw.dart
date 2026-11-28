@@ -7,7 +7,7 @@ import 'report_layout.dart';
 import 'scene.dart';
 import 'style.dart';
 
-/// One chimney or lantern on the plan, in scene pixels: its outline ([polygon]) and the kind. The outline is the measured
+/// One chimney, lantern or unit on the plan, in scene pixels: its outline ([polygon]) and the kind. The outline is the measured
 /// polygon when the object has one, else the axis-aligned `size_ft` rectangle.
 class ObjectMark {
   const ObjectMark(this.object, this.center, this.polygon);
@@ -30,7 +30,7 @@ class ObjectMark {
   Obb get box => Obb(center.x, center.y, halfW, halfH);
 }
 
-/// The drawn objects of [m]: every chimney and lantern that stands on the roof (an `unknown` object, one off the roof, a
+/// The drawn objects of [m]: every chimney, lantern and unit that stands on the roof (an `unknown` object, one off the roof, a
 /// degenerate one and any object of a model with no geometry are never drawn). The outline is the object's polygon (or its
 /// size rectangle) at the plan scale; an axis of its bounding box shorter than [minSide] pixels is stretched to [minSide]
 /// about the centre, so the mark stays readable and a sliver can never blow up.
@@ -101,4 +101,8 @@ void addObjectMark(List<Prim> out, Pt c, double side, ObjectKind kind, DiagramSt
     ..add(TextPrim(at: c, text: _letter(kind, labels), size: letterSize, color: style.objectColorOf(kind), bold: true));
 }
 
-String _letter(ObjectKind kind, RoofLabels l) => kind == ObjectKind.lantern ? l.markLantern : l.markChimney;
+String _letter(ObjectKind kind, RoofLabels l) => switch (kind) {
+      ObjectKind.lantern => l.markLantern,
+      ObjectKind.unit => l.markUnit,
+      _ => l.markChimney,
+    };

@@ -88,8 +88,10 @@ class RoofLabels {
   String get legendFlatSeam => _m['legend_flat_seam']!;
   String get legendChimney => _m['legend_chimney']!;
   String get legendLantern => _m['legend_lantern']!;
+  String get legendUnit => _m['legend_unit']!;
   String get markChimney => _m['mark_chimney']!;
   String get markLantern => _m['mark_lantern']!;
+  String get markUnit => _m['mark_unit']!;
   String get levelChangeStep => _m['level_change_step']!;
   String get totalsRoofingPitched => _m['totals_roofing_pitched']!;
   String get totalsRoofingFlat => _m['totals_roofing_flat']!;
@@ -102,6 +104,9 @@ class RoofLabels {
   String get totalsTransition => _m['totals_transition']!;
   String get totalsChimneys => _m['totals_chimneys']!;
   String get totalsLanterns => _m['totals_lanterns']!;
+  String get totalsUnits => _m['totals_units']!;
+  String get totalsLanternSides => _m['totals_lantern_sides']!;
+  String get totalsLanternHips => _m['totals_lantern_hips']!;
   String get lengthTitle => _m['length_title']!;
   String get lengthCaption => _m['length_caption']!;
   String get areaTitle => _m['area_title']!;

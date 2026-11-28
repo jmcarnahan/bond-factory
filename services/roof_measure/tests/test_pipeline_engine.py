@@ -113,7 +113,7 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     w = world(main="flat_pitched_step_d8")
     stages: list[str] = []
     env = run(w, tmp_path, on_stage=stages.append)
-    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.6.0"
+    assert env["contract"] == "bond.roof_model/0.2" and env["pipeline_version"] == PIPELINE_VERSION == "0.7.0"
     assert env["method_used"] == "planes" and env["footprint_source"] == "lariac"
     assert env["verification"]["verdict"] == "unverified"
     m, t = env["model"], env["totals"]
@@ -124,7 +124,7 @@ def test_the_plane_engine_returns_a_full_envelope(world, tmp_path):
     assert m["source"]["building"]["parcel_id"] == "P1" and m["source"]["building"]["outline_id"] == "B1"
     assert m["source"]["lidar"]["density_per_m2"] >= 6 and m["source"]["footprint"]["provider"].startswith("lacounty")
     assert tuple(t) == TOTALS_KEYS and m["objects"] == []
-    assert t["roofing_flat_sqft"] > 100 and t["roofing_pitched_sqft"] > 100 and t["area_sqft"] == t["area_sqft_roof_edge"]
+    assert t["roofing_flat_sqft"] > 100 and t["roofing_pitched_sqft"] > 100 and "area_sqft_roof_edge" not in t
     # a pitched roof draining into the higher flat deck's wall: sidewall flashing
     assert t["level_change_ft"] + t["step_flashing_ft"] + t["wall_flashing_ft"] > 0
     assert m["planes"] and "model_from_planes" not in env["warning_codes"]

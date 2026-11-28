@@ -15,7 +15,7 @@ RoofModel _withTotals(Map<String, Object?> totals, {List<Map<String, Object?>> o
 TotalRow? _row(List<TotalRow> rows, String id) => rows.where((r) => r.id == id).firstOrNull;
 
 void main() {
-  group('RoofEngineTotals reads the 0.6 keys', () {
+  group('RoofEngineTotals reads the 0.7 keys', () {
     test('every key of the contract is read and written back', () {
       final t = RoofEngineTotals.fromJson(sampleJson()['totals'] as Map<String, dynamic>)!;
       expect(t.toJson().keys.toSet(), RoofEngineTotals.knownKeys.toSet());
@@ -34,16 +34,17 @@ void main() {
       expect(t.toJson(), {'area_sqft': 1000.0});
     });
 
-    test('totals without any 0.6 key give no engine totals', () {
+    test('totals without any 0.7 key give no engine totals', () {
       expect(RoofEngineTotals.fromJson({'total_area_sqft': 5.0}), isNull);
     });
 
-    test('keys that were removed at 0.6 are not read', () {
+    test('keys that were removed at 0.6 or 0.7 are not read', () {
       final t = RoofEngineTotals.fromJson({
         'area_sqft': 1.0,
         'planes_surface_area_sqft': 2.0, 'area_sqft_wall_line': 3.0, 'outline_perimeter_ft': 4.0, 'outline_perimeter_wall_ft': 5.0,
         'overhang_ft_median': 6.0, 'drip_edge_eave_ft': 7.0, 'drip_edge_eave_rake_ft': 8.0, 'ridge_cap_ridge_ft': 9.0,
         'ridge_cap_ridge_hip_ft': 10.0, 'predominant_pitch': 11.0, 'roofing_pitched_squares': 12.0, 'roofing_flat_squares': 13.0,
+        'area_sqft_roof_edge': 14.0,
       })!;
       expect(t.toJson(), {'area_sqft': 1.0});
     });
@@ -61,7 +62,7 @@ void main() {
       final rows = totalRows(sampleModel(), l);
       expect([for (final r in rows) r.id], [
         'area', 'pitched', 'flat', 'pitch', 'eave', 'rake', 'flat_edge', 'exposed_edge', 'eave_rake', 'ridge', 'ridge_hip',
-        'step_flashing', 'wall_flashing', 'transition', 'chimneys', 'lanterns', 'facets',
+        'step_flashing', 'wall_flashing', 'transition', 'chimneys', 'lanterns', 'lantern_sides', 'lantern_hips', 'units', 'facets',
       ]);
       expect(_row(rows, 'area')!.value, '1,418 sq ft  (14.18 squares)');
       expect(_row(rows, 'pitch')!.value, '6/12 (5.9)');
@@ -126,7 +127,7 @@ void main() {
 
 
     test('the table, the legend and the summary print the same rows (sample and an old flat roof)', () {
-      const nonLegend = {'area', 'pitched', 'flat', 'low_slope', 'pitch', 'facets'};
+      const nonLegend = {'area', 'pitched', 'flat', 'low_slope', 'pitch', 'facets', 'lantern_sides', 'lantern_hips'};
       final old = RoofModel.fromJson(loadOldFixtures().firstWhere((f) => f.name == 'synthetic_flat_parapet').json);
       for (final model in [sampleModel(), old]) {
         final table = [for (final r in totalRows(model, l)) if (!nonLegend.contains(r.id)) r.id];
@@ -138,6 +139,55 @@ void main() {
       }
       expect(legendRowIds(old), contains('unspecified'));
       expect([for (final r in totalRows(sampleModel(), l)) r.id], containsAll(['lanterns']));
+    });
+
+    test('the three 0.7 keys are read, written back, and read as null when the service sent none', () {
+      final t = RoofEngineTotals.fromJson({
+        'area_sqft': 1.0, 'lantern_sides_ft': 20.0, 'lantern_hips_ft': 13.86, 'unit_count': 2,
+      })!;
+      expect((t.lanternSidesFt, t.lanternHipsFt, t.unitCount), (20.0, 13.86, 2));
+      expect(RoofEngineTotals.fromJson(t.toJson()), t);
+      final none = RoofEngineTotals.fromJson({'area_sqft': 1.0})!;
+      expect((none.lanternSidesFt, none.lanternHipsFt, none.unitCount), (null, null, null));
+    });
+
+    test('a totals key this package does not know is ignored without error, and so is an unknown object kind', () {
+      final t = RoofEngineTotals.fromJson({'area_sqft': 1.0, 'a_key_of_a_later_contract_ft': 3.0})!;
+      expect(t.toJson(), {'area_sqft': 1.0});
+      final m = _withTotals({'area_sqft': 100.0}, objects: [
+        {'id': 'a', 'kind': 'a_kind_of_a_later_contract', 'center': [1.0, 1.0], 'size_ft': [2.0, 2.0]},
+      ]);
+      expect(m.objects.single.kind, ObjectKind.unknown);
+      expect(RoofFigures.of(m).units, 0);
+      expect(() => totalRows(m, const RoofLabels()), returnsNormally);
+    });
+
+    test('the unit, lantern sides, lantern hips rows show only when the value is over 0', () {
+      const rowOf = {'unit_count': 'units', 'lantern_sides_ft': 'lantern_sides', 'lantern_hips_ft': 'lantern_hips'};
+      const labelOf = {
+        'units': 'Rooftop units',
+        'lantern_sides': 'Roof lantern sides (in eave + rake)',
+        'lantern_hips': 'Roof lantern hips (not in ridge + hip)',
+      };
+      for (final key in rowOf.keys) {
+        final id = rowOf[key]!;
+        final shown = totalRows(_withTotals({'area_sqft': 100.0, key: key == 'unit_count' ? 3 : 24.0}), l);
+        expect(_row(shown, id)?.label, labelOf[id], reason: key);
+        expect(_row(shown, id)!.value, key == 'unit_count' ? '3' : '24ft 0in', reason: key);
+        for (final zero in [0, 0.0, null]) {
+          final hidden = totalRows(_withTotals({'area_sqft': 100.0, key: ?zero}), l);
+          expect(_row(hidden, id), isNull, reason: '$key = $zero');
+        }
+      }
+    });
+
+    test('the units row counts the unit objects when the key is absent, like the chimney count', () {
+      final obj = [
+        {'id': 'a', 'kind': 'unit', 'center': [1.0, 1.0], 'size_ft': [2.0, 2.0]},
+        {'id': 'b', 'kind': 'unit', 'center': [5.0, 5.0], 'size_ft': [2.0, 2.0]},
+      ];
+      expect(RoofFigures.of(_withTotals({'area_sqft': 1.0}, objects: obj)).units, 2);
+      expect(RoofFigures.of(_withTotals({'area_sqft': 1.0, 'unit_count': 7}, objects: obj)).units, 7);
     });
 
     test('model totals that carry only a few keys lose nothing from a full envelope totals (read key by key)', () {
@@ -190,7 +240,7 @@ void main() {
       expect((j['model'] as Map)['totals'], j['totals']);
     });
 
-    test('the table of an envelope reads the envelope totals when the model has no 0.6 keys', () {
+    test('the table of an envelope reads the envelope totals when the model has no 0.7 keys', () {
       final j = sampleJson();
       (j['model'] as Map<String, dynamic>)['totals'] = {'total_area_sqft': 1000.0};
       (j['totals'] as Map<String, dynamic>)['step_flashing_ft'] = 99.0;

@@ -21,7 +21,7 @@ from roof_measure.engine.load import roof_points_from_arrays
 from roof_measure.engine.measure import measure_stages
 from roof_measure.engine.objects import find_objects
 from roof_measure.engine.params import DEFAULT
-from roof_measure.engine.synth_points import add_box, cases, flat, gable, hip, simulate
+from roof_measure.engine.synth_points import add_box, cases, flat, gable, hip, shed, simulate
 from roof_measure.engine.types import Facet, Outline
 
 FT = 1 / 0.3048
@@ -173,7 +173,7 @@ def test_a_planar_upper_roof_the_facets_missed_is_mislabelled_not_an_object():
 def test_a_small_planar_part_is_an_object_not_mislabelled():
     pts, facets, outline = _flat_roof_with_upper_patch(1.2, 1.2)  # 1.4 m2, 1.2 m high
     objs, mis = find_objects(pts, facets, outline, 0.0)
-    assert mis == [] and [o["kind"] for o in objs] == ["chimney"]
+    assert mis == [] and [o["kind"] for o in objs] == ["unit"]  # the small box stands on a flat facet: a rooftop unit
 
 
 def test_an_object_gives_the_same_result_translated_by_any_offset():
@@ -231,19 +231,50 @@ def _flat_with_boxes(centres, size, height, density=16):
     return res, find_objects(pts, res.facets, res.outline, gz)
 
 
-def test_a_lantern_sized_box_on_a_low_slope_roof_is_unknown_and_adds_no_exposed_edge():
+def test_a_lantern_sized_box_on_a_low_slope_roof_is_a_unit_and_adds_no_exposed_edge():
     c = flat().roof_polygon().centroid
     res, (objs, _) = _flat_with_boxes([(c.x, c.y)], (1.6, 1.6), 0.5)
-    assert [o["kind"] for o in objs] == ["unknown"]
-    assert res.totals["lantern_count"] == 0 and res.totals["exposed_edge_ft"] == 0
+    assert [o["kind"] for o in objs] == ["unit"]
+    assert res.totals["lantern_count"] == 0 and res.totals["exposed_edge_ft"] == 0 and res.totals["unit_count"] == 1
 
 
-def test_rooftop_units_on_a_flat_commercial_roof_are_no_lanterns_and_leave_eave_rake_alone():
+def test_a_tall_narrow_box_and_a_low_wide_box_on_a_flat_roof_are_both_units_and_a_bare_flat_roof_has_none():
     roof = flat()
     x0, y0, x1, y1 = roof.roof_polygon().bounds
-    centres = [(x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy) for fx, fy in ((0.3, 0.3), (0.5, 0.5), (0.7, 0.3), (0.3, 0.7), (0.7, 0.7))]
-    res, (objs, _) = _flat_with_boxes(centres, (2.0, 1.1), 0.55)
-    assert len(objs) == 5 and not any(o["kind"] == "lantern" for o in objs)
-    t = res.totals
-    assert t["lantern_count"] == 0 and t["exposed_edge_ft"] == 0
-    assert t["eave_rake_ft"] == round(t["eave_ft"] + t["rake_ft"] + t["flat_edge_ft"], 2)  # the outer edge only
+    tall, wide = (x0 + (x1 - x0) * 0.3, y0 + (y1 - y0) * 0.5), (x0 + (x1 - x0) * 0.7, y0 + (y1 - y0) * 0.5)
+    pts = simulate(roof, density=16, seed=2)
+    pts = add_box(pts, roof, tall, (0.9, 0.9), 1.5, density=16, seed=30)  # chimney-like on a pitched roof
+    pts = add_box(pts, roof, wide, (1.8, 1.3), 0.4, density=16, seed=31)  # lantern-like on a pitched roof
+    res, gz = _measure(roof, pts)
+    objs, _ = find_objects(pts, res.facets, res.outline, gz)
+    assert [o["kind"] for o in objs] == ["unit", "unit"] and res.totals["unit_count"] == 2 and res.totals["chimney_count"] == 0
+    bare, gz = _measure(roof, simulate(roof, density=16, seed=2))
+    assert bare.totals["unit_count"] == 0 and find_objects(simulate(roof, density=16, seed=2), bare.facets, bare.outline, gz) == ([], [])
+
+
+def test_the_same_two_boxes_on_a_pitched_roof_stay_a_chimney_and_a_lantern():
+    roof = gable()
+    c = roof.roof_polygon().centroid
+    pts = simulate(roof, density=16, seed=2)
+    pts = add_box(pts, roof, (c.x - 3.0, c.y - 1.0), (0.9, 0.9), 1.5, density=16, seed=30)
+    pts = add_box(pts, roof, (c.x + 3.0, c.y), (1.8, 1.3), 0.4, density=16, seed=31)
+    res, gz = _measure(roof, pts)
+    objs, _ = find_objects(pts, res.facets, res.outline, gz)
+    assert sorted(o["kind"] for o in objs) == ["chimney", "lantern"]
+    assert "hips_ft" in next(o for o in objs if o["kind"] == "lantern") and not any("hips_ft" in o for o in objs if o["kind"] != "lantern")
+
+
+@pytest.mark.parametrize("density", [16, 13])
+def test_a_lantern_carries_the_length_of_its_own_four_hips(density):
+    """A 1.6 x 1.6 m box 0.4 m high on a 2.5/12 roof (the box top is level, so on any slope the returns stand a little higher
+    over the plane than 0.4 m: a gentle roof keeps that small): 4 hips of sqrt(0.8^2 + 0.8^2 + 0.4^2) m = 1.2 m each,
+    4.8 m = 15.75 ft in all (written before the run; the footprint is measured from returns: 1.5 ft of tolerance). Its sides
+    are the padded rectangle's perimeter, 4 x 1.6 m = 21.0 ft plus the pad: within 2.5 ft."""
+    roof = shed(pitch=2.5)
+    c = roof.roof_polygon().centroid
+    pts = add_box(simulate(roof, density=density, seed=2), roof, (c.x, c.y), (1.6, 1.6), 0.4, density=density, seed=3)
+    res, gz = _measure(roof, pts)
+    objs, _ = find_objects(pts, res.facets, res.outline, gz)
+    assert [o["kind"] for o in objs] == ["lantern"]
+    assert objs[0]["hips_ft"] == pytest.approx(4.8 * FT, abs=1.5)
+    assert 2 * sum(objs[0]["size_ft"]) == pytest.approx(4 * 1.6 * FT, abs=2.5)

@@ -10,17 +10,17 @@ Future<void> _settle(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('picking the 0.6 sample shows its report and totals; the language switch relabels them', (tester) async {
+  testWidgets('picking the 0.7 sample shows its report and totals; the language switch relabels them', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1280, 6000);
     addTearDown(tester.view.reset);
     await tester.pumpWidget(const MaterialApp(home: DemoPage()));
     await _settle(tester);
 
-    expect(find.widgetWithText(ChoiceChip, 'roof_measurement_0.6_sample'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'roof_measurement_0.6_sample'));
+    expect(find.widgetWithText(ChoiceChip, 'roof_measurement_0.7_sample'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'roof_measurement_0.7_sample'));
     await _settle(tester);
-    expect(find.textContaining('Report: roof_measurement_0.6_sample'), findsOneWidget);
+    expect(find.textContaining('Report: roof_measurement_0.7_sample'), findsOneWidget);
     expect(find.text('Sidewall flashing'), findsWidgets);
     expect(find.text('Headwall flashing'), findsWidgets);
     expect(find.text('Chimneys'), findsWidgets);

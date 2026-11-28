@@ -3,7 +3,7 @@ import 'package:bond_roof/bond_roof.dart';
 
 import 'tokens.dart';
 
-/// The measurement as inline text rows: the totals the roof has (area, pitch, each length, the chimney count: see
+/// The measurement as inline text rows: the totals the roof has (area, pitch, each length, the chimney, lantern and unit counts: see
 /// [totalRows]), confidence, and when it was generated. A roof never gets a row for a thing it does not have. No popups.
 class RoofTotalsTable extends StatelessWidget {
   const RoofTotalsTable(this.measurement, {super.key, this.labels = const RoofLabels()});

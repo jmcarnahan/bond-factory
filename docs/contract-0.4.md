@@ -1,6 +1,6 @@
 # roof_measure envelope 0.4 (additive to 0.2 and 0.3): the plane engine and the building choice
 
-> **Superseded by [contract-0.6.md](contract-0.6.md).** The `engine="blocks"` choice, the `hints` argument (`steps`), the priced-versus-drawn totals and the old totals keys described here were removed in 0.6.0. Kept as the record of the shape before.
+> **Superseded by [contract-0.7.md](contract-0.7.md).** The `engine="blocks"` choice, the `hints` argument (`steps`), the priced-versus-drawn totals and the old totals keys described here were removed in 0.6.0. Kept as the record of the shape before.
 
 > **Removed in 0.6.** What this file calls "the block path" and "the verifier" no longer exists in the library; the plane engine
 > described here is the only engine. `roof_measure.pipeline`, `model` and `quality` keep only what the engine uses.

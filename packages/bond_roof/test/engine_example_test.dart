@@ -6,8 +6,8 @@ import 'package:test/test.dart';
 import 'scene_checks.dart';
 import 'support.dart';
 
-/// The generated 0.6 example (fixtures/roof_engine/roof_measurement_0.6_engine.json): what the engine really writes, on a
-/// synthetic two-level roof with a chimney and a lantern.
+/// The generated 0.7 example (fixtures/roof_engine/roof_measurement_0.7_engine.json): what the engine really writes, on a
+/// synthetic two-level roof with a chimney, a lantern and a unit.
 void main() {
   final j = engineJson();
   final m = RoofMeasurement.parseAny(j);
@@ -16,17 +16,17 @@ void main() {
   test('every totals key, edge type and object kind in it is one the reader knows; nothing is mapped or noted', () {
     expect(unknownEnvelopeKeys(j), isEmpty);
     expect(model.parseNotes, isEmpty);
-    expect(m.pipelineVersion, startsWith('0.6'));
+    expect(m.pipelineVersion, startsWith('0.7'));
     expect(m.methodUsed, 'planes');
   });
 
-  test('the envelope totals are the 24 contract keys and model.totals carries the same values', () {
+  test('the envelope totals are the 27 contract keys and model.totals carries the same values', () {
     expect(m.totals.toJson().keys.toSet(), RoofEngineTotals.knownKeys.toSet());
     expect(model.totals.engine, m.totals);
   });
 
-  test('objects: a chimney and a lantern with closed-ring polygons that round-trip', () {
-    expect(model.objects.map((o) => o.kind).toSet(), {ObjectKind.chimney, ObjectKind.lantern});
+  test('objects: a chimney, a lantern and a unit with closed-ring polygons that round-trip', () {
+    expect(model.objects.map((o) => o.kind).toSet(), {ObjectKind.chimney, ObjectKind.lantern, ObjectKind.unit});
     for (final o in model.objects) {
       expect(o.polygon, isNotNull);
       expect(o.returns, isNotNull);

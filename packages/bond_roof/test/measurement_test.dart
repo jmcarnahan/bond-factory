@@ -15,7 +15,7 @@ void main() {
 
     test('top-level fields', () {
       expect(m.contract, startsWith('bond.roof_model/0.'));
-      expect(m.pipelineVersion, '0.6.0');
+      expect(m.pipelineVersion, '0.7.0');
       expect(m.methodUsed, 'planes');
       expect(m.footprintSource, 'lariac');
       expect(m.generatedAt!.year, 2026);

@@ -38,7 +38,7 @@ def test_every_kept_synthetic_model_passes_validate(path):
 def test_docs_embed_the_pass_envelope_verbatim_and_name_every_warning_code():
     doc = (ROOT / "docs" / "contract-0.2.md").read_text()
     assert (FIXTURES / "roof_measurement_0.2_pass.json").read_text().rstrip("\n") in doc
-    current = (ROOT / "docs" / "contract-0.6.md").read_text()  # the closed list is the 0.6 contract's
+    current = (ROOT / "docs" / "contract-0.7.md").read_text()  # the closed list is the 0.7 contract's
     for code in WARNING_CODES:
         assert f"`{code}`" in current
 
@@ -46,4 +46,4 @@ def test_docs_embed_the_pass_envelope_verbatim_and_name_every_warning_code():
 def test_pipeline_version_and_the_contract_name():
     from roof_measure.version import CONTRACT, PIPELINE_VERSION
 
-    assert PIPELINE_VERSION == "0.6.0" and CONTRACT == "bond.roof_model/0.2"
+    assert PIPELINE_VERSION == "0.7.0" and CONTRACT == "bond.roof_model/0.2"

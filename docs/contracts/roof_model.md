@@ -79,7 +79,7 @@ Rules:
   polygons tile the block polygon (holes excluded).
 - `edges[].type` is one of `eave | rake | ridge | hip | valley | step_flashing |
   wall_flashing | parapet | transition | unspecified`, plus `flat_edge | level_change` in a model from the plane
-  engine (an edge with `level_change`, `step_flashing` or `wall_flashing` carries `jump_ft` and `upper`; see contract-0.6.md), and
+  engine (an edge with `level_change`, `step_flashing` or `wall_flashing` carries `jump_ft` and `upper`; see contract-0.7.md), and
   `flat_seam` since pipeline 0.5.1 (a drawn line between two flat facets, never priced, in no total). `parapet` and `unspecified`
   stay valid in the schema for stored results and hand-built models; the plane engine emits neither, and `totals.lengths_ft` keeps both
   keys (0 for an engine model; such an edge is counted there under its own type and in no contract total). Every edge is a straight segment
@@ -147,7 +147,7 @@ transition `#D81B60`, unspecified `#26A69A`, flat_edge `#00838F`, level_change `
 
 ## 5. Fixtures (the contract tests)
 
-`fixtures/roof_engine/roof_measurement_0.6_sample.json` is the reference input of the Dart readers (hand-written, synthetic). `fixtures/synthetic_hip.json`,
+`fixtures/roof_engine/roof_measurement_0.7_sample.json` is the reference input of the Dart readers (hand-written, synthetic). `fixtures/synthetic_hip.json`,
 `fixtures/synthetic_gable.json`, `fixtures/synthetic_flat_parapet.json`, `fixtures/synthetic_flat_curbs.json`, `fixtures/synthetic_hip_zigzag.json`: closed-form cases
 with known totals, kept for the Python tests and as old shapes. Consumers filter on the `schema` string. The Dart `bond_roof` tests check on the 0.6 sample: it parses with no
 unknown key, totals recompute from facets and edges within 0.5 sq ft / 0.05 ft, the diagrams hide no more than 30% of labels, and every old fixture still opens

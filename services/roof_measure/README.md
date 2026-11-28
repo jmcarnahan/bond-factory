@@ -1,8 +1,8 @@
 # roof_measure
 
 Python library: address -> footprint + USGS 3DEP LiDAR -> the plane engine -> a roof measurement envelope
-`bond.roof_model/0.2` (`bond.roof_model/0.1` model inside), pipeline 0.6.0. Apps call `roof_measure.measure()` in-process.
-Roof model, totals and call: [docs/contract-0.6.md](../../docs/contract-0.6.md) (older shapes: [0.2](../../docs/contract-0.2.md),
+`bond.roof_model/0.2` (`bond.roof_model/0.1` model inside), pipeline 0.7.0. Apps call `roof_measure.measure()` in-process.
+Roof model, totals and call: [docs/contract-0.7.md](../../docs/contract-0.7.md) (older shapes: [0.2](../../docs/contract-0.2.md),
 [0.3](../../docs/contract-0.3.md), [0.4](../../docs/contract-0.4.md)). Licence: see the repository `NOTICE`.
 
 ## Use as a library
@@ -57,6 +57,6 @@ site list in `local/sites.json` (see `tests/sites.example.json`). Tests that nee
 ```
 make test                      # offline suite
 make lint
-make fixtures                  # regenerate ../../fixtures/roof_engine/roof_measurement_0.6_engine.json (the engine's example envelope)
+make fixtures                  # regenerate ../../fixtures/roof_engine/roof_measurement_0.7_engine.json (the engine's example envelope)
 make roof-eval / roof-synth    # the regression harness, tools/roof_eval/README.md
 ```

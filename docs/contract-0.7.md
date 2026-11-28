@@ -1,9 +1,9 @@
-# roof_measure 0.6.0: the roof model, the totals and the library call
+# roof_measure 0.7.0: the roof model, the totals and the library call
 
 Replaces `contract-0.2.md`, `contract-0.3.md` and `contract-0.4.md`: this file is the whole contract of the library. The older files stay
 as the record of the shapes before 0.6.0 (their job API, block path, verifier, hints and `engine=` argument no longer exist); where they
 disagree with this file, this file wins. The envelope contract name is still `bond.roof_model/0.2` and the model schema `bond.roof_model/0.1`;
-`pipeline_version` is `0.6.0`. A missing key means "not available", never "checked and fine".
+`pipeline_version` is `0.7.0`. A missing key means "not available", never "checked and fine".
 
 Only the plane engine exists: one facet per measured roof plane, flat (under 2/12) and pitched told apart, typed edges, things
 standing on the roof. The inner `model` and the envelope describe ONE roof and carry ONE set of totals.
@@ -49,7 +49,7 @@ the block-path test hooks. A caller that passes one gets a `TypeError`; so does 
 ## Totals (`envelope.totals`, and the same values in `model.totals`)
 
 One function (`engine/totals.py`, `roof_totals`) adds up the facets, edges and objects of the drawn roof. THE RULE: `model.totals` is that
-function over the model's own rows and `envelope.totals` is exactly its 24 contract keys (never the engine's separate dict, which can differ from it by up to 0.1, one rounding step, where the adapter removes a spike; the largest gap over
+function over the model's own rows and `envelope.totals` is exactly its 26 contract keys (never the engine's separate dict, which can differ from it by up to 0.1, one rounding step, where the adapter removes a spike; the largest gap over
 the 45 measured synthetic roofs is 0.1). Areas in square feet (sloped), lengths in feet (3D). A test parses this table
 and asserts the engine writes exactly these keys, in this order, and no other.
 
@@ -64,7 +64,7 @@ and asserts the engine writes exactly these keys, in this order, and no other.
 | `eave_ft` | sum of the `eave` edges |
 | `rake_ft` | sum of the `rake` edges |
 | `flat_edge_ft` | sum of the `flat_edge` edges (the outer edge of a flat facet) |
-| `exposed_edge_ft` | `step_flashing_ft + wall_flashing_ft` plus 2 x (a + b) of every lantern (`size_ft` [a, b]) |
+| `exposed_edge_ft` | `step_flashing_ft + wall_flashing_ft + lantern_sides_ft` |
 | `eave_rake_ft` | `eave_ft + rake_ft + flat_edge_ft + exposed_edge_ft` |
 | `ridge_ft` | sum of the `ridge` edges |
 | `hip_ft` | sum of the `hip` edges |
@@ -76,11 +76,13 @@ and asserts the engine writes exactly these keys, in this order, and no other.
 | `level_change_ft` | a step between two low-slope sections |
 | `chimney_count` | objects of kind `chimney` |
 | `chimney_perimeter_ft` | sum of 2 x (a + b) of the chimneys |
-| `lantern_count` | objects of kind `lantern` |
-| `area_sqft_roof_edge` | equal to `area_sqft`; kept for ONE release because phone builds in the field recognise an engine roof by its presence |
+| `lantern_count` | objects of kind `lantern` (on a pitched facet) |
+| `lantern_sides_ft` | 2 x (a + b) of every lantern (the padded footprint); the value inside `exposed_edge_ft`, written once and used in both; 0.0 when none |
+| `lantern_hips_ft` | an estimate of the lanterns' own hips: per lantern 4 x sqrt((a/2)^2 + (b/2)^2 + h^2), a and b the footprint sides WITHOUT the pad, h the height above the roof (the object's `hips_ft`); NOT inside `ridge_hip_ft`; 0.0 when none |
+| `unit_count` | objects of kind `unit` (a box on a flat or low-slope facet) |
 | `low_slope_confirm_sqft` | area of the borderline facets (the fitted pitch is within 2 sigma of the 2/12 cut and the facet is over 5% of the roof) |
 
-`unknown` objects are counted nowhere. A count never prices until a person types it.
+`chimney_count` and `chimney_perimeter_ft` count chimneys on pitched facets only. `unknown` objects are counted nowhere. A count never prices until a person types it.
 
 `model.totals` carries these keys and, beside them, the MODEL-ONLY shape keys that `model.validate` and the Dart readers use:
 `lengths_ft` (feet per edge type, the twelve keys of `EDGE_TYPES`, each the sum of the model's edges of that type; `flat_seam`
@@ -104,13 +106,13 @@ edge (`level_change`, `step_flashing`, `wall_flashing`) carries `jump_ft` (the m
 of a shed). `parapet` and `unspecified` stay valid in the schema for stored results and hand-built models; the engine emits neither, `model.totals.lengths_ft` keeps both keys (0 for an engine model), and such an edge is counted there under its own type and in no contract total.
 
 `model.objects[]`: things standing on the roof, never facets. Each is
-`{id, kind, center: [x, y], size_ft: [a, b], polygon: [[x, y], ...], height_ft, facet, returns}`: `id` is `o1`, `o2`, ... in order of
-x then y; `kind` is `chimney`, `lantern` or `unknown`; `center` and `polygon` (a closed rectangle, the measured footprint) are in
+`{id, kind, center: [x, y], size_ft: [a, b], polygon: [[x, y], ...], height_ft, facet, returns}` (a lantern also carries `hips_ft`): `id` is `o1`, `o2`, ... in order of
+x then y; `kind` is `chimney`, `lantern`, `unit` or `unknown`; `center` and `polygon` (a closed rectangle, the measured footprint) are in
 the model frame, feet; `size_ft` is long side first; `height_ft` is the 95th percentile height above the plane of the facet under
 the object; `facet` is the id of that facet; `returns` is the number of LiDAR returns on the object. Never listed: trees, blobs
 with more than 30% of their returns outside the outline, blobs beside a tree, blobs on the roof edge (parapets, walls), blobs
 thinner than 0.5 m, and planar blobs over 3 m2 (a roof part the facets left out: they set `model.quality.roof_part_missed_sqft`
-instead). A box on a low-slope roof is not called a lantern: rooftop units look the same, so `lantern` is only given on a PITCHED facet (2/12 and up) and the same blob on a low-slope facet is `unknown`; a real lantern on a low-slope deck must be entered by hand. Skylights are flush with the roof and cannot be seen by LiDAR: they are never listed. A chimney under about 0.6 m
+instead). Any object on a facet that is not pitched (under 2/12) is a `unit`, a rooftop unit, whatever its height: it is counted in `unit_count` and adds no edge to any total. `chimney` and `lantern` are only given on a PITCHED facet (2/12 and up); a real lantern on a low-slope deck must be entered by hand. Skylights are flush with the roof and cannot be seen by LiDAR: they are never listed. A chimney under about 0.6 m
 across is not found at 13 returns/m2, and under 1.0 m is not reliably found at 8.
 
 ## model.quality
@@ -140,7 +142,7 @@ The closed list, each with a producer: `footprint_osm`, `footprint_lidar_hull`, 
 
 ## Envelope
 
-`contract`, `pipeline_version` (`0.6.0`), `method_used` (`planes`), `footprint_source`, `generated_at`, `model`, `totals`,
+`contract`, `pipeline_version` (`0.7.0`), `method_used` (`planes`), `footprint_source`, `generated_at`, `model`, `totals`,
 `verification` (always `{verdict: "unverified", notes: [one text], adjustments: [], model: null, rounds: 0, usage: {input_tokens: 0, output_tokens: 0}, skipped: "engine"}`: no verifier exists, the engine's `model.quality` replaces it; the hand-written sample omits the block, readers must not need it), `confidence`, `warnings`, `warning_codes`, and the optional
 `other_buildings` (with `lot_buildings`, `lot_area_sqft`, `lot_squares` and `lot_outline_perimeter_ft` = `eave_ft + rake_ft +
 flat_edge_ft` summed over the buildings, added to `totals` only when `include_other_buildings`) and `nearby_buildings`.
@@ -157,3 +159,19 @@ is gone: there is one roof and one area. Old to new: perimeter is `eave_ft + rak
 drip edge is `eave_ft` or `eave_rake_ft`; area is `area_sqft`; squares is `squares`. Arguments: see "The call". Edge naming: a
 step is `step_flashing` or `wall_flashing` (`level_change` only between two low-slope sections); a hint to type the step otherwise
 no longer exists. `ridge_hip_ft` is the plain sum: a crease between two low-slope facets is now counted in it.
+
+## Changed in 0.7.0
+
+- Totals: `area_sqft_roof_edge` is removed (it was kept for one release only). Added: `lantern_sides_ft`, `lantern_hips_ft` and `unit_count`,
+  always written (0 or 0.0 when there is nothing). 26 keys.
+- Object kinds: `unit` is new. Any object on a facet that is not pitched is a `unit` (before: a lantern-sized one was `unknown`, a small
+  one on a flat roof a `chimney`). `chimney_count` and `chimney_perimeter_ft` therefore count pitched-roof chimneys only.
+- Objects: a lantern carries `hips_ft`.
+- Edges: unchanged. The geometry of the engine is not part of this contract; `pipeline_version` moves with it.
+- `docs/contract-0.6.md` became this file.
+
+## Stability of this contract
+
+From 0.7.0 on, totals keys, object kinds and edge types are only ever ADDED. A key is never removed and never given a new meaning
+without a major decision (a new major version of this contract). A consumer must ignore keys and kinds it does not know: a new key is
+not a break, and an object of an unknown kind is read as `unknown`.

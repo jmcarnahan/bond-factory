@@ -1,4 +1,4 @@
-"""One roof, one set of totals (contract 0.6 keys): every total is the sum of its drawn facets, edges and objects, recomputed here independently.
+"""One roof, one set of totals (contract 0.7 keys): every total is the sum of its drawn facets, edges and objects, recomputed here independently.
 
 Two hand-built roofs (exact numbers from their geometry) and every synthetic roof of ``synth_points.cases()`` run through
 the engine. Synthetic data only."""
@@ -45,7 +45,7 @@ def test_a_hand_built_gable_has_the_totals_its_geometry_gives():
     assert tuple(t) == TOTALS_KEYS
     surface = 100.0 * SQM * math.sqrt(1.25)  # 100 m2 of plan at 6/12
     assert t["area_sqft"] == pytest.approx(surface, abs=AREA_TOL)
-    assert t["area_sqft_roof_edge"] == t["area_sqft"] and t["roofing_pitched_sqft"] == pytest.approx(surface, abs=AREA_TOL)
+    assert t["roofing_pitched_sqft"] == pytest.approx(surface, abs=AREA_TOL)
     assert t["roofing_flat_sqft"] == 0 and t["squares"] == pytest.approx(surface / 100, abs=0.005)
     assert t["planes_pitch_weighted"] == 6.0 and t["plane_count"] == 2
     assert t["ridge_ft"] == pytest.approx(10 * FT, abs=LEN_TOL) and t["eave_ft"] == pytest.approx(20 * FT, abs=LEN_TOL)
@@ -53,7 +53,8 @@ def test_a_hand_built_gable_has_the_totals_its_geometry_gives():
     assert t["eave_rake_ft"] == pytest.approx((20 + 4 * rake) * FT, abs=LEN_TOL)  # nothing exposed
     assert t["ridge_hip_ft"] == pytest.approx(10 * FT, abs=LEN_TOL)
     for k in ("hip_ft", "valley_ft", "flat_edge_ft", "level_change_ft", "step_flashing_ft", "wall_flashing_ft", "transition_ft",
-              "exposed_edge_ft", "chimney_count", "chimney_perimeter_ft", "lantern_count", "low_slope_confirm_sqft"):
+              "exposed_edge_ft", "chimney_count", "chimney_perimeter_ft", "lantern_count", "lantern_sides_ft", "lantern_hips_ft",
+              "unit_count", "low_slope_confirm_sqft"):
         assert t[k] == 0, k
 
 
@@ -91,6 +92,17 @@ def test_a_lantern_and_a_chimney_add_their_perimeters_by_kind():
     assert t["exposed_edge_ft"] == pytest.approx(2 * (6 + 5), abs=LEN_TOL)  # the sides of the lantern only
     assert t["eave_rake_ft"] == pytest.approx(10 * FT + 22, abs=LEN_TOL)
     assert t["ridge_hip_ft"] == pytest.approx(10 * FT, abs=LEN_TOL)  # a lantern's hips are glass: not added
+    assert t["lantern_sides_ft"] == t["exposed_edge_ft"] == pytest.approx(22.0, abs=LEN_TOL)  # one number, used twice
+
+
+def test_lantern_hips_and_units_are_their_own_totals():
+    a = facet("f1", box(0, 0, 10, 10), 6.0, "pitched")
+    objs = [{"kind": "lantern", "size_ft": [6.0, 5.0], "hips_ft": 11.5}, {"kind": "lantern", "size_ft": [3.0, 3.0], "hips_ft": 7.25},
+            {"kind": "unit", "size_ft": [6.0, 4.0]}, {"kind": "unit", "size_ft": [5.0, 5.0]}, {"kind": "unit", "size_ft": [2.0, 2.0]}]
+    t = roof_totals([a], [edge("eave", 10.0, ("f1",)), edge("hip", 4.0, ("f1",))], set(), objs)
+    assert t["lantern_hips_ft"] == pytest.approx(18.75, abs=LEN_TOL) and t["ridge_hip_ft"] == pytest.approx(4 * FT, abs=LEN_TOL)
+    assert t["lantern_sides_ft"] == pytest.approx(2 * (6 + 5) + 2 * (3 + 3), abs=LEN_TOL)
+    assert t["unit_count"] == 3 and t["chimney_count"] == 0 and t["exposed_edge_ft"] == t["lantern_sides_ft"]  # units add no edge
 
 
 def test_the_removed_keys_are_not_written():
@@ -127,7 +139,7 @@ def test_every_total_is_the_sum_of_its_drawn_facets_and_edges_on_every_synthetic
         assert tuple(t) == TOTALS_KEYS, name
         area = sum(f.polygon.area * SQM * math.sqrt(1 + (f.pitch_rise / 12) ** 2) for f in res.facets)
         flat = sum(f.polygon.area * SQM * math.sqrt(1 + (f.pitch_rise / 12) ** 2) for f in res.facets if f.roof_type == "flat")
-        assert t["area_sqft"] == pytest.approx(area, abs=AREA_TOL) and t["area_sqft_roof_edge"] == t["area_sqft"], name
+        assert t["area_sqft"] == pytest.approx(area, abs=AREA_TOL), name
         assert t["squares"] * 100 == pytest.approx(area, abs=AREA_TOL), name
         assert t["roofing_flat_sqft"] == pytest.approx(flat, abs=AREA_TOL), name
         assert t["roofing_pitched_sqft"] == pytest.approx(area - flat, abs=AREA_TOL), name
@@ -145,6 +157,8 @@ def test_every_total_is_the_sum_of_its_drawn_facets_and_edges_on_every_synthetic
         lanterns = sum(2 * (o["size_ft"][0] + o["size_ft"][1]) for o in res.objects if o["kind"] == "lantern")
         exposed = by_type.get("step_flashing", 0.0) + by_type.get("wall_flashing", 0.0) + lanterns
         assert t["exposed_edge_ft"] == pytest.approx(exposed, abs=LEN_TOL), name
+        assert t["lantern_sides_ft"] == pytest.approx(lanterns, abs=LEN_TOL), name
+        assert t["unit_count"] == sum(o["kind"] == "unit" for o in res.objects), name
         assert t["eave_rake_ft"] == pytest.approx(sum(by_type.get(k, 0.0) for k in ("eave", "rake", "flat_edge")) + exposed,
                                                   abs=LEN_TOL), name
         assert t["ridge_hip_ft"] == pytest.approx(by_type.get("ridge", 0.0) + by_type.get("hip", 0.0), abs=LEN_TOL), name

@@ -7,27 +7,27 @@ typedef Fixture = ({String name, Map<String, dynamic> json});
 
 const _prefix = 'bond.roof_model/0.';
 
-/// The hand-written 0.6 sample envelope (fixtures/roof_engine/roof_measurement_0.6_sample.json).
-const samplePath = '../../fixtures/roof_engine/roof_measurement_0.6_sample.json';
+/// The hand-written 0.7 sample envelope (fixtures/roof_engine/roof_measurement_0.7_sample.json).
+const samplePath = '../../fixtures/roof_engine/roof_measurement_0.7_sample.json';
 
 /// A fresh copy of the raw sample envelope (safe to edit).
 Map<String, dynamic> sampleJson() => jsonDecode(File(samplePath).readAsStringSync()) as Map<String, dynamic>;
 
 RoofMeasurement loadSample() => RoofMeasurement.parseAny(sampleJson());
 
-/// The generated 0.6 example (the real engine's output on a synthetic roof).
-const enginePath = '../../fixtures/roof_engine/roof_measurement_0.6_engine.json';
+/// The generated 0.7 example (the real engine's output on a synthetic roof).
+const enginePath = '../../fixtures/roof_engine/roof_measurement_0.7_engine.json';
 Map<String, dynamic> engineJson() => jsonDecode(File(enginePath).readAsStringSync()) as Map<String, dynamic>;
 
 /// The model of the sample.
 RoofModel sampleModel() => loadSample().model;
 
 /// Every model or envelope JSON in the repo-level fixtures/ folder (the old 0.2 envelopes and the closed-form models,
-/// and the 0.4 engine example, kept for the Python side; not the 0.6 sample): the "old shapes" the reader must still open.
+/// and the 0.4 engine example, kept for the Python side; not the 0.7 sample): the "old shapes" the reader must still open.
 List<Fixture> loadOldFixtures() {
   final files = [
     for (final d in ['../../fixtures', '../../fixtures/roof_engine'])
-      ...Directory(d).listSync().whereType<File>().where((f) => f.path.endsWith('.json') && !f.path.contains('_0.6_')),
+      ...Directory(d).listSync().whereType<File>().where((f) => f.path.endsWith('.json') && !f.path.contains('_0.7_')),
   ]..sort((a, b) => a.path.compareTo(b.path));
   return [
     for (final f in files)

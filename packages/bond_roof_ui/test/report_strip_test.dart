@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 RoofMeasurement _envelope() => RoofMeasurement.parseAny(
-    jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.6_sample.json').readAsStringSync()) as Map<String, dynamic>);
+    jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.7_sample.json').readAsStringSync()) as Map<String, dynamic>);
 
 const _es = {
   'action_print': 'Imprimir',
@@ -144,7 +144,7 @@ void main() {
     });
 
     testWidgets('no generated line when the envelope has no timestamp', (tester) async {
-      final j = jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.6_sample.json').readAsStringSync())
+      final j = jsonDecode(File('../../fixtures/roof_engine/roof_measurement_0.7_sample.json').readAsStringSync())
           as Map<String, dynamic>
         ..remove('generated_at');
       await _pump(tester, 1280, RoofReportStrip(measurement: RoofMeasurement.parseAny(j), showActions: false));

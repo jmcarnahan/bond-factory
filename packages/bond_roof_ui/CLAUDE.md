@@ -12,7 +12,7 @@ Contract: docs/contracts/roof_model.md
 - lib/src/report.dart — report pages as scenes; print and PDF share/download
 - lib/src/tokens.dart — layout and colour tokens (strings live in RoofLabels)
 - assets/fonts/Roboto-Regular.ttf — PDF font (license beside it)
-- test/roof_diagram_view_test.dart, report_strip_test.dart, engine_ui_test.dart, roof_proof_test.dart (paints the 0.6 sample; `ROOF_PROOF_DIR=dir` writes PNG and SVG)
+- test/roof_diagram_view_test.dart, report_strip_test.dart, engine_ui_test.dart, roof_proof_test.dart (paints the 0.7 sample; `ROOF_PROOF_DIR=dir` writes PNG and SVG)
 
 ## Commands
 - One test: `make test T=test/roof_diagram_view_test.dart`

@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- Library 0.7.0 contract (`docs/contract-0.7.md`). BREAKING for code that reads `areaSqftRoofEdge`; an app adopts it at its next pin bump.
+  - `RoofEngineTotals`: `areaSqftRoofEdge` removed; added `lanternSidesFt`, `lanternHipsFt`, `unitCount` (26 wire keys in `knownKeys`).
+  - `ObjectKind.unit` (a box on a flat or low-slope facet): drawn like a chimney, mark `mark_unit` ("U"), its own legend row and count.
+    `RoofObject.hipsFt` (a lantern's own hips). An unknown totals key or object kind is still ignored (the kind reads as `unknown`).
+  - `RoofFigures`: `units`, `lanternSidesFt`, `lanternHipsFt`. `totalRows`: rows `lantern_sides`, `lantern_hips`,
+    `units`, each only when the value is over 0.
+  - Five label keys (75 to 80): `legend_unit`, `mark_unit`, `totals_units`, `totals_lantern_sides`, `totals_lantern_hips`.
+  - Fixtures are `roof_measurement_0.7_{sample,engine}.json`.
 - Roof accuracy round (the bullets after this round describe earlier rounds; where they disagree with it, this round holds): the reader follows the 0.6 library contract (`docs/contract-0.6.md`). BREAKING; an app adopts it at its next pin bump.
   - Totals: `RoofEngineTotals` reads exactly the 0.6 keys (area, squares, roofing pitched/flat, low-slope confirm, weighted pitch, plane count,
     eave, rake, flat edge, exposed edge, eave + rake, ridge, hip, valley, ridge + hip, sidewall, headwall, transition, level change,

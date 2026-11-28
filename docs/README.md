@@ -1,7 +1,7 @@
 # docs index
 
 - contracts/roof_model.md — the `bond.roof_model/0.1` wire contract shared by bond_roof and roof_measure
-- contract-0.6.md — the roof model, totals, edges, objects and the `measure` call of pipeline 0.6.0 (the whole contract; replaces 0.2-0.4)
+- contract-0.7.md — the roof model, totals, edges, objects and the `measure` call of pipeline 0.6.0 (the whole contract; replaces 0.2-0.4)
 - contract-0.2.md — OLD (before 0.6.0): the `bond.roof_model/0.2` job API and envelope; the job API was removed in 0.6.0
 - contract-0.3.md — additive to 0.2 (pipeline 0.3.1): `model.planes`, `model.quality`, four totals, `parcel_street_match`, agent fallback, planes-only result (`model_failed`)
 - contract-0.4.md — additive (pipeline 0.5.0 emits `model.source.building`, `model.quality.parcel_match`; 0.5.0 adds the plane engine, `engine="planes"`: its keys, edge types, verdicts and warning codes)

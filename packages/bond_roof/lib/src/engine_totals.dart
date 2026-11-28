@@ -1,6 +1,6 @@
 import 'json_util.dart';
 
-/// The `totals` of a 0.6 envelope (and of `model.totals` when it carries the same keys): one set of figures for the one
+/// The `totals` of a 0.7 envelope (and of `model.totals` when it carries the same keys): one set of figures for the one
 /// roof, every one the sum of drawn edges or facets. Every field is nullable: a key the service did not send is "not
 /// available", never zero. A key this package does not know is ignored.
 class RoofEngineTotals {
@@ -28,7 +28,9 @@ class RoofEngineTotals {
     this.chimneyCount,
     this.chimneyPerimeterFt,
     this.lanternCount,
-    this.areaSqftRoofEdge,
+    this.lanternSidesFt,
+    this.lanternHipsFt,
+    this.unitCount,
   });
 
   /// Null when [j] has none of the keys.
@@ -58,7 +60,9 @@ class RoofEngineTotals {
       chimneyCount: numOrNull(j, 'chimney_count', path)?.round(),
       chimneyPerimeterFt: numOrNull(j, 'chimney_perimeter_ft', path),
       lanternCount: numOrNull(j, 'lantern_count', path)?.round(),
-      areaSqftRoofEdge: numOrNull(j, 'area_sqft_roof_edge', path),
+      lanternSidesFt: numOrNull(j, 'lantern_sides_ft', path),
+      lanternHipsFt: numOrNull(j, 'lantern_hips_ft', path),
+      unitCount: numOrNull(j, 'unit_count', path)?.round(),
     );
   }
 
@@ -67,7 +71,7 @@ class RoofEngineTotals {
     'planes_pitch_weighted', 'plane_count', 'eave_ft', 'rake_ft', 'flat_edge_ft', 'exposed_edge_ft',
     'eave_rake_ft', 'ridge_ft', 'hip_ft', 'valley_ft', 'ridge_hip_ft', 'step_flashing_ft', 'wall_flashing_ft',
     'transition_ft', 'level_change_ft', 'chimney_count', 'chimney_perimeter_ft', 'lantern_count',
-    'area_sqft_roof_edge',
+    'lantern_sides_ft', 'lantern_hips_ft', 'unit_count',
   ];
 
   /// Key by key: every value of [primary], and of [fallback] where [primary] has none. Null when both are.
@@ -116,8 +120,12 @@ class RoofEngineTotals {
   final int? chimneyCount;
   final double? chimneyPerimeterFt;
   final int? lanternCount;
-  /// Equal to [areaSqft]; kept for one release (phone builds in the field use its presence).
-  final double? areaSqftRoofEdge;
+  /// The perimeter of every lantern: the part of [exposedEdgeFt] that is lantern sides.
+  final double? lanternSidesFt;
+  /// An estimate of the lanterns' own hips; in no ridge + hip.
+  final double? lanternHipsFt;
+  /// Objects of kind unit: a box on a flat or low-slope facet.
+  final int? unitCount;
 
   Map<String, dynamic> toJson() => {
         if (areaSqft != null) 'area_sqft': areaSqft,
@@ -143,7 +151,9 @@ class RoofEngineTotals {
         if (chimneyCount != null) 'chimney_count': chimneyCount,
         if (chimneyPerimeterFt != null) 'chimney_perimeter_ft': chimneyPerimeterFt,
         if (lanternCount != null) 'lantern_count': lanternCount,
-        if (areaSqftRoofEdge != null) 'area_sqft_roof_edge': areaSqftRoofEdge,
+        if (lanternSidesFt != null) 'lantern_sides_ft': lanternSidesFt,
+        if (lanternHipsFt != null) 'lantern_hips_ft': lanternHipsFt,
+        if (unitCount != null) 'unit_count': unitCount,
       };
 
   @override

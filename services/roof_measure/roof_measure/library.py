@@ -51,7 +51,7 @@ def measure(address: str, *, lat: float | None = None, lng: float | None = None,
             on_stage: Callable[[str], None] | None = None, isolate: bool = True,
             include_other_buildings: bool = False, building_outline_id: str | None = None,
             points_path: str | Path | None = None) -> dict[str, Any]:
-    """Measure one roof with the plane engine and return the ``bond.roof_model/0.2`` envelope as a dict (0.6.0 keys).
+    """Measure one roof with the plane engine and return the ``bond.roof_model/0.2`` envelope as a dict (0.7.0 keys).
 
     Blocks the calling thread for up to ``deadline_s`` plus ``KILL_GRACE_S`` (30) seconds: run it off a request
     thread and off a serial worker loop. Keys and directories are arguments; the process environment is not consulted.

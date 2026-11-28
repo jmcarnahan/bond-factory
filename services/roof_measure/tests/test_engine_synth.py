@@ -76,12 +76,11 @@ def test_the_result_json_has_the_harness_shape():
     assert out["totals"]["plane_count"] == len(out["facets"]) and "complexity" not in out["totals"]
 
 
-def test_one_roof_one_area_and_the_roof_edge_twin_agrees():
+def test_one_roof_one_area():
     res = run("gable_d8")
     t = res.totals
     area = sum(f.area_sqft for f in res.facets)
-    for k in ("area_sqft", "area_sqft_roof_edge"):
-        assert t[k] == pytest.approx(area, abs=0.1), k
+    assert t["area_sqft"] == pytest.approx(area, abs=0.1) and "area_sqft_roof_edge" not in t
     assert t["eave_rake_ft"] > 0 and t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"], abs=0.02)
 
 

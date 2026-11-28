@@ -1,6 +1,6 @@
 # Roof measurement service contract 0.2
 
-> **Superseded by [contract-0.6.md](contract-0.6.md).** The job API (HTTP, auth, job store, runner), the block path, the agent methods, the verifier, Solar, the `method` / `verify` / `blocks_path` arguments and the old totals keys described here were removed in 0.6.0. Kept as the record of the shape before.
+> **Superseded by [contract-0.7.md](contract-0.7.md).** The job API (HTTP, auth, job store, runner), the block path, the agent methods, the verifier, Solar, the `method` / `verify` / `blocks_path` arguments and the old totals keys described here were removed in 0.6.0. Kept as the record of the shape before.
 
 > **Removed in 0.6 (library cleanup, no change to the plane engine's output).** The block-path engine, the methods
 > `lidar_agent` and `solar_agent`, the LLM verifier (the `verification` block of an engine result says `unverified`,

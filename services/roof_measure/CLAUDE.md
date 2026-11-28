@@ -1,7 +1,7 @@
 # roof_measure
 
 Role: library (`roof_measure.measure`). Address -> footprint chain + LiDAR -> plane engine -> envelope
-`bond.roof_model/0.2` (model `bond.roof_model/0.1`). Python 3.12. Contract: docs/contract-0.6.md (the whole contract: roof model, totals, call, errors; 0.2-0.4 are the record of older shapes),
+`bond.roof_model/0.2` (model `bond.roof_model/0.1`). Python 3.12. Contract: docs/contract-0.7.md (the whole contract: roof model, totals, call, errors; 0.2-0.4 are the record of older shapes),
 docs/contracts/roof_model.md. The block path, the agents, the verifier, Solar and the job service were removed.
 
 ## Key files (roof_measure/)

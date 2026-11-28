@@ -9,15 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Paints the length and the area diagram of the hand-written 0.6 sample (wide and compact) through the real painter. The
-/// chimney and lantern marks must be on the picture. When ROOF_PROOF_DIR names a folder the pictures are written there as
+/// Paints the length and the area diagram of the hand-written 0.7 sample (wide and compact) through the real painter. The
+/// chimney, lantern and unit marks must be on the picture. When ROOF_PROOF_DIR names a folder the pictures are written there as
 /// PNG (the test font draws letters as blocks) with the SVG of each scene beside it (readable text).
 void main() {
   const style = DiagramStyle.report;
 
   for (final (tag, file) in [
-    ('sample', 'roof_measurement_0.6_sample.json'),
-    ('engine', 'roof_measurement_0.6_engine.json'),
+    ('sample', 'roof_measurement_0.7_sample.json'),
+    ('engine', 'roof_measurement_0.7_engine.json'),
   ]) {
     final measurement = RoofMeasurement.parseAny(
       jsonDecode(File('../../fixtures/roof_engine/$file').readAsStringSync())
@@ -29,7 +29,7 @@ void main() {
         ('area', (RoofModel m) => AreaDiagram.build(m, layout: layout)),
       ]) {
         testWidgets(
-          '$tag $name diagram, ${layout.name}: the chimney and the lantern are on the picture',
+          '$tag $name diagram, ${layout.name}: the chimney, the lantern and the unit are on the picture',
           (tester) async {
             final scene = build(measurement.model);
             tester.view.devicePixelRatio = 1;
@@ -65,7 +65,7 @@ void main() {
             if (out != null && out.isNotEmpty) {
               Directory(out).createSync(recursive: true);
               File(
-                '$out/roof06_${tag}_${name}_${layout.name}.png',
+                '$out/roof07_${tag}_${name}_${layout.name}.png',
               ).writeAsBytesSync(png.buffer.asUint8List());
               File(
                 '$out/roof06_${tag}_${name}_${layout.name}.svg',
@@ -93,6 +93,11 @@ void main() {
               near(style.objectColorOf(ObjectKind.lantern)),
               greaterThan(30),
               reason: 'the lantern outline and letter',
+            );
+            expect(
+              near(style.objectColorOf(ObjectKind.unit)),
+              greaterThan(30),
+              reason: 'the unit outline and letter',
             );
           },
         );

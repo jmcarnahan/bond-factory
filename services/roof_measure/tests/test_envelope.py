@@ -1,4 +1,4 @@
-"""The envelope: the contract-0.6 totals keys, the confidence rule, warning codes. Models come from the engine on synthetic roofs."""
+"""The envelope: the contract-0.7 totals keys, the confidence rule, warning codes. Models come from the engine on synthetic roofs."""
 
 import pytest
 from test_engine_adapter import model_of

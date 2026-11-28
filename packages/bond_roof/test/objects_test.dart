@@ -22,8 +22,12 @@ List<PolyPrim> _planMarks(Scene s, ObjectKind k) => [
 RoofModel _withObjects(List<Map<String, Object?>> objects) {
   final j = sampleJson()['model'] as Map<String, dynamic>;
   j['objects'] = objects;
-  (j['totals'] as Map).remove('chimney_count');
-  (j['totals'] as Map).remove('lantern_count');
+  (j['totals'] as Map)
+    ..remove('chimney_count')
+    ..remove('lantern_count')
+    ..remove('unit_count')
+    ..remove('lantern_sides_ft')
+    ..remove('lantern_hips_ft');
   return RoofModel.fromJson(j);
 }
 
@@ -35,10 +39,11 @@ void main() {
       final len = LengthDiagram.build(m, layout: layout);
       final area = AreaDiagram.build(m, layout: layout);
 
-      test('each chimney and lantern is one outlined rectangle on the length diagram and on the area diagram', () {
+      test('each chimney, lantern and unit is one outlined rectangle on the length diagram and on the area diagram', () {
         for (final s in [len, area]) {
           expect(_planMarks(s, ObjectKind.chimney), hasLength(1), reason: s.title);
           expect(_planMarks(s, ObjectKind.lantern), hasLength(1), reason: s.title);
+          expect(_planMarks(s, ObjectKind.unit), hasLength(1), reason: s.title);
           expectFits(s);
         }
       });
@@ -48,11 +53,13 @@ void main() {
           final t = textsOf(s);
           expect(t.where((x) => x == 'C'), isNotEmpty, reason: s.title);
           expect(t.where((x) => x == 'L'), isNotEmpty, reason: s.title);
+          expect(t.where((x) => x == 'U'), isNotEmpty, reason: s.title);
         }
-        final es = RoofLabels.fromMap({'mark_chimney': 'Ch', 'mark_lantern': 'Tr'});
+        final es = RoofLabels.fromMap({'mark_chimney': 'Ch', 'mark_lantern': 'Tr', 'mark_unit': 'Ud'});
         final t = textsOf(AreaDiagram.build(m, labels: es, layout: layout));
-        expect(t, containsAll(['Ch', 'Tr']));
+        expect(t, containsAll(['Ch', 'Tr', 'Ud']));
         expect(t, isNot(contains('C')));
+        expect(t, isNot(contains('U')));
       });
 
       test('the mark letter is readable', () {
@@ -144,9 +151,9 @@ void main() {
   });
 
   group('legend rows and totals row, only when present', () {
-    test('both present: "Chimney" and "Roof lantern" rows with their counts, "Chimneys" in the totals', () {
+    test('all present: "Chimney", "Roof lantern" and "Rooftop unit" rows with their counts, "Chimneys" in the totals', () {
       final t = textsOf(LengthDiagram.build(m));
-      expect(t, containsAll(['Chimney', 'Roof lantern']));
+      expect(t, containsAll(['Chimney', 'Roof lantern', 'Rooftop unit']));
       expect(totalRows(m, const RoofLabels()).firstWhere((r) => r.id == 'chimneys').value, '1');
     });
 
@@ -160,6 +167,22 @@ void main() {
       expect(t, isNot(contains('Roof lantern')));
       expect(totalRows(one, const RoofLabels()).firstWhere((r) => r.id == 'chimneys').value, '2');
       expect(_planMarks(LengthDiagram.build(one), ObjectKind.chimney), hasLength(2));
+    });
+
+    test('only units: a "Rooftop unit" row and a "Rooftop units" count, one mark each, and no chimney or lantern row', () {
+      final two = _withObjects([
+        {'id': 'o', 'kind': 'unit', 'center': [-5.0, 5.0], 'size_ft': [4.0, 3.0]},
+        {'id': 'p', 'kind': 'unit', 'center': [-5.0, 8.0], 'size_ft': [2.0, 2.0]},
+      ]);
+      final len = LengthDiagram.build(two);
+      final t = textsOf(len);
+      expect(t, contains('Rooftop unit'));
+      expect(t, isNot(anyOf(contains('Chimney'), contains('Roof lantern'))));
+      expect(totalRows(two, const RoofLabels()).firstWhere((r) => r.id == 'units').value, '2');
+      expect(totalRows(two, const RoofLabels()).where((r) => r.id == 'chimneys'), isEmpty);
+      expect(_planMarks(len, ObjectKind.unit), hasLength(2));
+      expect(_planMarks(AreaDiagram.build(two), ObjectKind.unit), hasLength(2));
+      expect(textsOf(AreaDiagram.build(two)), containsAll(['Rooftop units']));
     });
 
     test('an unknown object is kept in the model, never drawn, never listed', () {
@@ -190,7 +213,10 @@ void main() {
       final j = sampleJson()['model'] as Map<String, dynamic>..remove('objects');
       (j['totals'] as Map)
         ..remove('chimney_count')
-        ..remove('lantern_count');
+        ..remove('lantern_count')
+        ..remove('unit_count')
+        ..remove('lantern_sides_ft')
+        ..remove('lantern_hips_ft');
       final absent = RoofModel.fromJson(j);
       expect(sceneToSvg(LengthDiagram.build(absent)), sceneToSvg(LengthDiagram.build(none)));
       expect(sceneToSvg(AreaDiagram.build(absent)), sceneToSvg(AreaDiagram.build(none)));

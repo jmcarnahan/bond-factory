@@ -1,5 +1,21 @@
 # roof_measure changelog
 
+## 0.7.0 (pipeline version; the contract says what a roof reports, and only ever adds; contract in ../../docs/contract-0.7.md)
+
+`PIPELINE_VERSION` 0.6.0 to 0.7.0 (keys the result cache). The contract changes; the geometry of the engine is the subject of the
+same release's other entries. A consumer must change: one totals key went and three came, and a new object kind exists.
+
+- **Totals keys:** removed `area_sqft_roof_edge` (kept for one release only; it always equalled `area_sqft`). Added, always written:
+  `lantern_sides_ft` (the sum already inside `exposed_edge_ft`, now written once and used in both), `lantern_hips_ft` (an estimate
+  of the lanterns' own four hips, not inside `ridge_hip_ft`) and `unit_count`. 26 keys.
+- **Object kinds:** `unit` is new: any object on a facet that is not pitched is a rooftop unit, whatever its height (before, a
+  lantern-sized one was `unknown` and a small one a `chimney`). `chimney_count` and `chimney_perimeter_ft` now count pitched-roof
+  chimneys only. A lantern object carries `hips_ft`.
+- **Looked at, not added:** a `wall_ring_ft` key (headwall flashing closing a loop round a raised roof). Closed headwall rings round a raised roof occur on none of the tuning houses (one closed loop exists and it is a sunken deck), so the key is not in the contract; it can be added when a real roof needs it.
+- **Stability of the contract:** from 0.7.0 on, keys, kinds and edge types are only added (`docs/contract-0.7.md`, a test pins the
+  26 keys as a subset). The example fixtures are `roof_measurement_0.7_{engine,sample}.json` (the engine example now shows a unit).
+- The block-path engine, the older planes family, the agent paths and the verifier were removed in 0.6.0; the last commit that contains them is 2927c38.
+
 ## 0.6.0 (pipeline version; one roof, one set of totals, chimneys and lanterns; contract in ../../docs/contract-0.6.md)
 
 `PIPELINE_VERSION` 0.5.1 to 0.6.0 (keys the result cache: every stored roof is recomputed). A consumer must change: totals keys,
