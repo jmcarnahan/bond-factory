@@ -14,7 +14,13 @@ import numpy as np
 from shapely.geometry import Polygon
 
 from .absorb import absorb_labels
-from .cleanup import clean_facets, close_gaps, merge_coplanar_facets, merge_small_facets, repair_items
+from .cleanup import (
+    clean_facets,
+    close_gaps,
+    merge_coplanar_facets,
+    merge_small_facets,
+    repair_items,
+)
 from .errors import Ctx, EngineFailure
 from .junk import absorb_edge_strips, absorb_enclosed_flat, absorb_flat_junk, merge_flat_fitting
 from .raster import label_raster
@@ -75,6 +81,7 @@ def build_partition(outline: Polygon, q: np.ndarray, qlab: np.ndarray, planes: l
     """Label the outline's cells and produce the clean facet polygons. Returns (chosen run, grid step m)."""
     p = ctx.p
     h = max(p.grid_min_m, math.sqrt(outline.area / p.grid_cells_target))
+    h = math.ceil(round(h / p.grid_quantum_m, 6)) * p.grid_quantum_m
     allowed = outline.area / p.beta_m2_per_facet + p.beta_extra_facets
     best: PartitionRun | None = None
     for beta in p.beta_schedule:

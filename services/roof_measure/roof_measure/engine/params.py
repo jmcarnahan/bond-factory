@@ -18,8 +18,7 @@ _MAY_BE_NEGATIVE = frozenset({"overhang_floor_m"})
 
 @dataclass(frozen=True)
 class EngineParams:
-    # ---- priced versus drawn roof edge (plan 3.7a)
-    overhang_scale: float = 0.5  # ratio: PRICED roof edge = measured overhang x this (cost-sheet totals)
+    # ---- the drawn roof edge (plan 3.7a)
     overhang_scale_draw: float = 1.0  # ratio: DRAWN roof edge (facets, diagram) on county (wall-line) outlines
     overhang_scale_roofedge: float = 0.25  # ratio: cap on the drawn scale when the outline is not a county wall line
     overhang_cap_m: float = 1.0  # m: per-side overhang upper clamp
@@ -173,6 +172,8 @@ class EngineParams:
     # ---- labelling raster and graph cut
     grid_min_m: float = 0.12  # m: label raster step (never finer)
     grid_cells_target: float = 22000.0  # cells: step = sqrt(outline area / this)
+    grid_quantum_m: float = 0.01  # m: the step is rounded up to a multiple of this, so a centimetre of outline does not change it
+    label_clip_m: float = 0.10  # m: the labelled cells are kept inside the outline grown by this
     cost_tau_m: float = 0.25  # m: residual saturation in the data cost
     cost_nbrs: int = 5  # pts: neighbours per cell in the data cost
     cost_sigma_m: float = 0.30  # m: weight falloff
@@ -284,6 +285,11 @@ class EngineParams:
     supported_reach_m: float = 0.5  # m
     chain_angle_deg: float = 7.0  # deg: edge segments chain when collinear within this
     edge_min_seg_m: float = 0.12  # m: shorter raw segments are dropped
+    jump_outlier_m: float = 0.3  # m: a return this far off its own side's plane is not measured (a tree over the seam)
+    jump_trim_m: float = 0.15  # m: after the fit, returns further than this (or 3 robust sigmas) from it are left out and it is refitted
+    end_touch_m: float = 0.15  # m: a boundary piece with no line of its own that touches a line of the same two facets this closely takes its type
+    step_along_deg: float = 30.0  # deg: a step line within this of the lower facet's fall line is sidewall (step) flashing
+    step_up_cos: float = 0.3  # a step line across the lower slope with the upper roof up-slope of it (cos over this) is headwall flashing
     # ---- outputs
     fit_tol_m: float = 0.15  # m: a point fits its facet's plane within this (fit_all / fit_covered)
     # ---- objects standing on the roof (engine.objects.find_objects): chimneys, flues, lanterns; never trees
@@ -309,8 +315,6 @@ class EngineParams:
     obj_chimney_max_area_m2: float = 3.0  # m2: ... at least obj_lantern_max_h_m high and at most this wide is a chimney
     obj_mislabel_area_m2: float = 3.0  # m2: a planar blob wider than this is a roof part the facets left out (mislabelled)
     obj_planar_rms_m: float = 0.08  # m: ... planar means a plane fit with an rms under this
-    # ---- hints (caller answers; skipped from stable_hash while at their default)
-    pitched_steps: bool = True  # False: a step line between two pitched facets whose planes agree at the seam is typed from the planes
 
     def __post_init__(self) -> None:
         """Canonical values (an int where a float is declared is stored as a float, so 1 and 1.0 hash alike) and sanity
@@ -333,11 +337,7 @@ class EngineParams:
 
     def stable_hash(self) -> str:
         """sha256 of the sorted fields: the result-cache and harness key."""
-        d = asdict(self)
-        for name in HINT_FIELDS:  # a hint at its default must not change the key every cached result already has
-            if d[name] == _FIELD_DEFAULTS[name]:
-                del d[name]
-        blob = json.dumps(d, sort_keys=True, separators=(",", ":"))
+        blob = json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode()).hexdigest()
 
     def replace(self, **kw: object) -> EngineParams:
@@ -346,10 +346,5 @@ class EngineParams:
 
         return replace(self, **kw)
 
-
-# Changing the DEFAULT of a hint field changes what an unhinted request means, but the hash skips defaults: it then needs a
-# PIPELINE_VERSION bump (tests/test_engine_hints.py pins the defaults).
-HINT_FIELDS = ("pitched_steps",)
-_FIELD_DEFAULTS = {f.name: f.default for f in fields(EngineParams)}
 
 DEFAULT = EngineParams()

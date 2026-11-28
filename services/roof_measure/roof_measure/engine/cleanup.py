@@ -161,6 +161,14 @@ def _best_neighbour(i: int, items: list, planes: list, q: np.ndarray, inside: np
     return best
 
 
+def _longest_neighbour(i: int, items: list):
+    """(score, index) of the neighbour sharing the most boundary with facet i (at least 0.5 m), else None."""
+    pg = items[i][1]
+    shared = [(pg.buffer(0.05).intersection(p2.boundary).length, j) for j, (_, p2) in enumerate(items) if j != i]
+    shared = [t for t in shared if t[0] >= 0.5]
+    return None if not shared else (None, max(shared)[1])
+
+
 def merge_small_facets(items: list, planes: list, q: np.ndarray, ctx: Ctx) -> tuple[list, int]:
     """A facet under ``small_facet_m2`` merges into the neighbour whose residual rms rises least."""
     p = ctx.p
@@ -177,6 +185,8 @@ def merge_small_facets(items: list, planes: list, q: np.ndarray, ctx: Ctx) -> tu
             if _keeps_small(i, items, planes, q, inside, p):
                 continue
             best = _best_neighbour(i, items, planes, q, inside, p)
+            if best is None and inside.sum() < p.plane_min_pts:  # too few returns to be a plane of its own: the longest shared boundary takes it
+                best = _longest_neighbour(i, items)
             if best is not None:
                 j = best[1]
                 u = unary_union([items[j][1].buffer(0.003), pg.buffer(0.003)]).buffer(-0.003)

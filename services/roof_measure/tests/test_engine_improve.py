@@ -2,17 +2,18 @@
 point density, low-slope roofs, junction nodes, flat-roof junk, multi-level flat roofs, tree crowns, thin clouds."""
 
 import pytest
-from engine_improve_cases import FULL_EDGE, cases, drawn_area, length, run, truth
+from engine_improve_cases import cases, drawn_area, length, run, truth
 from shapely.ops import unary_union
 
 from roof_measure.engine import measure_roof
 from roof_measure.engine.load import roof_points_from_arrays
+from roof_measure.engine.params import DEFAULT
 
 M2FT = 3.280839895013123
 
 
 def _area_err(name: str) -> float:
-    return drawn_area(run(name, FULL_EDGE)) / sum(f.area_sqft for f in truth(name).facets) - 1
+    return drawn_area(run(name, DEFAULT)) / sum(f.area_sqft for f in truth(name).facets) - 1
 
 
 @pytest.mark.parametrize("name", [f"{s}_d{d}" for s in ("gable", "hip", "l_shape", "t_shape", "shed", "flat", "two_level") for d in (16, 8)])
@@ -24,7 +25,7 @@ def test_area_within_the_gate_at_16_and_8_points(name):
 @pytest.mark.parametrize("name", ["gable_d16", "gable_d8", "hip_d16", "hip_d8", "l_shape_d16"])
 def test_measured_overhang_does_not_depend_on_density(name):
     """The true overhang is 0.3 m. The support boundary moves inward as returns thin out; the spacing correction undoes it."""
-    got = [v for v in run(name, FULL_EDGE).outline.overhang_measured_m if v is not None]
+    got = [v for v in run(name, DEFAULT).outline.overhang_measured_m if v is not None]
     assert got and all(abs(v - 0.3) <= 0.12 for v in got), got
 
 
@@ -40,13 +41,13 @@ def test_low_slope_roofs_keep_their_planes(name):
 @pytest.mark.parametrize("name", ["gable_p25_d8_noisy", "hip_p30_d8_noisy", "l_shape_p30_d8_noisy"])
 def test_low_slope_with_realistic_noise(name):
     """7 cm of vertical noise on a 2.5-3/12 roof (the real LiDAR scatter) keeps the facet count and the area."""
-    res = run(name, FULL_EDGE)
+    res = run(name, DEFAULT)
     assert len(res.facets) == len(truth(name).facets)
     assert abs(drawn_area(res) / sum(f.area_sqft for f in truth(name).facets) - 1) <= 0.03
 
 
 def test_two_level_flat_roof_is_two_facets_with_the_measured_step():
-    res = run("two_level_flat_d16", FULL_EDGE)
+    res = run("two_level_flat_d16", DEFAULT)
     assert len(res.facets) == 2 and {f.roof_type for f in res.facets} == {"flat"}
     steps = [e for e in res.edges if e.type == "level_change"]
     assert steps and abs(sum(e.length_ft for e in steps) - truth("two_level_flat_d16").totals["level_change_ft"]) <= 1.5
@@ -56,20 +57,20 @@ def test_two_level_flat_roof_is_two_facets_with_the_measured_step():
 @pytest.mark.parametrize("name", ["flat_equipment_d16", "flat_equipment_d8", "flat_equipment_d8_noisy"])
 def test_rooftop_units_and_a_bulkhead_are_part_of_the_flat_roof(name):
     """Equipment under 6 m2 is absorbed: one flat facet, no pitched patch, the main roof's area."""
-    res = run(name, FULL_EDGE)
+    res = run(name, DEFAULT)
     assert len(res.facets) == 1 and res.facets[0].roof_type == "flat"
     assert abs(_area_err(name)) <= 0.03  # the units' plan area belongs to the one flat facet
 
 
 @pytest.mark.parametrize("name", ["flat_parapet_d16", "flat_parapet_d8"])
 def test_parapet_strips_do_not_become_pitched_facets(name):
-    res = run(name, FULL_EDGE)
+    res = run(name, DEFAULT)
     assert {f.roof_type for f in res.facets} == {"flat"} and len(res.facets) <= 2
 
 
 def test_low_slope_l_shape_junction_is_where_the_planes_meet():
     """The ridge, valley and hip meet at one node; the raster put it 0.6-1.0 m off at 2.5/12 and cut the valley by 11%."""
-    res = run("l_shape_p25_d16", FULL_EDGE)
+    res = run("l_shape_p25_d16", DEFAULT)
     want = truth("l_shape_p25_d16").totals
     assert abs(length(res, "valley") / want["valley_ft"] - 1) <= 0.05
     assert abs(length(res, "hip") / want["hip_ft"] - 1) <= 0.05
@@ -77,13 +78,13 @@ def test_low_slope_l_shape_junction_is_where_the_planes_meet():
 
 def test_a_short_chain_with_a_real_corner_is_not_straightened():
     """Dutch gable: the vertical gable wall plus the hip are one 5 m chain; straightening it dropped one of four hips."""
-    res = run("dutch_gable_d8", FULL_EDGE)
+    res = run("dutch_gable_d8", DEFAULT)
     assert abs(length(res, "hip") / truth("dutch_gable_d8").totals["hip_ft"] - 1) <= 0.06  # +5.1% since the hip reaches the corner
 
 
 @pytest.mark.parametrize("name", ["gable_d8_trees", "hip_d8_trees", "l_shape_d8_trees"])
 def test_tree_crowns_do_not_create_facets_or_bend_planes(name):
-    res = run(name, FULL_EDGE)
+    res = run(name, DEFAULT)
     assert len(res.facets) == len(truth(name).facets)
     pitch = truth(name).facets[0].pitch
     assert all(abs(f.pitch_rise - pitch) <= 0.8 for f in res.facets)
@@ -94,7 +95,7 @@ def test_tree_crowns_do_not_create_facets_or_bend_planes(name):
 
 @pytest.mark.parametrize("name", ["gable_d4", "hip_d4", "l_shape_d4"])
 def test_thin_clouds_are_refused_or_measured_within_ten_percent(name):
-    res = run(name, FULL_EDGE)
+    res = run(name, DEFAULT)
     if res.refused:
         assert res.quality.verdict == "lidar_too_sparse"
     else:
@@ -155,7 +156,7 @@ def test_wall_returns_below_an_eave_do_not_become_a_facet(pitch):
 
 def test_a_crease_chain_ends_on_the_eave_corner():
     """Dutch gable: the hip ran to a raster node 0.6 m short of the corner and the stub went to the wrong facet."""
-    res = run("dutch_gable_d8", FULL_EDGE)
+    res = run("dutch_gable_d8", DEFAULT)
     assert length(res, "rake") == 0.0
 
 
@@ -192,7 +193,6 @@ def test_a_rounded_ridge_is_not_a_flat_facet(shape, width):
     """LiDAR rounds ridges: returns within `width` of the ridge sit on a flat top. That strip is not a facet."""
     import numpy as np
     import shapely
-    from engine_improve_cases import FULL_EDGE
     from shapely.geometry import LineString
 
     from roof_measure.engine import measure_roof, synth_points
@@ -206,7 +206,7 @@ def test_a_rounded_ridge_is_not_a_flat_facet(shape, width):
         pts[near, 2] = e.p0[2] - (roof.params.get("pitch", 6) / 12.0) * width
     wall = roof.wall_polygon()
     rp = roof_points_from_arrays(pts[pts[:, 3] == 1][:, :3], wall, pts)
-    res = measure_roof(rp, wall, params=FULL_EDGE, outline_source="county", parcel_match="given", context=pts)
+    res = measure_roof(rp, wall, params=DEFAULT, outline_source="county", parcel_match="given", context=pts)
     assert {f.roof_type for f in res.facets} == {"pitched"}
     assert len(res.facets) <= len(roof.facets)
     assert np.isfinite(sum(f.area_sqft for f in res.facets))
@@ -263,7 +263,6 @@ def test_a_tree_and_a_neighbour_wall_beyond_the_eave_change_nothing(shape, kind,
 
 def _double_gable_result(density: int, rounded_m: float):
     import shapely
-    from engine_improve_cases import FULL_EDGE
     from shapely.geometry import LineString
 
     from roof_measure.engine import measure_roof, synth_extra, synth_points
@@ -277,7 +276,7 @@ def _double_gable_result(density: int, rounded_m: float):
         pts[near, 2] = e.p0[2] - roof.facets[e.facets[0]].pitch / 12.0 * rounded_m  # a flat top, as LiDAR rounds a ridge
     wall = roof.wall_polygon()
     rp = roof_points_from_arrays(pts[pts[:, 3] == 1][:, :3], wall, pts)
-    return roof, measure_roof(rp, wall, params=FULL_EDGE, outline_source="county", parcel_match="given", context=pts)
+    return roof, measure_roof(rp, wall, params=DEFAULT, outline_source="county", parcel_match="given", context=pts)
 
 
 @pytest.mark.parametrize("density", [8, 16])

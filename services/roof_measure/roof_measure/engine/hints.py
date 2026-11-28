@@ -1,11 +1,10 @@
 """Caller answers that steer the plane engine (``library.measure(..., hints=)``).
 
-A hint is a question the caller asked a person and the answer. No hint, or a hint that equals today's behaviour, changes
-nothing: the same parameters, the same cache key, the same output.
-
-    ``steps``: ``False`` = "there is no wall or step between the two parts of this roof". A step line between two
-    PITCHED sections whose fitted planes agree at the seam is then typed from the planes (valley, ridge, hip).
-    ``True`` is today's behaviour (the points decide)."""
+There are none today. The one that existed, ``steps`` ("there is no wall or step between the two parts of this roof"), is
+retired: the step test now measures the jump robustly (``edge_measure.points_jump``) and a step line between two PITCHED
+facets whose fitted planes agree at the seam is always typed from the planes (``edges._planes_agree_pitched``), so the
+answer changed nothing on the 160 tuning houses or the three accuracy houses. A hint to add later is a key of ``ALLOWED``
+and a parameter the hint switches (left out of ``EngineParams.stable_hash`` while at its default so no cached result moves)."""
 
 from __future__ import annotations
 
@@ -14,7 +13,7 @@ from typing import Any
 from . import params as _params
 from .params import EngineParams
 
-ALLOWED: dict[str, type] = {"steps": bool}
+ALLOWED: dict[str, type] = {}
 
 
 def clean_hints(hints: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -28,16 +27,10 @@ def clean_hints(hints: dict[str, Any] | None) -> dict[str, Any] | None:
             raise ValueError(f"unknown hint {k!r}; accepted: {sorted(ALLOWED)}")
         if not isinstance(v, ALLOWED[k]):
             raise ValueError(f"hint {k!r} must be {ALLOWED[k].__name__}, got {type(v).__name__}")  # noqa: TRY004
-    out = {k: v for k, v in hints.items() if not (k == "steps" and v is True)}
-    return out or None
+    return None
 
 
 def params_from_hints(hints: dict[str, Any] | None, base: EngineParams | None = None) -> EngineParams:
-    """``base`` itself (the same object) when no hint changes anything, else a copy with the hints applied."""
-    base = base if base is not None else _params.DEFAULT  # looked up at call time (tests swap the default)
-    clean = clean_hints(hints)
-    if clean is None:
-        return base
-    if clean.get("steps") is False:
-        base = base.replace(pitched_steps=False)
-    return base
+    """``base`` itself (the same object): no hint changes a parameter today. Bad hints raise as ``clean_hints`` does."""
+    clean_hints(hints)
+    return base if base is not None else _params.DEFAULT  # looked up at call time (tests swap the default)

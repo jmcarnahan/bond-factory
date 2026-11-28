@@ -14,25 +14,30 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 from shapely.geometry import Polygon
 
-from ..model import SCHEMA, ModelError, _totals, origin_of, validate
+from ..model import EDGE_TYPES, SCHEMA, ModelError, origin_of, validate
 from .edges import edge_diagnostics
 from .params import DEFAULT, EngineParams
+from .totals import roof_totals
 from .types import EngineResult, Facet
 
 FT = 1 / 0.3048
 FLAT_KIND_RISE = 0.5  # contract 0.2: ``kind`` is flat under 0.5/12 (``roof_type`` cuts at 2.0/12)
 MIN_ANGLE_DEG = 10.0  # model.validate rejects a facet corner sharper than this
 SOURCE_METHOD = "lidar_skeleton"  # a validated METHODS value; a deliberate rename is a phase 3 job
+# the totals the envelope carries beside the model's own (area, squares, the lengths by type): read from model.totals
 COST_KEYS = ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft",
              "roofing_pitched_sqft", "roofing_flat_sqft", "roofing_pitched_squares", "roofing_flat_squares",
              "low_slope_confirm_sqft", "area_sqft_wall_line", "outline_perimeter_wall_ft", "overhang_ft_median",
-             "flat_edge_ft", "level_change_ft", "complexity")
-AREA_TOL_SQFT = 0.5  # the priced area may not leave [wall line, drawn] by more than this (rounding)
+             "flat_edge_ft", "level_change_ft", "complexity", "area_sqft_roof_edge")
+FOOTPRINT_KEYS = ("area_sqft_wall_line", "squares_wall_line", "outline_perimeter_wall_ft", "overhang_ft_median",
+                  "roof_edge_perimeter_geom_ft")  # engine totals that need the wall line or the outline polygon
+AREA_TOL_SQFT = 0.5  # a facet whose polygon is smaller than this is dropped from the model
 
 
 def _ring_ft(poly: Polygon) -> list[tuple[float, float]]:
@@ -116,7 +121,7 @@ def _edge_dicts(res: EngineResult, kept: set[str]) -> list[dict]:
         d: dict[str, Any] = {"id": f"e{n}", "type": e.type,
                              "points": [[e.p0[0] * FT, e.p0[1] * FT], [e.p1[0] * FT, e.p1[1] * FT]],
                              "length_ft": float(e.length_ft), "facets": list(e.facets)}
-        if e.type == "level_change" and e.jump_ft is not None:
+        if e.type in ("level_change", "step_flashing", "wall_flashing") and e.jump_ft is not None:
             d["jump_ft"] = float(e.jump_ft)
         if e.high_edge:
             d["high_edge"] = True
@@ -124,45 +129,20 @@ def _edge_dicts(res: EngineResult, kept: set[str]) -> list[dict]:
     return out
 
 
-def priced_area_check(res: EngineResult) -> dict[str, Any]:
-    """The drawn area, and whether the priced area lies between the wall-line area and the drawn area."""
-    drawn = float(sum(f.area_sqft for f in res.facets))
-    priced = res.totals.get("planes_surface_area_sqft")
-    wall = res.totals.get("area_sqft_wall_line")
-    ok = (priced is not None and wall is not None
-          and wall - AREA_TOL_SQFT <= priced <= drawn + AREA_TOL_SQFT)
-    return {"drawn": round(drawn, 1), "priced": priced, "wall_line": wall, "between": bool(ok)}
-
-
-def engine_totals(res: EngineResult) -> dict[str, Any]:
-    """The envelope totals the engine owns: the four cost-sheet keys with the PRICED values, and the 0.4 additions.
-
-    The envelope's ``area_sqft``, ``squares``, ``planes_surface_area_sqft`` and ``roofing_pitched_sqft`` +
-    ``roofing_flat_sqft`` are ONE number, the priced area (same rounding: the pitched and flat parts are rounded first
-    and the area is their sum). ``area_sqft_roof_edge`` is the drawn (measured roof edge) area, ``area_sqft_wall_line``
-    the wall-line one; the priced area is held between them (scaled, pitched and flat together, if it ever leaves).
-    The inner ``model.totals`` describe the DRAWN facets. Keys whose value is None are left out.
-    """
-    t = {k: res.totals[k] for k in COST_KEYS if res.totals.get(k) is not None}
-    chk = priced_area_check(res)
-    t["area_sqft_roof_edge"] = chk["drawn"]
-    if "roofing_pitched_sqft" in t and "roofing_flat_sqft" in t:
-        pitched, flat = t["roofing_pitched_sqft"], t["roofing_flat_sqft"]
-        priced = pitched + flat
-        wall = chk["wall_line"]
-        if wall is not None and priced > 0:
-            target = min(max(priced, wall), chk["drawn"])
-            if abs(target - priced) > 1e-9:
-                pitched, flat = pitched * target / priced, flat * target / priced
-        pitched, flat = round(pitched, 1), round(flat, 1)
-        priced = round(pitched + flat, 1)
-        t.update(roofing_pitched_sqft=pitched, roofing_flat_sqft=flat, roofing_pitched_squares=round(pitched / 100, 2),
-                 roofing_flat_squares=round(flat / 100, 2), planes_surface_area_sqft=priced)
-    if "planes_surface_area_sqft" in t:
-        t["area_sqft"] = t["planes_surface_area_sqft"]
-        t["squares"] = round(t["area_sqft"] / 100.0, 3)
-    t["plane_count"] = len(res.facets)
-    return t
+def _model_totals(res: EngineResult, facets: list[dict], edges: list[dict], params: EngineParams) -> dict[str, Any]:
+    """``model.totals``: ``roof_totals`` over the facets and edges the model carries (so every total is the sum of
+    them, as ``validate`` checks), in the model's shape plus the cost-sheet keys. The wall-line and outline numbers
+    are the engine's. Keys whose value is None are left out."""
+    rows = [SimpleNamespace(id=f["id"], area_sqft=f["area_sqft"], roof_type=f["roof_type"], pitch_rise=f["pitch_rise"])
+            for f in facets]
+    segs = [SimpleNamespace(type=e["type"], length_ft=e["length_ft"], facets=tuple(e["facets"]), high_edge=bool(e.get("high_edge")))
+            for e in edges]
+    t = roof_totals(rows, segs, {f["id"] for f in facets if f["borderline"]}, params)
+    t.update({k: res.totals[k] for k in FOOTPRINT_KEYS if res.totals.get(k) is not None})
+    t["total_area_sqft"] = t["area_sqft"]
+    t["predominant_pitch_rise"] = t.pop("predominant_pitch")
+    t["lengths_ft"] = {k: t["lengths_ft"].get(k, 0.0) for k in EDGE_TYPES}
+    return {k: v for k, v in t.items() if v is not None}
 
 
 def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[str, Any] | None = None,
@@ -190,9 +170,8 @@ def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[s
                              if lidar else None),
                    "solar": None, "from_planes": True, "engine": "planes/1", "engine_params": res.params_hash},
         "blocks": blocks, "facets": facets, "edges": edges, "holes": [],
-        "totals": {**_totals(facets, edges),
-                   "note": "These totals describe the DRAWN roof (the facets of this model, at the measured roof edge). "
-                           "The envelope's totals are the priced ones."},
+        "totals": {**_model_totals(res, facets, edges, params),
+                   "note": "Every total is the sum of the facets and edges of this model; the envelope's totals repeat them."},
         "confidence": {"overall": "low" if res.quality.verdict != "ok" else "medium", "notes": [
             "Drawn from the measured roof planes by the plane engine: one facet per plane, edges typed from geometry.",
             *(notes or [])]},
@@ -201,9 +180,6 @@ def engine_model(res: EngineResult, base: Any, ground_z_m: float, source: dict[s
     model["debug"]["coplanar_seams"] = diag["mergeable"]  # kept key: facets with no line between them
     diag["seam_points_only"] = sum(1 for e in res.edges if e.type == "flat_seam")  # points show a step, the planes agree
     model["debug"]["edge_diagnostics"] = diag
-    model["debug"]["area_check"] = priced_area_check(res)
-    if res.diagnostics.get("priced_clip_error"):
-        model["debug"]["priced_clip_error"] = res.diagnostics["priced_clip_error"]
     validate(model)
     return model
 

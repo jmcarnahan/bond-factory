@@ -49,10 +49,9 @@ class Plane:
 
 @dataclass(frozen=True)
 class Outline:
-    """The roof edge. ``drawn`` is the measured roof edge (diagram), ``priced`` the one the cost sheet prices."""
+    """The roof edge: ``drawn`` is the one outline, the diagram's and the totals' (facets tile it)."""
 
     drawn: Polygon
-    priced: Polygon
     source: str  # the outline provider as given (e.g. "lariac")
     county: bool  # the given outline is a county wall line (so an overhang was measured and applied)
     scale_drawn: float  # overhang scale used for the drawn edge
@@ -108,7 +107,7 @@ class Facet:
 class Edge:
     """A typed edge between two facets (or a facet and the outside); p0, p1 are (x, y, z) in metres."""
 
-    type: str  # eave rake ridge hip valley flat_edge level_change flat_seam transition (and "step" inside the engine)
+    type: str  # eave rake ridge hip valley flat_edge level_change step_flashing wall_flashing flat_seam transition
     p0: tuple[float, float, float]
     p1: tuple[float, float, float]
     length_ft: float
@@ -116,6 +115,7 @@ class Edge:
     jump_m: float | None = None
     jump_ft: float | None = None
     high_edge: bool = False  # exterior high edge of a pitched facet (typed ridge, never a wall type)
+    upper: str | None = None  # a step (level_change, step_flashing, wall_flashing): the id of the HIGHER facet
 
 
 @dataclass
@@ -132,13 +132,12 @@ class Quality:
     outline_shift: float | None = None
     parcel_match: str | None = None
     outline_source: str = ""
-    overhang_scale: float | None = None
     roof_cover_of_outline: float | None = None
     extra_roof_ring_ratio: float | None = None
     tree_contact_pct: float | None = None
     fit_clear: float | None = None  # fit_all with canopy (returns well above the surface) left out: REPORTED only, poor_fit tests fit_all
     tree_cover_pct: float | None = None  # share of the roof returns that are canopy above the surface
-    flat_share: float | None = None  # flat (under 2/12) priced area / total priced area, 0..1 (0.5.1)
+    flat_share: float | None = None  # flat (under 2/12) area / total area, 0..1 (0.5.1)
     error: str | None = None
     brief: bool = False  # a refusal: only the density, the reason and the verdict are reported
 
@@ -152,7 +151,7 @@ class Quality:
         return {"engine": "planes/1", "fit_all": self.fit_all, "fit_covered": self.fit_covered,
                 "coverage": self.coverage, "supported_pct": self.supported_pct, "density_pts_m2": self.density,
                 "parcel_match": self.parcel_match, "outline_source": self.outline_source,
-                "overhang_scale": self.overhang_scale, "roof_cover_of_outline": self.roof_cover_of_outline,
+                "roof_cover_of_outline": self.roof_cover_of_outline,
                 "extra_roof_ring_ratio": self.extra_roof_ring_ratio, "tree_contact_pct": self.tree_contact_pct,
                 "fit_clear": self.fit_clear, "tree_cover_pct": self.tree_cover_pct,
                 "outline_shift": self.outline_shift, "reasons": list(self.reasons), "verdict": self.verdict,

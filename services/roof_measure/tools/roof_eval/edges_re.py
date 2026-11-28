@@ -27,7 +27,9 @@ from shapely.geometry import LineString, Point
 from shapely.ops import linemerge, unary_union
 from shapely.strtree import STRtree
 
-from .geom import Edge, Facet, Roof
+from roof_measure.engine.edge_measure import crease_slope
+
+from .geom import STEP_TYPES, Edge, Facet, Roof
 from .m_fit import FALSE_JUMP_M, edge_jump_m
 from .seam_check import strip_step
 
@@ -39,6 +41,7 @@ HORIZONTAL = 0.1
 MERGE_DZ_M = 0.07
 MERGE_ANGLE_DEG = 3.0
 UNMARKED_MATCH_M = 0.5
+END_TOUCH_M = 0.15
 
 
 @dataclass
@@ -88,8 +91,7 @@ def _crease(p: Facet, q: Facet, a, b) -> str:
     sp = p.plane[0] * n[0] + p.plane[1] * n[1]
     sq = -(q.plane[0] * n[0] + q.plane[1] * n[1])
     if sp < -SLOPE_EPS and sq < -SLOPE_EPS:
-        run = math.dist(a, b)
-        return "ridge" if abs(p.z_at(*a) - p.z_at(*b)) <= HORIZONTAL * run else "hip"
+        return "ridge" if crease_slope(p.plane, q.plane) <= HORIZONTAL else "hip"  # the line where the planes meet, wherever the boundary runs
     if sp > SLOPE_EPS and sq > SLOPE_EPS:
         return "valley"
     return "transition"
@@ -104,6 +106,24 @@ def _mergeable(p: Facet, q: Facet, segs) -> bool:
     na, nb = np.array([-p.plane[0], -p.plane[1], 1.0]), np.array([-q.plane[0], -q.plane[1], 1.0])
     ang = math.degrees(math.acos(float(np.clip(na @ nb / np.linalg.norm(na) / np.linalg.norm(nb), -1, 1))))
     return dz <= MERGE_DZ_M and ang <= MERGE_ANGLE_DEG
+
+
+def _end_pieces(pair: list[Edge]) -> None:
+    """A piece of the boundary between two PITCHED facets that reads as one slope carrying on (``transition``) but touches a ridge,
+    hip, valley or level change of the same two facets is the end of that line and has its type: where the boundary turns at an
+    eave corner the slope test changes sign for the last piece (the engine does the same: ``engine.ends``)."""
+    typed = [e for e in pair if e.type in ("ridge", "hip", "valley", "level_change")]
+    joined = True
+    while joined:
+        joined = False
+        for e in pair:
+            if e.type != "transition":
+                continue
+            near = [t for t in typed if min(math.dist(u[:2], v[:2]) for u in (e.p0, e.p1) for v in (t.p0, t.p1)) <= END_TOUCH_M]
+            if near:
+                e.type = max({t.type for t in near}, key=lambda k: sum(t.length_ft for t in typed if t.type == k))
+                typed.append(e)
+                joined = True
 
 
 def recompute(roof: Roof, ref: np.ndarray) -> Recomputed:
@@ -129,11 +149,12 @@ def recompute(roof: Roof, ref: np.ndarray) -> Recomputed:
             if sum(math.dist(a, b) for a, b in segs) >= MIN_PAIR_M:
                 pairs += 1
                 merge += _mergeable(p, q, segs)
+            first = len(edges)
             for a, b in segs:
                 mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
                 lo = p if p.z_at(*mid) <= q.z_at(*mid) else q
                 gap = max(abs(p.z_at(*a) - q.z_at(*a)), abs(p.z_at(*b) - q.z_at(*b)))
-                jump = edge_jump_m(ref, (*a, 0.0), (*b, 0.0))
+                jump = edge_jump_m(ref, (*a, 0.0), (*b, 0.0), (p, q))
                 fids = [p.id, q.id]
                 step = strip_step(ref, p.poly, q.poly, a, b) if p.is_flat and q.is_flat else None
                 if p.is_flat and q.is_flat and step is not None:
@@ -156,6 +177,8 @@ def recompute(roof: Roof, ref: np.ndarray) -> Recomputed:
                     unver += edges[-1].length_ft
                 else:
                     edges.append(_edge3(p, a, b, _crease(p, q, a, b), fids))
+            if not p.is_flat and not q.is_flat:
+                _end_pieces(edges[first:])
     for i, f in enumerate(fs):
         free = f.poly.boundary
         if shared_by[i]:
@@ -174,9 +197,9 @@ def recompute(roof: Roof, ref: np.ndarray) -> Recomputed:
 
 
 def unmarked_level_change_ft(rec: Recomputed, engine_edges: list[Edge]) -> float:
-    """Feet of verified level change (recomputed) that the engine did not type level_change (no engine level_change edge
+    """Feet of verified level change (recomputed) that the engine did not type as a step (no engine step edge
     within 0.5 m of the segment's midpoint)."""
-    marked = [LineString([e.p0[:2], e.p1[:2]]) for e in engine_edges if e.type == "level_change"]
+    marked = [LineString([e.p0[:2], e.p1[:2]]) for e in engine_edges if e.type in STEP_TYPES]
     tot = 0.0
     for e in rec.edges:
         if e.type != "level_change":
@@ -195,8 +218,9 @@ def disagreement_ft(recomputed: list[Edge], engine: list[Edge]) -> float:
         if e.type in a:
             a[e.type] += e.length_ft
     for e in engine:
-        if e.type in b:
-            b[e.type] += e.length_ft
+        t = "level_change" if e.type in STEP_TYPES else e.type  # the engine names a step (sidewall, headwall); the recompute only says "step"
+        if t in b:
+            b[t] += e.length_ft
     return sum(abs(a[t] - b[t]) for t in types)
 
 

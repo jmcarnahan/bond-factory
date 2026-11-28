@@ -1,4 +1,4 @@
-"""The late stages of a run: facets and edges, priced totals, quality verdict, back to the world frame."""
+"""The late stages of a run: facets and edges, totals, quality verdict, back to the world frame."""
 
 from __future__ import annotations
 
@@ -13,16 +13,16 @@ from shapely.geometry import Polygon
 
 from . import axes
 from .cleanup import valid_polygon
-from .edges import build_edges, totals_of
+from .edges import build_edges
 from .errors import EngineError
 from .facets import facet_stats, supported_pct
 from .params import EngineParams
 from .partition import PartitionRun, explode
 from .plane_math import aspect_deg, pitch_rise, pres
-from .priced import priced_clip
 from .ring import ring_filter
-from .signals import cost_outputs, quality, ring_roof_extra_ratio, tree_contact_pct
+from .signals import quality, ring_roof_extra_ratio, tree_contact_pct
 from .state import Run
+from .totals import footprint_totals, roof_totals
 from .types import Edge, EngineResult, Facet, Outline, Partition, Plane, Quality
 
 
@@ -83,10 +83,6 @@ def quality_stage(run: Run, facets: list[Facet], o: Polygon, crop: np.ndarray, p
         out.reasons.append("planes_not_found")  # a roof drawn from (almost) no planes is never a confident drawing
         if out.verdict in ("ok", "not_exact_parcel", "low_density"):
             out.verdict = "poor_fit"
-    if run.diag.get("priced_fallback"):
-        out.reasons.append("priced_fallback")  # the priced totals are the drawn ones (the clip failed): never "good"
-        if out.verdict == "ok":
-            out.verdict = "unknown"
     return out
 
 
@@ -96,12 +92,11 @@ def _quality(run: Run, facets: list[Facet], o: Polygon, crop: np.ndarray, plab: 
     pall = run.pts_all[shapely.contains_xy(run.wall.buffer(p.crop_buffer_m), run.pts_all[:, 0], run.pts_all[:, 1])]
     pall = ring_filter(pall, run.wall, p, {})  # the same points the planes were fitted on
     return quality(facets, pall, o, run.wall, run.parcel_match, run.source, run.diag.get("supported_pct"),
-                   run.diag.get("support_area_m2", 0), p.overhang_scale, extra, tree_pct, p)
+                   run.diag.get("support_area_m2", 0), extra, tree_pct, p)
 
 
-def facets_stage(run: Run, best: PartitionRun, q: np.ndarray, o: Polygon, theta: float
-                  ) -> tuple[list[Facet], list[Edge], dict[str, Any], Polygon]:
-    """Facets, edges, borderline flags, supported share, and the priced totals (returns drawn + totals + priced O)."""
+def facets_stage(run: Run, best: PartitionRun, q: np.ndarray, o: Polygon) -> tuple[list[Facet], list[Edge], dict[str, Any]]:
+    """Facets, edges, borderline flags, supported share and the totals of the one (drawn) roof."""
     p, diag, ctx = run.ctx.p, run.diag, run.ctx
     facets = facet_stats(explode(best.items), best.planes, q, p)
     diag["facets_per_20m2"] = round(len(facets) / (o.area / 20.0), 2)
@@ -111,33 +106,23 @@ def facets_stage(run: Run, best: PartitionRun, q: np.ndarray, o: Polygon, theta:
     diag["borderline"] = bool(ids)
     diag["borderline_facets"] = ids
     diag["supported_pct"] = _supported(facets, q, p)
-    diag["overhang_scale"] = p.overhang_scale
     diag["overhang_scale_draw"] = p.overhang_scale_draw
-    tot_draw = totals_of(facets, edges)
-    facets_p, edges_p, o_p = priced_clip(facets, edges, o, q, run.wall, theta, run.county, diag, ctx, jq)
-    tot = totals_of(facets_p, edges_p)
-    tot["area_sqft_measured_edge"] = tot_draw["area_sqft"]
-    tot["squares_measured_edge"] = tot_draw["squares"]
-    tot["perimeter_measured_edge_ft"] = round(sum(e.length_ft for e in edges if len(e.facets) == 1
-                                                  and e.type in ("eave", "rake", "flat_edge")), 1)
-    tot.update(cost_outputs(facets_p, edges_p, o_p, run.wall, set(ids), diag.get("overhang_applied_m", []), p))
-    tot["area_sqft_roof_edge"] = tot_draw["area_sqft"]  # the DRAWN area (the physical roof), not the priced one
-    tot["squares_wall_line"] = round(tot["area_sqft_wall_line"] / 100.0, 1)
+    tot = roof_totals(facets, edges, set(ids), p)
+    tot.update(footprint_totals(facets, o, run.wall, diag.get("overhang_applied_m", [])))
     run.stages.facets, run.stages.edges = [replace(f) for f in facets], [replace(e) for e in edges]
-    return facets, edges, tot, o_p
+    return facets, edges, tot
 
 
-def assemble(run: Run, facets: list[Facet], edges: list[Edge], tot: dict, o: Polygon, o_p: Polygon,
+def assemble(run: Run, facets: list[Facet], edges: list[Edge], tot: dict, o: Polygon,
               best: PartitionRun, q: np.ndarray, qlab: np.ndarray, quality_: Quality) -> EngineResult:
     p, diag, ang = run.ctx.p, run.diag, run.ang
     diag["quality"] = quality_.to_dict()
     o_world = _to_world(ang, facets, edges, o)
-    o_p_world = axes.poly_to_world(o_p, ang) if ang else o_p
     world_planes = [axes.rotate_plane(pl, ang) if ang else pl for pl in best.planes]
     diag["support_planes"] = [[round(pitch_rise(pl), 2), round(aspect_deg(pl), 1)] for pl in world_planes]
     h = best.origin[2]
     partition = Partition(best.labels, best.origin[0], best.origin[1], h, _plane_objs(best.planes, qlab, q), best.beta)
-    outline = Outline(o_world, o_p_world, run.source, run.county,
+    outline = Outline(o_world, run.source, run.county,
                       p.overhang_scale_draw if run.county else min(p.overhang_scale_draw, p.overhang_scale_roofedge),
                       tuple(diag.get("overhang_measured_m", [])), tuple(diag.get("overhang_applied_m", [])),
                       float(diag.get("support_area_m2", 0.0)))
