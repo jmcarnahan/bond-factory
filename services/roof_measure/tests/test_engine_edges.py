@@ -218,8 +218,8 @@ def test_the_engine_result_carries_the_same_vocabulary():
     assert [e.type for e in steps] == ["step_flashing"] and all(e.jump_ft is not None and e.upper for e in steps)
     shed = run("shed_d8")
     assert "ridge" not in {e.type for e in shed.edges} and sum(e.high_edge for e in shed.edges) == 1
-    assert {"level_change", "step_flashing", "wall_flashing"} <= set(res.totals["lengths_ft"]) and "step" not in res.totals["lengths_ft"]
-    assert res.totals["lengths_ft"]["step_flashing"] > 0
+    assert {"level_change_ft", "step_flashing_ft", "wall_flashing_ft"} <= set(res.totals) and "step" not in {e.type for e in res.edges}
+    assert res.totals["step_flashing_ft"] > 0
 
 
 # ----------------------------------------------------------------------------- the harness's measurement

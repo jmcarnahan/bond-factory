@@ -256,8 +256,9 @@
    "value": 0
   },
   {
-   "name": "7a T3: 90% interval of the median ratio contains 1.00",
+   "name": "7a T3: 90% interval of the median ratio contains 1.00 (REPORTED, not a gate: John's decision Q2)",
    "agg": "t3_contains",
+   "report_only": true,
    "op": ">=",
    "value": 1.0,
    "require": [

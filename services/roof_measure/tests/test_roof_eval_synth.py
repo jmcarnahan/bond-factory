@@ -216,10 +216,10 @@ def test_high_edge_is_rake_and_flagged():
     assert {e.type for e in rc.edges} == {"eave", "rake"}  # never ridge
 
 
-def test_synthetic_truth_uses_drawn_geometry_and_reports_the_priced_shortfall(tmp_path):
+def test_synthetic_and_vendor_truth_are_both_compared_with_the_drawn_geometry(tmp_path):
     c = synth._cases()["gable_d16"]
     res = synth.result_dict(synth.exact_roof(c), "g")
-    res["totals"] = {"planes_surface_area_sqft": c.roof.totals["area_sqft"] * 0.95, "outline_perimeter_ft": c.roof.totals["perimeter_ft"] * 0.9}
+    res["totals"] = {"area_sqft": c.roof.totals["area_sqft"] * 0.95}  # whatever the totals say is not read
     from tools.roof_eval import score
 
     t6 = {**synth.truth_dict(synth.exact_roof(c), "g"), "tier": "T6"}
@@ -227,6 +227,5 @@ def test_synthetic_truth_uses_drawn_geometry_and_reports_the_priced_shortfall(tm
     ref = pts[(pts[:, 3] != 2) & (pts[:, 2] > 1.5)][:, :3]
     r = score.score_house(res, ref, Polygon(c.roof.wall_outline), [t6, {**t6, "source": "vendor_report", "tier": "T1"}])
     d, v = r["truth"]["T6"], r["truth"]["T1"]
-    assert abs(d["squares.err_pct"]) < 0.1 and d["squares.priced_ratio"] == pytest.approx(0.95, abs=1e-3)  # drawn vs exact; priced shortfall visible
-    assert v["squares.err_pct"] == pytest.approx(-5.0, abs=0.1) and v["squares.err_pct_drawn"] == pytest.approx(0, abs=0.1)  # vendor: priced basis
-    assert abs(d["lengths.perimeter.err_pct"]) < 0.5 and v["lengths.perimeter.err_pct"] == pytest.approx(-10.0, abs=0.5)
+    assert abs(d["squares.err_pct"]) < 0.1 and abs(v["squares.err_pct"]) < 0.1 and "squares.priced_ratio" not in d
+    assert abs(d["lengths.perimeter.err_pct"]) < 0.5 and abs(v["lengths.perimeter.err_pct"]) < 0.5

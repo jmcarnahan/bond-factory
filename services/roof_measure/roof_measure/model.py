@@ -18,11 +18,19 @@ CORE_EDGE_TYPES = ("eave", "rake", "ridge", "hip", "valley", "step_flashing", "w
                    "transition", "unspecified")  # the closed ten of contract 0.2: always in totals.lengths_ft
 NEW_EDGE_TYPES = ("flat_edge", "level_change")  # contract 0.4 (engine): a result without them reads as zero
 EDGE_TYPES = CORE_EDGE_TYPES + NEW_EDGE_TYPES  # the twelve keys of totals.lengths_ft
+OBJECT_KINDS = ("chimney", "lantern", "unknown")  # contract 0.6: things standing on the roof (never facets)
+STEP_EDGE_TYPES = ("level_change", "step_flashing", "wall_flashing")  # a step between two roofs: carries ``jump_ft`` and ``upper``
+# the totals of contract 0.6, in order: engine.totals writes exactly these; the envelope carries exactly these
+TOTALS_KEYS = (
+    "area_sqft", "squares", "roofing_pitched_sqft", "roofing_flat_sqft", "planes_pitch_weighted", "plane_count",
+    "eave_ft", "rake_ft", "flat_edge_ft", "exposed_edge_ft", "eave_rake_ft", "ridge_ft", "hip_ft", "valley_ft",
+    "ridge_hip_ft", "step_flashing_ft", "wall_flashing_ft", "transition_ft", "level_change_ft", "chimney_count",
+    "chimney_perimeter_ft", "lantern_count", "area_sqft_roof_edge", "low_slope_confirm_sqft")
 UNPRICED_EDGE_TYPES = ("flat_seam",)  # 0.5.1: drawn between two flat pieces of one deck, never priced, in no total
 VALID_EDGE_TYPES = EDGE_TYPES + UNPRICED_EDGE_TYPES  # what an edge may be typed
 # closed contract vocabulary (FORMS, METHODS); entries the library no longer emits stay until the 0.6.0 contract
 FORMS = ("flat", "hip", "gable", "shed")
-METHODS = ("lidar_skeleton", "lidar_agent", "solar_agent", "manual", "fixture")
+METHODS = ("planes", "lidar_skeleton", "lidar_agent", "solar_agent", "manual", "fixture")  # the engine writes "planes"; the rest only read old fixtures
 
 
 def origin_of(blockset: Any) -> dict[str, Any]:
@@ -110,6 +118,15 @@ def validate(model: dict[str, Any]) -> None:
              f"edge {e['id']}: length_ft shorter than its plan length")
         if e["type"] not in UNPRICED_EDGE_TYPES:
             lengths[e["type"]] += e["length_ft"]
+    for e in model["edges"]:
+        if "upper" in e:
+            need(e["type"] in STEP_EDGE_TYPES and e["upper"] in e["facets"], f"edge {e['id']}: upper must be a facet of a step edge")
+    for o in model.get("objects", []):
+        need(o["kind"] in OBJECT_KINDS, f"object {o['id']}: bad kind {o['kind']!r}")
+        need(o["facet"] in facets and len(o["polygon"]) >= 4 and o["polygon"][0] == o["polygon"][-1],
+             f"object {o['id']}: needs a facet of the model and a closed polygon")
+        need(len(o["center"]) == 2 and len(o["size_ft"]) == 2 and o["size_ft"][0] >= o["size_ft"][1] > 0,
+             f"object {o['id']}: center [x, y] and size_ft [long, short]")
     for e in model["edges"]:  # every edge lies on the boundary of one of its facets (hole outlines excepted)
         if e["type"] == "wall_flashing" and model["holes"]:
             continue

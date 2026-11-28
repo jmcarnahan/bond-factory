@@ -13,7 +13,7 @@ from roof_measure.engine.errors import EngineTimeout
 SHAPES = ("gable", "hip", "l_shape", "t_shape", "cross_gable", "flat", "flat_pitched", "two_level")
 STRICT = ("gable", "hip", "flat")  # facet count within +-1 of the truth; the rest within +-2
 AREA_TOL = 0.025  # phase 2b: the roof edge is measured with a spacing correction (was 0.04 at the port)
-COST_KEYS = ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft")
+COST_KEYS = ("area_sqft", "planes_pitch_weighted", "eave_rake_ft", "ridge_hip_ft")
 GRID = [f"{s}_d{d}" for s in SHAPES for d in (16, 8)]
 
 
@@ -54,7 +54,7 @@ def test_facet_types_and_edge_types(name):
         assert res.totals["roofing_flat_sqft"] > 0 and res.totals["roofing_pitched_sqft"] > 0
     elif shape == "two_level":
         assert "step_flashing" in types  # two gables end to end, one 1.2 m higher: the step runs down the lower slope (sidewall)
-        assert res.totals["lengths_ft"]["step_flashing"] > 0
+        assert res.totals["step_flashing_ft"] > 0
         assert all(e.jump_ft is not None and e.upper for e in res.edges if e.type in ("level_change", "step_flashing", "wall_flashing"))
 
 
@@ -73,16 +73,16 @@ def test_the_result_json_has_the_harness_shape():
     f = out["facets"][0]
     assert {"id", "plane", "pitch_rise", "aspect_deg", "roof_type", "area_sqft", "polygon", "pitch_fit"} <= set(f)
     assert out["diagnostics"]["quality"]["verdict"] == "ok"
-    assert out["totals"]["complexity"]["hint"] in ("simple", "cut_up")
+    assert out["totals"]["plane_count"] == len(out["facets"]) and "complexity" not in out["totals"]
 
 
-def test_one_roof_one_area_and_the_twins_agree():
-    t = run("gable_d8").totals
-    area = sum(f.area_sqft for f in run("gable_d8").facets)
-    for k in ("area_sqft", "planes_surface_area_sqft", "area_sqft_roof_edge", "area_sqft_measured_edge"):
+def test_one_roof_one_area_and_the_roof_edge_twin_agrees():
+    res = run("gable_d8")
+    t = res.totals
+    area = sum(f.area_sqft for f in res.facets)
+    for k in ("area_sqft", "area_sqft_roof_edge"):
         assert t[k] == pytest.approx(area, abs=0.1), k
-    assert t["area_sqft"] > t["area_sqft_wall_line"] * 0.9  # the roof edge lies outside the wall line
-    assert t["outline_perimeter_ft"] > 0 and t["outline_perimeter_wall_ft"] > 0
+    assert t["eave_rake_ft"] > 0 and t["eave_rake_ft"] == pytest.approx(t["eave_ft"] + t["rake_ft"], abs=0.02)
 
 
 def test_a_rotated_roof_is_measured_in_its_own_frame():

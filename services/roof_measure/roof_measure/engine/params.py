@@ -58,8 +58,6 @@ class EngineParams:
     planes_min_assigned_pct: float = 50.0  # percent: fewer returns on detected planes than this (or none found): poor_fit, reason planes_not_found (synthetic 14/12 cross gable at 8 pts/m2 before the steep fix drew one flat facet)
     fit_floor: float = 0.55  # ratio: fit_all below this: poor_fit
     supported_floor: float = 70.0  # percent: supported area below this: poor_fit
-    cut_up_facets: int = 14  # facets at or above this: complexity "cut_up"
-    cut_up_hv_per_sq: float = 7.0  # ft of hip+valley per roofing square at or above this: "cut_up"
     # ---- input preparation
     crop_buffer_m: float = 1.3  # m: points kept within this of the footprint
     thin_above_pts: int = 9000  # pts: voxel-thin a crop denser than this
@@ -311,7 +309,7 @@ class EngineParams:
     obj_layered_share: float = 0.35  # ratio: more roof returns than this inside the blob's footprint ...
     obj_layered_spread_m: float = 0.5  # m: ... with a height spread (std) above this is canopy with the roof seen through it
     obj_lantern_max_h_m: float = 0.9  # m: lower than this and at least obj_lantern_min_area_m2 wide is a lantern ...
-    obj_lantern_min_area_m2: float = 2.0  # m2
+    obj_lantern_min_area_m2: float = 1.5  # m2: (the footprint is the rectangle of the returns: a 5 x 5 ft lantern is 2.3 m2 by the walls, 1.8 by its returns)
     obj_chimney_max_area_m2: float = 3.0  # m2: ... at least obj_lantern_max_h_m high and at most this wide is a chimney
     obj_mislabel_area_m2: float = 3.0  # m2: a planar blob wider than this is a roof part the facets left out (mislabelled)
     obj_planar_rms_m: float = 0.08  # m: ... planar means a plane fit with an rms under this

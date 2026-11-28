@@ -12,7 +12,6 @@ from roof_measure.engine import measure_roof, synth_points
 from roof_measure.engine.edge_measure import seam_is_level, seam_offsets
 from roof_measure.engine.edges import build_edges
 from roof_measure.engine.load import roof_points_from_arrays
-from roof_measure.engine.params import DEFAULT
 from roof_measure.engine.totals import roof_totals
 
 LEFT = [(0, 0), (20, 0), (20, 5), (0, 5)]  # a 20 m long seam at y = 5 between two flat decks
@@ -90,8 +89,8 @@ def test_a_flat_seam_is_in_no_total():
     facets, q = two_decks((0.02, 0.0, 3.0), upper_pts=(0.0, 0.0, 3.5))
     edges = build_edges(facets, q, CTX)
     assert any(e.type == "flat_seam" and e.jump_ft is None for e in edges)
-    lengths = roof_totals(facets, edges, set(), DEFAULT)["lengths_ft"]
-    assert "flat_seam" not in lengths and lengths["level_change"] == 0.0
+    t = roof_totals(facets, edges, set())
+    assert "flat_seam_ft" not in t and t["level_change_ft"] == 0.0
 
 
 def test_the_stations_are_at_least_twelve_and_never_more_than_half_a_metre_apart():
@@ -144,7 +143,7 @@ def test_a_model_with_a_flat_seam_validates_and_keeps_it_out_of_the_totals():
     for e in res.edges:
         if e.type == "level_change":
             e.type = "flat_seam"
-            e.jump_ft = None
+            e.jump_ft = e.upper = None
     base = BlockSet(address={"formatted": "x"}, origin={"lat": 0.0, "lng": 0.0}, frame={}, footprint_ft=[],
                     footprint_meta={"provider": "county", "id": "x", "area_sqft": 1000.0})
     model = engine_model(res, base, float(rp.ground_z))

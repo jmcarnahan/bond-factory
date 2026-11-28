@@ -404,8 +404,8 @@ def test_digest_ignores_runtimes_and_stderr(root, tmp_path):
     assert runner.digest(recs) == d
 
 
-def test_summary_reports_priced_inconsistency_and_drawn_t3(root, tmp_path):
+def test_summary_has_one_t3_aggregate_and_reports_gate_7a_without_failing_it(root, tmp_path):
     s = runner.evaluate(cfg_for(root, tmp_path, "perfect"))
-    assert s["overall"]["priced_inconsistent_houses"] == 0 and s["overall"]["priced_from_totals_houses"] == 0
-    assert s["t3"]["median_ratio"] == pytest.approx(s["t3_drawn"]["median_ratio"])  # no priced totals: both are the drawn value
-    assert "priced totals read from the engine" in (tmp_path / "run" / "tables.md").read_text()
+    assert "t3_drawn" not in s and "priced_inconsistent_houses" not in s["overall"] and "priced_from_totals_houses" not in s["overall"]
+    text = (tmp_path / "run" / "tables.md").read_text()
+    assert "gate 7a is not a gate" in text and "priced" not in text.lower()

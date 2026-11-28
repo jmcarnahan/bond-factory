@@ -165,7 +165,7 @@ def _warn(env: dict[str, Any], text: str) -> None:
 def _lot_part(tot: Any) -> tuple[float, float, float]:
     """(area, squares, perimeter) of one building's totals; ValueError when one is missing or not finite."""
     area, squares = float(tot["area_sqft"]), float(tot["squares"])
-    perim = float(tot.get("outline_perimeter_ft", tot.get("eave_ft", 0.0)))
+    perim = float(tot["eave_ft"]) + float(tot["rake_ft"]) + float(tot["flat_edge_ft"])  # the outer roof edge
     if not all(math.isfinite(v) for v in (area, squares, perim)):
         raise ValueError("non-finite building totals")
     return area, squares, perim

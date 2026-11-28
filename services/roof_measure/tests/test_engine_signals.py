@@ -1,5 +1,5 @@
-"""signals.quality and the complexity hint of totals.roof_totals at their thresholds: each verdict condition just below, at and just above
-the limit (plan 3.9 / 3.7a values, read from EngineParams), and the complexity hint."""
+"""signals.quality at its thresholds: each verdict condition just below, at and just above
+the limit (plan 3.9 / 3.7a values, read from EngineParams)."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ from shapely.geometry import box
 
 from roof_measure.engine.params import DEFAULT as P
 from roof_measure.engine.signals import quality
-from roof_measure.engine.totals import roof_totals
-from roof_measure.engine.types import Edge, Facet
+from roof_measure.engine.types import Facet
 
 WALL = box(0, 0, 10, 10)  # 100 m2, sqrt = 10
 PLANE = (0.0, 0.0, 3.0)
@@ -90,26 +89,6 @@ def test_poor_fit_at_supported_70(supported, poor):
 def test_not_exact_parcel(match, flagged):
     got = q(match=match)
     assert ("not_exact_parcel" in got.reasons) is flagged and got.parcel_match == match
-
-
-# ----------------------------------------------------------------------------- complexity hint
-def hint(n_facets: int, hv_ft: float, total_sqft: float = 1000.0) -> str:
-    facets = [facet(f"f{i}", total_sqft / n_facets) for i in range(n_facets)]
-    edges = [Edge("hip", (0, 0, 0), (1, 0, 0), hv_ft, ("f0", "f1"))] if hv_ft else []
-    return roof_totals(facets, edges, set(), P)["complexity"]["hint"]
-
-
-@pytest.mark.parametrize("n, cut", [(13, False), (14, True), (15, True)])
-def test_cut_up_at_14_facets(n, cut):
-    assert hint(n, 0.0) == ("cut_up" if cut else "simple")
-
-
-@pytest.mark.parametrize("hv, cut", [(69.9, False), (70.0, True), (70.1, True)])
-def test_cut_up_at_7_ft_of_hip_and_valley_per_square(hv, cut):
-    t = roof_totals([facet("f1", 1000.0), facet("f2", 0.0)], [Edge("valley", (0, 0, 0), (1, 0, 0), hv, ("f1", "f2"))],
-                    set(), P)  # 10 squares
-    assert t["complexity"]["hint"] == ("cut_up" if cut else "simple")
-    assert t["complexity"]["hip_valley_ft_per_square"] == pytest.approx(hv / 10, abs=0.006)
 
 
 # ----------------------------------------------------------------------------- canopy: reported, never in the verdict

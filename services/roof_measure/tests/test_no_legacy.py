@@ -31,21 +31,11 @@ def test_the_deleted_files_do_not_exist():
     assert not (PKG.parent / "Dockerfile").exists() and not (PKG.parent / "railway.toml").exists()
 
 
-def test_the_block_engine_is_refused(tmp_path):
-    with pytest.raises(ValueError, match="engine"):
-        library.measure("1 Example St", engine="blocks", cache_dir=tmp_path)
-
-
-@pytest.mark.parametrize("kw", [{"verify": False}, {"anthropic_api_key": "k"}, {"google_solar_api_key": "k"}])
+@pytest.mark.parametrize("kw", [{"engine": "blocks"}, {"method": "auto"}, {"hints": {}}, {"verify": False},
+                                {"anthropic_api_key": "k"}, {"google_solar_api_key": "k"}])
 def test_the_removed_arguments_raise_type_error(tmp_path, kw):
     with pytest.raises(TypeError):
         library.measure("1 Example St", cache_dir=tmp_path, **kw)
-
-
-@pytest.mark.parametrize("method", ["lidar_agent", "solar_agent"])
-def test_the_agent_methods_are_refused(tmp_path, method):
-    with pytest.raises(ValueError, match="method"):
-        library.measure("1 Example St", method=method, cache_dir=tmp_path)
 
 
 def test_a_measurement_needs_none_of_the_removed_dependencies(tmp_path):

@@ -295,62 +295,36 @@ def test_t3_aggregate_counts_one_ratio_per_house():
     assert m_truth.t3_aggregate([two_files, one])["n"] == 2
 
 
-def priced_result(**totals):
+def with_totals(**totals):
     r = H.gable_result()
     r["totals"] = totals
     return r
 
 
-def test_priced_totals_are_read_when_present_and_geometry_is_the_fallback():
+def test_the_engine_totals_are_not_read_the_drawn_roof_is_the_only_basis():
+    """0.6.0 retired the priced-versus-drawn split: whatever the totals say, the numbers come from the facets and edges."""
     drawn = M(GOOD)
-    fb = M(priced_result())["priced"]
-    assert fb["src"] == {"area_sqft": "geometry", "pitch": "geometry", "perimeter_ft": "geometry", "ridge_hip_ft": "geometry"}
-    assert fb["area_sqft"] == pytest.approx(drawn["area_sqft"]) and fb["perimeter_ft"] == pytest.approx(drawn["perimeter_ft"])
-    pr = M(priced_result(planes_surface_area_sqft=1000.0, planes_pitch_weighted=5.5, outline_perimeter_ft=120.0,
-                         ridge_cap_ridge_hip_ft=30.0))["priced"]
-    assert pr["src"] == dict.fromkeys(("area_sqft", "pitch", "perimeter_ft", "ridge_hip_ft"), "totals")
-    assert (pr["area_sqft"], pr["squares"], pr["pitch"], pr["perimeter_ft"], pr["ridge_hip_ft"]) == (1000.0, 10.0, 5.5, 120.0, 30.0)
-    junk = M(priced_result(planes_surface_area_sqft="x", outline_perimeter_ft=float("nan")))["priced"]
-    assert junk["src"]["area_sqft"] == "geometry" and junk["src"]["perimeter_ft"] == "geometry"
+    odd = M(with_totals(area_sqft=1000.0, eave_ft=1.0, ridge_hip_ft=999.0, planes_surface_area_sqft=5.0))
+    for k in ("area_sqft", "perimeter_ft", "ridge_hip_ft"):
+        assert odd[k] == pytest.approx(drawn[k]), k
+    assert "priced" not in odd and "priced_consistent" not in odd
 
 
-def test_truth_comparison_uses_priced_and_reports_drawn_beside_it():
+def test_truth_comparison_uses_the_drawn_roof_for_every_tier():
     drawn_sq = M(GOOD)["squares"]
-    res = priced_result(planes_surface_area_sqft=drawn_sq * 100 * 0.9, outline_perimeter_ft=100.0, ridge_cap_ridge_hip_ft=39.0)
+    res = with_totals(area_sqft=drawn_sq * 90)
     t = {"source": "vendor_report", "tier": "T1", "squares": drawn_sq * 0.9, "lengths_ft": {"eave": 50.0, "rake": 50.0, "ridge": 39.0, "hip": 0.0}}
     r = sc(res, [t])["truth"]["T1"]
-    assert r["squares.err_pct"] == pytest.approx(0, abs=1e-9) and r["squares.err_pct_drawn"] == pytest.approx(100 / 0.9 - 100, rel=1e-6)
-    assert r["squares.result"] == pytest.approx(drawn_sq * 0.9) and r["squares.result_drawn"] == pytest.approx(drawn_sq)
-    assert r["lengths.perimeter.err_pct"] == pytest.approx(0, abs=1e-9) and r["lengths.perimeter.result_drawn"] > 100.0
-    assert r["lengths.ridge_hip.abs_diff"] == pytest.approx(0, abs=1e-9)
+    assert r["squares.result"] == pytest.approx(drawn_sq) and r["squares.err_pct"] == pytest.approx(100 / 0.9 - 100, rel=1e-6)
+    assert "squares.err_pct_drawn" not in r and "squares.priced_ratio" not in r and "lengths.perimeter.result_drawn" not in r
     t3 = {"source": "contractor_squares", "tier": "T3", "confidence": "medium", "squares": drawn_sq * 0.9}
-    r3 = sc(res, [t3])["truth"]["T3"]
-    assert r3["squares.ratio"] == pytest.approx(1.0) and r3["squares.ratio_drawn"] == pytest.approx(1 / 0.9)
-    # shape metrics still use the drawn geometry
-    assert sc(res)["m"]["fit_all"] == 1.0
+    assert sc(res, [t3])["truth"]["T3"]["squares.ratio"] == pytest.approx(1 / 0.9)
+    assert sc(res)["m"]["fit_all"] == 1.0  # shape metrics use the drawn geometry, as before
 
 
-def test_price_delta_uses_priced_inputs():
+def test_price_delta_uses_the_drawn_inputs():
     m = M(GOOD)
-    res = priced_result(planes_surface_area_sqft=m["area_sqft"] * 0.9, planes_pitch_weighted=6.0,
-                        outline_perimeter_ft=m["perimeter_ft"], ridge_cap_ridge_hip_ft=m["ridge_hip_ft"])
     ln = m["lengths"]
-    t = {"source": "vendor_report", "tier": "T1", "squares": m["squares"] * 0.9, "predominant_pitch": 6.0,
+    t = {"source": "vendor_report", "tier": "T1", "squares": m["squares"], "predominant_pitch": 6.0,
          "lengths_ft": {"eave": ln["eave"], "rake": ln["rake"], "ridge": ln["ridge"], "hip": 0.0, "valley": 0.0}}
-    assert sc(res, [t], rules=RULES)["truth"]["T1"]["price.total.delta"] == pytest.approx(0, abs=1e-6)
-    assert sc(GOOD, [t], rules=RULES)["truth"]["T1"]["price.total.delta"] > 0  # drawn-only result over-prices
-
-
-def test_priced_consistency_flags_arbitrary_totals():
-    drawn = M(GOOD)["area_sqft"]
-    ok = M(priced_result(planes_surface_area_sqft=drawn * 0.95, area_sqft_wall_line=drawn * 0.9, area_sqft_roof_edge=drawn))
-    assert ok["priced_consistent"] is True and ok["priced_inconsistent"] == 0
-    for kw in ({"planes_surface_area_sqft": drawn * 1.3, "area_sqft_wall_line": drawn * 0.9},   # above the drawn area
-               {"planes_surface_area_sqft": drawn * 0.5, "area_sqft_wall_line": drawn * 0.9},   # below the wall-line area
-               {"planes_surface_area_sqft": drawn * 0.95, "area_sqft_wall_line": drawn * 0.9, "area_sqft_roof_edge": drawn * 1.2}):
-        m = M(priced_result(**kw))
-        assert m["priced_consistent"] is False and m["priced_inconsistent"] == 1 and m["priced_why"], kw
-    per = M(priced_result(outline_perimeter_ft=500.0, outline_perimeter_wall_ft=100.0))
-    assert per["priced_consistent"] is False
-    assert M(priced_result())["priced_consistent"] is None  # nothing priced: nothing to check
-    assert M(priced_result(planes_surface_area_sqft=drawn * 0.95))["priced_consistent"] is None  # no wall-line to compare with
+    assert sc(GOOD, [t], rules=RULES)["truth"]["T1"]["price.total.delta"] == pytest.approx(0, abs=1e-6)

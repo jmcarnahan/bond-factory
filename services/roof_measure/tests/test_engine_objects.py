@@ -146,7 +146,7 @@ def _flat_roof_with_upper_patch(patch_w, patch_h, rise=1.2, density=13, seed=1):
     ring = box(0, 0, 10, 8)
     facet = Facet(id="f1", polygon=ring, plane=(0.0, 0.0, 3.0), label=0, pitch_rise=0.0, aspect_deg=0.0,
                   roof_type="flat", plan_area_sqft=80 * 10.7639, area_sqft=80 * 10.7639, points=1000, rms_m=0.02)
-    outline = Outline(drawn=ring, priced=ring, source="county", county=True, scale_drawn=1.0)
+    outline = Outline(drawn=ring, source="county", county=True, scale_drawn=1.0)
     s = 1 / math.sqrt(density)
     gx, gy = np.meshgrid(np.arange(-8, 18, s), np.arange(-8, 16, s))
     x, y = gx.ravel() + rng.uniform(0, s, gx.size), gy.ravel() + rng.uniform(0, s, gx.size)
@@ -190,8 +190,7 @@ def test_an_object_gives_the_same_result_translated_by_any_offset():
         facets = [dataclasses.replace(f, polygon=translate(f.polygon, dx, dy),
                                       plane=(f.plane[0], f.plane[1], f.plane[2] - f.plane[0] * dx - f.plane[1] * dy))
                   for f in res.facets]
-        outline = dataclasses.replace(res.outline, drawn=translate(res.outline.drawn, dx, dy),
-                                      priced=translate(res.outline.priced, dx, dy))
+        outline = dataclasses.replace(res.outline, drawn=translate(res.outline.drawn, dx, dy))
         got, _ = find_objects(moved, facets, outline, gz)
         assert [(o["kind"], o["size_ft"], o["height_ft"], o["returns"], o["facet"]) for o in got] == \
                [(o["kind"], o["size_ft"], o["height_ft"], o["returns"], o["facet"]) for o in base], (dx, dy)

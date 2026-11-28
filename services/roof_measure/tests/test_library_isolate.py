@@ -44,7 +44,7 @@ def fake_child(monkeypatch):
 
 
 def call(tmp_path, addr=ADDR, **kw):
-    args = {"method": "lidar_skeleton", "cache_dir": tmp_path / "cache", "points_path": house(tmp_path)}
+    args = {"cache_dir": tmp_path / "cache", "points_path": house(tmp_path)}
     return measure(addr, **(args | kw))
 
 
@@ -76,7 +76,7 @@ def test_happy_path_and_stage_thread(tmp_path):
 def test_relative_paths_are_resolved_for_the_child(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     shutil.copytree(house(tmp_path / "src"), tmp_path / "h")
-    env = measure(ADDR, method="lidar_skeleton", cache_dir="relcache", work_dir="relwork",
+    env = measure(ADDR, cache_dir="relcache", work_dir="relwork",
                   points_path="h", isolate=True)
     assert env["contract"] == "bond.roof_model/0.2"
     assert any(p.name.endswith("_model.json") for p in (tmp_path / "relwork").iterdir())
@@ -162,7 +162,7 @@ def test_the_real_child_keeps_library_prints_off_the_protocol_stream(tmp_path):
         from roof_measure import _child
         sys.exit(_child.main())
     """)
-    req = {"address": "x", "lat_lng": None, "method": "lidar_skeleton", "force": False,
+    req = {"address": "x", "lat_lng": None, "force": False,
            "deadline_s": 30.0, "work_dir": str(tmp_path),
            "runtime": {"cache_dir": str(tmp_path), "overpass_urls": None, "footprint_stage_s": None}}
     res = subprocess.run([sys.executable, "-P", "-c", code], input=json.dumps(req) + "\n", capture_output=True,
@@ -207,17 +207,17 @@ STUB_PIPELINE = textwrap.dedent("""
     from roof_measure.footprint_types import FootprintError
     from roof_measure.model import ModelError
 
-    def fake(address, out_dir, method, **k):
+    def fake(address, out_dir, **k):
         if address == "no-outline":
             raise FootprintError("no outline")
         if address == "bad-model":
             raise ModelError("bad model")
         rt = config.current()
         return SimpleNamespace(envelope={
-            "address": address, "method": method, "overpass": list(rt.overpass_urls or []),
+            "address": address, "overpass": list(rt.overpass_urls or []),
             "cache_dir": str(rt.cache_dir), "force": cache._FORCE.get(),
             "lat_lng": list(k["lat_lng"]) if k["lat_lng"] else None, "points_path": k["points_path"],
-            "lot": k["include_other_buildings"], "outline": k["building_outline_id"], "hints": k["hints"]})
+            "lot": k["include_other_buildings"], "outline": k["building_outline_id"]})
     p.run_pipeline = fake
     from roof_measure import _child
     sys.exit(_child.main())
@@ -232,18 +232,18 @@ def stub_child(monkeypatch):
 def test_the_real_child_receives_every_request_field(tmp_path, stub_child):
     folder = house(tmp_path / "src")
     env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True,
-                  overpass_urls=["https://m1.example/api"], force=True, lat=1.0, lng=2.0, method="lidar_skeleton",
-                  points_path=folder, include_other_buildings=True, building_outline_id=" B7 ", hints={})
+                  overpass_urls=["https://m1.example/api"], force=True, lat=1.0, lng=2.0,
+                  points_path=folder, include_other_buildings=True, building_outline_id=" B7 ")
     assert env == {
-        "address": "x", "method": "lidar_skeleton", "overpass": ["https://m1.example/api"],
+        "address": "x", "overpass": ["https://m1.example/api"],
         "cache_dir": str((tmp_path / "cache").resolve()), "force": True, "lat_lng": [1.0, 2.0],
-        "points_path": str(folder.resolve()), "lot": True, "outline": "B7", "hints": None}  # {} is no hint: nothing is sent
+        "points_path": str(folder.resolve()), "lot": True, "outline": "B7"}
 
 
 def test_the_real_child_defaults_are_off_and_none(tmp_path, stub_child):
     env = measure("x", cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True)
-    assert (env["method"], env["overpass"], env["force"], env["lat_lng"], env["points_path"], env["lot"],
-            env["outline"], env["hints"]) == ("auto", [], False, None, None, False, None, None)
+    assert (env["overpass"], env["force"], env["lat_lng"], env["points_path"], env["lot"],
+            env["outline"]) == ([], False, None, None, False, None)
 
 
 def test_the_request_carries_no_keys(tmp_path, fake_child):
@@ -258,7 +258,7 @@ def test_the_request_carries_no_keys(tmp_path, fake_child):
 ])
 def test_the_real_child_relays_the_error_code(tmp_path, stub_child, addr, code, retryable, message):
     with pytest.raises(MeasureError) as e:
-        measure(addr, cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True, method="lidar_skeleton")
+        measure(addr, cache_dir=tmp_path / "cache", work_dir=tmp_path / "w", isolate=True)
     assert e.value.code == code and e.value.retryable is retryable
     if message:
         assert e.value.message == message

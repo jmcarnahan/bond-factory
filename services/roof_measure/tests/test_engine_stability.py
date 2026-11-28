@@ -52,7 +52,7 @@ def _run(name: str, wall):
 
 def _totals(res) -> tuple[float, float]:
     t = res.totals
-    return float(t["ridge_cap_ridge_hip_ft"]), float(t["lengths_ft"].get("valley", 0.0))
+    return float(t["ridge_hip_ft"]), float(t["valley_ft"])
 
 
 @pytest.mark.parametrize("name", ROOFS)

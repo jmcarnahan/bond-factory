@@ -45,13 +45,11 @@ def engine_quality(res: Any, model: dict[str, Any], warning_codes: Iterable[str]
         "model_uncovered_pct": None if q.coverage is None else round(100.0 * (1.0 - q.coverage), 1),
         "level_spread_ft": round(max(heights) - min(heights), 1) if heights else None,
         "planes_lidar": len({f.label for f in res.facets}),
-        "facets_model": len(facets), "reasons": reasons}
+        "facets_model": len(facets), "roof_part_missed_sqft": res.roof_part_missed_sqft, "reasons": reasons}
 
 
 def assess_engine(res: Any, model: dict[str, Any], warning_codes: Iterable[str] = ()) -> dict[str, Any]:
-    """The assessment ``envelope.build_envelope`` takes for an engine result: ``{"quality", "planes", "totals"}``."""
-    from .engine.adapter import COST_KEYS, engine_planes
+    """The assessment ``envelope.build_envelope`` takes for an engine result: ``{"quality", "planes"}``."""
+    from .engine.adapter import engine_planes
 
-    totals = {k: model["totals"][k] for k in COST_KEYS if k in model["totals"]}
-    totals["plane_count"] = len(model["facets"])
-    return {"quality": engine_quality(res, model, warning_codes), "planes": engine_planes(model), "totals": totals}
+    return {"quality": engine_quality(res, model, warning_codes), "planes": engine_planes(model)}

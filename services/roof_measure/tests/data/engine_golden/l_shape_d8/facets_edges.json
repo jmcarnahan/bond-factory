@@ -380,17 +380,12 @@
   }
  ],
  "totals": {
-  "planes_surface_area_sqft": 1975.7,
+  "area_sqft": 1975.7,
   "planes_pitch_weighted": 6.0,
-  "outline_perimeter_ft": 193.1,
-  "ridge_cap_ridge_hip_ft": 87.1,
+  "eave_rake_ft": 193.15,
+  "ridge_hip_ft": 87.11,
   "roofing_pitched_sqft": 1975.7,
-  "roofing_flat_sqft": 0,
-  "complexity": {
-   "facets": 4,
-   "hip_valley_ft_per_square": 2.0,
-   "hint": "simple"
-  }
+  "roofing_flat_sqft": 0
  },
  "verdict": "ok"
 }

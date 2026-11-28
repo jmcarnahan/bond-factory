@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import m_shape, price, priced, stats
+from . import m_shape, price, stats
 from .geom import Roof
-
-PRICED_TIERS = ("T1", "T3")  # vendor and contractor numbers are priced quantities; T2 labels and synthetic truth trace the physical roof
 
 
 def drawn_basis(roof: Roof) -> dict[str, Any]:
-    """The physical-roof numbers (facets and recomputed edges), shaped like ``priced.priced``."""
+    """The numbers of the one roof (the drawn facets and the recomputed edges): the only basis since 0.6.0."""
     fp, ln = m_shape.flat_pitched(roof), m_shape.lengths(roof)
     return {"area_sqft": fp["area_sqft"], "squares": fp["squares"], "pitch": fp["pitch_weighted"], "perimeter_ft": ln["perimeter"],
             "ridge_hip_ft": ln["ridge_hip"]}
@@ -56,27 +54,23 @@ def truth_inputs(t: dict[str, Any]) -> dict[str, Any]:
 
 
 def engine_inputs(roof: Roof) -> dict[str, Any]:
-    """Price-sheet inputs of a result: the PRICED numbers (totals keys when present, else geometry)."""
-    p, ln = priced.priced(roof), m_shape.lengths(roof)
-    return {"pitched_squares": p["pitched_squares"], "flat_squares": p["flat_squares"], "pitch": p["pitch"],
-            "perimeter_ft": p["perimeter_ft"], "ridge_hip_ft": p["ridge_hip_ft"], "facets": len(roof.facets),
+    """Price-sheet inputs of a result, from the drawn roof."""
+    fp, ln = m_shape.flat_pitched(roof), m_shape.lengths(roof)
+    return {"pitched_squares": fp["pitched_sqft"] / 100.0, "flat_squares": fp["flat_sqft"] / 100.0, "pitch": fp["pitch_weighted"],
+            "perimeter_ft": ln["perimeter"], "ridge_hip_ft": ln["ridge_hip"], "facets": len(roof.facets),
             "hip_valley_ft": ln["hip"] + ln["valley"]}
 
 
 def compare(roof: Roof, t: dict[str, Any], rules: dict[str, Any] | None = None) -> dict[str, Any]:
     """Metrics of ``roof`` against one truth file; every field is omitted or None when the truth is silent on it."""
-    fp, ln, priced_all = m_shape.flat_pitched(roof), m_shape.lengths(roof), priced.priced(roof)
-    # priced quantities (totals keys, else geometry) face T1 and T3; the DRAWN physical roof faces T2 labels and synthetic truth
-    pr = priced_all if t.get("tier") in PRICED_TIERS else drawn_basis(roof)
+    fp, ln = m_shape.flat_pitched(roof), m_shape.lengths(roof)
+    pr = drawn_basis(roof)  # one roof, one area: every tier is compared with the drawn roof
     o: dict[str, Any] = {"source": t.get("source"), "tier": t.get("tier"), "confidence": t.get("confidence")}
     tsq = _num(t.get("squares"))
     if tsq is None and _num(t.get("area_sqft")) is not None:
         tsq = t["area_sqft"] / 100.0
-    # the basis chosen above is what is compared; the drawn value is reported beside it
     o["squares"] = {"truth": tsq, "result": pr["squares"], "err_pct": pct(pr["squares"], tsq),
-                    "ratio": pr["squares"] / tsq if tsq else None, "result_drawn": fp["squares"],
-                    "priced_ratio": priced_all["squares"] / tsq if tsq else None,  # report-only: the pricing shortfall
-                    "err_pct_drawn": pct(fp["squares"], tsq), "ratio_drawn": fp["squares"] / tsq if tsq else None}
+                    "ratio": pr["squares"] / tsq if tsq else None}
     for k, rv in (("flat_area_sqft", fp["flat_sqft"]), ("pitched_area_sqft", fp["pitched_sqft"])):
         if _num(t.get(k)) is not None:
             o[k] = {"truth": t[k], "result": rv, "err_pct": pct(rv, t[k]), "abs_diff": rv - t[k]}
@@ -93,11 +87,11 @@ def compare(roof: Roof, t: dict[str, Any], rules: dict[str, Any] | None = None) 
     if _num(tl.get("eave")) is not None and _num(tl.get("rake")) is not None:
         tp = tl["eave"] + tl["rake"] + _truth_flat_edge(t)
         lens["perimeter"] = {"truth": tp, "result": pr["perimeter_ft"], "err_pct": pct(pr["perimeter_ft"], tp),
-                             "abs_diff": pr["perimeter_ft"] - tp, "result_drawn": ln["perimeter"]}
+                             "abs_diff": pr["perimeter_ft"] - tp}
     if _num(tl.get("ridge")) is not None and _num(tl.get("hip")) is not None:
         th = tl["ridge"] + tl["hip"]
         lens["ridge_hip"] = {"truth": th, "result": pr["ridge_hip_ft"], "err_pct": pct(pr["ridge_hip_ft"], th),
-                             "abs_diff": pr["ridge_hip_ft"] - th, "result_drawn": ln["ridge_hip"]}
+                             "abs_diff": pr["ridge_hip_ft"] - th}
     if lens:
         o["lengths"] = lens
     if t.get("facets"):
@@ -140,7 +134,7 @@ def t2_confidence(files: list[dict[str, Any]]) -> str | None:
 
 
 def t3_aggregate(rows: list[dict[str, Any]], key: str = "ratio") -> dict[str, Any] | None:
-    """The T3 aggregate over per-house records (``key`` "ratio" = priced, "ratio_drawn" = drawn): median of result/contractor squares with a bootstrap 90% interval.
+    """The T3 aggregate over per-house records (``key`` the per-file ratio, result over contractor squares): median of result/contractor squares with a bootstrap 90% interval.
     Only T3 files whose confidence is medium or high count, one ratio per house; never a per-house verdict."""
     ratios = []
     for r in rows:  # one ratio per house: the mean over its T3 files

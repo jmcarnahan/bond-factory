@@ -47,9 +47,9 @@ are set from tuning percentiles, and `fit_covered` and `coverage` are always rep
   changes and `unmarked_level_change_ft` (a verified jump the engine did not type level_change). Jumps that cannot be measured
   (< 5 points a side) are `level_change_unverified_ft`, reported apart. Individual eave/rake feet are recomputed too; a
   pitched facet's level HIGH outline edge (a shed's) is `rake` with `high_edge` (contract convention), never ridge or eave.
-- **Priced vs drawn basis:** T1 (vendor) and T3 (contractor) are compared with the PRICED values (totals keys, else geometry;
-  drawn reported beside them); T2 labels and synthetic truth trace the physical roof, so they are compared with the DRAWN
-  geometry. `squares.priced_ratio` (priced over exact area) is reported per synthetic case, report-only.
+- **One roof, one basis:** every tier is compared with the DRAWN roof (the facets and the recomputed edges); the engine's
+  totals keys are not read (0.6.0 retired the priced-versus-drawn split). Gate 7a (the contractor-squares interval contains
+  1.00) is a REPORTED figure, not a gate (`report_only` in the gate file).
 - **Over-segmentation and padding:** `facet_count_ratio` (vs manifest `facet_count_ref`), `facets_per_1000sqft`,
   `mergeable_neighbour_share` (adjacent facets coplanar within 0.07 m and 3 degrees), `unsupported_facet_area_share` (drawn
   area with no reference point within 0.5 m), `outside_outline_area_share` (report-only: no threshold in 3.7a).

@@ -172,6 +172,8 @@ class EngineResult:
     diagnostics: dict[str, Any] = field(default_factory=dict)  # deterministic: no wall time in here
     timings: dict[str, float] = field(default_factory=dict)  # stage wall times; never part of a hashed output
     params_hash: str = ""
+    objects: list[dict[str, Any]] = field(default_factory=list)  # engine.objects.find_objects: things standing on the roof (feet)
+    roof_part_missed_sqft: float = 0.0  # footprint of planar blobs over 3 m2 the facets left out (not listed as objects)
 
     @property
     def refused(self) -> bool:

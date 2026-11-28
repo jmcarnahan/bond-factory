@@ -71,8 +71,7 @@ def _facets_edges_view(res: EngineResult, st: Stages) -> dict[str, Any]:
                "points": f.points, "polygon": _ring(f.polygon)} for f in st.facets]
     edges = [{"type": e.type, "length_ft": round(e.length_ft, 1), "facets": list(e.facets),
               "p0": [round(v, 2) for v in e.p0], "p1": [round(v, 2) for v in e.p1]} for e in st.edges]
-    keys = ("planes_surface_area_sqft", "planes_pitch_weighted", "outline_perimeter_ft", "ridge_cap_ridge_hip_ft",
-            "roofing_pitched_sqft", "roofing_flat_sqft", "complexity")
+    keys = ("area_sqft", "planes_pitch_weighted", "eave_rake_ft", "ridge_hip_ft", "roofing_pitched_sqft", "roofing_flat_sqft")
     return {"facets": facets, "edges": edges, "totals": {k: res.totals.get(k) for k in keys},
             "verdict": res.quality.verdict}
 
