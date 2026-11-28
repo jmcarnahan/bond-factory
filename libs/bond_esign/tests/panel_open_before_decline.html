@@ -1,0 +1,18 @@
+<form class="bond-esign" method="post" action="/sign/abc" data-bond-esign data-allow-typed="1" data-allow-drawn="1">
+<input type="hidden" name="csrf" value="t0k">
+<input type="hidden" name="consent_version" value="v1">
+<input type="hidden" name="mode" value="typed" data-bond-esign-mode>
+<input type="hidden" name="drawn_png" value="" data-bond-esign-png>
+<h2 class="bond-esign__heading">Sign this document</h2>
+<p class="bond-esign__doc">Service agreement</p>
+<p class="bond-esign__who">Signing as Pat Example</p>
+<div class="bond-esign__consent-text"><p>Line one.</p><p>Line two.</p></div>
+<div class="bond-esign__consent"><input type="checkbox" name="consent_accepted" value="1" id="bond-esign-consent" class="bond-esign__check"><label for="bond-esign-consent">I have read the above and I agree to sign this document electronically.</label></div>
+<div class="bond-esign__field"><label for="bond-esign-name">Your full name</label><input type="text" name="typed_name" id="bond-esign-name" autocomplete="name" maxlength="120" value="" required></div>
+<div class="bond-esign__tabs" role="tablist" aria-label="How do you want to sign?" hidden><button type="button" role="tab" class="bond-esign__tab" id="bond-esign-tab-drawn" data-mode="drawn" aria-controls="bond-esign-panel-drawn" aria-selected="false" tabindex="-1">Draw</button><button type="button" role="tab" class="bond-esign__tab" id="bond-esign-tab-typed" data-mode="typed" aria-controls="bond-esign-panel-typed" aria-selected="true" tabindex="0">Type</button></div>
+<div class="bond-esign__draw" id="bond-esign-panel-drawn" role="tabpanel" hidden><canvas class="bond-esign__canvas" id="bond-esign-canvas" aria-label="Draw your signature in the box" tabindex="0"></canvas><button type="button" class="bond-esign__clear">Clear</button></div>
+<div class="bond-esign__type" id="bond-esign-panel-typed" role="tabpanel"><p class="bond-esign__preview-label">Your signature will look like this</p><p class="bond-esign__preview" aria-live="polite" data-bond-esign-preview></p></div>
+<p class="bond-esign__error" role="alert" id="bond-esign-error">Oops</p>
+<button type="submit" class="bond-esign__submit">Sign and accept</button>
+<noscript><p class="bond-esign__hint">Without JavaScript you can sign by typing your full name.</p></noscript>
+</form>

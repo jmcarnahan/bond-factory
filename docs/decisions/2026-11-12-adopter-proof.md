@@ -38,3 +38,5 @@ Those collisions appear only when tests run against that shape.
   module's CHANGELOG.
 
 Amended 2026-11-12: eighth trait added (round 3)
+
+Amended 2026-11-27: ninth trait added (an existing provider seam: a module adopted behind an interface and a table the app already has)

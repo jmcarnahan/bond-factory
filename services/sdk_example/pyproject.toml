@@ -14,6 +14,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "bond_service_kit",
     "bond_storage",
+    "bond_esign",
     "bond_auth_py[firebase]",
     "bond_jobs",
     "bond_sync_py",
@@ -40,6 +41,7 @@ include = ["sdk_example*"]
 [tool.uv.sources]
 bond_service_kit = { workspace = true }
 bond_storage = { workspace = true }
+bond_esign = { workspace = true }
 bond_auth_py = { workspace = true }
 bond_jobs = { workspace = true }
 bond_sync_py = { workspace = true }

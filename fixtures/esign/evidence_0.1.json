@@ -1,0 +1,331 @@
+{
+  "chain": {
+    "count": 13,
+    "head": "ee1b09d0c9a4020e0fced7fab5f24e85a63ac9fdaabe38af2f8c9720f5184a53",
+    "ok": true
+  },
+  "check": {
+    "ok": true,
+    "problems": []
+  },
+  "events": [
+    {
+      "actor": null,
+      "at": "2026-11-08T10:00:00Z",
+      "data": {
+        "consent_sha256": "8f6c349857938a3e609d71af194d78076a1968e099058f8e1924e0b36cc9bbec",
+        "consent_version": "bond-esign-consent/1",
+        "document_sha256": "cc1c220f99668ccd91bef228db89aca0978f0c3c252a7c308118bab31a7865c8",
+        "signers": [
+          {
+            "email": "pat@example.com",
+            "id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+            "key": null,
+            "name": "Pat Example",
+            "position": 0,
+            "role": "signer"
+          },
+          {
+            "email": "sam@example.com",
+            "id": "4f938908-715a-4373-bc3b-62c1a4377dbd",
+            "key": null,
+            "name": "Sam Example",
+            "position": 1,
+            "role": "co-signer"
+          }
+        ],
+        "title": "Sample estimate"
+      },
+      "ip": null,
+      "kind": "created",
+      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "row_hash": "1c378b945e437e5e2e168f1b0ccbdcdc68c5c691a4f7219494e46ad872420524",
+      "seq": 1,
+      "signer_id": null,
+      "user_agent": null
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:01:00Z",
+      "data": {
+        "expires_at": null
+      },
+      "ip": null,
+      "kind": "token_issued",
+      "prev_hash": "1c378b945e437e5e2e168f1b0ccbdcdc68c5c691a4f7219494e46ad872420524",
+      "row_hash": "e1cd6ae862a2f67b39b972082ae5f21c6ee45ab4e528b94546fb3f98451000f5",
+      "seq": 2,
+      "signer_id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+      "user_agent": null
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:01:00Z",
+      "data": {
+        "expires_at": null
+      },
+      "ip": null,
+      "kind": "token_issued",
+      "prev_hash": "e1cd6ae862a2f67b39b972082ae5f21c6ee45ab4e528b94546fb3f98451000f5",
+      "row_hash": "f40372d055c881b3a3c05057d27b46e20e45da73ce4f64dc05fed7d113e6c830",
+      "seq": 3,
+      "signer_id": "4f938908-715a-4373-bc3b-62c1a4377dbd",
+      "user_agent": null
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:05:00Z",
+      "data": {},
+      "ip": "203.0.113.10",
+      "kind": "viewed",
+      "prev_hash": "f40372d055c881b3a3c05057d27b46e20e45da73ce4f64dc05fed7d113e6c830",
+      "row_hash": "10bf79552eb9e127466dbfabd669477220406a38da7ab28a76340d4f27bda198",
+      "seq": 4,
+      "signer_id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+      "user_agent": "Mozilla/5.0 (Example phone)"
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:06:00Z",
+      "data": {
+        "language": "en",
+        "sha256": "8f6c349857938a3e609d71af194d78076a1968e099058f8e1924e0b36cc9bbec",
+        "version": "bond-esign-consent/1"
+      },
+      "ip": "203.0.113.10",
+      "kind": "consent_given",
+      "prev_hash": "10bf79552eb9e127466dbfabd669477220406a38da7ab28a76340d4f27bda198",
+      "row_hash": "23696ea9489b9b4e4f0db09423f38a10a6b077ed0aeabe78b7ec87f829902e62",
+      "seq": 5,
+      "signer_id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+      "user_agent": "Mozilla/5.0 (Example phone)"
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:06:00Z",
+      "data": {
+        "kind": "drawn",
+        "method": "link",
+        "name": "Pat Example",
+        "signature_sha256": "a912adf2c646cca7634fbe58ab3b8079056fa9cecd25f0436174832cb4edc362",
+        "typed_name": "Pat Example"
+      },
+      "ip": "203.0.113.10",
+      "kind": "signed",
+      "prev_hash": "23696ea9489b9b4e4f0db09423f38a10a6b077ed0aeabe78b7ec87f829902e62",
+      "row_hash": "5dfaaf68bdce5b9727556a260636e72e98be846de55b76dc677446769bdcb39b",
+      "seq": 6,
+      "signer_id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+      "user_agent": "Mozilla/5.0 (Example phone)"
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:30:00Z",
+      "data": {},
+      "ip": "203.0.113.20",
+      "kind": "viewed",
+      "prev_hash": "5dfaaf68bdce5b9727556a260636e72e98be846de55b76dc677446769bdcb39b",
+      "row_hash": "9cfcb6aa1c90832fa7361b3345b205e6c5d39c39dc2cee27f0eab00dfdd15883",
+      "seq": 7,
+      "signer_id": "4f938908-715a-4373-bc3b-62c1a4377dbd",
+      "user_agent": "Mozilla/5.0 (Example laptop)"
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:31:00Z",
+      "data": {
+        "language": "en",
+        "sha256": "8f6c349857938a3e609d71af194d78076a1968e099058f8e1924e0b36cc9bbec",
+        "version": "bond-esign-consent/1"
+      },
+      "ip": "203.0.113.20",
+      "kind": "consent_given",
+      "prev_hash": "9cfcb6aa1c90832fa7361b3345b205e6c5d39c39dc2cee27f0eab00dfdd15883",
+      "row_hash": "7b95f99c445ef260a78dcf82d43cb2b8020180a7700f13253a317ed749d96da7",
+      "seq": 8,
+      "signer_id": "4f938908-715a-4373-bc3b-62c1a4377dbd",
+      "user_agent": "Mozilla/5.0 (Example laptop)"
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:31:00Z",
+      "data": {
+        "kind": "typed",
+        "method": "link",
+        "name": "Sam Example",
+        "signature_sha256": "86f3439098109e2a660883cecc7936c964e5cee13149657ed9f519ba8ce1debb",
+        "typed_name": "Sam Example"
+      },
+      "ip": "203.0.113.20",
+      "kind": "signed",
+      "prev_hash": "7b95f99c445ef260a78dcf82d43cb2b8020180a7700f13253a317ed749d96da7",
+      "row_hash": "72c98098551358edeef23ab66a279a92d545d44395f4b6677113d6bbf29c774a",
+      "seq": 9,
+      "signer_id": "4f938908-715a-4373-bc3b-62c1a4377dbd",
+      "user_agent": "Mozilla/5.0 (Example laptop)"
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:32:00Z",
+      "data": {
+        "pages": 3,
+        "sealed": false,
+        "sha256": "806dea0bba761c8f17fc6e89886d9e2b7cd12e024da25235d6f7f7e718a34c35",
+        "timestamp_url": null,
+        "timestamped": false
+      },
+      "ip": null,
+      "kind": "document_built",
+      "prev_hash": "72c98098551358edeef23ab66a279a92d545d44395f4b6677113d6bbf29c774a",
+      "row_hash": "115d7fc0c4a7f0209582a22fe9de1f1d933128537fd8095950c4a9554ac131fd",
+      "seq": 10,
+      "signer_id": null,
+      "user_agent": null
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:32:00Z",
+      "data": {
+        "sha256": "806dea0bba761c8f17fc6e89886d9e2b7cd12e024da25235d6f7f7e718a34c35"
+      },
+      "ip": null,
+      "kind": "completed",
+      "prev_hash": "115d7fc0c4a7f0209582a22fe9de1f1d933128537fd8095950c4a9554ac131fd",
+      "row_hash": "96bf854b1a1bdaa54e422066ca417d8e7867a3c096ce4f76e90278503fc89e28",
+      "seq": 11,
+      "signer_id": null,
+      "user_agent": null
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:33:00Z",
+      "data": {
+        "channel": "email",
+        "reference": "message-1"
+      },
+      "ip": null,
+      "kind": "copy_delivered",
+      "prev_hash": "96bf854b1a1bdaa54e422066ca417d8e7867a3c096ce4f76e90278503fc89e28",
+      "row_hash": "4f61042ef03e7ac65db346a3b0c8975b882ee50861a4fc54314119e3db8ccd32",
+      "seq": 12,
+      "signer_id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+      "user_agent": null
+    },
+    {
+      "actor": null,
+      "at": "2026-11-08T10:40:00Z",
+      "data": {},
+      "ip": "203.0.113.10",
+      "kind": "downloaded",
+      "prev_hash": "4f61042ef03e7ac65db346a3b0c8975b882ee50861a4fc54314119e3db8ccd32",
+      "row_hash": "ee1b09d0c9a4020e0fced7fab5f24e85a63ac9fdaabe38af2f8c9720f5184a53",
+      "seq": 13,
+      "signer_id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+      "user_agent": "Mozilla/5.0 (Example phone)"
+    }
+  ],
+  "request": {
+    "completed_at": "2026-11-08T10:32:00Z",
+    "consent_language": "en",
+    "consent_sha256": "8f6c349857938a3e609d71af194d78076a1968e099058f8e1924e0b36cc9bbec",
+    "consent_text": "I agree to receive and sign this document electronically. I understand that typing or drawing my signature here has the same effect as signing on paper. I can ask Example Co for a paper copy at no charge by contacting help@example.com. I can decline by not signing. To open and save the signed document I need a device that can open and save a PDF file. Example Co will provide me with a signed copy.",
+    "consent_version": "bond-esign-consent/1",
+    "created_at": "2026-11-08T10:00:00Z",
+    "declined_at": null,
+    "document_bytes": 44242,
+    "document_sha256": "cc1c220f99668ccd91bef228db89aca0978f0c3c252a7c308118bab31a7865c8",
+    "expires_at": "2026-11-22T10:00:00Z",
+    "id": "6e755120-6170-4526-ba06-3f3049f5c4bf",
+    "page_count": 1,
+    "policy": {
+      "allow_drawn": true,
+      "allow_typed": true,
+      "code_max_attempts": 5,
+      "code_resend_seconds": 30,
+      "code_ttl_seconds": 600,
+      "max_pdf_bytes": 25000000,
+      "max_signature_bytes": 200000,
+      "max_signers": 10,
+      "require_email_code": false,
+      "typed_charset": "latin-1",
+      "view_event_gap_seconds": 3600
+    },
+    "sealed": false,
+    "signed_sha256": "806dea0bba761c8f17fc6e89886d9e2b7cd12e024da25235d6f7f7e718a34c35",
+    "status": "completed",
+    "subject_id": "sample-1",
+    "subject_type": "estimate",
+    "timestamped": false,
+    "title": "Sample estimate",
+    "updated_at": "2026-11-08T10:32:00Z",
+    "void_reason": null,
+    "voided_at": null
+  },
+  "schema": "bond.esign_evidence/0.1",
+  "signers": [
+    {
+      "code_attempts": 0,
+      "code_expires_at": null,
+      "code_sent_at": null,
+      "code_verified_at": null,
+      "created_at": "2026-11-08T10:00:00Z",
+      "date_placement": null,
+      "decline_reason": null,
+      "email": "pat@example.com",
+      "id": "4b1cbb25-002c-4d34-87d5-ce9c6b2881a4",
+      "ip": "203.0.113.10",
+      "key": null,
+      "method": "link",
+      "name": "Pat Example",
+      "placement": {
+        "h": 0.055,
+        "page": 1,
+        "w": 0.3,
+        "x": 0.27469,
+        "y": 0.34559
+      },
+      "position": 0,
+      "request_id": "6e755120-6170-4526-ba06-3f3049f5c4bf",
+      "role": "signer",
+      "signature_kind": "drawn",
+      "signature_png_base64": "iVBORw0KGgoAAAANSUhEUgAAARgAAABHCAYAAADcIVgaAAADNElEQVR42u3dsVLDMAyA4bgjMw/LI/RhO3eFleNKaUhsS/L3T9zRoZWUP5ITJ9sGAAAAAAAA/JO394/PR38DGEerLpfv3G/XJuXAOC6ryAUAwXSVC/kABNO1cyEZgGAOy+V+uzZrLuNiT9zYKi7y/iaXvZ9Bn9hDB7NkgTvj9hlJxRUlBLNHLs6qFtNBMF07l0f/dyD0i73YIqVgzp77HQjnxJ5kkF4wR+ViVDqXn/EkGaQVzFmdi4PgnPjvWe8SX4JZ/nKog+C82JAM0gimh1yMSv3jTzIIL5ienYsDYM6alxgTzNJ3iToArHmhuGBGycWoNCb+JEMwy3Yuin9M/MWZYGyeW7z4e8efZAhmSbkYleaOpSRT91aGi85F4RtLcaR2nuXuQi5GpRnxJ5n8UvmZr0f5u5DL2qPSq1sASAZ/dStbpCfaRe5cVnlSW5Tf6cl4+beK/Jav5gBe871K0XJAMvnE8kp+nK0WLPiov41kcncr0wWTrYAqFnzG7pFk8olluGAyFk61UUn3iFFiGSqYzAVTpdh1jxgllaGCqVAo2X9D1u9PMnnFMkQwlc/+DlLfn1gmCqZaYVRZQzLeEcvIGDYFsc46BsGTyui4NYVQc1SqJBeSySeWrcdepOoFkPnKV9X4r7536ZX9Qffbtc2q3UYu9lGJv24ltGBWS3jUUYnka0smk1hOE8yqZxObBeWAWDoLRqvqcQdyUPsy8zTBWNGPMSrJQ60YZO5WThOMoo4RC3mofcdyhdw2RZ2zuOWh9o79KnltijrfqCQPuWNTXSrbf260U9Rxi0EectyMF/2muGkdDLnEkXDFLQDeElo3j41c8oxKcpErXhUuM3cVjIKOU9RykSNuK3cruwSjoOMUtVzkG12tlT0RjIKOMyrJRb7OUr6eCEZBxylouYgpGVI5sYMRqDkFTS45ciJHB9ZgBGvOqEQusSRDLIFfW6KYjxez4p2TF5eZCaaUZMglx6NF5WSb80xeWCjcCm/xqHYbP8EsVMi2AMTNDbEYkVKPSkYjr3khGAyb+RX3vPyIPcF4ziqwWYPBToGQCwgGHhoFIMeotPqrTwEAAAAAAAAc4wu7nrXtBTi5oQAAAABJRU5ErkJggg==",
+      "signature_sha256": "a912adf2c646cca7634fbe58ab3b8079056fa9cecd25f0436174832cb4edc362",
+      "signed_at": "2026-11-08T10:06:00Z",
+      "status": "signed",
+      "token_expires_at": null,
+      "typed_name": "Pat Example",
+      "updated_at": "2026-11-08T10:06:00Z",
+      "user_agent": "Mozilla/5.0 (Example phone)",
+      "witness": null
+    },
+    {
+      "code_attempts": 0,
+      "code_expires_at": null,
+      "code_sent_at": null,
+      "code_verified_at": null,
+      "created_at": "2026-11-08T10:00:00Z",
+      "date_placement": null,
+      "decline_reason": null,
+      "email": "sam@example.com",
+      "id": "4f938908-715a-4373-bc3b-62c1a4377dbd",
+      "ip": "203.0.113.20",
+      "key": null,
+      "method": "link",
+      "name": "Sam Example",
+      "placement": null,
+      "position": 1,
+      "request_id": "6e755120-6170-4526-ba06-3f3049f5c4bf",
+      "role": "co-signer",
+      "signature_kind": "typed",
+      "signature_png_base64": null,
+      "signature_sha256": "86f3439098109e2a660883cecc7936c964e5cee13149657ed9f519ba8ce1debb",
+      "signed_at": "2026-11-08T10:31:00Z",
+      "status": "signed",
+      "token_expires_at": null,
+      "typed_name": "Sam Example",
+      "updated_at": "2026-11-08T10:31:00Z",
+      "user_agent": "Mozilla/5.0 (Example laptop)",
+      "witness": null
+    }
+  ]
+}

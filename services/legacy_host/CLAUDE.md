@@ -6,6 +6,7 @@ Role: TEST-ONLY host of an app that already exists: legacy column names, app-own
 - `rules.py`: `prepare` (blank to NULL, only owner/admin relinks, case implies client), `LegacyPermissions`.
 - `wire.py` (`legacy_item`, `legacy_error`), `bodies.py` (both request vocabularies), `routes.py` (own task routes over `service.*`), `routes_extra.py` (`/prefs`, `/shares`), `app.py`, `deps.py`.
 - `legacy_ddl.py`: the old tables as raw DDL and the `ADOPT` migration; `tests/legacy_db.py` builds a database from them.
+- `esign_seam.py` (the host's `EsignProvider` Protocol, `EsignError`, `CANNOT_VOID`, routing + service functions, `complete_envelope`, `take_back`), `esign_native.py` (`NativeProvider` over bond_esign, <150 lines), `esign_fake_vendor.py` (old vendor stand-in), `esign_models.py`, `esign_routes.py` (signing page).
 - `README.md`: trait -> test file. Fixtures: `../../fixtures/legacy_host/`.
 
 ## Commands

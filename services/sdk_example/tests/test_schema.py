@@ -6,6 +6,7 @@ import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from bond_esign import EsignEventMixin, EsignRequestMixin, EsignSignerMixin
 from bond_jobs import JobsMixin
 from bond_notify_py import NoticesMixin
 from bond_oauth.models import ConnectionsMixin
@@ -64,6 +65,14 @@ def test_tasks_table_matches_the_tasks_lib(engine):
 ])
 def test_todo_tables_match_their_libs(engine, mixin, table):
     lib_contract(mixin, table).assert_matches(engine)
+
+
+def test_esign_tables_match_their_lib(engine):
+    """The three mixins share a private Base (the signer and event tables point at the request table)."""
+    private = declarative_base()
+    for name, mixin in (("R", EsignRequestMixin), ("S", EsignSignerMixin), ("E", EsignEventMixin)):
+        type(name, (mixin, private), {})
+    schema_contract(private.metadata, tables=["esign_requests", "esign_signers", "esign_events"]).assert_matches(engine)
 
 
 def test_tasks_no_longer_carry_the_reminder_columns(engine):
@@ -162,7 +171,7 @@ def test_a_database_the_fake_app_created_is_already_at_head(app, tmp_path, monke
     config.set_main_option("script_location", str(SERVICE / "alembic"))
     command.upgrade(config, "head")  # would raise "table already exists" if the stamp were missing
     with app.state.engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0006"
+        assert MigrationContext.configure(connection).get_current_revision() == "0007"
 
 
 def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
@@ -170,7 +179,7 @@ def test_bootstrap_creates_and_stamps_an_empty_database(tmp_path):
     bootstrap_schema(engine)
     assert "users" in inspect(engine).get_table_names()
     with engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0006"
+        assert MigrationContext.configure(connection).get_current_revision() == "0007"
 
 
 def test_bootstrap_leaves_a_stale_database_alone_and_says_so(tmp_path, caplog):

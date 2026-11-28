@@ -133,6 +133,7 @@ roof-measure = { git = "https://github.com/jmcarnahan/bond-factory.git", rev = "
 | `bond_notify_py` | Python | 5 | Stored inbox: notices table, list, read, dismiss and sync handlers (the ledger, stages and sweep live in `bond_tasks_py`) |
 | `bond_push_py` | Python | 5 | Apple push sender (APNs over HTTP/2) and device tokens |
 | `bond_capture_py` | Python | 5 | Natural-language capture: parse model output into tasks and events |
+| `bond_esign` | Python | 6 | Native e-signing on the app's own page: evidence chain, signed PDF, optional seal, web panel |
 | `bond_notify` | pure Dart | 5 | Notice models, client and inbox stream |
 | `bond_notify_ui` | Flutter | 5 | Inbox and notice widgets |
 | `bond_push` | Flutter | 5 | Apple push registration plugin |

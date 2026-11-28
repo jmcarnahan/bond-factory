@@ -61,6 +61,7 @@ capture, phone alerts) is adopted in the order of `docs/migration/todo-checklist
 | `libs/bond_service_kit` | Python | FastAPI and SQLAlchemy plumbing: errors, middleware, rate limit, clock, health |
 | `libs/bond_auth_py`, `bond_signin`, `bond_oauth` | Python | token verification and sessions; direct sign-in; OAuth flows and encrypted token storage |
 | `libs/bond_jobs`, `bond_storage`, `bond_sync_py` | Python | job queue and worker; S3-compatible storage; server side of device sync |
+| `libs/bond_esign` | Python | sign a PDF on the app's own page: hash-chained evidence log, signed PDF with certificate page, optional seal, inline web panel |
 | `libs/bond_calendar` | Python | Microsoft Graph and Google calendar providers behind one protocol |
 | `libs/bond_tasks_py` | Python | tasks table, due instants, notice stages, sweep, outbox, calendar mirror |
 | `libs/bond_notify_py`, `bond_push_py`, `bond_capture_py` | Python | stored inbox; Apple push delivery; natural-language capture |
